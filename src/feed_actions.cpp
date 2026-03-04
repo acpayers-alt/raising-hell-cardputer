@@ -24,6 +24,19 @@ bool consumeOneSoulFood() {
   return true;
 }
 
+static const char* foodLabelForCurrentPet()
+{
+  const char* s = g_app.inventory.getItemLabelForType(ITEM_SOUL_FOOD);
+  return (s && *s) ? s : "Soul Food";
+}
+
+static void showNoFoodMessage()
+{
+  char buf[48];
+  snprintf(buf, sizeof(buf), "No %s!", foodLabelForCurrentPet());
+  ui_showMessage(buf);
+}
+
 int consumeSoulFoodUntilFull() {
   int used = 0;
   while (pet.hunger < 100) {
@@ -41,7 +54,7 @@ void feedUseSelected() {
       return;
     }
 
-    if (!consumeOneSoulFood()) ui_showMessage("No Soul Food!");
+    if (!consumeOneSoulFood()) showNoFoodMessage();
     else ui_showMessage("Snack time!");
     return;
   }
@@ -53,7 +66,7 @@ void feedUseSelected() {
     }
 
     int used = consumeSoulFoodUntilFull();
-    if (used <= 0) ui_showMessage("No Soul Food!");
+    if (used <= 0) showNoFoodMessage();
     else {
       String msg = "Ate x" + String(used);
       ui_showMessage(msg.c_str());
