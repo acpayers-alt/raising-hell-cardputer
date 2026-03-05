@@ -18,8 +18,8 @@
 
 #else
 
-#include <stdint.h>
 #include "esp_heap_caps.h"
+#include <stdint.h>
 
 #include "mini_games.h"
 
@@ -30,14 +30,15 @@
 #include "app_state.h" // g_app
 #include "display.h"
 #include "graphics.h"   // spr, screenW/screenH, invalidateBackgroundCache()
+#include "sdcard.h"     // g_sdReady
 #include "sound.h"      // soundFlap/soundConfirm/soundError/playBeep
 #include "ui_defs.h"    // UIState
 #include "ui_runtime.h" // requestUIRedraw()
-#include "sdcard.h"   // g_sdReady
-#include <string.h>  // strrchr
-#include <strings.h> // strcasecmp (ESP32 toolchain usually has this)
+#include <string.h>     // strrchr
+#include <strings.h>    // strcasecmp (ESP32 toolchain usually has this)
 
 #include "currency.h"
+#include "input.h"
 #include "inventory.h"     // ItemType
 #include "mg_pause_core.h" // mgPause* + MGPAUSE_* constants
 #include "mg_pause_menu.h"
@@ -45,7 +46,6 @@
 #include "pet.h"
 #include "save_manager.h"
 #include "ui_actions.h"
-#include "input.h"
 
 // -----------------------------------------------------------------------------
 // Mini-game input helpers / shared state
@@ -59,7 +59,7 @@ static bool s_showReward = false;
 static char s_rewardMsg[64] = {0};
 
 // Forward decls used by multiple mini-games / defined later in this file
-static int  rollMiniGameInfReward();
+static int rollMiniGameInfReward();
 static void exitMiniGameToReturnUi(bool beginLockout = true);
 static void mgApplyResultAndShowReward(bool won);
 static bool tryAwardWinItem_1in4(ItemType *outType);
@@ -93,21 +93,27 @@ static bool miniGameEnterOnce(const InputState &input)
   return enterOnce || input.mgSelectOnce;
 }
 
-static const char* mgItemName(ItemType t)
+static const char *mgItemName(ItemType t)
 {
   // Preferred: use inventory’s label function (old reference behavior).
   // If this doesn't compile, see fallback note below.
-  const char* nm = g_app.inventory.getItemLabelForType(t);
-  if (nm && nm[0]) return nm;
+  const char *nm = g_app.inventory.getItemLabelForType(t);
+  if (nm && nm[0])
+    return nm;
 
   // Fallback: keep something readable even if labels aren’t available.
   switch (t)
   {
-    case ITEM_SOUL_FOOD:     return "SOUL FOOD";
-    case ITEM_CURSED_RELIC:  return "CURSED RELIC";
-    case ITEM_DEMON_BONE:    return "DEMON BONE";
-    case ITEM_RITUAL_CHALK:  return "RITUAL CHALK";
-    default:                return "ITEM";
+  case ITEM_SOUL_FOOD:
+    return "SOUL FOOD";
+  case ITEM_CURSED_RELIC:
+    return "CURSED RELIC";
+  case ITEM_DEMON_BONE:
+    return "DEMON BONE";
+  case ITEM_RITUAL_CHALK:
+    return "RITUAL CHALK";
+  default:
+    return "ITEM";
   }
 }
 
@@ -162,12 +168,20 @@ static int s_fbVY = 0;
 static uint32_t s_lastStepMs = 0;
 static int s_flappyBgScrollX = 0;
 // Cache: decoded background image (assumed SCREEN_W x SCREEN_H)
-static uint16_t* s_flappyBgCache = nullptr;
-static char      s_flappyBgCachePath[128] = {0};
+static uint16_t *s_flappyBgCache = nullptr;
+static char s_flappyBgCachePath[128] = {0};
+
+// Flappy pipe sprites (8bpp, cached)
+static M5Canvas s_flappyPipeUpSpr(&M5.Display);
+static M5Canvas s_flappyPipeDownSpr(&M5.Display);
+static bool s_flappyPipeSprReady = false;
+static int s_flappyPipeW = 0;
+static int s_flappyPipeH = 0;
+static char s_flappyPipeDir[128] = {0}; // folder containing bg + spikes
 
 // Flappy background cache (8bpp to fit non-PSRAM heaps)
 static M5Canvas s_flappyBgSpr(&M5.Display);
-static bool     s_flappyBgSprReady = false;
+static bool s_flappyBgSprReady = false;
 static void freeFlappyBgCache();
 
 struct FlappyPipe
@@ -178,6 +192,25 @@ struct FlappyPipe
 };
 
 static FlappyPipe s_pipes[3];
+
+// -----------------------------------------------------------------------------
+// Flappy pipe sprites (stalagmites/stalactites)
+// -----------------------------------------------------------------------------
+// We keep this simple: read PNG dimensions once, then draw the PNGs directly.
+// (This preserves transparency and avoids maintaining a separate alpha-capable cache.)
+static bool s_flappyPipeFsSet = false;
+static int s_flappyPipeImgW = 0;
+static int s_flappyPipeImgH = 0;
+static int s_flappyPipePetType = -1;
+
+static inline void flappyEnsurePipeFileStorage()
+{
+  if (!s_flappyPipeFsSet)
+  {
+    spr.setFileStorage(SD);
+    s_flappyPipeFsSet = true;
+  }
+}
 
 static int flappyRandGapY(int h)
 {
@@ -211,6 +244,200 @@ static void flappyResetWorld(int w, int h)
   }
 }
 
+static void flappyDirFromBgPath(const char *bgPath, char *outDir, size_t outSz)
+{
+  if (!outDir || outSz == 0)
+    return;
+  outDir[0] = 0;
+
+  if (!bgPath || !bgPath[0])
+    return;
+
+  const char *lastSlash = strrchr(bgPath, '/');
+  if (!lastSlash)
+  {
+    // no slash; treat as current dir
+    strlcpy(outDir, "", outSz);
+    return;
+  }
+
+  const size_t len = (size_t)(lastSlash - bgPath + 1); // include trailing slash
+  if (len >= outSz)
+    return;
+
+  memcpy(outDir, bgPath, len);
+  outDir[len] = 0;
+}
+
+static bool sdExistsTrySlash(const char *path, const char **outUsePath)
+{
+  if (outUsePath)
+    *outUsePath = path;
+  if (!path || !path[0])
+    return false;
+
+  if (SD.exists(path))
+  {
+    if (outUsePath)
+      *outUsePath = path;
+    return true;
+  }
+
+  if (path[0] == '/')
+  {
+    const char *p2 = path + 1;
+    if (SD.exists(p2))
+    {
+      if (outUsePath)
+        *outUsePath = p2;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static void freeFlappyPipeSprites()
+{
+  if (s_flappyPipeSprReady)
+  {
+    s_flappyPipeUpSpr.deleteSprite();
+    s_flappyPipeDownSpr.deleteSprite();
+    s_flappyPipeSprReady = false;
+  }
+  s_flappyPipeW = 0;
+  s_flappyPipeH = 0;
+  s_flappyPipeDir[0] = 0;
+}
+
+static bool flappyReadPngDimsTrySlash(const char *path, int *outW, int *outH, const char **outUsePath)
+{
+  if (outW)
+    *outW = 0;
+  if (outH)
+    *outH = 0;
+  if (outUsePath)
+    *outUsePath = nullptr;
+
+  if (!g_sdReady || !path || !path[0])
+    return false;
+
+  const char *usePath = path;
+  if (!sdExistsTrySlash(path, &usePath))
+    return false;
+
+  File f = SD.open(usePath, "r");
+  if (!f)
+    return false;
+
+  // PNG signature (8) + IHDR chunk header (8) + width/height (8) = 24 bytes
+  uint8_t b[24];
+  const int n = f.read(b, sizeof(b));
+  f.close();
+  if (n != (int)sizeof(b))
+    return false;
+
+  static const uint8_t sig[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+  if (memcmp(b, sig, 8) != 0)
+    return false;
+
+  // Expect "IHDR" at bytes 12..15
+  if (!(b[12] == 'I' && b[13] == 'H' && b[14] == 'D' && b[15] == 'R'))
+    return false;
+
+  const int w = (int)((uint32_t)b[16] << 24 | (uint32_t)b[17] << 16 | (uint32_t)b[18] << 8 | (uint32_t)b[19]);
+  const int h = (int)((uint32_t)b[20] << 24 | (uint32_t)b[21] << 16 | (uint32_t)b[22] << 8 | (uint32_t)b[23]);
+
+  if (w <= 0 || h <= 0)
+    return false;
+
+  if (outW)
+    *outW = w;
+  if (outH)
+    *outH = h;
+  if (outUsePath)
+    *outUsePath = usePath;
+  return true;
+}
+
+static const uint16_t kPipeKey = TFT_MAGENTA;
+static bool ensureFlappyPipeSprites(const char *bgPath)
+{
+  if (!bgPath || !bgPath[0])
+    return false;
+  if (!g_sdReady)
+    return false;
+
+  char dir[128];
+  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
+  if (!dir[0])
+    return false;
+
+  // If already loaded for this folder, we're good.
+  if (s_flappyPipeSprReady && s_flappyPipeDir[0] && strcmp(s_flappyPipeDir, dir) == 0)
+    return true;
+
+  // Build spike paths (same folder as bg image)
+  char upPath[192];
+  char downPath[192];
+  snprintf(upPath, sizeof(upPath), "%srock_spike_up.png", dir);
+  snprintf(downPath, sizeof(downPath), "%srock_spike_down.png", dir);
+
+  const char *useUp = upPath;
+  const char *useDown = downPath;
+
+  if (!sdExistsTrySlash(upPath, &useUp))
+    return false;
+  if (!sdExistsTrySlash(downPath, &useDown))
+    return false;
+
+  // Reload
+  freeFlappyPipeSprites();
+
+  // Read PNG sizes so our sprites are big enough (prevents drawPngFile() failing)
+  const char *useUpPath = nullptr;
+  const char *useDnPath = nullptr;
+  int upW = 0, upH = 0;
+  int dnW = 0, dnH = 0;
+
+  if (!flappyReadPngDimsTrySlash(upPath, &upW, &upH, &useUpPath))
+    return false;
+  if (!flappyReadPngDimsTrySlash(downPath, &dnW, &dnH, &useDnPath))
+    return false;
+
+  const int w = (upW > dnW) ? upW : dnW;
+  const int h = (upH > dnH) ? upH : dnH;
+
+  s_flappyPipeUpSpr.setColorDepth(8);
+  s_flappyPipeDownSpr.setColorDepth(8);
+
+  if (!s_flappyPipeUpSpr.createSprite(w, h))
+    return false;
+  if (!s_flappyPipeDownSpr.createSprite(w, h))
+  {
+    s_flappyPipeUpSpr.deleteSprite();
+    return false;
+  }
+
+  s_flappyPipeUpSpr.fillSprite(kPipeKey);
+  s_flappyPipeDownSpr.fillSprite(kPipeKey);
+
+  const bool okUp = s_flappyPipeUpSpr.drawPngFile(SD, useUpPath, 0, 0);
+  const bool okDn = s_flappyPipeDownSpr.drawPngFile(SD, useDnPath, 0, 0);
+
+  if (!okUp || !okDn)
+  {
+    freeFlappyPipeSprites();
+    return false;
+  }
+
+  s_flappyPipeW = w;
+  s_flappyPipeH = h;
+  strlcpy(s_flappyPipeDir, dir, sizeof(s_flappyPipeDir));
+  s_flappyPipeSprReady = true;
+  return true;
+}
+
 void startFlappyFireball()
 {
   mgPauseReset();
@@ -241,14 +468,22 @@ void startFlappyFireball()
   miniGameSetReturnUi(retUi);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
+  const int gW = (screenW > 0) ? screenW : 240;
+  const int gH = (screenH > 0) ? screenH : 135;
+
+  s_flappyInited = true;
+  flappyResetWorld(gW, gH); // <-- initializes s_pipes[] + sets s_flappyStartMs
+  s_lastStepMs = millis();
+
   s_flappyInited = false;
   s_lastStepMs = millis();
 
   s_flappyBgScrollX = 0;
   freeFlappyBgCache();
 
+  freeFlappyPipeSprites();
+
   invalidateBackgroundCache();
-  s_flappyStartMs = millis();
   requestUIRedraw();
   clearInputLatch();
   mgBeginInputLockout(220);
@@ -477,11 +712,13 @@ void updateFlappyFireball(const InputState &input)
 
   const uint32_t stepMs = 16;
 
-  if ((int32_t)(now - s_lastStepMs) >= 0)
+  if ((int32_t)(now - s_lastStepMs) >= (int32_t)stepMs)
   {
     bool flapUsed = false;
+    int steps = 0;
+    const int kMaxStepsPerFrame = 5;
 
-    while ((int32_t)(now - s_lastStepMs) >= 0)
+    while ((int32_t)(now - s_lastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
     {
       const bool flapThisStep = (flap && !flapUsed);
       flappyStep(gW, gH, flapThisStep);
@@ -489,9 +726,15 @@ void updateFlappyFireball(const InputState &input)
         flapUsed = true;
 
       s_lastStepMs += stepMs;
+      steps++;
+
       if (g_app.gameOver)
         break;
     }
+
+    // If we fell WAY behind (SD hitch), snap forward so we don't "fast-forward death".
+    if ((int32_t)(now - s_lastStepMs) >= (int32_t)stepMs)
+      s_lastStepMs = now;
   }
 }
 
@@ -504,17 +747,14 @@ static void drawRewardModal(int gW, int gH)
   // BIG WIN / LOSE HEADER
   // ---------------------------------------------------------
   spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
-  spr.drawCentreString(
-      playerWon ? "YOU WIN!" : "YOU LOSE!",
-      gW / 2,
-      gH / 2 - 36,
-      4   // big font
+  spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU LOSE!", gW / 2, gH / 2 - 36,
+                       4 // big font
   );
 
   // ---------------------------------------------------------
   // Reward body text (supports 1 or 2 lines)
   // ---------------------------------------------------------
-  const char* nl = strchr(s_rewardMsg, '\n');
+  const char *nl = strchr(s_rewardMsg, '\n');
 
   if (nl)
   {
@@ -548,11 +788,11 @@ static void drawRewardModal(int gW, int gH)
 // -----------------------------------------------------------------------------
 // Flappy scrolling background (cached RGB565 + per-pet theme)
 // -----------------------------------------------------------------------------
-static const char* flappyBgPathForPet()
+static const char *flappyBgPathForPet()
 {
   switch (pet.type)
   {
-    case PET_ELDRITCH:
+  case PET_ELDRITCH:
     return "/raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.jpg";
   case PET_DEVIL:
   default:
@@ -583,9 +823,10 @@ static void freeFlappyBgCache()
 
 static bool s_flappyBgCacheDisabled = false;
 
-static bool ensureFlappyBgCache(const char* path)
+static bool ensureFlappyBgCache(const char *path)
 {
-  if (!path || !path[0]) return false;
+  if (!path || !path[0])
+    return false;
 
   // already cached for this path?
   if (s_flappyBgSprReady && s_flappyBgCachePath[0] && strcmp(s_flappyBgCachePath, path) == 0)
@@ -593,7 +834,8 @@ static bool ensureFlappyBgCache(const char* path)
 
   const int w = (int)spr.width();
   const int h = (int)spr.height();
-  if (w <= 0 || h <= 0) return false;
+  if (w <= 0 || h <= 0)
+    return false;
 
   if (!g_sdReady)
   {
@@ -603,20 +845,24 @@ static bool ensureFlappyBgCache(const char* path)
 
   // detect png vs jpg
   bool isPng = false;
-  if (const char* ext = strrchr(path, '.'))
+  if (const char *ext = strrchr(path, '.'))
   {
     isPng = (strcasecmp(ext, ".png") == 0);
   }
 
   // Try both with and without leading slash
-  const char* usePath = path;
+  const char *usePath = path;
   bool exists = SD.exists(usePath);
-  if (!exists && usePath[0] == '/') { usePath = usePath + 1; exists = SD.exists(usePath); }
+  if (!exists && usePath[0] == '/')
+  {
+    usePath = usePath + 1;
+    exists = SD.exists(usePath);
+  }
 
-  Serial.printf("[FLAPPY] bg path='%s' try='%s' exists=%d isPng=%d\n",
-                path, usePath, (int)exists, (int)isPng);
+  Serial.printf("[FLAPPY] bg path='%s' try='%s' exists=%d isPng=%d\n", path, usePath, (int)exists, (int)isPng);
 
-  if (!exists) return false;
+  if (!exists)
+    return false;
 
   // (Re)create an 8bpp cache sprite if needed (fits heap without PSRAM)
   if (!s_flappyBgSprReady || s_flappyBgW != w || s_flappyBgH != h)
@@ -627,10 +873,8 @@ static bool ensureFlappyBgCache(const char* path)
     s_flappyBgSpr.setColorDepth(8);
     if (!s_flappyBgSpr.createSprite(w, h))
     {
-      Serial.printf("[FLAPPY] bg cache sprite create FAIL w=%d h=%d free=%u largest=%u\n",
-                    w, h,
-                    (unsigned)ESP.getFreeHeap(),
-                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      Serial.printf("[FLAPPY] bg cache sprite create FAIL w=%d h=%d free=%u largest=%u\n", w, h,
+                    (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       return false;
     }
 
@@ -642,11 +886,14 @@ static bool ensureFlappyBgCache(const char* path)
   s_flappyBgSpr.fillSprite(TFT_BLACK);
 
   bool ok = false;
-  if (isPng) ok = s_flappyBgSpr.drawPngFile(SD, usePath, 0, 0);
-  else       ok = s_flappyBgSpr.drawJpgFile(SD, usePath, 0, 0);
+  if (isPng)
+    ok = s_flappyBgSpr.drawPngFile(SD, usePath, 0, 0);
+  else
+    ok = s_flappyBgSpr.drawJpgFile(SD, usePath, 0, 0);
 
   Serial.printf("[FLAPPY] bg cache draw -> %s\n", ok ? "OK" : "FAIL");
-  if (!ok) return false;
+  if (!ok)
+    return false;
 
   strncpy(s_flappyBgCachePath, path, sizeof(s_flappyBgCachePath) - 1);
   s_flappyBgCachePath[sizeof(s_flappyBgCachePath) - 1] = 0;
@@ -662,15 +909,20 @@ static void drawFlappyScrollingBg(int scrollX)
     return;
   }
 
-const int w = s_flappyBgW;
-const int h = s_flappyBgH;
-if (w <= 0 || h <= 0) { spr.fillSprite(TFT_BLACK); return; }
+  const int w = s_flappyBgW;
+  const int h = s_flappyBgH;
+  if (w <= 0 || h <= 0)
+  {
+    spr.fillSprite(TFT_BLACK);
+    return;
+  }
 
   // normalize scroll into [0..w-1]
   scrollX %= w;
-  if (scrollX < 0) scrollX += w;
+  if (scrollX < 0)
+    scrollX += w;
 
-  uint16_t* dst = (uint16_t*)spr.getBuffer();
+  uint16_t *dst = (uint16_t *)spr.getBuffer();
   if (!dst)
   {
     spr.fillSprite(TFT_BLACK);
@@ -680,15 +932,15 @@ if (w <= 0 || h <= 0) { spr.fillSprite(TFT_BLACK); return; }
   // Copy each scanline in two chunks (wrap-around).
   for (int y = 0; y < h; ++y)
   {
-    const uint16_t* srcRow = s_flappyBgCache + (size_t)y * (size_t)w;
-    uint16_t* dstRow       = dst + (size_t)y * (size_t)w;
+    const uint16_t *srcRow = s_flappyBgCache + (size_t)y * (size_t)w;
+    uint16_t *dstRow = dst + (size_t)y * (size_t)w;
 
-    const int leftW  = w - scrollX;
+    const int leftW = w - scrollX;
     const int rightW = scrollX;
 
-    memcpy(dstRow,            srcRow + scrollX, (size_t)leftW  * sizeof(uint16_t));
+    memcpy(dstRow, srcRow + scrollX, (size_t)leftW * sizeof(uint16_t));
     if (rightW > 0)
-      memcpy(dstRow + leftW,  srcRow,           (size_t)rightW * sizeof(uint16_t));
+      memcpy(dstRow + leftW, srcRow, (size_t)rightW * sizeof(uint16_t));
   }
 }
 
@@ -697,7 +949,7 @@ void drawFlappyFireball()
   const int gW = (int)spr.width();
   const int gH = (int)spr.height();
 
-  const char* bgPath = flappyBgPathForPet();
+  const char *bgPath = flappyBgPathForPet();
 
   bool drewBg = false;
 
@@ -708,7 +960,8 @@ void drawFlappyFireball()
     {
       // Wrap scroll into [0, bw)
       int x = -(s_flappyBgScrollX % bw);
-      if (x > 0) x -= bw;
+      if (x > 0)
+        x -= bw;
 
       s_flappyBgSpr.pushSprite(&spr, x, 0);
       s_flappyBgSpr.pushSprite(&spr, x + bw, 0);
@@ -738,26 +991,43 @@ void drawFlappyFireball()
     return;
   }
 
+  const int gapH = 64;
+
+  const bool havePipes = ensureFlappyPipeSprites(bgPath);
+
   const int pipeW = 26;
-  const int gapH  = 64;
 
   for (int i = 0; i < 3; ++i)
   {
-    const int x      = s_pipes[i].x;
+    const int x = s_pipes[i].x;
     const int gapTop = s_pipes[i].gapY - gapH / 2;
     const int gapBot = s_pipes[i].gapY + gapH / 2;
 
-    spr.fillRect(x, 0, pipeW, gapTop, TFT_DARKGREY);
-    spr.fillRect(x, gapBot, pipeW, gH - gapBot, TFT_DARKGREY);
+    if (havePipes && s_flappyPipeSprReady)
+    {
+      const int drawX = x + (pipeW - s_flappyPipeW) / 2;
+
+      // stalactite (top)
+      s_flappyPipeDownSpr.pushSprite(&spr, drawX, gapTop - s_flappyPipeH, kPipeKey);
+      
+      // stalagmite (bottom)
+      s_flappyPipeUpSpr.pushSprite(&spr, drawX, gapBot, kPipeKey);
+    }
+    else
+    {
+      // fallback pipes
+      spr.fillRect(x, 0, pipeW, gapTop, TFT_DARKGREY);
+      spr.fillRect(x, gapBot, pipeW, gH - gapBot, TFT_DARKGREY);
+    }
   }
 
   spr.fillCircle(s_fbX, s_fbY, 5, TFT_ORANGE);
   spr.drawCircle(s_fbX, s_fbY, 5, TFT_RED);
 
   {
-    const uint32_t now     = millis();
+    const uint32_t now = millis();
     const uint32_t aliveMs = flappyAliveMsNow(now);
-    const uint32_t winMs   = s_flappyWinMs;
+    const uint32_t winMs = s_flappyWinMs;
 
     const int barW = gW - 20;
     const int barX = 10;
@@ -767,8 +1037,10 @@ void drawFlappyFireball()
     spr.drawRect(barX, barY, barW, barH, TFT_DARKGREY);
 
     int fill = (int)((aliveMs * (uint32_t)(barW - 2)) / winMs);
-    if (fill < 0) fill = 0;
-    if (fill > barW - 2) fill = barW - 2;
+    if (fill < 0)
+      fill = 0;
+    if (fill > barW - 2)
+      fill = barW - 2;
 
     spr.fillRect(barX + 1, barY + 1, fill, barH - 2, TFT_YELLOW);
   }
@@ -832,23 +1104,13 @@ static void mgApplyResultAndShowReward(bool won)
 
     if (wonItem)
     {
-      const char* nm = mgItemName(rewardType);
-      snprintf(
-        s_rewardMsg,
-        sizeof(s_rewardMsg),
-        "You win! XP +25  INF +%d  MOOD +20\nRandom Reward: %s +1",
-        infReward,
-        (nm && nm[0]) ? nm : "ITEM"
-      );
+      const char *nm = mgItemName(rewardType);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +25  INF +%d  MOOD +20\nRandom Reward: %s +1", infReward,
+               (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(
-        s_rewardMsg,
-        sizeof(s_rewardMsg),
-        "You win! XP +25  INF +%d  MOOD +20",
-        infReward
-      );
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +25  INF +%d  MOOD +20", infReward);
     }
   }
   else
@@ -856,11 +1118,7 @@ static void mgApplyResultAndShowReward(bool won)
     pet.addXP(5);
     pet.happiness = constrain(pet.happiness + 10, 0, 100);
 
-    snprintf(
-      s_rewardMsg,
-      sizeof(s_rewardMsg),
-      "You lose! XP +5  MOOD +10"
-    );
+    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5  MOOD +10");
   }
 
   saveManagerMarkDirty();
@@ -892,9 +1150,9 @@ void miniGameExitToReturnUi(bool beginLockout)
 
   // Now tear down the mini-game
   g_app.inMiniGame = false;
-  g_app.gameOver   = false;
-  playerWon        = false;
-  currentMiniGame  = MiniGame::NONE;
+  g_app.gameOver = false;
+  playerWon = false;
+  currentMiniGame = MiniGame::NONE;
 
   mgPauseReset();
   clearInputLatch();
@@ -1800,7 +2058,8 @@ static inline uint32_t dodgerAliveMsNow(uint32_t now)
   return elapsed;
 }
 
-void startInfernalDodger() {
+void startInfernalDodger()
+{
   inputSetTextCapture(false);
   mgPauseReset();
 
@@ -2018,8 +2277,10 @@ void drawInfernalDodger()
     spr.drawRect(barX, barY, barW, 6, TFT_DARKGREY);
 
     int fill = (int)((aliveMs * (uint32_t)(barW - 2)) / kWinMs);
-    if (fill < 0) fill = 0;
-    if (fill > barW - 2) fill = barW - 2;
+    if (fill < 0)
+      fill = 0;
+    if (fill > barW - 2)
+      fill = barW - 2;
 
     spr.fillRect(barX + 1, barY + 1, fill, 4, TFT_YELLOW);
   }
@@ -2046,7 +2307,8 @@ void drawInfernalDodger()
   // Gameplay
   for (auto &b : s_dodgerBalls)
   {
-    if (!b.active) continue;
+    if (!b.active)
+      continue;
     spr.fillCircle(b.x, b.y, b.r, TFT_ORANGE);
     spr.drawCircle(b.x, b.y, b.r, TFT_RED);
   }
