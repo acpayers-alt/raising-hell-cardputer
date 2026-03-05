@@ -148,9 +148,15 @@ static bool mgAcceptArmedNow(uint32_t now)
 }
 
 // -----------------------------------------------------------------------------
-// FLAPPY FIREBALL (Flappy Bird clone)
+// FLAPPY FIREBALL GLOBALS (Flappy Bird clone)
 // -----------------------------------------------------------------------------
-
+static M5Canvas s_flappyFireballSpr[3];
+static bool     s_flappyFireballReady = false;
+static char     s_flappyFireballDir[128] = {0};
+static const uint16_t kFireKey = TFT_MAGENTA;
+static const char* flappyBgPathForPet();
+static int s_flappyFireballW = 0;
+static int s_flappyFireballH = 0;
 static bool s_flappyInited = false;
 static bool s_flappyPlaying = false;
 static bool s_flappyCrashed = false;
@@ -191,13 +197,46 @@ struct FlappyPipe
   bool passed;
 };
 
-static FlappyPipe s_pipes[3];
+// -----------------------------------------------------------------------------
+// Flappy fireball sprite (3-frame PNG animation) - cached per flappy folder
+// -----------------------------------------------------------------------------
+static void freeFlappyFireballSprites()
+{
+  for (int i = 0; i < 3; ++i) s_flappyFireballSpr[i].deleteSprite();
+  s_flappyFireballReady = false;
+  s_flappyFireballDir[0] = 0;
+  s_flappyFireballW = 0;
+  s_flappyFireballH = 0;
+}
+
+static bool flappyDirFromPath(const char* path, char* out, size_t outSz)
+{
+  if (!path || !path[0] || !out || outSz == 0) return false;
+  const char* last = strrchr(path, '/');
+  if (!last) return false;
+
+  const size_t len = (size_t)(last - path) + 1; // include trailing '/'
+  if (len >= outSz) return false;
+
+  memcpy(out, path, len);
+  out[len] = 0;
+  return true;
+}
+
+static bool sdExistsTrySlashLocal(const char* path, const char** outUse)
+{
+  if (!path || !path[0]) return false;
+  if (SD.exists(path)) { if (outUse) *outUse = path; return true; }
+  if (path[0] == '/' && SD.exists(path + 1)) { if (outUse) *outUse = path + 1; return true; }
+  return false;
+}
 
 // -----------------------------------------------------------------------------
 // Flappy pipe sprites (stalagmites/stalactites)
 // -----------------------------------------------------------------------------
 // We keep this simple: read PNG dimensions once, then draw the PNGs directly.
 // (This preserves transparency and avoids maintaining a separate alpha-capable cache.)
+static FlappyPipe s_pipes[3];
 static bool s_flappyPipeFsSet = false;
 static int s_flappyPipeImgW = 0;
 static int s_flappyPipeImgH = 0;
@@ -360,6 +399,69 @@ static bool flappyReadPngDimsTrySlash(const char *path, int *outW, int *outH, co
   return true;
 }
 
+static bool ensureFlappyFireballSprites(const char* bgPath)
+{
+  if (!bgPath || !bgPath[0]) return false;
+  if (!g_sdReady) return false;
+
+  char dir[128];
+  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
+  if (!dir[0]) return false;
+
+  // Already loaded for this folder?
+  if (s_flappyFireballReady && s_flappyFireballDir[0] && strcmp(s_flappyFireballDir, dir) == 0)
+    return true;
+
+  freeFlappyFireballSprites();
+
+  char path[192];
+
+  for (int i = 0; i < 3; ++i)
+  {
+    snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
+
+    const char* usePath = path;
+    if (!sdExistsTrySlash(path, &usePath))
+    {
+      freeFlappyFireballSprites();
+      return false;
+    }
+
+    int w = 0, h = 0;
+    const char* pngUse = nullptr;
+
+    if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
+    {
+      freeFlappyFireballSprites();
+      return false;
+    }
+
+    s_flappyFireballSpr[i].setColorDepth(8);
+
+    if (!s_flappyFireballSpr[i].createSprite(w, h))
+    {
+      freeFlappyFireballSprites();
+      return false;
+    }
+
+    // Fill with colorkey so pushSprite(..., kFireballKey) works
+    s_flappyFireballSpr[i].fillSprite(kFireKey);
+
+    if (!s_flappyFireballSpr[i].drawPngFile(SD, pngUse, 0, 0))
+    {
+      freeFlappyFireballSprites();
+      return false;
+    }
+  }
+
+  s_flappyFireballW = (int)s_flappyFireballSpr[0].width();
+  s_flappyFireballH = (int)s_flappyFireballSpr[0].height();
+
+  strlcpy(s_flappyFireballDir, dir, sizeof(s_flappyFireballDir));
+  s_flappyFireballReady = true;
+  return true;
+}
+
 static const uint16_t kPipeKey = TFT_MAGENTA;
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
@@ -400,10 +502,9 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
   int upW = 0, upH = 0;
   int dnW = 0, dnH = 0;
 
-  if (!flappyReadPngDimsTrySlash(upPath, &upW, &upH, &useUpPath))
-    return false;
-  if (!flappyReadPngDimsTrySlash(downPath, &dnW, &dnH, &useDnPath))
-    return false;
+  // Read actual PNG dimensions (handles leading slash variants via outUsePath)
+  if (!flappyReadPngDimsTrySlash(useUp, &upW, &upH, &useUpPath)) return false;
+  if (!flappyReadPngDimsTrySlash(useDown, &dnW, &dnH, &useDnPath)) return false;
 
   const int w = (upW > dnW) ? upW : dnW;
   const int h = (upH > dnH) ? upH : dnH;
@@ -482,6 +583,7 @@ void startFlappyFireball()
   freeFlappyBgCache();
 
   freeFlappyPipeSprites();
+  ensureFlappyFireballSprites(flappyBgPathForPet());
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -903,7 +1005,7 @@ static bool ensureFlappyBgCache(const char *path)
 static void drawFlappyScrollingBg(int scrollX)
 {
   // If cache missing, fall back to black.
-  if (!s_flappyBgCache)
+  if (!s_flappyBgSprReady)
   {
     spr.fillSprite(TFT_BLACK);
     return;
@@ -950,6 +1052,7 @@ void drawFlappyFireball()
   const int gH = (int)spr.height();
 
   const char *bgPath = flappyBgPathForPet();
+  const bool haveFireball = ensureFlappyFireballSprites(bgPath);
 
   bool drewBg = false;
 
@@ -1021,8 +1124,24 @@ void drawFlappyFireball()
     }
   }
 
+if (haveFireball && s_flappyFireballReady){
+  const int frame = (millis() / 80) % 3;
+
+  const int w = s_flappyFireballSpr[frame].width();
+  const int h = s_flappyFireballSpr[frame].height();
+
+  const int drawX = s_fbX - w / 2;
+  const int drawY = s_fbY - h / 2;
+
+  // subtle glow behind fireball
+  spr.fillCircle(s_fbX, s_fbY, 6, TFT_RED);
+
+  s_flappyFireballSpr[frame].pushSprite(&spr, drawX, drawY, kFireKey);
+}
+else
+{
   spr.fillCircle(s_fbX, s_fbY, 5, TFT_ORANGE);
-  spr.drawCircle(s_fbX, s_fbY, 5, TFT_RED);
+}
 
   {
     const uint32_t now = millis();
@@ -2309,8 +2428,14 @@ void drawInfernalDodger()
   {
     if (!b.active)
       continue;
-    spr.fillCircle(b.x, b.y, b.r, TFT_ORANGE);
-    spr.drawCircle(b.x, b.y, b.r, TFT_RED);
+  
+    // If you have real sprites for dodger balls later, hook them here.
+    // For now: simple hazard dot per ball.
+    const int bx = (int)b.x;
+    const int by = (int)b.y;
+  
+    spr.fillCircle(bx, by, 4, TFT_ORANGE);
+    spr.drawCircle(bx, by, 4, TFT_RED);
   }
 
   spr.fillCircle(s_dodgerPx, s_dodgerPy, 6, TFT_GREEN);
