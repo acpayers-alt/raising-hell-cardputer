@@ -19,10 +19,13 @@
 #else
 
 #include <stdint.h>
+#include "esp_heap_caps.h"
 
 #include "mini_games.h"
 
 #include <Arduino.h>
+#include <FS.h>
+#include <SD.h>
 
 #include "app_state.h" // g_app
 #include "display.h"
@@ -30,6 +33,9 @@
 #include "sound.h"      // soundFlap/soundConfirm/soundError/playBeep
 #include "ui_defs.h"    // UIState
 #include "ui_runtime.h" // requestUIRedraw()
+#include "sdcard.h"   // g_sdReady
+#include <string.h>  // strrchr
+#include <strings.h> // strcasecmp (ESP32 toolchain usually has this)
 
 #include "currency.h"
 #include "inventory.h"     // ItemType
@@ -152,6 +158,7 @@ static int s_fbX = 0;
 static int s_fbY = 0;
 static int s_fbVY = 0;
 static uint32_t s_lastStepMs = 0;
+static int s_flappyBgScrollX = 0;
 
 struct FlappyPipe
 {
@@ -194,6 +201,8 @@ static void flappyResetWorld(int w, int h)
   }
 }
 
+static void freeFlappyBgCache();
+
 void startFlappyFireball()
 {
   mgPauseReset();
@@ -226,6 +235,9 @@ void startFlappyFireball()
 
   s_flappyInited = false;
   s_lastStepMs = millis();
+
+  s_flappyBgScrollX = 0;
+  freeFlappyBgCache();
 
   invalidateBackgroundCache();
   s_flappyStartMs = millis();
@@ -276,6 +288,7 @@ static void flappyStep(int w, int h, bool flap)
 {
   const int pipeW = 26;
   const int speedX = 1;
+  s_flappyBgScrollX += speedX;
   const int fbR = 4;
 
   const int gravity = 1;
@@ -524,12 +537,156 @@ static void drawRewardModal(int gW, int gH)
   spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 40, 2);
 }
 
+// -----------------------------------------------------------------------------
+// Flappy scrolling background (cached RGB565 + per-pet theme)
+// -----------------------------------------------------------------------------
+static const char* flappyBgPathForPet()
+{
+  switch (pet.type)
+  {
+    case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.png";
+  }
+}
+
+// Cache: decoded background image (assumed SCREEN_W x SCREEN_H)
+static uint16_t* s_flappyBgCache = nullptr;
+static char      s_flappyBgCachePath[128] = {0};
+
+static void freeFlappyBgCache()
+{
+  if (s_flappyBgCache)
+  {
+    free(s_flappyBgCache);
+    s_flappyBgCache = nullptr;
+  }
+  s_flappyBgCachePath[0] = 0;
+}
+
+static bool ensureFlappyBgCache(const char* path)
+{
+  if (!path || !path[0]) return false;
+
+  // already cached for this path?
+  if (s_flappyBgCache && s_flappyBgCachePath[0] && strcmp(s_flappyBgCachePath, path) == 0)
+    return true;
+
+  freeFlappyBgCache();
+
+  const size_t pxCount  = (size_t)screenW * (size_t)screenH;
+  const size_t bufBytes = pxCount * sizeof(uint16_t);
+
+  s_flappyBgCache = (uint16_t*)heap_caps_malloc(bufBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);  if (!s_flappyBgCache)
+  {
+    Serial.println("[FLAPPY] bg cache malloc FAIL");
+    return false;
+  }
+
+  // detect png vs jpg
+  bool isPng = false;
+  if (const char* ext = strrchr(path, '.'))
+  {
+    isPng = (strcasecmp(ext, ".png") == 0);
+  }
+
+  spr.fillSprite(TFT_BLACK);
+
+  if (!g_sdReady)
+  {
+    Serial.println("[FLAPPY] SD not ready (g_sdReady=false)");
+    freeFlappyBgCache();
+    return false;
+  }
+
+  // Try both with and without leading slash
+  const char* usePath = path;
+  bool exists = SD.exists(usePath);
+  if (!exists && usePath[0] == '/') { usePath = usePath + 1; exists = SD.exists(usePath); }
+
+  Serial.printf("[FLAPPY] bg path='%s' try='%s' exists=%d isPng=%d\n",
+                path, usePath, (int)exists, (int)isPng);
+
+  bool ok = false;
+  if (exists)
+  {
+    if (isPng) ok = sprDrawPngFromSD(usePath, 0, 0);
+    else       ok = sprDrawJpgFromSD(usePath, 0, 0);
+  }
+
+  Serial.printf("[FLAPPY] bg draw -> %s\n", ok ? "OK" : "FAIL");
+
+  uint16_t* sprBuf = (uint16_t*)spr.getBuffer();
+  if (!ok || !sprBuf)
+  {
+    Serial.printf("[FLAPPY] bg cache abort ok=%d sprBuf=%p\n", (int)ok, (void*)sprBuf);
+    freeFlappyBgCache();
+    return false;
+  }
+
+  memcpy(s_flappyBgCache, sprBuf, bufBytes);
+
+  strncpy(s_flappyBgCachePath, path, sizeof(s_flappyBgCachePath) - 1);
+  s_flappyBgCachePath[sizeof(s_flappyBgCachePath) - 1] = 0;
+  return true;
+}
+
+static void drawFlappyScrollingBg(int scrollX)
+{
+  // If cache missing, fall back to black.
+  if (!s_flappyBgCache)
+  {
+    spr.fillSprite(TFT_BLACK);
+    return;
+  }
+
+  const int w = screenW;
+  const int h = screenH;
+
+  // normalize scroll into [0..w-1]
+  scrollX %= w;
+  if (scrollX < 0) scrollX += w;
+
+  uint16_t* dst = (uint16_t*)spr.getBuffer();
+  if (!dst)
+  {
+    spr.fillSprite(TFT_BLACK);
+    return;
+  }
+
+  // Copy each scanline in two chunks (wrap-around).
+  for (int y = 0; y < h; ++y)
+  {
+    const uint16_t* srcRow = s_flappyBgCache + (size_t)y * (size_t)w;
+    uint16_t* dstRow       = dst + (size_t)y * (size_t)w;
+
+    const int leftW  = w - scrollX;
+    const int rightW = scrollX;
+
+    memcpy(dstRow,            srcRow + scrollX, (size_t)leftW  * sizeof(uint16_t));
+    if (rightW > 0)
+      memcpy(dstRow + leftW,  srcRow,           (size_t)rightW * sizeof(uint16_t));
+  }
+}
+
 void drawFlappyFireball()
 {
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
-  spr.fillSprite(TFT_BLACK);
+  const char* bgPath = flappyBgPathForPet();
+
+  if (g_sdReady && bgPath && bgPath[0])
+  {
+    sprDrawPngFromSD(bgPath, -s_flappyBgScrollX, 0);
+    sprDrawPngFromSD(bgPath, -s_flappyBgScrollX + screenW, 0);
+  }
+  else
+  {
+    spr.fillSprite(TFT_BLACK);
+  }
 
   if (s_showReward)
   {

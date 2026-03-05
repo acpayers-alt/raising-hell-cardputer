@@ -11,6 +11,7 @@
 #include <SD.h>
 #include "esp_system.h"
 #include "esp_log.h"
+#include <esp_heap_caps.h>
 
 #include "motion.h"
 #include "ui_runtime.h"
@@ -54,8 +55,39 @@
 
 void updateBattery();
 
+static void serialBootHandshake(uint32_t waitMs)
+{
+  // CDC can take a moment; don't hang forever (battery / no host).
+  Serial.setTxTimeoutMs(10);
+
+  const uint32_t t0 = millis();
+  while (!Serial && (millis() - t0) < waitMs) {
+    delay(10);
+  }
+
+  // If the port opens slightly later, spam a short banner so you still catch it.
+  // (Harmless if no host; writes are dropped.)
+  const uint32_t t1 = millis();
+  while ((millis() - t1) < 300) {
+    Serial.println("[BOOT] serial up");
+    delay(30);
+  }
+}
+
 void appSetup() {
   Serial.begin(115200);
+
+  // Give USB stack a moment, then do a bounded handshake.
+  delay(50);
+  serialBootHandshake(2500);
+
+  Serial.printf("[PSRAM] size=%u free=%u\n",
+    (unsigned)ESP.getPsramSize(),
+    (unsigned)ESP.getFreePsram());
+
+  Serial.printf("[HEAP] free=%u largest=%u\n",
+    (unsigned)ESP.getFreeHeap(),
+    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   // DO NOT use 0 here; on some ESP32 CDC builds this can cause "no output ever".
   // Keep it small so we still don't block hard when host isn't ready.

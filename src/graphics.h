@@ -39,6 +39,9 @@ void sleepBgNotifyScreenWake();
 
 void sleepBgKickNow();
 
+bool sprDrawPngFromSD(const char* path, int x, int y);
+bool sprDrawJpgFromSD(const char* path, int x, int y);
+
 // -----------------------------------------------------------------------------
 // RAW streaming helpers for sprites/icons
 // -----------------------------------------------------------------------------

@@ -82,8 +82,10 @@ static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static void drawCrackedEggBig(int cx, int cy);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
-static bool sprDrawJpgFromSD(const char *path, int x, int y);
-static bool sprDrawPngFromSD(const char *path, int x, int y);
+bool sprDrawJpgFromSD(const char *path, int x, int y);
+bool sprDrawPngFromSD(const char *path, int x, int y);
+bool canvasDrawPngFromSD(m5gfx::M5Canvas& canvas, const char* path, int x, int y);
+bool canvasDrawJpgFromSD(m5gfx::M5Canvas& canvas, const char* path, int x, int y);
 
 // Provide no-arg wrappers for existing bool-signature screens
 static void drawDeathScreen();   // calls drawDeathScreen(bool)
@@ -172,30 +174,38 @@ static AnimId evoHappyClipFor(PetType type, uint8_t stage)
 // -----------------------------------------------------------------------------
 static void ensureSprFileStorage()
 {
-  static bool s_inited = false;
-  if (s_inited)
-    return;
-  s_inited = true;
-
   spr.setFileStorage(SD);
 }
 
-static bool sprDrawJpgFromSD(const char *path, int x, int y)
+bool sprDrawJpgFromSD(const char *path, int x, int y)
 {
+  if (!g_sdReady) return false;
   if (!path || !*path)
     return false;
   ensureSprFileStorage();
   return spr.drawJpgFile(path, x, y);
 }
 
-static bool sprDrawPngFromSD(const char *path, int x, int y)
+bool sprDrawPngFromSD(const char *path, int x, int y)
 {
+  if (!g_sdReady) return false;
   if (!path || !*path)
     return false;
   ensureSprFileStorage();
   return spr.drawPngFile(path, x, y);
 }
 
+bool canvasDrawPngFromSD(M5Canvas& canvas, const char* path, int x, int y)
+{
+  canvas.setFileStorage(SD);
+  return canvas.drawPngFile(path, x, y);
+}
+
+bool canvasDrawJpgFromSD(M5Canvas& canvas, const char* path, int x, int y)
+{
+  canvas.setFileStorage(SD);
+  return canvas.drawJpgFile(path, x, y);
+}
 // -----------------------------------------------------------------------------
 // LovyanGFX DataWrapper for Arduino fs::File
 // -----------------------------------------------------------------------------
@@ -3697,10 +3707,10 @@ static constexpr uint32_t DEV_ELDER_SLEEP_FRAME_MS = 200; // slightly slower fee
 static constexpr uint8_t DEV_ELDER_SLEEP_FRAME_COUNT = 4;
 
 static const char *DEV_ELDER_SLEEP_FRAMES[DEV_ELDER_SLEEP_FRAME_COUNT] = {
-    "/raising_hell/graphics/pet/anim/dev/edr/sleep/dev_el_sleepbk1.jpg",
-    "/raising_hell/graphics/pet/anim/dev/edr/sleep/dev_el_sleepbk2.jpg",
-    "/raising_hell/graphics/pet/anim/dev/edr/sleep/dev_el_sleepbk3.jpg",
-    "/raising_hell/graphics/pet/anim/dev/edr/sleep/dev_el_sleepbk4.jpg",
+    "/raising_hell/graphics/pet/anim/dev/ed/sleep/dev_el_sleepbk1.jpg",
+    "/raising_hell/graphics/pet/anim/dev/ed/sleep/dev_el_sleepbk2.jpg",
+    "/raising_hell/graphics/pet/anim/dev/ed/sleep/dev_el_sleepbk3.jpg",
+    "/raising_hell/graphics/pet/anim/dev/ed/sleep/dev_el_sleepbk4.jpg",
 };
 
 static inline bool useDevElderSleepAnim()
