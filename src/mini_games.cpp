@@ -154,11 +154,21 @@ static uint32_t s_flappyStartMs = 0;
 // Survive timer
 static const uint32_t s_flappyWinMs = kSurviveWinMs;
 
+static int s_flappyBgW = 0;
+static int s_flappyBgH = 0;
 static int s_fbX = 0;
 static int s_fbY = 0;
 static int s_fbVY = 0;
 static uint32_t s_lastStepMs = 0;
 static int s_flappyBgScrollX = 0;
+// Cache: decoded background image (assumed SCREEN_W x SCREEN_H)
+static uint16_t* s_flappyBgCache = nullptr;
+static char      s_flappyBgCachePath[128] = {0};
+
+// Flappy background cache (8bpp to fit non-PSRAM heaps)
+static M5Canvas s_flappyBgSpr(&M5.Display);
+static bool     s_flappyBgSprReady = false;
+static void freeFlappyBgCache();
 
 struct FlappyPipe
 {
@@ -200,8 +210,6 @@ static void flappyResetWorld(int w, int h)
     s_pipes[i].passed = false;
   }
 }
-
-static void freeFlappyBgCache();
 
 void startFlappyFireball()
 {
@@ -545,43 +553,51 @@ static const char* flappyBgPathForPet()
   switch (pet.type)
   {
     case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.png";
+    return "/raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.jpg";
   case PET_DEVIL:
   default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.png";
+    return "/raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.jpg";
   }
 }
 
-// Cache: decoded background image (assumed SCREEN_W x SCREEN_H)
-static uint16_t* s_flappyBgCache = nullptr;
-static char      s_flappyBgCachePath[128] = {0};
-
 static void freeFlappyBgCache()
 {
+  // If you’ve moved to sprite-cache only, keep this harmless (or delete the malloc cache entirely)
   if (s_flappyBgCache)
   {
     free(s_flappyBgCache);
     s_flappyBgCache = nullptr;
   }
+
   s_flappyBgCachePath[0] = 0;
+  s_flappyBgW = 0;
+  s_flappyBgH = 0;
+
+  // also free the sprite cache
+  if (s_flappyBgSprReady)
+  {
+    s_flappyBgSpr.deleteSprite();
+    s_flappyBgSprReady = false;
+  }
 }
+
+static bool s_flappyBgCacheDisabled = false;
 
 static bool ensureFlappyBgCache(const char* path)
 {
   if (!path || !path[0]) return false;
 
   // already cached for this path?
-  if (s_flappyBgCache && s_flappyBgCachePath[0] && strcmp(s_flappyBgCachePath, path) == 0)
+  if (s_flappyBgSprReady && s_flappyBgCachePath[0] && strcmp(s_flappyBgCachePath, path) == 0)
     return true;
 
-  freeFlappyBgCache();
+  const int w = (int)spr.width();
+  const int h = (int)spr.height();
+  if (w <= 0 || h <= 0) return false;
 
-  const size_t pxCount  = (size_t)screenW * (size_t)screenH;
-  const size_t bufBytes = pxCount * sizeof(uint16_t);
-
-  s_flappyBgCache = (uint16_t*)heap_caps_malloc(bufBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);  if (!s_flappyBgCache)
+  if (!g_sdReady)
   {
-    Serial.println("[FLAPPY] bg cache malloc FAIL");
+    Serial.println("[FLAPPY] SD not ready (g_sdReady=false)");
     return false;
   }
 
@@ -592,15 +608,6 @@ static bool ensureFlappyBgCache(const char* path)
     isPng = (strcasecmp(ext, ".png") == 0);
   }
 
-  spr.fillSprite(TFT_BLACK);
-
-  if (!g_sdReady)
-  {
-    Serial.println("[FLAPPY] SD not ready (g_sdReady=false)");
-    freeFlappyBgCache();
-    return false;
-  }
-
   // Try both with and without leading slash
   const char* usePath = path;
   bool exists = SD.exists(usePath);
@@ -609,24 +616,37 @@ static bool ensureFlappyBgCache(const char* path)
   Serial.printf("[FLAPPY] bg path='%s' try='%s' exists=%d isPng=%d\n",
                 path, usePath, (int)exists, (int)isPng);
 
+  if (!exists) return false;
+
+  // (Re)create an 8bpp cache sprite if needed (fits heap without PSRAM)
+  if (!s_flappyBgSprReady || s_flappyBgW != w || s_flappyBgH != h)
+  {
+    s_flappyBgSpr.deleteSprite();
+    s_flappyBgSprReady = false;
+
+    s_flappyBgSpr.setColorDepth(8);
+    if (!s_flappyBgSpr.createSprite(w, h))
+    {
+      Serial.printf("[FLAPPY] bg cache sprite create FAIL w=%d h=%d free=%u largest=%u\n",
+                    w, h,
+                    (unsigned)ESP.getFreeHeap(),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      return false;
+    }
+
+    s_flappyBgW = w;
+    s_flappyBgH = h;
+    s_flappyBgSprReady = true;
+  }
+
+  s_flappyBgSpr.fillSprite(TFT_BLACK);
+
   bool ok = false;
-  if (exists)
-  {
-    if (isPng) ok = sprDrawPngFromSD(usePath, 0, 0);
-    else       ok = sprDrawJpgFromSD(usePath, 0, 0);
-  }
+  if (isPng) ok = s_flappyBgSpr.drawPngFile(SD, usePath, 0, 0);
+  else       ok = s_flappyBgSpr.drawJpgFile(SD, usePath, 0, 0);
 
-  Serial.printf("[FLAPPY] bg draw -> %s\n", ok ? "OK" : "FAIL");
-
-  uint16_t* sprBuf = (uint16_t*)spr.getBuffer();
-  if (!ok || !sprBuf)
-  {
-    Serial.printf("[FLAPPY] bg cache abort ok=%d sprBuf=%p\n", (int)ok, (void*)sprBuf);
-    freeFlappyBgCache();
-    return false;
-  }
-
-  memcpy(s_flappyBgCache, sprBuf, bufBytes);
+  Serial.printf("[FLAPPY] bg cache draw -> %s\n", ok ? "OK" : "FAIL");
+  if (!ok) return false;
 
   strncpy(s_flappyBgCachePath, path, sizeof(s_flappyBgCachePath) - 1);
   s_flappyBgCachePath[sizeof(s_flappyBgCachePath) - 1] = 0;
@@ -642,8 +662,9 @@ static void drawFlappyScrollingBg(int scrollX)
     return;
   }
 
-  const int w = screenW;
-  const int h = screenH;
+const int w = s_flappyBgW;
+const int h = s_flappyBgH;
+if (w <= 0 || h <= 0) { spr.fillSprite(TFT_BLACK); return; }
 
   // normalize scroll into [0..w-1]
   scrollX %= w;
@@ -673,17 +694,29 @@ static void drawFlappyScrollingBg(int scrollX)
 
 void drawFlappyFireball()
 {
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
+  const int gW = (int)spr.width();
+  const int gH = (int)spr.height();
 
   const char* bgPath = flappyBgPathForPet();
 
-  if (g_sdReady && bgPath && bgPath[0])
+  bool drewBg = false;
+
+  if (bgPath && bgPath[0] && ensureFlappyBgCache(bgPath))
   {
-    sprDrawPngFromSD(bgPath, -s_flappyBgScrollX, 0);
-    sprDrawPngFromSD(bgPath, -s_flappyBgScrollX + screenW, 0);
+    const int bw = (int)s_flappyBgSpr.width();
+    if (bw > 0)
+    {
+      // Wrap scroll into [0, bw)
+      int x = -(s_flappyBgScrollX % bw);
+      if (x > 0) x -= bw;
+
+      s_flappyBgSpr.pushSprite(&spr, x, 0);
+      s_flappyBgSpr.pushSprite(&spr, x + bw, 0);
+      drewBg = true;
+    }
   }
-  else
+
+  if (!drewBg)
   {
     spr.fillSprite(TFT_BLACK);
   }
@@ -706,11 +739,11 @@ void drawFlappyFireball()
   }
 
   const int pipeW = 26;
-  const int gapH = 64;
+  const int gapH  = 64;
 
   for (int i = 0; i < 3; ++i)
   {
-    const int x = s_pipes[i].x;
+    const int x      = s_pipes[i].x;
     const int gapTop = s_pipes[i].gapY - gapH / 2;
     const int gapBot = s_pipes[i].gapY + gapH / 2;
 
@@ -722,22 +755,20 @@ void drawFlappyFireball()
   spr.drawCircle(s_fbX, s_fbY, 5, TFT_RED);
 
   {
-    const uint32_t now = millis();
+    const uint32_t now     = millis();
     const uint32_t aliveMs = flappyAliveMsNow(now);
-    const uint32_t winMs = s_flappyWinMs;
+    const uint32_t winMs   = s_flappyWinMs;
 
-    int barW = gW - 20;
-    int barX = 10;
-    int barY = 6;
-    int barH = 6;
+    const int barW = gW - 20;
+    const int barX = 10;
+    const int barY = 6;
+    const int barH = 6;
 
     spr.drawRect(barX, barY, barW, barH, TFT_DARKGREY);
 
     int fill = (int)((aliveMs * (uint32_t)(barW - 2)) / winMs);
-    if (fill < 0)
-      fill = 0;
-    if (fill > barW - 2)
-      fill = barW - 2;
+    if (fill < 0) fill = 0;
+    if (fill > barW - 2) fill = barW - 2;
 
     spr.fillRect(barX + 1, barY + 1, fill, barH - 2, TFT_YELLOW);
   }
