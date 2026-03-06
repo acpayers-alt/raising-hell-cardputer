@@ -148,7 +148,7 @@ static bool mgAcceptArmedNow(uint32_t now)
 }
 
 // -----------------------------------------------------------------------------
-// FLAPPY FIREBALL GLOBALS (Flappy Bird clone)
+// FLAPPY FIREBALL GLOBALS 
 // -----------------------------------------------------------------------------
 static M5Canvas s_flappyFireballSpr[3];
 static bool     s_flappyFireballReady = false;
@@ -160,7 +160,12 @@ static int s_flappyFireballH = 0;
 static bool s_flappyInited = false;
 static bool s_flappyPlaying = false;
 static bool s_flappyCrashed = false;
-
+static int s_flappyDistancePx = 0;
+static bool s_flappyGoalActive = false;
+static int  s_flappyGoalX = 0;
+static int  s_flappyGoalY = 0;
+static bool s_flappyGoalReached = false;
+static int  s_flappyGoalR = 10;
 static uint32_t s_flappyStartMs = 0;
 
 // Survive timer
@@ -263,25 +268,32 @@ static int flappyRandGapY(int h)
 }
 
 static void flappyResetWorld(int w, int h)
-{
-  s_flappyStartMs = millis();
-  s_flappyPlaying = true;
-  s_flappyCrashed = false;
-
-  s_fbX = 52;
-  s_fbY = h / 2;
-  s_fbVY = 0;
-
-  const int spacing = 140;
-  const int startX = w + 30;
-
-  for (int i = 0; i < 3; ++i)
   {
-    s_pipes[i].x = startX + i * spacing;
-    s_pipes[i].gapY = flappyRandGapY(h);
-    s_pipes[i].passed = false;
+    s_flappyStartMs = millis();
+    s_flappyPlaying = true;
+    s_flappyCrashed = false;
+  
+    s_flappyDistancePx = 0;
+  
+    s_fbX = 52;
+    s_fbY = h / 2;
+    s_fbVY = 0;
+  
+    const int spacing = 140;
+    const int startX = w + 30;
+  
+    for (int i = 0; i < 3; ++i)
+    {
+      s_pipes[i].x = startX + i * spacing;
+      s_pipes[i].gapY = flappyRandGapY(h);
+      s_pipes[i].passed = false;
+    }
+  
+    s_flappyGoalActive = false;
+    s_flappyGoalReached = false;
+    s_flappyGoalX = 0;
+    s_flappyGoalY = h - 42;
   }
-}
 
 static void flappyDirFromBgPath(const char *bgPath, char *outDir, size_t outSz)
 {
@@ -633,7 +645,12 @@ static void flappyStep(int w, int h, bool flap)
 {
   const int pipeW = 26;
   const int speedX = 1;
+  
   s_flappyBgScrollX += speedX;
+  
+  // Track level progress
+  s_flappyDistancePx += speedX;
+
   const int fbR = 4;
 
   const int gravity = 1;
@@ -679,6 +696,20 @@ static void flappyStep(int w, int h, bool flap)
     }
   }
 
+  // Activate the goal once the player has traveled far enough
+  if (!s_flappyGoalActive && s_flappyDistancePx >= 520)
+  {
+    s_flappyGoalActive = true;
+    s_flappyGoalX = w + 120;      // start offscreen
+    s_flappyGoalY = h - 26;       // "standing on an island" near bottom (tune)
+  }
+  
+  if (s_flappyGoalActive)
+  {
+    s_flappyGoalX -= speedX;
+  }
+  
+  // Pipe collisions
   for (int i = 0; i < 3; ++i)
   {
     if (flappyCollides(s_fbX, s_fbY, fbR, s_pipes[i], w, h))
@@ -689,6 +720,34 @@ static void flappyStep(int w, int h, bool flap)
       s_resultShown = true;
       s_flappyPlaying = false;
       soundError();
+      return;
+    }
+  }
+
+  // Win condition: touch the imp goal (simple AABB vs fireball circle)
+  if (s_flappyGoalActive && !s_flappyGoalReached)
+  {
+    // Match draw placeholder sizing (imp on small island)
+    const int impW = 18;
+    const int impH = 18;
+    const int islandH = 8;
+
+    const int goalLeft = s_flappyGoalX;
+    const int goalTop = s_flappyGoalY - impH;
+    const int goalRight = goalLeft + impW;
+    const int goalBottom = s_flappyGoalY + islandH;
+
+    if ((s_fbX + fbR) >= goalLeft && (s_fbX - fbR) <= goalRight && (s_fbY + fbR) >= goalTop &&
+        (s_fbY - fbR) <= goalBottom)
+    {
+      s_flappyGoalReached = true;
+
+      playerWon = true;
+      g_app.gameOver = true;
+      requestUIRedraw();
+      s_resultShown = true;
+      s_flappyPlaying = false;
+      soundConfirm();
       return;
     }
   }
@@ -796,18 +855,6 @@ void updateFlappyFireball(const InputState &input)
   if (mgPauseJustResumedConsume())
   {
     s_lastStepMs = now;
-  }
-
-  const uint32_t aliveMs = flappyAliveMsNow(now);
-  if (aliveMs >= s_flappyWinMs)
-  {
-    playerWon = true;
-    g_app.gameOver = true;
-    requestUIRedraw();
-    s_resultShown = true;
-    s_flappyPlaying = false;
-    soundConfirm();
-    return;
   }
 
   const bool flap = input.mgSelectOnce || input.mgSelectHeld || input.mgUpOnce || input.mgUpHeld;
@@ -1124,6 +1171,34 @@ void drawFlappyFireball()
     }
   }
 
+  if (s_flappyGoalActive && !s_flappyGoalReached)
+{
+  const int islandW = 28;
+  const int islandH = 8;
+  const int impW = 18;
+  const int impH = 18;
+
+  const int islandX = s_flappyGoalX - 4;
+  const int islandY = s_flappyGoalY;
+
+  // rocky island
+  spr.fillRoundRect(islandX, islandY, islandW, islandH, 3, TFT_BROWN);
+  spr.drawRoundRect(islandX, islandY, islandW, islandH, 3, TFT_DARKGREY);
+
+  // imp body
+  const int impX = s_flappyGoalX;
+  const int impY = s_flappyGoalY - impH;
+
+  spr.fillCircle(impX + 9, impY + 6, 5, TFT_RED);         // head
+  spr.fillRect(impX + 5, impY + 11, 8, 6, TFT_RED);       // body
+  spr.drawPixel(impX + 7, impY + 5, TFT_WHITE);           // eyes
+  spr.drawPixel(impX + 10, impY + 5, TFT_WHITE);
+
+  // horns
+  spr.drawLine(impX + 6, impY + 2, impX + 4, impY, TFT_YELLOW);
+  spr.drawLine(impX + 12, impY + 2, impX + 14, impY, TFT_YELLOW);
+}
+
 if (haveFireball && s_flappyFireballReady){
   const int frame = (millis() / 80) % 3;
 
@@ -1142,27 +1217,6 @@ else
 {
   spr.fillCircle(s_fbX, s_fbY, 5, TFT_ORANGE);
 }
-
-  {
-    const uint32_t now = millis();
-    const uint32_t aliveMs = flappyAliveMsNow(now);
-    const uint32_t winMs = s_flappyWinMs;
-
-    const int barW = gW - 20;
-    const int barX = 10;
-    const int barY = 6;
-    const int barH = 6;
-
-    spr.drawRect(barX, barY, barW, barH, TFT_DARKGREY);
-
-    int fill = (int)((aliveMs * (uint32_t)(barW - 2)) / winMs);
-    if (fill < 0)
-      fill = 0;
-    if (fill > barW - 2)
-      fill = barW - 2;
-
-    spr.fillRect(barX + 1, barY + 1, fill, barH - 2, TFT_YELLOW);
-  }
 }
 
 // -----------------------------------------------------------------------------
