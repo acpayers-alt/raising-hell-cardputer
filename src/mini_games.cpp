@@ -148,29 +148,56 @@ static bool mgAcceptArmedNow(uint32_t now)
 }
 
 // -----------------------------------------------------------------------------
-// FLAPPY FIREBALL GLOBALS 
+// FLAPPY FIREBALL GLOBALS
 // -----------------------------------------------------------------------------
+
+// FIREBALL
 static M5Canvas s_flappyFireballSpr[3];
-static bool     s_flappyFireballReady = false;
-static char     s_flappyFireballDir[128] = {0};
-static const uint16_t kFireKey = TFT_MAGENTA;
-static const char* flappyBgPathForPet();
+static bool s_flappyFireballReady = false;
+static char s_flappyFireballDir[128] = {0};
 static int s_flappyFireballW = 0;
 static int s_flappyFireballH = 0;
+
+// IMP
+static bool s_impHit = false;
+static bool s_impBurnDone = false;
+
+static int s_impFrame = 0;
+static uint32_t s_impAnimMs = 0;
+static uint32_t s_impHoldMs = 0;
+
+static constexpr uint32_t kImpWaveFrameMs = 180;
+static constexpr uint32_t kImpBurnFrameMs = 120;
+static constexpr uint32_t kImpBurnHoldMs = 600;
+
+static const char *const kImpWaveFrames[] = {
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png",
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png",
+};
+
+static const char *const kImpBurnFrames[] = {
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_burn1.png",
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_burn2.png",
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_burn3.png",
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_burn4.png",
+    "/raising_hell/graphics/mini_games/flappy/dev/imp_burn5.png",
+};
+
+// SPIKES
+static const uint16_t kFireKey = TFT_MAGENTA;
+static const char *flappyBgPathForPet();
+
+// GOALS
 static bool s_flappyInited = false;
 static bool s_flappyPlaying = false;
 static bool s_flappyCrashed = false;
 static int s_flappyDistancePx = 0;
 static bool s_flappyGoalActive = false;
-static int  s_flappyGoalX = 0;
-static int  s_flappyGoalY = 0;
+static int s_flappyGoalX = 0;
+static int s_flappyGoalY = 0;
 static bool s_flappyGoalReached = false;
-static int  s_flappyGoalR = 10;
+static int s_flappyGoalR = 10;
 static uint32_t s_flappyStartMs = 0;
-
-// Survive timer
-static const uint32_t s_flappyWinMs = kSurviveWinMs;
-
 static int s_flappyBgW = 0;
 static int s_flappyBgH = 0;
 static int s_fbX = 0;
@@ -178,6 +205,10 @@ static int s_fbY = 0;
 static int s_fbVY = 0;
 static uint32_t s_lastStepMs = 0;
 static int s_flappyBgScrollX = 0;
+
+// Survive timer
+static const uint32_t s_flappyWinMs = kSurviveWinMs;
+
 // Cache: decoded background image (assumed SCREEN_W x SCREEN_H)
 static uint16_t *s_flappyBgCache = nullptr;
 static char s_flappyBgCachePath[128] = {0};
@@ -207,32 +238,47 @@ struct FlappyPipe
 // -----------------------------------------------------------------------------
 static void freeFlappyFireballSprites()
 {
-  for (int i = 0; i < 3; ++i) s_flappyFireballSpr[i].deleteSprite();
+  for (int i = 0; i < 3; ++i)
+    s_flappyFireballSpr[i].deleteSprite();
   s_flappyFireballReady = false;
   s_flappyFireballDir[0] = 0;
   s_flappyFireballW = 0;
   s_flappyFireballH = 0;
 }
 
-static bool flappyDirFromPath(const char* path, char* out, size_t outSz)
+static bool flappyDirFromPath(const char *path, char *out, size_t outSz)
 {
-  if (!path || !path[0] || !out || outSz == 0) return false;
-  const char* last = strrchr(path, '/');
-  if (!last) return false;
+  if (!path || !path[0] || !out || outSz == 0)
+    return false;
+  const char *last = strrchr(path, '/');
+  if (!last)
+    return false;
 
   const size_t len = (size_t)(last - path) + 1; // include trailing '/'
-  if (len >= outSz) return false;
+  if (len >= outSz)
+    return false;
 
   memcpy(out, path, len);
   out[len] = 0;
   return true;
 }
 
-static bool sdExistsTrySlashLocal(const char* path, const char** outUse)
+static bool sdExistsTrySlashLocal(const char *path, const char **outUse)
 {
-  if (!path || !path[0]) return false;
-  if (SD.exists(path)) { if (outUse) *outUse = path; return true; }
-  if (path[0] == '/' && SD.exists(path + 1)) { if (outUse) *outUse = path + 1; return true; }
+  if (!path || !path[0])
+    return false;
+  if (SD.exists(path))
+  {
+    if (outUse)
+      *outUse = path;
+    return true;
+  }
+  if (path[0] == '/' && SD.exists(path + 1))
+  {
+    if (outUse)
+      *outUse = path + 1;
+    return true;
+  }
   return false;
 }
 
@@ -268,32 +314,39 @@ static int flappyRandGapY(int h)
 }
 
 static void flappyResetWorld(int w, int h)
+{
+  s_flappyStartMs = millis();
+  s_flappyPlaying = true;
+  s_flappyCrashed = false;
+
+  s_flappyDistancePx = 0;
+
+  s_fbX = 52;
+  s_fbY = h / 2;
+  s_fbVY = 0;
+
+  const int spacing = 140;
+  const int startX = w + 30;
+
+  for (int i = 0; i < 3; ++i)
   {
-    s_flappyStartMs = millis();
-    s_flappyPlaying = true;
-    s_flappyCrashed = false;
-  
-    s_flappyDistancePx = 0;
-  
-    s_fbX = 52;
-    s_fbY = h / 2;
-    s_fbVY = 0;
-  
-    const int spacing = 140;
-    const int startX = w + 30;
-  
-    for (int i = 0; i < 3; ++i)
-    {
-      s_pipes[i].x = startX + i * spacing;
-      s_pipes[i].gapY = flappyRandGapY(h);
-      s_pipes[i].passed = false;
-    }
-  
-    s_flappyGoalActive = false;
-    s_flappyGoalReached = false;
-    s_flappyGoalX = 0;
-    s_flappyGoalY = h - 42;
+    s_pipes[i].x = startX + i * spacing;
+    s_pipes[i].gapY = flappyRandGapY(h);
+    s_pipes[i].passed = false;
   }
+
+  s_flappyGoalActive = false;
+  s_flappyGoalReached = false;
+  s_flappyGoalX = 0;
+  s_flappyGoalY = h - 42;
+
+  s_impHit = false;
+  s_impBurnDone = false;
+  s_impFrame = 0;
+  s_impAnimMs = 0;
+  s_impHoldMs = 0;
+  s_flappyGoalReached = false;
+}
 
 static void flappyDirFromBgPath(const char *bgPath, char *outDir, size_t outSz)
 {
@@ -411,14 +464,17 @@ static bool flappyReadPngDimsTrySlash(const char *path, int *outW, int *outH, co
   return true;
 }
 
-static bool ensureFlappyFireballSprites(const char* bgPath)
+static bool ensureFlappyFireballSprites(const char *bgPath)
 {
-  if (!bgPath || !bgPath[0]) return false;
-  if (!g_sdReady) return false;
+  if (!bgPath || !bgPath[0])
+    return false;
+  if (!g_sdReady)
+    return false;
 
   char dir[128];
   flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-  if (!dir[0]) return false;
+  if (!dir[0])
+    return false;
 
   // Already loaded for this folder?
   if (s_flappyFireballReady && s_flappyFireballDir[0] && strcmp(s_flappyFireballDir, dir) == 0)
@@ -432,7 +488,7 @@ static bool ensureFlappyFireballSprites(const char* bgPath)
   {
     snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
 
-    const char* usePath = path;
+    const char *usePath = path;
     if (!sdExistsTrySlash(path, &usePath))
     {
       freeFlappyFireballSprites();
@@ -440,7 +496,7 @@ static bool ensureFlappyFireballSprites(const char* bgPath)
     }
 
     int w = 0, h = 0;
-    const char* pngUse = nullptr;
+    const char *pngUse = nullptr;
 
     if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
     {
@@ -515,8 +571,10 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
   int dnW = 0, dnH = 0;
 
   // Read actual PNG dimensions (handles leading slash variants via outUsePath)
-  if (!flappyReadPngDimsTrySlash(useUp, &upW, &upH, &useUpPath)) return false;
-  if (!flappyReadPngDimsTrySlash(useDown, &dnW, &dnH, &useDnPath)) return false;
+  if (!flappyReadPngDimsTrySlash(useUp, &upW, &upH, &useUpPath))
+    return false;
+  if (!flappyReadPngDimsTrySlash(useDown, &dnW, &dnH, &useDnPath))
+    return false;
 
   const int w = (upW > dnW) ? upW : dnW;
   const int h = (upH > dnH) ? upH : dnH;
@@ -585,18 +643,15 @@ void startFlappyFireball()
   const int gH = (screenH > 0) ? screenH : 135;
 
   s_flappyInited = true;
-  flappyResetWorld(gW, gH); // <-- initializes s_pipes[] + sets s_flappyStartMs
+  flappyResetWorld(gW, gH);
   s_lastStepMs = millis();
-
-  s_flappyInited = false;
-  s_lastStepMs = millis();
-
+  
   s_flappyBgScrollX = 0;
   freeFlappyBgCache();
-
+  
   freeFlappyPipeSprites();
   ensureFlappyFireballSprites(flappyBgPathForPet());
-
+  
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
@@ -645,14 +700,11 @@ static void flappyStep(int w, int h, bool flap)
 {
   const int pipeW = 26;
   const int speedX = 1;
-  
+
   s_flappyBgScrollX += speedX;
-  
-  // Track level progress
   s_flappyDistancePx += speedX;
 
   const int fbR = 4;
-
   const int gravity = 1;
   const int flapVY = -3;
 
@@ -671,10 +723,8 @@ static void flappyStep(int w, int h, bool flap)
     s_fbVY += gravity;
   }
 
-  if (s_fbVY > 4)
-    s_fbVY = 4;
-  if (s_fbVY < -6)
-    s_fbVY = -6;
+  if (s_fbVY > 4) s_fbVY = 4;
+  if (s_fbVY < -6) s_fbVY = -6;
 
   s_fbY += s_fbVY;
 
@@ -696,20 +746,18 @@ static void flappyStep(int w, int h, bool flap)
     }
   }
 
-  // Activate the goal once the player has traveled far enough
   if (!s_flappyGoalActive && s_flappyDistancePx >= 520)
   {
     s_flappyGoalActive = true;
-    s_flappyGoalX = w + 120;      // start offscreen
-    s_flappyGoalY = h - 26;       // "standing on an island" near bottom (tune)
+    s_flappyGoalX = w + 120;
+    s_flappyGoalY = h - 26;
   }
-  
+
   if (s_flappyGoalActive)
   {
     s_flappyGoalX -= speedX;
   }
-  
-  // Pipe collisions
+
   for (int i = 0; i < 3; ++i)
   {
     if (flappyCollides(s_fbX, s_fbY, fbR, s_pipes[i], w, h))
@@ -724,10 +772,8 @@ static void flappyStep(int w, int h, bool flap)
     }
   }
 
-  // Win condition: touch the imp goal (simple AABB vs fireball circle)
   if (s_flappyGoalActive && !s_flappyGoalReached)
   {
-    // Match draw placeholder sizing (imp on small island)
     const int impW = 18;
     const int impH = 18;
     const int islandH = 8;
@@ -737,18 +783,18 @@ static void flappyStep(int w, int h, bool flap)
     const int goalRight = goalLeft + impW;
     const int goalBottom = s_flappyGoalY + islandH;
 
-    if ((s_fbX + fbR) >= goalLeft && (s_fbX - fbR) <= goalRight && (s_fbY + fbR) >= goalTop &&
-        (s_fbY - fbR) <= goalBottom)
+    if ((s_fbX + fbR) >= goalLeft && (s_fbX - fbR) <= goalRight &&
+        (s_fbY + fbR) >= goalTop && (s_fbY - fbR) <= goalBottom)
     {
-      s_flappyGoalReached = true;
-
-      playerWon = true;
-      g_app.gameOver = true;
-      requestUIRedraw();
-      s_resultShown = true;
-      s_flappyPlaying = false;
-      soundConfirm();
-      return;
+      if (!s_impHit)
+      {
+        s_impHit = true;
+        s_flappyGoalReached = true;
+        s_impFrame = 0;
+        s_impAnimMs = 0;
+        s_impHoldMs = 0;
+        soundConfirm();
+      }
     }
   }
 }
@@ -870,7 +916,58 @@ void updateFlappyFireball(const InputState &input)
     while ((int32_t)(now - s_lastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
     {
       const bool flapThisStep = (flap && !flapUsed);
-      flappyStep(gW, gH, flapThisStep);
+
+      if (!s_impHit)
+      {
+        flappyStep(gW, gH, flapThisStep);
+      }
+      else
+      {
+        // keep background/level motion alive, but don't allow new flap impulse
+        flappyStep(gW, gH, false);
+      }
+
+      const uint32_t dt = stepMs;
+
+      if (!s_impHit)
+      {
+        s_impAnimMs += dt;
+        if (s_impAnimMs >= kImpWaveFrameMs)
+        {
+          s_impAnimMs -= kImpWaveFrameMs;
+          s_impFrame = (s_impFrame + 1) % 2;
+        }
+      }
+      else if (!s_impBurnDone)
+      {
+        s_impAnimMs += dt;
+        if (s_impAnimMs >= kImpBurnFrameMs)
+        {
+          s_impAnimMs -= kImpBurnFrameMs;
+          s_impFrame++;
+
+          if (s_impFrame >= 5)
+          {
+            s_impFrame = 4;
+            s_impBurnDone = true;
+            s_impHoldMs = 0;
+          }
+        }
+      }
+      else
+      {
+        s_impHoldMs += dt;
+      
+        if (s_impHoldMs >= kImpBurnHoldMs)
+        {
+          playerWon = true;
+          g_app.gameOver = true;
+          requestUIRedraw();
+          s_resultShown = true;
+          s_flappyPlaying = false;
+        }
+      }
+
       if (flapThisStep)
         flapUsed = true;
 
@@ -1159,7 +1256,7 @@ void drawFlappyFireball()
 
       // stalactite (top)
       s_flappyPipeDownSpr.pushSprite(&spr, drawX, gapTop - s_flappyPipeH, kPipeKey);
-      
+
       // stalagmite (bottom)
       s_flappyPipeUpSpr.pushSprite(&spr, drawX, gapBot, kPipeKey);
     }
@@ -1171,52 +1268,49 @@ void drawFlappyFireball()
     }
   }
 
-  if (s_flappyGoalActive && !s_flappyGoalReached)
-{
-  const int islandW = 28;
-  const int islandH = 8;
-  const int impW = 18;
-  const int impH = 18;
+  if (s_flappyGoalActive && !s_impBurnDone)
+  {
+    const int islandW = 28;
+    const int islandH = 8;
+    const int impH = 18;
+  
+    const int islandX = s_flappyGoalX - 4;
+    const int islandY = s_flappyGoalY;
+  
+    spr.fillRoundRect(islandX, islandY, islandW, islandH, 3, TFT_BROWN);
+    spr.drawRoundRect(islandX, islandY, islandW, islandH, 3, TFT_DARKGREY);
+  
+    const int impX = s_flappyGoalX;
+    const int impY = s_flappyGoalY - impH;
+  
+    const char* impSprite = nullptr;
+    if (!s_impHit)
+      impSprite = kImpWaveFrames[s_impFrame];
+    else
+      impSprite = kImpBurnFrames[s_impFrame];
+  
+    if (impSprite)
+      sprDrawPngFromSD(impSprite, impX, impY);
+  }
+  if (haveFireball && s_flappyFireballReady)
+  {
+    const int frame = (millis() / 80) % 3;
 
-  const int islandX = s_flappyGoalX - 4;
-  const int islandY = s_flappyGoalY;
+    const int w = s_flappyFireballSpr[frame].width();
+    const int h = s_flappyFireballSpr[frame].height();
 
-  // rocky island
-  spr.fillRoundRect(islandX, islandY, islandW, islandH, 3, TFT_BROWN);
-  spr.drawRoundRect(islandX, islandY, islandW, islandH, 3, TFT_DARKGREY);
+    const int drawX = s_fbX - w / 2;
+    const int drawY = s_fbY - h / 2;
 
-  // imp body
-  const int impX = s_flappyGoalX;
-  const int impY = s_flappyGoalY - impH;
+    // subtle glow behind fireball
+    spr.fillCircle(s_fbX, s_fbY, 6, TFT_RED);
 
-  spr.fillCircle(impX + 9, impY + 6, 5, TFT_RED);         // head
-  spr.fillRect(impX + 5, impY + 11, 8, 6, TFT_RED);       // body
-  spr.drawPixel(impX + 7, impY + 5, TFT_WHITE);           // eyes
-  spr.drawPixel(impX + 10, impY + 5, TFT_WHITE);
-
-  // horns
-  spr.drawLine(impX + 6, impY + 2, impX + 4, impY, TFT_YELLOW);
-  spr.drawLine(impX + 12, impY + 2, impX + 14, impY, TFT_YELLOW);
-}
-
-if (haveFireball && s_flappyFireballReady){
-  const int frame = (millis() / 80) % 3;
-
-  const int w = s_flappyFireballSpr[frame].width();
-  const int h = s_flappyFireballSpr[frame].height();
-
-  const int drawX = s_fbX - w / 2;
-  const int drawY = s_fbY - h / 2;
-
-  // subtle glow behind fireball
-  spr.fillCircle(s_fbX, s_fbY, 6, TFT_RED);
-
-  s_flappyFireballSpr[frame].pushSprite(&spr, drawX, drawY, kFireKey);
-}
-else
-{
-  spr.fillCircle(s_fbX, s_fbY, 5, TFT_ORANGE);
-}
+    s_flappyFireballSpr[frame].pushSprite(&spr, drawX, drawY, kFireKey);
+  }
+  else
+  {
+    spr.fillCircle(s_fbX, s_fbY, 5, TFT_ORANGE);
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -2482,12 +2576,12 @@ void drawInfernalDodger()
   {
     if (!b.active)
       continue;
-  
+
     // If you have real sprites for dodger balls later, hook them here.
     // For now: simple hazard dot per ball.
     const int bx = (int)b.x;
     const int by = (int)b.y;
-  
+
     spr.fillCircle(bx, by, 4, TFT_ORANGE);
     spr.drawCircle(bx, by, 4, TFT_RED);
   }
