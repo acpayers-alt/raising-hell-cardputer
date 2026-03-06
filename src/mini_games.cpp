@@ -232,6 +232,11 @@ static M5Canvas s_flappyBgSpr(&M5.Display);
 static bool s_flappyBgSprReady = false;
 static void freeFlappyBgCache();
 
+// Fireball Run background Cache
+static void freeDodgerBgCache();
+static void freeDodgerFireballSprites();
+static void freeDodgerCarSprite();
+
 struct FlappyPipe
 {
   int x;
@@ -1584,6 +1589,9 @@ void miniGameExitToReturnUi(bool beginLockout)
   inputForceClear();
   s_prevSelectHeld = false;
   freeImpWaveSprites();
+  freeDodgerBgCache();
+  freeDodgerFireballSprites();
+  freeDodgerCarSprite();
   invalidateBackgroundCache();
   requestFullUIRedraw();
 
@@ -2368,7 +2376,7 @@ void drawCrossyRoad()
 }
 
 // -----------------------------------------------------------------------------
-// INFERNAL DODGER
+// FIREBALL RUN GLOBALS
 // -----------------------------------------------------------------------------
 
 struct DodgerBall
@@ -2395,6 +2403,252 @@ static int8_t s_dodgerMoveDir = 0;
 static uint32_t s_dodgerDirHoldMs = 0;
 
 static DodgerBall s_dodgerBalls[8];
+
+static const uint16_t kDodgerKey = TFT_MAGENTA;
+
+static M5Canvas s_dodgerBgSpr(&M5.Display);
+static bool s_dodgerBgSprReady = false;
+static char s_dodgerBgCachePath[128] = {0};
+static int s_dodgerBgW = 0;
+static int s_dodgerBgH = 0;
+static int s_dodgerBgScrollY = 0;
+
+static M5Canvas s_dodgerFireballSpr[3] = {
+  M5Canvas(&M5.Display),
+  M5Canvas(&M5.Display),
+  M5Canvas(&M5.Display)
+};
+static bool s_dodgerFireballReady = false;
+static char s_dodgerFireballDir[128] = {0};
+static int s_dodgerFireballW = 0;
+static int s_dodgerFireballH = 0;
+
+static M5Canvas s_dodgerCarSpr(&M5.Display);
+static bool s_dodgerCarReady = false;
+static char s_dodgerCarPath[128] = {0};
+static int s_dodgerCarW = 0;
+static int s_dodgerCarH = 0;
+
+static const char *fireballRunBgPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bg.jpg";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bg.jpg";
+  }
+}
+
+static const char *fireballRunCarPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/fbrun/eld/car.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/fbrun/dev/car.png";
+  }
+}
+
+static void freeDodgerBgCache()
+{
+  if (s_dodgerBgSprReady)
+  {
+    s_dodgerBgSpr.deleteSprite();
+    s_dodgerBgSprReady = false;
+  }
+
+  s_dodgerBgCachePath[0] = 0;
+  s_dodgerBgW = 0;
+  s_dodgerBgH = 0;
+  s_dodgerBgScrollY = 0;
+}
+
+static void freeDodgerFireballSprites()
+{
+  for (int i = 0; i < 3; ++i)
+    s_dodgerFireballSpr[i].deleteSprite();
+
+  s_dodgerFireballReady = false;
+  s_dodgerFireballDir[0] = 0;
+  s_dodgerFireballW = 0;
+  s_dodgerFireballH = 0;
+}
+
+static void freeDodgerCarSprite()
+{
+  if (s_dodgerCarReady)
+  {
+    s_dodgerCarSpr.deleteSprite();
+    s_dodgerCarReady = false;
+  }
+
+  s_dodgerCarPath[0] = 0;
+  s_dodgerCarW = 0;
+  s_dodgerCarH = 0;
+}
+
+static bool ensureDodgerBgCache(const char *path)
+{
+  if (!path || !path[0])
+    return false;
+
+  if (s_dodgerBgSprReady && s_dodgerBgCachePath[0] && strcmp(s_dodgerBgCachePath, path) == 0)
+    return true;
+
+  const int w = (int)spr.width();
+  const int h = (int)spr.height();
+  if (w <= 0 || h <= 0)
+    return false;
+
+  if (!g_sdReady)
+    return false;
+
+  bool isPng = false;
+  if (const char *ext = strrchr(path, '.'))
+    isPng = (strcasecmp(ext, ".png") == 0);
+
+  const char *usePath = path;
+  bool exists = SD.exists(usePath);
+  if (!exists && usePath[0] == '/')
+  {
+    usePath = usePath + 1;
+    exists = SD.exists(usePath);
+  }
+  if (!exists)
+    return false;
+
+  if (!s_dodgerBgSprReady || s_dodgerBgW != w || s_dodgerBgH != h)
+  {
+    s_dodgerBgSpr.deleteSprite();
+    s_dodgerBgSprReady = false;
+
+    s_dodgerBgSpr.setColorDepth(8);
+    if (!s_dodgerBgSpr.createSprite(w, h))
+      return false;
+
+    s_dodgerBgW = w;
+    s_dodgerBgH = h;
+    s_dodgerBgSprReady = true;
+  }
+
+  s_dodgerBgSpr.fillSprite(TFT_BLACK);
+
+  bool ok = false;
+  if (isPng)
+    ok = s_dodgerBgSpr.drawPngFile(SD, usePath, 0, 0);
+  else
+    ok = s_dodgerBgSpr.drawJpgFile(SD, usePath, 0, 0);
+
+  if (!ok)
+    return false;
+
+  strlcpy(s_dodgerBgCachePath, path, sizeof(s_dodgerBgCachePath));
+  return true;
+}
+
+static bool ensureDodgerFireballSprites(const char *bgPath)
+{
+  if (!bgPath || !bgPath[0] || !g_sdReady)
+    return false;
+
+  char dir[128];
+  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
+  if (!dir[0])
+    return false;
+
+  if (s_dodgerFireballReady && s_dodgerFireballDir[0] && strcmp(s_dodgerFireballDir, dir) == 0)
+    return true;
+
+  freeDodgerFireballSprites();
+
+  char path[192];
+
+  for (int i = 0; i < 3; ++i)
+  {
+    snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
+
+    const char *usePath = path;
+    if (!sdExistsTrySlash(path, &usePath))
+    {
+      freeDodgerFireballSprites();
+      return false;
+    }
+
+    int w = 0, h = 0;
+    const char *pngUse = nullptr;
+
+    if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
+    {
+      freeDodgerFireballSprites();
+      return false;
+    }
+
+    s_dodgerFireballSpr[i].setColorDepth(8);
+
+    if (!s_dodgerFireballSpr[i].createSprite(w, h))
+    {
+      freeDodgerFireballSprites();
+      return false;
+    }
+
+    s_dodgerFireballSpr[i].fillSprite(kDodgerKey);
+
+    if (!s_dodgerFireballSpr[i].drawPngFile(SD, pngUse, 0, 0))
+    {
+      freeDodgerFireballSprites();
+      return false;
+    }
+  }
+
+  s_dodgerFireballW = (int)s_dodgerFireballSpr[0].width();
+  s_dodgerFireballH = (int)s_dodgerFireballSpr[0].height();
+  strlcpy(s_dodgerFireballDir, dir, sizeof(s_dodgerFireballDir));
+  s_dodgerFireballReady = true;
+  return true;
+}
+
+static bool ensureDodgerCarSprite(const char *path)
+{
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (s_dodgerCarReady && s_dodgerCarPath[0] && strcmp(s_dodgerCarPath, path) == 0)
+    return true;
+
+  freeDodgerCarSprite();
+
+  const char *usePath = path;
+  if (!sdExistsTrySlash(path, &usePath))
+    return false;
+
+  int w = 0, h = 0;
+  const char *pngUse = nullptr;
+  if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
+    return false;
+
+  s_dodgerCarSpr.setColorDepth(8);
+
+  if (!s_dodgerCarSpr.createSprite(w, h))
+    return false;
+
+  s_dodgerCarSpr.fillSprite(kDodgerKey);
+
+  if (!s_dodgerCarSpr.drawPngFile(SD, pngUse, 0, 0))
+  {
+    freeDodgerCarSprite();
+    return false;
+  }
+
+  s_dodgerCarW = w;
+  s_dodgerCarH = h;
+  strlcpy(s_dodgerCarPath, path, sizeof(s_dodgerCarPath));
+  s_dodgerCarReady = true;
+  return true;
+}
 
 static void dodgerReset()
 {
@@ -2508,6 +2762,16 @@ void startInfernalDodger()
 
   s_dodgerInited = false;
 
+  s_dodgerBgScrollY = 0;
+
+  freeDodgerBgCache();
+  freeDodgerFireballSprites();
+  freeDodgerCarSprite();
+
+  ensureDodgerBgCache(fireballRunBgPathForPet());
+  ensureDodgerFireballSprites(fireballRunBgPathForPet());
+  ensureDodgerCarSprite(fireballRunCarPathForPet());
+
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
@@ -2559,7 +2823,7 @@ void updateInfernalDodger(const InputState &input)
   const uint32_t now = millis();
   const uint32_t aliveMs = dodgerAliveMsNow(now);
   const int difficulty = (int)(aliveMs / 3000);
-
+  s_dodgerBgScrollY -= 2 + (difficulty / 4);
   const uint32_t kWinMs = kSurviveWinMs;
   if (aliveMs >= kWinMs)
   {
@@ -2687,7 +2951,32 @@ void drawInfernalDodger()
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
-  spr.fillSprite(TFT_BLACK);
+  const char *bgPath = fireballRunBgPathForPet();
+  const char *carPath = fireballRunCarPathForPet();
+
+  const bool haveBg = ensureDodgerBgCache(bgPath);
+  const bool haveFireballs = ensureDodgerFireballSprites(bgPath);
+  const bool haveCar = ensureDodgerCarSprite(carPath);
+
+  bool drewBg = false;
+
+  if (haveBg && s_dodgerBgSprReady)
+  {
+    const int bh = (int)s_dodgerBgSpr.height();
+    if (bh > 0)
+    {
+      int y = -(s_dodgerBgScrollY % bh);
+      if (y > 0)
+        y -= bh;
+
+      s_dodgerBgSpr.pushSprite(&spr, 0, y);
+      s_dodgerBgSpr.pushSprite(&spr, 0, y + bh);
+      drewBg = true;
+    }
+  }
+
+  if (!drewBg)
+    spr.fillSprite(TFT_BLACK);
 
   // Top survive bar
   {
@@ -2708,14 +2997,12 @@ void drawInfernalDodger()
     spr.fillRect(barX + 1, barY + 1, fill, 4, TFT_YELLOW);
   }
 
-  // Reward modal (win only)
   if (s_showReward)
   {
     drawRewardModal(gW, gH);
     return;
   }
 
-  // Win/Lose screen
   if (g_app.gameOver)
   {
     spr.setTextDatum(CC_DATUM);
@@ -2727,23 +3014,45 @@ void drawInfernalDodger()
     return;
   }
 
-  // Gameplay
+  // Hazards
   for (auto &b : s_dodgerBalls)
   {
     if (!b.active)
       continue;
 
-    // If you have real sprites for dodger balls later, hook them here.
-    // For now: simple hazard dot per ball.
     const int bx = (int)b.x;
     const int by = (int)b.y;
 
-    spr.fillCircle(bx, by, 4, TFT_ORANGE);
-    spr.drawCircle(bx, by, 4, TFT_RED);
+    if (haveFireballs && s_dodgerFireballReady)
+    {
+      const int frame = (millis() / 80) % 3;
+      const int w = s_dodgerFireballSpr[frame].width();
+      const int h = s_dodgerFireballSpr[frame].height();
+
+      const int drawX = bx - w / 2;
+      const int drawY = by - h / 2;
+
+      s_dodgerFireballSpr[frame].pushSprite(&spr, drawX, drawY, kDodgerKey);
+    }
+    else
+    {
+      spr.fillCircle(bx, by, 4, TFT_ORANGE);
+      spr.drawCircle(bx, by, 4, TFT_RED);
+    }
   }
 
-  spr.fillCircle(s_dodgerPx, s_dodgerPy, 6, TFT_GREEN);
-  spr.drawCircle(s_dodgerPx, s_dodgerPy, 6, TFT_DARKGREEN);
+  // Player
+  if (haveCar && s_dodgerCarReady)
+  {
+    const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
+    const int drawY = s_dodgerPy - (s_dodgerCarH / 2);
+    s_dodgerCarSpr.pushSprite(&spr, drawX, drawY, kDodgerKey);
+  }
+  else
+  {
+    spr.fillCircle(s_dodgerPx, s_dodgerPy, 6, TFT_GREEN);
+    spr.drawCircle(s_dodgerPx, s_dodgerPy, 6, TFT_DARKGREEN);
+  }
 }
 
 static void mgSyncGameTimebases(uint32_t now)

@@ -30,7 +30,7 @@ static void actCrossy(InputState& in)
 
 static const MenuItem kItems[] = {
   {"Flappy Fireball",  actFlappy},
-  {"Infernal Dodger",  actDodger},
+  {"Fireball Run",  actDodger},
   {"Crossy Road",      actCrossy},
 };
 
