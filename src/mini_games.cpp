@@ -151,6 +151,10 @@ static bool mgAcceptArmedNow(uint32_t now)
 // FLAPPY FIREBALL GLOBALS
 // -----------------------------------------------------------------------------
 
+// START SCREEN
+static bool s_flappyShowIntro = true;
+static bool s_flappyDontShowAgain = false; // visual only for now
+
 // FIREBALL
 static M5Canvas s_flappyFireballSpr[3];
 static bool s_flappyFireballReady = false;
@@ -161,7 +165,8 @@ static int s_flappyFireballH = 0;
 // IMP
 static bool s_impHit = false;
 static bool s_impBurnDone = false;
-
+static M5Canvas s_impWaveSpr[2];
+static bool s_impWaveSprReady = false;
 static int s_impFrame = 0;
 static uint32_t s_impAnimMs = 0;
 static uint32_t s_impHoldMs = 0;
@@ -233,6 +238,13 @@ struct FlappyPipe
   int gapY; // center of gap
   bool passed;
 };
+
+static void freeImpWaveSprites()
+{
+  for (int i = 0; i < 2; ++i)
+    s_impWaveSpr[i].deleteSprite();
+  s_impWaveSprReady = false;
+}
 
 // -----------------------------------------------------------------------------
 // Flappy fireball sprite (3-frame PNG animation) - cached per flappy folder
@@ -465,6 +477,48 @@ static bool flappyReadPngDimsTrySlash(const char *path, int *outW, int *outH, co
   return true;
 }
 
+static bool ensureImpWaveSprites()
+{
+  if (s_impWaveSprReady)
+    return true;
+
+  const char *paths[2] = {
+      "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png",
+      "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png",
+  };
+
+  for (int i = 0; i < 2; ++i)
+  {
+    int w = 0, h = 0;
+    const char *usePath = nullptr;
+
+    if (!flappyReadPngDimsTrySlash(paths[i], &w, &h, &usePath))
+    {
+      freeImpWaveSprites();
+      return false;
+    }
+
+    s_impWaveSpr[i].setColorDepth(8);
+
+    if (!s_impWaveSpr[i].createSprite(w, h))
+    {
+      freeImpWaveSprites();
+      return false;
+    }
+
+    s_impWaveSpr[i].fillSprite(kFireKey);
+
+    if (!s_impWaveSpr[i].drawPngFile(SD, usePath, 0, 0))
+    {
+      freeImpWaveSprites();
+      return false;
+    }
+  }
+
+  s_impWaveSprReady = true;
+  return true;
+}
+
 static bool ensureFlappyFireballSprites(const char *bgPath)
 {
   if (!bgPath || !bgPath[0])
@@ -642,17 +696,25 @@ void startFlappyFireball()
 
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
+  (void)gW;
+  (void)gH;
 
   s_flappyInited = true;
-  flappyResetWorld(gW, gH);
+  s_flappyShowIntro = true;
+  s_flappyDontShowAgain = false;
+  s_impHit = false;
+  s_impBurnDone = false;
+  s_impFrame = 0;
+  s_impAnimMs = 0;
+  s_impHoldMs = 0;
   s_lastStepMs = millis();
-  
+
   s_flappyBgScrollX = 0;
   freeFlappyBgCache();
-  
+
   freeFlappyPipeSprites();
   ensureFlappyFireballSprites(flappyBgPathForPet());
-  
+  ensureImpWaveSprites();
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
@@ -724,8 +786,10 @@ static void flappyStep(int w, int h, bool flap)
     s_fbVY += gravity;
   }
 
-  if (s_fbVY > 4) s_fbVY = 4;
-  if (s_fbVY < -6) s_fbVY = -6;
+  if (s_fbVY > 4)
+    s_fbVY = 4;
+  if (s_fbVY < -6)
+    s_fbVY = -6;
 
   s_fbY += s_fbVY;
 
@@ -784,8 +848,8 @@ static void flappyStep(int w, int h, bool flap)
     const int goalRight = goalLeft + impW;
     const int goalBottom = s_flappyGoalY + islandH;
 
-    if ((s_fbX + fbR) >= goalLeft && (s_fbX - fbR) <= goalRight &&
-        (s_fbY + fbR) >= goalTop && (s_fbY - fbR) <= goalBottom)
+    if ((s_fbX + fbR) >= goalLeft && (s_fbX - fbR) <= goalRight && (s_fbY + fbR) >= goalTop &&
+        (s_fbY - fbR) <= goalBottom)
     {
       if (!s_impHit)
       {
@@ -826,6 +890,9 @@ void updateFlappyFireball(const InputState &input)
 {
   const bool enterOnce = miniGameEnterOnce(input);
   const uint32_t now = millis();
+
+  const int gW = (screenW > 0) ? screenW : 240;
+  const int gH = (screenH > 0) ? screenH : 135;
 
   // If we're actively playing (not reward, not game over), clear accept-arming state.
   // This prevents stale arming timers from carrying across rounds.
@@ -883,9 +950,38 @@ void updateFlappyFireball(const InputState &input)
     return;
   }
 
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
+  if (s_flappyShowIntro)
+  {
+    const uint32_t dt = (s_lastStepMs == 0) ? 0 : (now - s_lastStepMs);
+    s_lastStepMs = now;
 
+    s_impAnimMs += dt;
+    while (s_impAnimMs >= kImpWaveFrameMs)
+    {
+      s_impAnimMs -= kImpWaveFrameMs;
+      s_impFrame = (s_impFrame + 1) % 2;
+    }
+
+    const bool startPressed =
+        enterOnce ||
+        input.mgSelectOnce ||
+        input.mgUpOnce;
+
+    if (startPressed && !mgInputLockedOut())
+    {
+      s_flappyShowIntro = false;
+      flappyResetWorld(gW, gH);
+      s_lastStepMs = now;
+      clearInputLatch();
+      inputForceClear();
+      mgBeginInputLockout(120);
+      requestUIRedraw();
+    }
+
+    return;
+  }
+
+  // INIT
   if (!s_flappyInited)
   {
     s_flappyInited = true;
@@ -937,7 +1033,7 @@ void updateFlappyFireball(const InputState &input)
       else
       {
         s_impAnimMs += dt;
-      
+
         // Advance through burn frames 0..4
         if (s_impFrame < 4)
         {
@@ -945,7 +1041,7 @@ void updateFlappyFireball(const InputState &input)
           {
             s_impAnimMs = 0;
             s_impFrame++;
-      
+
             if (s_impFrame > 4)
               s_impFrame = 4;
           }
@@ -1264,30 +1360,93 @@ void drawFlappyFireball()
     }
   }
 
-  if (s_flappyGoalActive && !s_impBurnDone)
+  if (s_flappyShowIntro)
   {
-    const int islandW = 48;
-    const int islandH = 8;
-    const int impH = 48;
-  
-    const int islandX = s_flappyGoalX - 4;
-    const int islandY = s_flappyGoalY;
-  
-    spr.fillRoundRect(islandX, islandY, islandW, islandH, 3, TFT_BROWN);
-    spr.drawRoundRect(islandX, islandY, islandW, islandH, 3, TFT_DARKGREY);
-  
-    const int impX = s_flappyGoalX;
-    const int impY = s_flappyGoalY - impH;
-  
-    const char* impSprite = nullptr;
-    if (!s_impHit)
-      impSprite = kImpWaveFrames[s_impFrame];
-    else
-      impSprite = kImpBurnFrames[s_impFrame];
-  
+    spr.fillSprite(TFT_BLACK);
+    spr.setTextDatum(CC_DATUM);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
+    spr.drawCentreString("Torch the Imp!", gW / 2, 22, 2);
+
+    const int impX = (gW - 48) / 2;
+    const int impY = 40;
+
+    if (ensureImpWaveSprites())
+    {
+      s_impWaveSpr[s_impFrame].pushSprite(&spr, impX, impY, kFireKey);
+    }
+
+    if (s_flappyShowIntro)
+    {
+      spr.fillSprite(TFT_BLACK);
+      spr.setTextDatum(CC_DATUM);
+
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+      spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
+      spr.drawCentreString("Torch the Imp!", gW / 2, 22, 2);
+
+      const int impX = (gW - 48) / 2;
+      const int impY = 42;
+
+      const char *impSprite = kImpWaveFrames[s_impFrame];
+      sprDrawPngFromSD(impSprite, impX, impY);
+
+      const int cbY = 100;
+      const int cbSize = 10;
+      const int textOffset = 16;
+      const int lineWidth = 150; // approximate width of checkbox + text
+
+      const int cbX = (gW - lineWidth) / 2;
+
+      spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+      if (s_flappyDontShowAgain)
+      {
+        spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+        spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+      }
+
+      spr.setTextDatum(ML_DATUM);
+      spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+      spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
+
+      spr.setTextDatum(CC_DATUM);
+      spr.setTextColor(TFT_GREEN, TFT_BLACK);
+      spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
+      return;
+    }
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
+    return;
+  }
+if (s_flappyGoalActive && !s_impBurnDone)
+{
+  const int islandW = 48;
+  const int islandH = 8;
+  const int impH = 48;
+
+  const int islandX = s_flappyGoalX - 4;
+  const int islandY = s_flappyGoalY;
+
+  const int impX = s_flappyGoalX;
+  const int impY = s_flappyGoalY - impH;
+
+  if (!s_impHit)
+  {
+    if (ensureImpWaveSprites())
+      s_impWaveSpr[s_impFrame].pushSprite(&spr, impX, impY, kFireKey);
+  }
+  else
+  {
+    const char* impSprite = kImpBurnFrames[s_impFrame];
     if (impSprite)
       sprDrawPngFromSD(impSprite, impX, impY);
   }
+}
+
 if (!s_impHit)
 {
   if (haveFireball && s_flappyFireballReady)
@@ -1300,9 +1459,7 @@ if (!s_impHit)
     const int drawX = s_fbX - w / 2;
     const int drawY = s_fbY - h / 2;
 
-    // subtle glow behind fireball
     spr.fillCircle(s_fbX, s_fbY, 6, TFT_RED);
-
     s_flappyFireballSpr[frame].pushSprite(&spr, drawX, drawY, kFireKey);
   }
   else
@@ -1426,7 +1583,7 @@ void miniGameExitToReturnUi(bool beginLockout)
   // Prevent Exit-confirm ENTER from triggering other UI confirms
   inputForceClear();
   s_prevSelectHeld = false;
-
+  freeImpWaveSprites();
   invalidateBackgroundCache();
   requestFullUIRedraw();
 
