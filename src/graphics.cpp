@@ -59,6 +59,7 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
+#include "new_pet_flow_state.h"
 
 bool g_forcePetBgCache = false;
 static void drawBurialScreen();
@@ -84,8 +85,8 @@ static void drawCrackedEggBig(int cx, int cy);
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
 bool sprDrawPngFromSD(const char *path, int x, int y);
-bool canvasDrawPngFromSD(m5gfx::M5Canvas& canvas, const char* path, int x, int y);
-bool canvasDrawJpgFromSD(m5gfx::M5Canvas& canvas, const char* path, int x, int y);
+bool canvasDrawPngFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
+bool canvasDrawJpgFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 
 // Provide no-arg wrappers for existing bool-signature screens
 static void drawDeathScreen();   // calls drawDeathScreen(bool)
@@ -172,14 +173,12 @@ static AnimId evoHappyClipFor(PetType type, uint8_t stage)
 // That path instantiates DataWrapperT<fs::...> and fails to compile.
 // Instead, setFileStorage(SD) once, then use the "path-only" overload.
 // -----------------------------------------------------------------------------
-static void ensureSprFileStorage()
-{
-  spr.setFileStorage(SD);
-}
+static void ensureSprFileStorage() { spr.setFileStorage(SD); }
 
 bool sprDrawJpgFromSD(const char *path, int x, int y)
 {
-  if (!g_sdReady) return false;
+  if (!g_sdReady)
+    return false;
   if (!path || !*path)
     return false;
   ensureSprFileStorage();
@@ -188,20 +187,21 @@ bool sprDrawJpgFromSD(const char *path, int x, int y)
 
 bool sprDrawPngFromSD(const char *path, int x, int y)
 {
-  if (!g_sdReady) return false;
+  if (!g_sdReady)
+    return false;
   if (!path || !*path)
     return false;
   ensureSprFileStorage();
   return spr.drawPngFile(path, x, y);
 }
 
-bool canvasDrawPngFromSD(M5Canvas& canvas, const char* path, int x, int y)
+bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y)
 {
   canvas.setFileStorage(SD);
   return canvas.drawPngFile(path, x, y);
 }
 
-bool canvasDrawJpgFromSD(M5Canvas& canvas, const char* path, int x, int y)
+bool canvasDrawJpgFromSD(M5Canvas &canvas, const char *path, int x, int y)
 {
   canvas.setFileStorage(SD);
   return canvas.drawJpgFile(path, x, y);
@@ -404,7 +404,7 @@ static inline uint16_t uiModalOutline(PetType t) { return uiSchemeForPet(t).topO
 // -----------------------------------------------------------------------------
 static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
 static const char *PATH_BG_SLEEP = "/raising_hell/graphics/background/sleep_bg.jpg";
-static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/rh_splash.jpg";
+static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
 
 static const char *PATH_STAT_KAIJU = "/raising_hell/graphics/pet/kai_stat.png";
 static const char *PATH_STAT_AXOLOTL = "/raising_hell/graphics/pet/axo_stat.png";
@@ -753,14 +753,55 @@ static void drawSleepScreenImpl(bool redrawBg);
 
 void drawSleepScreen() { drawSleepScreenImpl(true); }
 
+// // -----------------------------------------------------------------------------
+// EGG Cracker - Cracks your eggs
 // -----------------------------------------------------------------------------
-// EGG Scaler - Are your eggs TOO SMALL??
-// -----------------------------------------------------------------------------
-static void drawCrackedEggBig(int cx, int cy)
+
+static const char *pendingEggClosedPng()
 {
-  // No scaling. Just draw the cracked egg centered.
-  // If you want it physically bigger, make the PNG itself bigger on SD.
-  drawCenteredImageSpr("/raising_hell/graphics/pet/egg/dev_egg_cracked.png", cx, cy);
+  if (g_pendingPetType == PET_ELDRITCH)
+    return "/raising_hell/graphics/pet/egg/eld_egg.png";
+
+  return "/raising_hell/graphics/pet/egg/dev_egg.png";
+}
+
+static const char *pendingEggCrackedPng()
+{
+  if (g_pendingPetType == PET_ELDRITCH)
+    return "/raising_hell/graphics/pet/egg/eld_egg_cracked.png";
+
+  return "/raising_hell/graphics/pet/egg/dev_egg_cracked.png";
+}
+
+static const char *const *pendingEggCrackFrames()
+{
+  static const char *const devFrames[4] = {
+      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack1.png",
+      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack2.png",
+      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack3.png",
+      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack4.png",
+  };
+
+  static const char *const eldFrames[4] = {
+      "/raising_hell/graphics/pet/egg/anim/eld/eld_crack1.png",
+      "/raising_hell/graphics/pet/egg/anim/eld/eld_crack2.png",
+      "/raising_hell/graphics/pet/egg/anim/eld/eld_crack3.png",
+      "/raising_hell/graphics/pet/egg/anim/eld/eld_crack4.png",
+  };
+
+  return (g_pendingPetType == PET_ELDRITCH) ? eldFrames : devFrames;
+}
+
+static const char *pendingHatchMessage()
+{
+  switch (g_pendingPetType)
+  {
+  case PET_ELDRITCH:
+    return "You hatched a baby eldritch";
+  case PET_DEVIL:
+  default:
+    return "You hatched a baby devil";
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -5040,6 +5081,53 @@ static void drawCenteredImageSpr(const char *path, int cx, int cy)
   }
 }
 
+static void drawCrackedEggBig(int cx, int cy)
+{
+  const char *path = pendingEggCrackedPng();
+  if (!path || !path[0] || !g_sdReady)
+    return;
+
+  // Devil egg should NOT be scaled
+  if (g_pendingPetType == PET_DEVIL)
+  {
+    drawCenteredImageSpr(path, cx, cy);
+    return;
+  }
+
+  int w = 0;
+  int h = 0;
+  if (!getPngWH(path, w, h) || w <= 0 || h <= 0)
+  {
+    drawCenteredImageSpr(path, cx, cy);
+    return;
+  }
+
+  M5Canvas egg(&M5.Display);
+  egg.setColorDepth(16);
+
+  if (!egg.createSprite(w, h))
+  {
+    drawCenteredImageSpr(path, cx, cy);
+    return;
+  }
+
+  egg.fillSprite(TFT_BLACK);
+
+  if (!egg.drawPngFile(SD, path, 0, 0))
+  {
+    egg.deleteSprite();
+    drawCenteredImageSpr(path, cx, cy);
+    return;
+  }
+
+  egg.setPivot(w / 2, h / 2);
+
+  const float scale = 1.6f;
+  egg.pushRotateZoom(&spr, cx, cy, 0.0f, scale, scale);
+
+  egg.deleteSprite();
+}
+
 static void drawCenteredLine(const char *s, int y, int font = 2, int size = 1)
 {
   spr.setTextDatum(TC_DATUM);
@@ -5228,10 +5316,8 @@ void drawHatchingScreen(bool redrawBg)
 {
   (void)redrawBg;
 
-  // Always redraw cleanly (prevents ghosting)
   spr.fillSprite(TFT_BLACK);
 
-  // Flash is ONLY allowed before message phase.
   if (g_app.flow.hatch.flashWhite && !g_app.flow.hatch.showingMsg)
   {
     spr.fillSprite(TFT_WHITE);
@@ -5239,77 +5325,28 @@ void drawHatchingScreen(bool redrawBg)
   }
 
   const int centerX = screenW / 2;
-
-  // Move the animated egg DOWN into the lower part of the screen
   const int animEggY = 92;
-
-  // Move the cracked/hatched egg DOWN (you resized it; give it room)
   const int crackedEggY = 78;
 
-  const char *crackFrames[4] = {
-      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack1.png",
-      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack2.png",
-      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack3.png",
-      "/raising_hell/graphics/pet/egg/anim/dev/devil_crack4.png",
-  };
+  const char *const *crackFrames = pendingEggCrackFrames();
 
-  // ----- ANIMATION PHASE -----
   if (!g_app.flow.hatch.showingMsg)
   {
-    // Some SD packs don't include the crack-frame sequence yet.
-    // Try the sequence first, then fall back to the static egg with a subtle
-    // shake so the player still sees progress.
-    auto drawCenteredOk = [&](const char *path, int cx, int cy) -> bool
-    {
-      if (!path || !*path)
-        return false;
-      if (!g_sdReady)
-        return false;
-
-      int w = 0, h = 0;
-      const bool gotWH = getPngWH(path, w, h);
-      const int x = gotWH ? (cx - (w / 2)) : cx;
-      const int y = gotWH ? (cy - (h / 2)) : cy;
-      return sprDrawPngFromSD(path, x, y);
-    };
-
-    bool drew = false;
     if (g_app.flow.hatch.frame < 4)
-    {
-      drew = drawCenteredOk(crackFrames[g_app.flow.hatch.frame], centerX, animEggY);
-    }
+      drawCenteredImageSpr(crackFrames[g_app.flow.hatch.frame], centerX, animEggY);
     else
-    {
-      drew = drawCenteredOk("/raising_hell/graphics/pet/egg/dev_egg_cracked.png", centerX, crackedEggY);
-    }
+      drawCrackedEggBig(centerX, crackedEggY);
 
-    if (!drew)
-    {
-      const bool finalCracked = (g_app.flow.hatch.frame >= 4);
-      const char *fallback = finalCracked ? "/raising_hell/graphics/pet/egg/dev_egg_cracked.png" : DEV_EGG_PNG;
-
-      int shakeX = 0;
-      if (!finalCracked)
-      {
-        const uint32_t t = millis();
-        shakeX = ((t / 90) & 1) ? 2 : -2;
-      }
-      (void)drawCenteredOk(fallback, centerX + shakeX, finalCracked ? crackedEggY : animEggY);
-    }
     return;
   }
 
-  // ----- HATCHED / MESSAGE PHASE -----
-  // Draw BOTH egg and text in the same pass (no extra returns)
-  drawCenteredImageSpr("/raising_hell/graphics/pet/egg/dev_egg_cracked.png", centerX, crackedEggY);
+  drawCrackedEggBig(centerX, crackedEggY);
 
-  // Single line message (bottom-ish)
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.setTextFont(2);
   spr.setTextSize(1);
-
-  spr.drawString("You hatched a baby devil!", centerX, 122);
+  spr.drawString(pendingHatchMessage(), centerX, 122);
 }
 
 // ============================================================================
@@ -5398,7 +5435,7 @@ void drawSetTimeScreen()
 // ============================================================================
 static void drawBurialScreen()
 {
-  static const char *kBurialBg = "/raising_hell/graphics/background/grave.jpg";
+  static const char *kBurialBg = "/raising_hell/graphics/background/flow/grave.jpg";
 
   spr.fillSprite(TFT_BLACK);
 

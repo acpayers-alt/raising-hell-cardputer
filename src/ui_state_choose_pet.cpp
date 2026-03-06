@@ -1,7 +1,7 @@
 #include "ui_state_choose_pet.h"
 
 #include <string.h>
-
+#include "build_flags.h"
 #include "app_state.h"
 #include "input.h"
 #include "name_entry_state.h"
@@ -57,6 +57,12 @@ void uiChoosePetHandle(InputState& in)
 
   // This is your existing choice list ordering.
   // Keep identical to legacy:
+  #if PUBLIC_BUILD
+  static const PetType kChoices[] = {
+    PET_DEVIL,
+    PET_ELDRITCH,
+  };
+#else
   static const PetType kChoices[] = {
     PET_DEVIL,
     PET_ELDRITCH,
@@ -65,6 +71,7 @@ void uiChoosePetHandle(InputState& in)
     PET_ANUBIS,
     PET_AXOLOTL,
   };
+#endif
 
   const int choiceCount = (int)(sizeof(kChoices) / sizeof(kChoices[0]));
 
