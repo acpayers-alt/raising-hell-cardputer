@@ -167,8 +167,9 @@ static uint32_t s_impAnimMs = 0;
 static uint32_t s_impHoldMs = 0;
 
 static constexpr uint32_t kImpWaveFrameMs = 180;
-static constexpr uint32_t kImpBurnFrameMs = 120;
+static constexpr uint32_t kImpBurnFrameMs = 180;
 static constexpr uint32_t kImpBurnHoldMs = 600;
+static constexpr uint32_t kImpLastFrameHoldMs = 500;
 
 static const char *const kImpWaveFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png",
@@ -774,8 +775,8 @@ static void flappyStep(int w, int h, bool flap)
 
   if (s_flappyGoalActive && !s_flappyGoalReached)
   {
-    const int impW = 18;
-    const int impH = 18;
+    const int impW = 48;
+    const int impH = 48;
     const int islandH = 8;
 
     const int goalLeft = s_flappyGoalX;
@@ -921,11 +922,6 @@ void updateFlappyFireball(const InputState &input)
       {
         flappyStep(gW, gH, flapThisStep);
       }
-      else
-      {
-        // keep background/level motion alive, but don't allow new flap impulse
-        flappyStep(gW, gH, false);
-      }
 
       const uint32_t dt = stepMs;
 
@@ -938,33 +934,33 @@ void updateFlappyFireball(const InputState &input)
           s_impFrame = (s_impFrame + 1) % 2;
         }
       }
-      else if (!s_impBurnDone)
-      {
-        s_impAnimMs += dt;
-        if (s_impAnimMs >= kImpBurnFrameMs)
-        {
-          s_impAnimMs -= kImpBurnFrameMs;
-          s_impFrame++;
-
-          if (s_impFrame >= 5)
-          {
-            s_impFrame = 4;
-            s_impBurnDone = true;
-            s_impHoldMs = 0;
-          }
-        }
-      }
       else
       {
-        s_impHoldMs += dt;
+        s_impAnimMs += dt;
       
-        if (s_impHoldMs >= kImpBurnHoldMs)
+        // Advance through burn frames 0..4
+        if (s_impFrame < 4)
         {
-          playerWon = true;
-          g_app.gameOver = true;
-          requestUIRedraw();
-          s_resultShown = true;
-          s_flappyPlaying = false;
+          if (s_impAnimMs >= kImpBurnFrameMs)
+          {
+            s_impAnimMs = 0;
+            s_impFrame++;
+      
+            if (s_impFrame > 4)
+              s_impFrame = 4;
+          }
+        }
+        else
+        {
+          // Hold on the final burn frame before winning
+          if (s_impAnimMs >= kImpLastFrameHoldMs)
+          {
+            playerWon = true;
+            g_app.gameOver = true;
+            requestUIRedraw();
+            s_resultShown = true;
+            s_flappyPlaying = false;
+          }
         }
       }
 
@@ -1270,9 +1266,9 @@ void drawFlappyFireball()
 
   if (s_flappyGoalActive && !s_impBurnDone)
   {
-    const int islandW = 28;
+    const int islandW = 48;
     const int islandH = 8;
-    const int impH = 18;
+    const int impH = 48;
   
     const int islandX = s_flappyGoalX - 4;
     const int islandY = s_flappyGoalY;
@@ -1292,6 +1288,8 @@ void drawFlappyFireball()
     if (impSprite)
       sprDrawPngFromSD(impSprite, impX, impY);
   }
+if (!s_impHit)
+{
   if (haveFireball && s_flappyFireballReady)
   {
     const int frame = (millis() / 80) % 3;
@@ -1311,6 +1309,7 @@ void drawFlappyFireball()
   {
     spr.fillCircle(s_fbX, s_fbY, 5, TFT_ORANGE);
   }
+}
 }
 
 // -----------------------------------------------------------------------------
