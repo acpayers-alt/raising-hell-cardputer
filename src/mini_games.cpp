@@ -147,6 +147,8 @@ static bool mgAcceptArmedNow(uint32_t now)
   return s_acceptArmed && !mgInputLockedOut();
 }
 
+static const uint16_t kSpriteKey = 0x0841; // very dark grey
+
 // -----------------------------------------------------------------------------
 // FLAPPY FIREBALL GLOBALS
 // -----------------------------------------------------------------------------
@@ -190,7 +192,7 @@ static const char *const kImpBurnFrames[] = {
 };
 
 // SPIKES
-static const uint16_t kFireKey = TFT_MAGENTA;
+static const uint16_t kFireKey   = kSpriteKey;
 static const char *flappyBgPathForPet();
 
 // GOALS
@@ -593,7 +595,7 @@ static bool ensureFlappyFireballSprites(const char *bgPath)
   return true;
 }
 
-static const uint16_t kPipeKey = TFT_MAGENTA;
+static const uint16_t kPipeKey   = kSpriteKey;
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
   if (!bgPath || !bgPath[0])
@@ -2454,7 +2456,7 @@ static uint32_t s_dodgerDirHoldMs = 0;
 
 static DodgerBall s_dodgerBalls[8];
 
-static const uint16_t kDodgerKey = TFT_MAGENTA;
+static const uint16_t kDodgerKey = kSpriteKey;
 
 static M5Canvas s_dodgerBgSpr(&M5.Display);
 static bool s_dodgerBgSprReady = false;
