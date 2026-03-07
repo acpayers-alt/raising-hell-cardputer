@@ -2395,8 +2395,13 @@ enum DodgerPhase
   DODGER_PHASE_GOAL,
   DODGER_PHASE_IMPACT,
   DODGER_PHASE_CAR_EXIT,
-  DODGER_PHASE_HOLD
+  DODGER_PHASE_HOLD,
+  DODGER_PHASE_OFFROAD_CRASH,
+  DODGER_PHASE_OFFROAD_HOLD
 };
+
+static int8_t s_dodgerCrashDir = 0;
+static constexpr uint32_t kDodgerOffroadHoldMs = 500;
 
 static M5Canvas s_dodgerFireballSpr[3] = {M5Canvas(&M5.Display), M5Canvas(&M5.Display), M5Canvas(&M5.Display)};
 
@@ -2869,6 +2874,7 @@ static void dodgerReset()
   s_dodgerPhaseStartMs = millis();
   s_dodgerGoalAnimFrame = 0;
   s_dodgerGoalAnimMs = millis();
+  s_dodgerCrashDir = 0;
 
   s_dodgerFreezeScroll = false;
 }
@@ -2892,8 +2898,11 @@ static void dodgerSpawnOne(int difficulty)
   DodgerBall &b = s_dodgerBalls[slot];
 
   const int margin = 6;
+  const int roadLeft  = 54;
+  const int roadRight = gW - 54;
+  
   b.r = (uint8_t)(3 + (difficulty % 3));
-  b.x = (int16_t)random((long)(margin), (long)(gW - margin));
+  b.x = (int16_t)random((long)(roadLeft + margin), (long)(roadRight - margin));
   b.y = (int16_t)(-(int)(10 + random(40)));
 
   b.vy = (int16_t)(2 + (difficulty / 5));
@@ -3149,19 +3158,35 @@ void updateInfernalDodger(const InputState &input)
 
   s_dodgerPx = (int16_t)(s_dodgerPxF + 0.5f);
 
-  const int margin = 6;
-  if (s_dodgerPx < margin)
-    s_dodgerPx = margin;
-  if (s_dodgerPx > gW - margin)
-    s_dodgerPx = gW - margin;
+  const int roadLeft = 54;
+  const int roadRight = gW - 54;
 
-    const uint32_t stepMs = 16;
-    int steps = 0;
-    const int kMaxStepsPerFrame = 4;
-    
-    while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
+  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+  {
+    if (s_dodgerPx < roadLeft)
     {
+      s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
+      s_dodgerPhaseStartMs = now;
+      s_dodgerCrashDir = -1;
+      s_dodgerMoveDir = -1;
+      soundError();
+    }
+    else if (s_dodgerPx > roadRight)
+    {
+      s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
+      s_dodgerPhaseStartMs = now;
+      s_dodgerCrashDir = +1;
+      s_dodgerMoveDir = +1;
+      soundError();
+    }
+  }
 
+  const uint32_t stepMs = 16;
+  int steps = 0;
+  const int kMaxStepsPerFrame = 4;
+
+  while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
+  {
     int spawnEveryMs = 520 - difficulty * 24;
     if (spawnEveryMs < 220)
       spawnEveryMs = 220;
@@ -3199,14 +3224,29 @@ void updateInfernalDodger(const InputState &input)
           return;
         }
       }
-    }
 
-    if (s_dodgerPhase == DODGER_PHASE_GOAL)
+      const int roadLeft = 54;
+      const int roadRight = gW - 54;
+
+      if (s_dodgerPx < roadLeft || s_dodgerPx > roadRight)
+      {
+        s_dodgerCrashDir = (s_dodgerMoveDir < 0) ? -1 : +1;
+
+        if (s_dodgerPx < roadLeft && s_dodgerMoveDir == 0)
+          s_dodgerCrashDir = -1;
+        if (s_dodgerPx > roadRight && s_dodgerMoveDir == 0)
+          s_dodgerCrashDir = +1;
+
+        s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
+        s_dodgerPhaseStartMs = now;
+        s_dodgerMoveDir = 0;
+      }
+    }
+    else if (s_dodgerPhase == DODGER_PHASE_GOAL)
     {
       const int targetY = gH / 2;
 
-      if (!s_dodgerFreezeScroll)
-        s_dodgerGoalY += roadSpeed;
+      s_dodgerGoalY += roadSpeed;
 
       if (s_dodgerGoalY >= targetY)
       {
@@ -3218,15 +3258,12 @@ void updateInfernalDodger(const InputState &input)
         soundConfirm();
       }
     }
-        else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
+    else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
     {
-      if ((now - s_dodgerPhaseStartMs) >= 120)
-      {
-        s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
-        s_dodgerPhaseStartMs = now;
-      }
+      s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
+      s_dodgerPhaseStartMs = now;
     }
-        else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
+    else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
     {
       s_dodgerPy -= 3;
 
@@ -3247,12 +3284,37 @@ void updateInfernalDodger(const InputState &input)
         return;
       }
     }
+    else if (s_dodgerPhase == DODGER_PHASE_OFFROAD_CRASH)
+    {
+      s_dodgerPx += s_dodgerCrashDir * 4;
+      s_dodgerPxF = (float)s_dodgerPx;
+
+      if ((s_dodgerCrashDir < 0 && s_dodgerPx < -(s_dodgerCarW > 0 ? s_dodgerCarW : 32)) ||
+          (s_dodgerCrashDir > 0 && s_dodgerPx > gW + (s_dodgerCarW > 0 ? s_dodgerCarW : 32)))
+      {
+        s_dodgerPhase = DODGER_PHASE_OFFROAD_HOLD;
+        s_dodgerPhaseStartMs = now;
+      }
+    }
+    else if (s_dodgerPhase == DODGER_PHASE_OFFROAD_HOLD)
+    {
+      if ((now - s_dodgerPhaseStartMs) >= kDodgerOffroadHoldMs)
+      {
+        playerWon = false;
+        g_app.gameOver = true;
+        requestUIRedraw();
+        s_resultShown = true;
+        soundError();
+        return;
+      }
+    }
 
     s_dodgerLastStepMs += stepMs;
-   steps++; 
+    steps++;
   }
+
   if ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs)
-  s_dodgerLastStepMs = now;
+    s_dodgerLastStepMs = now;
 }
 
 void drawInfernalDodger()
@@ -3366,8 +3428,7 @@ void drawInfernalDodger()
     }
   }
 
-  if (s_dodgerPhase != DODGER_PHASE_HOLD)
-  {
+  if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)  {
     if (haveCar && s_dodgerCarReady)
     {
       const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
