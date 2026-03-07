@@ -2409,7 +2409,7 @@ static int16_t s_dodgerGoalY = 0;
 
 static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
 
-static constexpr uint32_t kDodgerCoastMs = 300;
+static constexpr uint32_t kDodgerCoastMs = 600;
 
 static LGFX_Sprite s_dodgerGoalSpr[2];
 static bool s_dodgerGoalFrameReady[2] = {false, false};
@@ -2863,7 +2863,7 @@ static void dodgerReset()
   s_dodgerGoalActive = false;
   s_dodgerGoalReached = false;
   s_dodgerGoalX = gW / 2;
-  s_dodgerGoalY = -40;
+  s_dodgerGoalY = gH / 2 - 20;
 
   s_dodgerPhase = DODGER_PHASE_FIREBALLS;
   s_dodgerPhaseStartMs = millis();
@@ -3038,16 +3038,25 @@ void updateInfernalDodger(const InputState &input)
     (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
     (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
 
-    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n",
-                  s_dodgerGoalFrameReady[0] ? 1 : 0,
-                  s_dodgerGoalFrameReady[1] ? 1 : 0,
-                  s_dodgerGoreReady ? 1 : 0,
-                  s_dodgerGoalW,
-                  s_dodgerGoalH);
+    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
+                  s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
   }
 
   if (s_dodgerPhase == DODGER_PHASE_COAST)
   {
+    const int targetX = gW / 2;
+    const int centerDriftPx = 2;
+
+    if (s_dodgerPx < targetX)
+      s_dodgerPx += centerDriftPx;
+    else if (s_dodgerPx > targetX)
+      s_dodgerPx -= centerDriftPx;
+
+    if (abs(s_dodgerPx - targetX) < centerDriftPx)
+      s_dodgerPx = targetX;
+
+    s_dodgerPxF = (float)s_dodgerPx;
+    
     if ((now - s_dodgerPhaseStartMs) >= kDodgerCoastMs)
     {
       s_dodgerPhase = DODGER_PHASE_GOAL;
@@ -3055,7 +3064,7 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerGoalActive = true;
       s_dodgerGoalReached = false;
       s_dodgerGoalX = gW / 2;
-      s_dodgerGoalY = 12;
+      s_dodgerGoalY = (gH / 2) - 18;
       s_dodgerGoalAnimFrame = 0;
       s_dodgerGoalAnimMs = now;
     }
@@ -3142,9 +3151,13 @@ void updateInfernalDodger(const InputState &input)
   if (s_dodgerPx > gW - margin)
     s_dodgerPx = gW - margin;
 
-  const uint32_t stepMs = 16;
-  while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs)
-  {
+    const uint32_t stepMs = 16;
+    int steps = 0;
+    const int kMaxStepsPerFrame = 4;
+    
+    while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
+    {
+
     int spawnEveryMs = 520 - difficulty * 24;
     if (spawnEveryMs < 220)
       spawnEveryMs = 220;
@@ -3187,25 +3200,28 @@ void updateInfernalDodger(const InputState &input)
     if (s_dodgerPhase == DODGER_PHASE_GOAL)
     {
       const int targetY = gH / 2;
-
-      s_dodgerGoalY += roadSpeed;
-
+    
+      s_dodgerGoalY += 1;
+    
       if (s_dodgerGoalY >= targetY)
       {
         s_dodgerGoalY = targetY;
         s_dodgerGoalReached = true;
         s_dodgerFreezeScroll = true;
-        s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
+        s_dodgerPhase = DODGER_PHASE_IMPACT;
         s_dodgerPhaseStartMs = now;
         soundConfirm();
       }
     }
     else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
     {
-      s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
-      s_dodgerPhaseStartMs = now;
+      if ((now - s_dodgerPhaseStartMs) >= 120)
+      {
+        s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
+        s_dodgerPhaseStartMs = now;
+      }
     }
-    else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
+        else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
     {
       s_dodgerPy -= 3;
 
@@ -3228,7 +3244,10 @@ void updateInfernalDodger(const InputState &input)
     }
 
     s_dodgerLastStepMs += stepMs;
+   steps++; 
   }
+  if ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs)
+  s_dodgerLastStepMs = now;
 }
 
 void drawInfernalDodger()
