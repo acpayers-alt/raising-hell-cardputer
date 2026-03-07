@@ -3015,11 +3015,12 @@ void updateInfernalDodger(const InputState &input)
   const uint32_t now = millis();
   const uint32_t aliveMs = dodgerAliveMsNow(now);
   const int difficulty = (int)(aliveMs / 3000);
+
   int roadSpeed = 2 + (difficulty / 4);
   if (roadSpeed > 4)
     roadSpeed = 4;
 
-  if (!s_dodgerFreezeScroll && s_dodgerPhase != DODGER_PHASE_GOAL)
+  if (!s_dodgerFreezeScroll)
     s_dodgerBgScrollY -= roadSpeed;
 
   if (s_dodgerPhase == DODGER_PHASE_FIREBALLS && aliveMs >= kDodgerGoalSpawnMs)
@@ -3037,8 +3038,12 @@ void updateInfernalDodger(const InputState &input)
     (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
     (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
 
-    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
-                  s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
+    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n",
+                  s_dodgerGoalFrameReady[0] ? 1 : 0,
+                  s_dodgerGoalFrameReady[1] ? 1 : 0,
+                  s_dodgerGoreReady ? 1 : 0,
+                  s_dodgerGoalW,
+                  s_dodgerGoalH);
   }
 
   if (s_dodgerPhase == DODGER_PHASE_COAST)
@@ -3138,54 +3143,60 @@ void updateInfernalDodger(const InputState &input)
     s_dodgerPx = gW - margin;
 
   const uint32_t stepMs = 16;
-  while ((int32_t)(now - s_dodgerLastStepMs) >= 0)
+  while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs)
   {
     int spawnEveryMs = 520 - difficulty * 24;
     if (spawnEveryMs < 220)
       spawnEveryMs = 220;
 
-      if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+    if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+    {
+      s_dodgerSpawnAccMs += stepMs;
+      if (s_dodgerSpawnAccMs >= (uint32_t)spawnEveryMs)
       {
-        for (auto &b : s_dodgerBalls)
+        s_dodgerSpawnAccMs = 0;
+        dodgerSpawnOne(difficulty);
+      }
+
+      for (auto &b : s_dodgerBalls)
+      {
+        if (!b.active)
+          continue;
+
+        b.y += b.vy;
+
+        if (b.y > gH + 12)
         {
-          if (!b.active)
-            continue;
-  
-          b.y += b.vy;
-  
-          if (b.y > gH + 12)
-          {
-            b.active = false;
-            continue;
-          }
-  
-          const int pr = 6;
-          if (dodgerHit((int)s_dodgerPx, (int)s_dodgerPy, pr, (int)b.x, (int)b.y, (int)b.r))
-          {
-            playerWon = false;
-            g_app.gameOver = true;
-            requestUIRedraw();
-            s_resultShown = true;
-            soundError();
-            return;
-          }
+          b.active = false;
+          continue;
+        }
+
+        const int pr = 6;
+        if (dodgerHit((int)s_dodgerPx, (int)s_dodgerPy, pr, (int)b.x, (int)b.y, (int)b.r))
+        {
+          playerWon = false;
+          g_app.gameOver = true;
+          requestUIRedraw();
+          s_resultShown = true;
+          soundError();
+          return;
         }
       }
-      
+    }
+
     if (s_dodgerPhase == DODGER_PHASE_GOAL)
     {
       const int targetY = gH / 2;
+
+      s_dodgerGoalY += roadSpeed;
 
       if (s_dodgerGoalY >= targetY)
       {
         s_dodgerGoalY = targetY;
         s_dodgerGoalReached = true;
         s_dodgerFreezeScroll = true;
-
-        // Go straight into the exit pull-away so the car keeps moving.
         s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
         s_dodgerPhaseStartMs = now;
-
         soundConfirm();
       }
     }
@@ -3215,6 +3226,7 @@ void updateInfernalDodger(const InputState &input)
         return;
       }
     }
+
     s_dodgerLastStepMs += stepMs;
   }
 }
