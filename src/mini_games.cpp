@@ -2400,6 +2400,11 @@ enum DodgerPhase
   DODGER_PHASE_OFFROAD_HOLD
 };
 
+static bool s_dodgerShowIntro = true;
+static bool s_dodgerDontShowAgain = false; // visual only for now
+static uint8_t s_dodgerIntroImpFrame = 0;
+static uint32_t s_dodgerIntroImpAnimMs = 0;
+
 static int8_t s_dodgerCrashDir = 0;
 static constexpr uint32_t kDodgerOffroadHoldMs = 500;
 
@@ -2984,6 +2989,10 @@ void startInfernalDodger()
   dodgerReset();
 
   invalidateBackgroundCache();
+  s_dodgerShowIntro = true;
+  s_dodgerDontShowAgain = false;
+  s_dodgerIntroImpFrame = 0;
+  s_dodgerIntroImpAnimMs = millis();
   requestUIRedraw();
   clearInputLatch();
   // Prevent the ENTER used to launch the mini-game from being interpreted as
@@ -3024,6 +3033,36 @@ void updateInfernalDodger(const InputState &input)
   const uint32_t now = millis();
   const uint32_t aliveMs = dodgerAliveMsNow(now);
   const int difficulty = (int)(aliveMs / 3000);
+
+  if (s_dodgerShowIntro)
+{
+  const uint32_t dt = now - s_dodgerIntroImpAnimMs;
+
+  if (dt >= 180)
+  {
+    s_dodgerIntroImpAnimMs = now;
+    s_dodgerIntroImpFrame ^= 1;
+  }
+
+  if (input.mgSpaceOnce)
+    s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
+
+  const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+
+  if (startPressed && !mgInputLockedOut())
+  {
+    s_dodgerShowIntro = false;
+    dodgerReset();
+    s_dodgerMoveLastMs = now;
+    s_dodgerLastStepMs = now;
+    clearInputLatch();
+    inputForceClear();
+    mgBeginInputLockout(120);
+    requestUIRedraw();
+  }
+
+  return;
+}
 
   int roadSpeed = 2 + (difficulty / 4);
   if (roadSpeed > 4)
@@ -3359,6 +3398,45 @@ void drawInfernalDodger()
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
+    return;
+  }
+
+  if (s_dodgerShowIntro)
+  {
+    spr.fillSprite(TFT_BLACK);
+    spr.setTextDatum(CC_DATUM);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Arrow keys or A/L to dodge", gW / 2, 8, 2);
+    spr.drawCentreString("Stay on the road, smash the Imp!", gW / 2, 26, 2);
+
+    const int impX = (gW - 48) / 2;
+    const int impY = 44;
+
+    if (ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet()))
+      s_dodgerGoalSpr[s_dodgerIntroImpFrame].pushSprite(&spr, impX, impY, kDodgerKey);
+
+    const int cbY = 102;
+    const int cbSize = 10;
+    const int textOffset = 16;
+    const int lineWidth = 150;
+    const int cbX = (gW - lineWidth) / 2;
+
+    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+    if (s_dodgerDontShowAgain)
+    {
+      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+    }
+
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
     return;
   }
 
