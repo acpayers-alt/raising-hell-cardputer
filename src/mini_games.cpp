@@ -2409,7 +2409,7 @@ static int16_t s_dodgerGoalY = 0;
 
 static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
 
-static constexpr uint32_t kDodgerCoastMs = 600;
+static constexpr uint32_t kDodgerCoastMs = 100;
 
 static LGFX_Sprite s_dodgerGoalSpr[2];
 static bool s_dodgerGoalFrameReady[2] = {false, false};
@@ -3019,6 +3019,10 @@ void updateInfernalDodger(const InputState &input)
   int roadSpeed = 2 + (difficulty / 4);
   if (roadSpeed > 4)
     roadSpeed = 4;
+  
+  // prevent acceleration during coast/goal/impact
+  if (s_dodgerPhase != DODGER_PHASE_FIREBALLS)
+    roadSpeed = 2;
 
   if (!s_dodgerFreezeScroll)
     s_dodgerBgScrollY -= roadSpeed;
@@ -3064,7 +3068,7 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerGoalActive = true;
       s_dodgerGoalReached = false;
       s_dodgerGoalX = gW / 2;
-      s_dodgerGoalY = (gH / 2) - 18;
+      s_dodgerGoalY = -24;
       s_dodgerGoalAnimFrame = 0;
       s_dodgerGoalAnimMs = now;
     }
@@ -3200,20 +3204,21 @@ void updateInfernalDodger(const InputState &input)
     if (s_dodgerPhase == DODGER_PHASE_GOAL)
     {
       const int targetY = gH / 2;
-    
-      s_dodgerGoalY += 1;
-    
+
+      if (!s_dodgerFreezeScroll)
+        s_dodgerGoalY += roadSpeed;
+
       if (s_dodgerGoalY >= targetY)
       {
         s_dodgerGoalY = targetY;
         s_dodgerGoalReached = true;
         s_dodgerFreezeScroll = true;
-        s_dodgerPhase = DODGER_PHASE_IMPACT;
+        s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
         s_dodgerPhaseStartMs = now;
         soundConfirm();
       }
     }
-    else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
+        else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
     {
       if ((now - s_dodgerPhaseStartMs) >= 120)
       {
