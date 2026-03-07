@@ -3028,8 +3028,8 @@ void updateInfernalDodger(const InputState &input)
   int roadSpeed = 2 + (difficulty / 4);
   if (roadSpeed > 4)
     roadSpeed = 4;
-  
-  // prevent acceleration during coast/goal/impact
+
+  // prevent acceleration during coast/goal/impact/exit/offroad
   if (s_dodgerPhase != DODGER_PHASE_FIREBALLS)
     roadSpeed = 2;
 
@@ -3051,8 +3051,12 @@ void updateInfernalDodger(const InputState &input)
     (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
     (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
 
-    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
-                  s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
+    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n",
+                  s_dodgerGoalFrameReady[0] ? 1 : 0,
+                  s_dodgerGoalFrameReady[1] ? 1 : 0,
+                  s_dodgerGoreReady ? 1 : 0,
+                  s_dodgerGoalW,
+                  s_dodgerGoalH);
   }
 
   if (s_dodgerPhase == DODGER_PHASE_COAST)
@@ -3069,7 +3073,7 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerPx = targetX;
 
     s_dodgerPxF = (float)s_dodgerPx;
-    
+
     if ((now - s_dodgerPhaseStartMs) >= kDodgerCoastMs)
     {
       s_dodgerPhase = DODGER_PHASE_GOAL;
@@ -3138,45 +3142,53 @@ void updateInfernalDodger(const InputState &input)
     s_dodgerMoveDir = 0;
   }
 
-  uint32_t mvDtMs = now - s_dodgerMoveLastMs;
-  s_dodgerMoveLastMs = now;
-  if (mvDtMs > 40)
-    mvDtMs = 40;
+  // Normal horizontal motion should NOT run during offroad crash/hold,
+  // or it will clamp the car back onto the screen.
+  if (s_dodgerPhase != DODGER_PHASE_OFFROAD_CRASH &&
+      s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
+  {
+    uint32_t mvDtMs = now - s_dodgerMoveLastMs;
+    s_dodgerMoveLastMs = now;
+    if (mvDtMs > 40)
+      mvDtMs = 40;
 
-  float pxPerSec = 120.0f + (float)(difficulty * 6);
-  if (pxPerSec > 170.0f)
-    pxPerSec = 170.0f;
+    float pxPerSec = 120.0f + (float)(difficulty * 6);
+    if (pxPerSec > 170.0f)
+      pxPerSec = 170.0f;
 
-  const float dt = (float)mvDtMs / 1000.0f;
-  s_dodgerPxF += (float)s_dodgerMoveDir * pxPerSec * dt;
+    const float dt = (float)mvDtMs / 1000.0f;
+    s_dodgerPxF += (float)s_dodgerMoveDir * pxPerSec * dt;
 
-  const float marginF = 6.0f;
-  if (s_dodgerPxF < marginF)
-    s_dodgerPxF = marginF;
-  if (s_dodgerPxF > (float)gW - marginF)
-    s_dodgerPxF = (float)gW - marginF;
+    const float marginF = 6.0f;
+    if (s_dodgerPxF < marginF)
+      s_dodgerPxF = marginF;
+    if (s_dodgerPxF > (float)gW - marginF)
+      s_dodgerPxF = (float)gW - marginF;
 
-  s_dodgerPx = (int16_t)(s_dodgerPxF + 0.5f);
+    s_dodgerPx = (int16_t)(s_dodgerPxF + 0.5f);
+  }
+  else
+  {
+    s_dodgerMoveLastMs = now;
+  }
 
   const int roadLeft = 54;
   const int roadRight = gW - 54;
 
   if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
   {
-    if (s_dodgerPx < roadLeft)
+    if (s_dodgerPx < roadLeft || s_dodgerPx > roadRight)
     {
+      s_dodgerCrashDir = (s_dodgerPx < roadLeft) ? -1 : +1;
+
+      if (s_dodgerMoveDir < 0)
+        s_dodgerCrashDir = -1;
+      else if (s_dodgerMoveDir > 0)
+        s_dodgerCrashDir = +1;
+
       s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
       s_dodgerPhaseStartMs = now;
-      s_dodgerCrashDir = -1;
-      s_dodgerMoveDir = -1;
-      soundError();
-    }
-    else if (s_dodgerPx > roadRight)
-    {
-      s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
-      s_dodgerPhaseStartMs = now;
-      s_dodgerCrashDir = +1;
-      s_dodgerMoveDir = +1;
+      s_dodgerMoveDir = 0;
       soundError();
     }
   }
@@ -3223,23 +3235,6 @@ void updateInfernalDodger(const InputState &input)
           soundError();
           return;
         }
-      }
-
-      const int roadLeft = 54;
-      const int roadRight = gW - 54;
-
-      if (s_dodgerPx < roadLeft || s_dodgerPx > roadRight)
-      {
-        s_dodgerCrashDir = (s_dodgerMoveDir < 0) ? -1 : +1;
-
-        if (s_dodgerPx < roadLeft && s_dodgerMoveDir == 0)
-          s_dodgerCrashDir = -1;
-        if (s_dodgerPx > roadRight && s_dodgerMoveDir == 0)
-          s_dodgerCrashDir = +1;
-
-        s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
-        s_dodgerPhaseStartMs = now;
-        s_dodgerMoveDir = 0;
       }
     }
     else if (s_dodgerPhase == DODGER_PHASE_GOAL)
@@ -3304,7 +3299,6 @@ void updateInfernalDodger(const InputState &input)
         g_app.gameOver = true;
         requestUIRedraw();
         s_resultShown = true;
-        soundError();
         return;
       }
     }
@@ -3329,12 +3323,7 @@ void drawInfernalDodger()
   const bool haveFireballs = ensureDodgerFireballSprites(bgPath);
   const bool haveCar = ensureDodgerCarSprite(carPath);
 
-  const char *goalFrame0 = dodgerGoalFrame1PathForPet();
-  const char *goalFrame1 = dodgerGoalFrame2PathForPet();
-  const char *gorePath = dodgerGoalGorePathForPet();
-
   const bool haveGoalFrames = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1];
-
   const bool haveGore = s_dodgerGoreReady;
 
   bool drewBg = false;
@@ -3402,16 +3391,23 @@ void drawInfernalDodger()
     }
   }
 
-  Serial.printf("GOAL draw: active=%d phase=%d ready0=%d ready1=%d x=%d y=%d w=%d h=%d\n", s_dodgerGoalActive ? 1 : 0,
-                (int)s_dodgerPhase, s_dodgerGoalFrameReady[0] ? 1 : 0, s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoalX,
-                s_dodgerGoalY, s_dodgerGoalW, s_dodgerGoalH);
+  Serial.printf("GOAL draw: active=%d phase=%d ready0=%d ready1=%d x=%d y=%d w=%d h=%d\n",
+                s_dodgerGoalActive ? 1 : 0,
+                (int)s_dodgerPhase,
+                s_dodgerGoalFrameReady[0] ? 1 : 0,
+                s_dodgerGoalFrameReady[1] ? 1 : 0,
+                s_dodgerGoalX,
+                s_dodgerGoalY,
+                s_dodgerGoalW,
+                s_dodgerGoalH);
 
   if (s_dodgerGoalActive)
   {
     const int drawX = s_dodgerGoalX - (s_dodgerGoalW / 2);
     const int drawY = s_dodgerGoalY - (s_dodgerGoalH / 2);
 
-    if (s_dodgerPhase == DODGER_PHASE_IMPACT || s_dodgerPhase == DODGER_PHASE_CAR_EXIT ||
+    if (s_dodgerPhase == DODGER_PHASE_IMPACT ||
+        s_dodgerPhase == DODGER_PHASE_CAR_EXIT ||
         s_dodgerPhase == DODGER_PHASE_HOLD)
     {
       if (haveGore)
@@ -3428,7 +3424,9 @@ void drawInfernalDodger()
     }
   }
 
-  if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)  {
+  if (s_dodgerPhase != DODGER_PHASE_HOLD &&
+      s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
+  {
     if (haveCar && s_dodgerCarReady)
     {
       const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
