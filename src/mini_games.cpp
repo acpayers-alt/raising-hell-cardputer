@@ -192,7 +192,7 @@ static const char *const kImpBurnFrames[] = {
 };
 
 // SPIKES
-static const uint16_t kFireKey   = kSpriteKey;
+static const uint16_t kFireKey = kSpriteKey;
 static const char *flappyBgPathForPet();
 
 // GOALS
@@ -595,7 +595,7 @@ static bool ensureFlappyFireballSprites(const char *bgPath)
   return true;
 }
 
-static const uint16_t kPipeKey   = kSpriteKey;
+static const uint16_t kPipeKey = kSpriteKey;
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
   if (!bgPath || !bgPath[0])
@@ -2043,26 +2043,34 @@ void drawResurrectionRun()
 }
 
 // -----------------------------------------------------------------------------
-// CROSSY ROAD (Frogger-lite)
+// CROSSY HELL GLOBALS (Frogger-style)
 // -----------------------------------------------------------------------------
-
 static const int kCrossyCols = 15;
-static const int kCrossyRows = 9;
+static const int kCrossyRows = 7;
 
 static const int kCrossyTileW = 16;
-static const int kCrossyTileH = 15;
+static const int kCrossyTileH = 19;
 
 static const int kCrossyOriginX = 0;
-static const int kCrossyOriginY = 0;
+static const int kCrossyOriginY = 1;
 
-static const int kCrossyFirstTrafficRow = 1;
-static const int kCrossyLastTrafficRow = kCrossyRows - 2;
+static int s_crossyCarryPxAccum[kCrossyRows] = {0};
+static uint8_t s_crossyLaneTick[kCrossyRows] = {0};
+
+enum CrossyLaneType : uint8_t
+{
+  CROSSY_LANE_SAFE = 0,
+  CROSSY_LANE_ROAD,
+  CROSSY_LANE_WATER,
+  CROSSY_LANE_GOAL
+};
 
 struct CrossyLane
 {
+  CrossyLaneType type;
   int8_t dir;
   uint8_t speed;
-  uint8_t carLen;
+  uint8_t moverLen;
   uint16_t gapPx;
   int32_t offsetPx;
 };
@@ -2071,6 +2079,7 @@ static CrossyLane s_crossyLanes[kCrossyRows];
 
 static int s_crossyPx = 0;
 static int s_crossyPy = 0;
+static int s_crossyVisualOffsetPx = 0;
 
 static bool s_crossyInited = false;
 static uint32_t s_crossyLastLaneMs = 0;
@@ -2084,28 +2093,67 @@ static inline int crossyClamp(int v, int lo, int hi)
   return v;
 }
 
+static bool crossyRowIsWater(int row) { return row >= 1 && row <= 5; }
+
+static bool crossyRowIsRoad(int row) { return false; }
+
+static bool crossyRowIsGoal(int row) { return row == 0; }
+
+static bool crossyRowIsSafe(int row) { return row == 6; }
+
+static bool crossyPlayerOverlapsMoverInRow(int row);
+
 static void crossyInitLanes()
 {
   memset(s_crossyLanes, 0, sizeof(s_crossyLanes));
 
-  for (int r = kCrossyFirstTrafficRow; r <= kCrossyLastTrafficRow; ++r)
+  for (int r = 0; r < kCrossyRows; ++r)
   {
     CrossyLane &L = s_crossyLanes[r];
-    L.dir = (r % 2 == 0) ? +1 : -1;
-    L.speed = (uint8_t)(1 + (r % 2));
-    L.carLen = (uint8_t)(1 + (r % 2));
-    L.gapPx = (uint16_t)(kCrossyTileW * (4 + (r % 3)));
-    L.offsetPx = (int32_t)random((long)(kCrossyTileW * 6));
+
+    if (crossyRowIsGoal(r))
+    {
+      L.type = CROSSY_LANE_GOAL;
+      L.dir = 0;
+      L.speed = 0;
+      L.moverLen = 0;
+      L.gapPx = 0;
+      L.offsetPx = 0;
+      continue;
+    }
+
+    if (crossyRowIsWater(r))
+    {
+      L.type = CROSSY_LANE_WATER;
+      L.dir = (r % 2 == 0) ? +1 : -1;
+      L.speed = (uint8_t)(1 + (r % 2));
+      L.moverLen = (uint8_t)(2 + (r % 2));
+      L.gapPx = (uint16_t)(kCrossyTileW * (3 + (r % 2)));
+      L.offsetPx = (int32_t)random((long)(kCrossyTileW * 8));
+      continue;
+    }
+
+    L.type = CROSSY_LANE_SAFE;
+    L.dir = 0;
+    L.speed = 0;
+    L.moverLen = 0;
+    L.gapPx = 0;
+    L.offsetPx = 0;
   }
 }
+
+static int s_crossyCarryAnchor[kCrossyRows] = {0};
 
 static void crossyReset()
 {
   s_crossyPx = kCrossyCols / 2;
   s_crossyPy = kCrossyRows - 1;
+  static int s_crossyVisualOffsetPx = 0;
 
   s_crossyLastLaneMs = millis();
 
+  memset(s_crossyCarryPxAccum, 0, sizeof(s_crossyCarryPxAccum));
+  memset(s_crossyLaneTick, 0, sizeof(s_crossyLaneTick));
   crossyInitLanes();
 }
 
@@ -2143,48 +2191,126 @@ void startCrossyRoad()
 
 static void crossyStepLanes(uint32_t now)
 {
-  const uint32_t kLaneStepMs = 50;
+  const uint32_t kLaneStepMs = 16;
   if ((uint32_t)(now - s_crossyLastLaneMs) < kLaneStepMs)
     return;
+
   s_crossyLastLaneMs = now;
 
-  for (int r = kCrossyFirstTrafficRow; r <= kCrossyLastTrafficRow; ++r)
+  for (int r = 0; r < kCrossyRows; ++r)
   {
     CrossyLane &L = s_crossyLanes[r];
-    L.offsetPx += (int32_t)L.speed * (L.dir > 0 ? 1 : -1);
-  }
+    if (L.type != CROSSY_LANE_WATER)
+      continue;
+
+    // speed=1 rows move 1 px every 3 ticks
+    // speed=2 rows move 1 px every 2 ticks
+    const uint8_t ticksPerPixel = (L.speed >= 2) ? 2 : 3;
+
+    s_crossyLaneTick[r]++;
+    if (s_crossyLaneTick[r] < ticksPerPixel)
+      continue;
+
+    s_crossyLaneTick[r] = 0;
+
+    const bool carryFrog = (s_crossyPy == r) && crossyPlayerOverlapsMoverInRow(r);
+
+    const int deltaPx = (L.dir > 0) ? 1 : -1;
+    L.offsetPx += deltaPx;
+
+    if (carryFrog)
+    {
+      // Frog must move with the LOG'S SCREEN DIRECTION,
+      // which is opposite the sign convention of offsetPx in drawCrossyRoad().
+      s_crossyVisualOffsetPx -= deltaPx;
+
+      while (s_crossyVisualOffsetPx <= -kCrossyTileW)
+      {
+        s_crossyPx -= 1;
+        s_crossyVisualOffsetPx += kCrossyTileW;
+      }
+
+      while (s_crossyVisualOffsetPx >= kCrossyTileW)
+      {
+        s_crossyPx += 1;
+        s_crossyVisualOffsetPx -= kCrossyTileW;
+      }
+    }
+    }
 }
 
-static bool crossyHitCar()
+static bool crossyPlayerOverlapsMoverInRow(int row)
 {
-  if (s_crossyPy < kCrossyFirstTrafficRow || s_crossyPy > kCrossyLastTrafficRow)
+  if (row < 0 || row >= kCrossyRows)
     return false;
 
-  const CrossyLane &L = s_crossyLanes[s_crossyPy];
+  const CrossyLane &L = s_crossyLanes[row];
+  if (L.type != CROSSY_LANE_WATER)
+    return false;
 
-  const int carLenPx = (int)L.carLen * kCrossyTileW;
-  const int periodPx = carLenPx + (int)L.gapPx;
-
+  const int moverLenPx = (int)L.moverLen * kCrossyTileW;
+  const int periodPx = moverLenPx + (int)L.gapPx;
   const int laneW = kCrossyCols * kCrossyTileW;
 
-  const int playerX0 = s_crossyPx * kCrossyTileW;
+  const int playerX0 = s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
   const int playerX1 = playerX0 + (kCrossyTileW - 1);
 
   for (int testX = playerX0; testX <= playerX1; testX += (kCrossyTileW / 2))
   {
+    if (testX < 0 || testX >= laneW)
+      continue;
+
     int shifted = testX + (int)L.offsetPx;
     int m = shifted % periodPx;
     if (m < 0)
       m += periodPx;
 
-    if (testX < 0 || testX >= laneW)
-      continue;
-
-    if (m >= 0 && m < carLenPx)
+    if (m >= 0 && m < moverLenPx)
       return true;
   }
 
   return false;
+}
+
+static bool crossyOnLog()
+{
+  if (s_crossyPy < 0 || s_crossyPy >= kCrossyRows)
+    return false;
+
+  if (s_crossyLanes[s_crossyPy].type != CROSSY_LANE_WATER)
+    return false;
+
+  return crossyPlayerOverlapsMoverInRow(s_crossyPy);
+}
+
+static void crossyCarryPlayerOnLog()
+{
+  if (s_crossyPy < 0 || s_crossyPy >= kCrossyRows)
+    return;
+
+  const CrossyLane &L = s_crossyLanes[s_crossyPy];
+  if (L.type != CROSSY_LANE_WATER)
+    return;
+
+  // IMPORTANT:
+  // Draw code uses x = x0 - offset, so positive offset means the platform
+  // moves LEFT on screen. Frog must move with the platform, so carry is the
+  // NEGATIVE of the offset direction.
+  const int deltaPx = -(int)L.speed * (L.dir > 0 ? 1 : -1);
+
+  s_crossyCarryPxAccum[s_crossyPy] += deltaPx;
+
+  while (s_crossyCarryPxAccum[s_crossyPy] >= kCrossyTileW)
+  {
+    s_crossyPx += 1;
+    s_crossyCarryPxAccum[s_crossyPy] -= kCrossyTileW;
+  }
+
+  while (s_crossyCarryPxAccum[s_crossyPy] <= -kCrossyTileW)
+  {
+    s_crossyPx -= 1;
+    s_crossyCarryPxAccum[s_crossyPy] += kCrossyTileW;
+  }
 }
 
 void updateCrossyRoad(const InputState &input)
@@ -2204,7 +2330,6 @@ void updateCrossyRoad(const InputState &input)
   // ---------------------------------------------------------------------------
   if (s_showReward)
   {
-    // First frame of reward modal: arm acceptance after a short delay and swallow input
     if (s_gameOverMs == 0)
     {
       s_acceptArmed = false;
@@ -2222,22 +2347,18 @@ void updateCrossyRoad(const InputState &input)
     {
       s_acceptArmed = false;
       s_gameOverMs = 0;
-
       exitMiniGameToReturnUi(true);
     }
     return;
   }
 
   // ---------------------------------------------------------------------------
-  // Game over: transition directly into the reward modal (legacy behavior)
+  // Game over -> reward modal
   // ---------------------------------------------------------------------------
   if (g_app.gameOver)
   {
-    // Apply result + show reward immediately; the reward modal itself is armed
-    // (so holding ENTER won't instantly dismiss it).
     mgApplyResultAndShowReward(playerWon);
 
-    // Arm acceptance for the reward modal and swallow any lingering input.
     s_acceptArmed = false;
     s_gameOverMs = 0;
     mgBeginInputLockout(180);
@@ -2245,14 +2366,19 @@ void updateCrossyRoad(const InputState &input)
     inputForceClear();
     return;
   }
+
   if (!s_crossyInited)
   {
     s_crossyInited = true;
     crossyReset();
   }
+
   crossyStepLanes(now);
 
-  int dx = 0, dy = 0;
+  const int prevPy = s_crossyPy;
+
+  int dx = 0;
+  int dy = 0;
 
   if (input.mgLeftOnce)
     dx = -1;
@@ -2268,12 +2394,13 @@ void updateCrossyRoad(const InputState &input)
   if (input.encoderDelta > 0)
     dy = +1;
 
-  if (dx || dy)
-  {
-    s_crossyPx = crossyClamp(s_crossyPx + dx, 0, kCrossyCols - 1);
-    s_crossyPy = crossyClamp(s_crossyPy + dy, 0, kCrossyRows - 1);
-    playBeep();
-  }
+    if (dx || dy)
+    {
+      s_crossyPx = crossyClamp(s_crossyPx + dx, 0, kCrossyCols - 1);
+      s_crossyPy = crossyClamp(s_crossyPy + dy, 0, kCrossyRows - 1);
+      s_crossyVisualOffsetPx = 0;
+      playBeep();
+    }
 
   if (s_crossyPy == 0)
   {
@@ -2285,16 +2412,32 @@ void updateCrossyRoad(const InputState &input)
     return;
   }
 
-  if (crossyHitCar())
+  if (s_crossyLanes[s_crossyPy].type == CROSSY_LANE_WATER)
   {
-    playerWon = false;
-    g_app.gameOver = true;
-    requestUIRedraw();
-    s_resultShown = true;
-    soundError();
-    return;
+    // If the lane step carried us off-screen, we lose.
+    if (s_crossyPx < 0 || s_crossyPx >= kCrossyCols)
+    {
+      playerWon = false;
+      g_app.gameOver = true;
+      requestUIRedraw();
+      s_resultShown = true;
+      soundError();
+      return;
+    }
+
+    // After lane movement and/or player movement, we must still be on a platform.
+    if (!crossyOnLog())
+    {
+      playerWon = false;
+      g_app.gameOver = true;
+      requestUIRedraw();
+      s_resultShown = true;
+      soundError();
+      return;
+    }
   }
 }
+
 
 void drawCrossyRoad()
 {
@@ -2320,8 +2463,7 @@ void drawCrossyRoad()
   {
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
-    spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU LOSE!", gW / 2, gH / 2 - 10, 4);
-
+    spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU BURN!", gW / 2, gH / 2 - 10, 4);
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
     return;
@@ -2330,25 +2472,57 @@ void drawCrossyRoad()
   for (int y = 0; y < kCrossyRows; ++y)
   {
     const int ry = kCrossyOriginY + y * kCrossyTileH;
+    uint16_t col = TFT_BLACK;
 
-    uint16_t col = TFT_NAVY;
-    if (y == 0)
+    switch (s_crossyLanes[y].type)
+    {
+    case CROSSY_LANE_GOAL:
       col = TFT_DARKGREEN;
-    else if (y == kCrossyRows - 1)
-      col = TFT_DARKGREY;
+      break;
+
+    case CROSSY_LANE_WATER:
+      col = TFT_MAROON;
+      break;
+
+    case CROSSY_LANE_SAFE:
+      col = (y == kCrossyRows - 1) ? TFT_BROWN : TFT_DARKGREY;
+      break;
+
+    default:
+      col = TFT_BLACK;
+      break;
+    }
 
     spr.fillRect(kCrossyOriginX, ry, kCrossyCols * kCrossyTileW, kCrossyTileH, col);
+
+    if (s_crossyLanes[y].type == CROSSY_LANE_GOAL)
+    {
+      for (int x = 0; x < kCrossyCols; ++x)
+      {
+        if ((x % 2) == 0)
+          spr.fillRect(kCrossyOriginX + x * kCrossyTileW + 4, ry + 4, 8, 7, TFT_GREENYELLOW);
+      }
+    }
+
+    if (s_crossyLanes[y].type == CROSSY_LANE_WATER)
+    {
+      spr.drawFastHLine(kCrossyOriginX, ry + 3, kCrossyCols * kCrossyTileW, TFT_RED);
+      spr.drawFastHLine(kCrossyOriginX, ry + 8, kCrossyCols * kCrossyTileW, TFT_ORANGE);
+      spr.drawFastHLine(kCrossyOriginX, ry + 13, kCrossyCols * kCrossyTileW, TFT_YELLOW);
+    }
   }
 
-  for (int r = kCrossyFirstTrafficRow; r <= kCrossyLastTrafficRow; ++r)
+  for (int r = 0; r < kCrossyRows; ++r)
   {
     const CrossyLane &L = s_crossyLanes[r];
+    if (L.type != CROSSY_LANE_WATER)
+      continue;
 
-    const int carLenPx = (int)L.carLen * kCrossyTileW;
-    const int periodPx = carLenPx + (int)L.gapPx;
+    const int moverLenPx = (int)L.moverLen * kCrossyTileW;
+    const int periodPx = moverLenPx + (int)L.gapPx;
     const int laneW = kCrossyCols * kCrossyTileW;
 
-    if (carLenPx <= 0 || periodPx <= 0)
+    if (moverLenPx <= 0 || periodPx <= 0)
       continue;
 
     const int y = kCrossyOriginY + r * kCrossyTileH;
@@ -2362,19 +2536,22 @@ void drawCrossyRoad()
       const int x = x0 - offset;
       const int drawX = kCrossyOriginX + x;
 
-      if (drawX + carLenPx < kCrossyOriginX)
+      if (drawX + moverLenPx < kCrossyOriginX)
         continue;
       if (drawX > kCrossyOriginX + laneW)
         continue;
 
-      spr.fillRect(drawX, y + 2, carLenPx - 2, kCrossyTileH - 4, TFT_RED);
-      spr.fillRect(drawX + 2, y + 4, carLenPx - 6, 2, TFT_WHITE);
-    }
+        spr.fillRect(drawX, y + 3, moverLenPx - 1, kCrossyTileH - 6, TFT_DARKGREY);
+        spr.drawFastHLine(drawX + 1, y + 5, moverLenPx - 4, TFT_LIGHTGREY);
+        spr.drawFastHLine(drawX + 1, y + kCrossyTileH - 4, moverLenPx - 4, TFT_BLACK);    }
   }
 
-  const int fx = kCrossyOriginX + s_crossyPx * kCrossyTileW;
-  const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH;
+  const int fx = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
+    const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH;
+
   spr.fillRect(fx + 4, fy + 3, kCrossyTileW - 8, kCrossyTileH - 6, TFT_GREEN);
+  spr.fillRect(fx + 6, fy + 5, 2, 2, TFT_BLACK);
+  spr.fillRect(fx + 10, fy + 5, 2, 2, TFT_BLACK);
 }
 
 // -----------------------------------------------------------------------------
@@ -2905,9 +3082,9 @@ static void dodgerSpawnOne(int difficulty)
   DodgerBall &b = s_dodgerBalls[slot];
 
   const int margin = 6;
-  const int roadLeft  = 54;
+  const int roadLeft = 54;
   const int roadRight = gW - 54;
-  
+
   b.r = (uint8_t)(3 + (difficulty % 3));
   b.x = (int16_t)random((long)(roadLeft + margin), (long)(roadRight - margin));
   b.y = (int16_t)(-(int)(10 + random(40)));
@@ -3037,34 +3214,34 @@ void updateInfernalDodger(const InputState &input)
   const int difficulty = (int)(aliveMs / 3000);
 
   if (s_dodgerShowIntro)
-{
-  const uint32_t dt = now - s_dodgerIntroImpAnimMs;
-
-  if (dt >= 180)
   {
-    s_dodgerIntroImpAnimMs = now;
-    s_dodgerIntroImpFrame ^= 1;
+    const uint32_t dt = now - s_dodgerIntroImpAnimMs;
+
+    if (dt >= 180)
+    {
+      s_dodgerIntroImpAnimMs = now;
+      s_dodgerIntroImpFrame ^= 1;
+    }
+
+    if (input.mgSpaceOnce)
+      s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
+
+    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+
+    if (startPressed && !mgInputLockedOut())
+    {
+      s_dodgerShowIntro = false;
+      dodgerReset();
+      s_dodgerMoveLastMs = now;
+      s_dodgerLastStepMs = now;
+      clearInputLatch();
+      inputForceClear();
+      mgBeginInputLockout(120);
+      requestUIRedraw();
+    }
+
+    return;
   }
-
-  if (input.mgSpaceOnce)
-    s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
-
-  const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
-
-  if (startPressed && !mgInputLockedOut())
-  {
-    s_dodgerShowIntro = false;
-    dodgerReset();
-    s_dodgerMoveLastMs = now;
-    s_dodgerLastStepMs = now;
-    clearInputLatch();
-    inputForceClear();
-    mgBeginInputLockout(120);
-    requestUIRedraw();
-  }
-
-  return;
-}
 
   int roadSpeed = 2 + (difficulty / 4);
   if (roadSpeed > 4)
@@ -3092,12 +3269,8 @@ void updateInfernalDodger(const InputState &input)
     (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
     (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
 
-    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n",
-                  s_dodgerGoalFrameReady[0] ? 1 : 0,
-                  s_dodgerGoalFrameReady[1] ? 1 : 0,
-                  s_dodgerGoreReady ? 1 : 0,
-                  s_dodgerGoalW,
-                  s_dodgerGoalH);
+    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
+                  s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
   }
 
   if (s_dodgerPhase == DODGER_PHASE_COAST)
@@ -3185,8 +3358,7 @@ void updateInfernalDodger(const InputState &input)
 
   // Normal horizontal motion should NOT run during offroad crash/hold,
   // or it will clamp the car back onto the screen.
-  if (s_dodgerPhase != DODGER_PHASE_OFFROAD_CRASH &&
-      s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
+  if (s_dodgerPhase != DODGER_PHASE_OFFROAD_CRASH && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
   {
     uint32_t mvDtMs = now - s_dodgerMoveLastMs;
     s_dodgerMoveLastMs = now;
@@ -3471,23 +3643,16 @@ void drawInfernalDodger()
     }
   }
 
-  Serial.printf("GOAL draw: active=%d phase=%d ready0=%d ready1=%d x=%d y=%d w=%d h=%d\n",
-                s_dodgerGoalActive ? 1 : 0,
-                (int)s_dodgerPhase,
-                s_dodgerGoalFrameReady[0] ? 1 : 0,
-                s_dodgerGoalFrameReady[1] ? 1 : 0,
-                s_dodgerGoalX,
-                s_dodgerGoalY,
-                s_dodgerGoalW,
-                s_dodgerGoalH);
+  Serial.printf("GOAL draw: active=%d phase=%d ready0=%d ready1=%d x=%d y=%d w=%d h=%d\n", s_dodgerGoalActive ? 1 : 0,
+                (int)s_dodgerPhase, s_dodgerGoalFrameReady[0] ? 1 : 0, s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoalX,
+                s_dodgerGoalY, s_dodgerGoalW, s_dodgerGoalH);
 
   if (s_dodgerGoalActive)
   {
     const int drawX = s_dodgerGoalX - (s_dodgerGoalW / 2);
     const int drawY = s_dodgerGoalY - (s_dodgerGoalH / 2);
 
-    if (s_dodgerPhase == DODGER_PHASE_IMPACT ||
-        s_dodgerPhase == DODGER_PHASE_CAR_EXIT ||
+    if (s_dodgerPhase == DODGER_PHASE_IMPACT || s_dodgerPhase == DODGER_PHASE_CAR_EXIT ||
         s_dodgerPhase == DODGER_PHASE_HOLD)
     {
       if (haveGore)
@@ -3504,8 +3669,7 @@ void drawInfernalDodger()
     }
   }
 
-  if (s_dodgerPhase != DODGER_PHASE_HOLD &&
-      s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
+  if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
   {
     if (haveCar && s_dodgerCarReady)
     {

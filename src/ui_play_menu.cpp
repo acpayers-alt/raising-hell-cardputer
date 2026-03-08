@@ -31,7 +31,7 @@ static void actCrossy(InputState& in)
 static const MenuItem kItems[] = {
   {"Flappy Fireball",  actFlappy},
   {"Fireball Run",  actDodger},
-  {"Crossy Road",      actCrossy},
+  {"Crossy Hell",      actCrossy},
 };
 
 } // namespace
