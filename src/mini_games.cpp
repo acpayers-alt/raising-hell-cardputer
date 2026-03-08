@@ -2142,13 +2142,117 @@ static void crossyInitLanes()
   }
 }
 
+static const char *crossyImpPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy_hell/eld/imp.png";
+
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy_hell/dev/imp.png";
+  }
+}
+
+static const char *crossyStonePathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy_hell/eld/stone_chunk.png";
+
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy_hell/dev/stone_chunk.png";
+  }
+}
+
+static const char *crossyLavaBgPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy_hell/eld/lava_bg.png";
+
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy_hell/dev/lava_bg.png";
+  }
+}
+
 static int s_crossyCarryAnchor[kCrossyRows] = {0};
+
+static uint32_t s_crossyAnimMs = 0;
+
+static const char *kCrossyImpPath = "/raising_hell/graphics/mini_games/crossy_hell/imp.png";
+
+static const char *kCrossyStonePath = "/raising_hell/graphics/mini_games/crossy_hell/stone_chunk.png";
+
+// Optional later if you make animated lava frames.
+// For now we will procedurally animate lava so no asset is required.
+static const char *kCrossyLavaBgPath = "/raising_hell/graphics/mini_games/crossy_hell/lava_bg.png";
+
+static void drawCrossyLavaRow(int x, int y, int w, int h, uint32_t now)
+{
+  spr.fillRect(x, y, w, h, TFT_MAROON);
+
+  const int phaseA = (int)((now / 70) % 12);
+  const int phaseB = (int)((now / 110) % 16);
+  const int phaseC = (int)((now / 90) % 10);
+
+  for (int i = -16; i < w + 16; i += 24)
+  {
+    spr.fillCircle(x + i + phaseA, y + 4, 2, TFT_RED);
+    spr.fillCircle(x + i + 10 - phaseB, y + 9, 2, TFT_ORANGE);
+    spr.fillCircle(x + i + 4 + phaseC, y + 14, 1, TFT_YELLOW);
+  }
+
+  spr.drawFastHLine(x, y + 3, w, TFT_RED);
+  spr.drawFastHLine(x, y + 8, w, TFT_ORANGE);
+  spr.drawFastHLine(x, y + 13, w, TFT_YELLOW);
+}
+
+static void drawCrossyStoneChunk(int x, int y, int w, int h)
+{
+  // Try real sprite first
+  if (sprDrawPngFromSD(crossyStonePathForPet(), x, y))
+    return;
+
+  // Fallback stone chunk
+  spr.fillRoundRect(x, y + 2, w, h - 4, 3, TFT_DARKGREY);
+  spr.drawFastHLine(x + 2, y + 4, w - 4, TFT_LIGHTGREY);
+  spr.drawFastHLine(x + 3, y + h - 4, w - 6, TFT_BLACK);
+
+  spr.drawPixel(x + 4, y + 6, TFT_LIGHTGREY);
+  spr.drawPixel(x + 9, y + 8, TFT_BLACK);
+  spr.drawPixel(x + 13, y + 5, TFT_LIGHTGREY);
+}
+
+static void drawCrossyImp(int x, int y, int w, int h, uint32_t now)
+{
+  // Try real sprite first
+  if (sprDrawPngFromSD(crossyImpPathForPet(), x, y))
+    return;
+
+  // Fallback imp
+  const int bob = ((now / 120) % 2 == 0) ? 0 : 1;
+
+  spr.fillRect(x + 5, y + 5 + bob, w - 10, h - 9, TFT_RED);
+  spr.fillTriangle(x + 6, y + 6 + bob, x + 8, y + 1 + bob, x + 10, y + 6 + bob, TFT_RED);
+  spr.fillTriangle(x + w - 10, y + 6 + bob, x + w - 8, y + 1 + bob, x + w - 6, y + 6 + bob, TFT_RED);
+
+  spr.fillRect(x + 7, y + 8 + bob, 2, 2, TFT_BLACK);
+  spr.fillRect(x + w - 9, y + 8 + bob, 2, 2, TFT_BLACK);
+
+  spr.drawFastHLine(x + 8, y + h - 6 + bob, w - 16, TFT_YELLOW);
+}
 
 static void crossyReset()
 {
   s_crossyPx = kCrossyCols / 2;
   s_crossyPy = kCrossyRows - 1;
-  static int s_crossyVisualOffsetPx = 0;
+  s_crossyVisualOffsetPx = 0;
 
   s_crossyLastLaneMs = millis();
 
@@ -2166,6 +2270,8 @@ void startCrossyRoad()
   g_app.gameOver = false;
   playerWon = false;
   s_resultShown = false;
+
+  s_crossyAnimMs = millis();
 
   s_showReward = false;
   s_rewardMsg[0] = 0;
@@ -2218,6 +2324,13 @@ static void crossyStepLanes(uint32_t now)
     const int deltaPx = (L.dir > 0) ? 1 : -1;
     L.offsetPx += deltaPx;
 
+    int moverLenPx = L.moverLen * kCrossyTileW;
+    int periodPx = moverLenPx + L.gapPx;
+
+    L.offsetPx %= periodPx;
+    if (L.offsetPx < 0)
+      L.offsetPx += periodPx;
+
     if (carryFrog)
     {
       // Frog must move with the LOG'S SCREEN DIRECTION,
@@ -2236,7 +2349,7 @@ static void crossyStepLanes(uint32_t now)
         s_crossyVisualOffsetPx -= kCrossyTileW;
       }
     }
-    }
+  }
 }
 
 static bool crossyPlayerOverlapsMoverInRow(int row)
@@ -2394,13 +2507,13 @@ void updateCrossyRoad(const InputState &input)
   if (input.encoderDelta > 0)
     dy = +1;
 
-    if (dx || dy)
-    {
-      s_crossyPx = crossyClamp(s_crossyPx + dx, 0, kCrossyCols - 1);
-      s_crossyPy = crossyClamp(s_crossyPy + dy, 0, kCrossyRows - 1);
-      s_crossyVisualOffsetPx = 0;
-      playBeep();
-    }
+  if (dx || dy)
+  {
+    s_crossyPx = crossyClamp(s_crossyPx + dx, 0, kCrossyCols - 1);
+    s_crossyPy = crossyClamp(s_crossyPy + dy, 0, kCrossyRows - 1);
+    s_crossyVisualOffsetPx = 0;
+    playBeep();
+  }
 
   if (s_crossyPy == 0)
   {
@@ -2438,7 +2551,6 @@ void updateCrossyRoad(const InputState &input)
   }
 }
 
-
 void drawCrossyRoad()
 {
   if (!s_crossyInited)
@@ -2469,46 +2581,45 @@ void drawCrossyRoad()
     return;
   }
 
-  for (int y = 0; y < kCrossyRows; ++y)
-  {
-    const int ry = kCrossyOriginY + y * kCrossyTileH;
-    uint16_t col = TFT_BLACK;
+  const uint32_t now = millis();
 
-    switch (s_crossyLanes[y].type)
+  for (int row = 0; row < kCrossyRows; ++row)
+  {
+    const int ry = kCrossyOriginY + row * kCrossyTileH;
+    const int laneW = kCrossyCols * kCrossyTileW;
+
+    switch (s_crossyLanes[row].type)
     {
     case CROSSY_LANE_GOAL:
-      col = TFT_DARKGREEN;
-      break;
-
-    case CROSSY_LANE_WATER:
-      col = TFT_MAROON;
-      break;
-
-    case CROSSY_LANE_SAFE:
-      col = (y == kCrossyRows - 1) ? TFT_BROWN : TFT_DARKGREY;
-      break;
-
-    default:
-      col = TFT_BLACK;
-      break;
-    }
-
-    spr.fillRect(kCrossyOriginX, ry, kCrossyCols * kCrossyTileW, kCrossyTileH, col);
-
-    if (s_crossyLanes[y].type == CROSSY_LANE_GOAL)
-    {
+      spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_DARKGREEN);
       for (int x = 0; x < kCrossyCols; ++x)
       {
         if ((x % 2) == 0)
           spr.fillRect(kCrossyOriginX + x * kCrossyTileW + 4, ry + 4, 8, 7, TFT_GREENYELLOW);
       }
-    }
+      break;
 
-    if (s_crossyLanes[y].type == CROSSY_LANE_WATER)
-    {
-      spr.drawFastHLine(kCrossyOriginX, ry + 3, kCrossyCols * kCrossyTileW, TFT_RED);
-      spr.drawFastHLine(kCrossyOriginX, ry + 8, kCrossyCols * kCrossyTileW, TFT_ORANGE);
-      spr.drawFastHLine(kCrossyOriginX, ry + 13, kCrossyCols * kCrossyTileW, TFT_YELLOW);
+    case CROSSY_LANE_WATER:
+      drawCrossyLavaRow(kCrossyOriginX, ry, laneW, kCrossyTileH, now);
+      break;
+
+    case CROSSY_LANE_SAFE:
+      if (row == kCrossyRows - 1)
+      {
+        // start ledge / ash bank
+        spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_BROWN);
+        spr.drawFastHLine(kCrossyOriginX, ry + 2, laneW, TFT_DARKGREY);
+        spr.drawFastHLine(kCrossyOriginX, ry + kCrossyTileH - 3, laneW, TFT_BLACK);
+      }
+      else
+      {
+        spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_DARKGREY);
+      }
+      break;
+
+    default:
+      spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_BLACK);
+      break;
     }
   }
 
@@ -2541,17 +2652,14 @@ void drawCrossyRoad()
       if (drawX > kCrossyOriginX + laneW)
         continue;
 
-        spr.fillRect(drawX, y + 3, moverLenPx - 1, kCrossyTileH - 6, TFT_DARKGREY);
-        spr.drawFastHLine(drawX + 1, y + 5, moverLenPx - 4, TFT_LIGHTGREY);
-        spr.drawFastHLine(drawX + 1, y + kCrossyTileH - 4, moverLenPx - 4, TFT_BLACK);    }
+      drawCrossyStoneChunk(drawX, y + 2, moverLenPx - 1, kCrossyTileH - 4);
+    }
   }
 
   const int fx = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
-    const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH;
+  const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH;
 
-  spr.fillRect(fx + 4, fy + 3, kCrossyTileW - 8, kCrossyTileH - 6, TFT_GREEN);
-  spr.fillRect(fx + 6, fy + 5, 2, 2, TFT_BLACK);
-  spr.fillRect(fx + 10, fy + 5, 2, 2, TFT_BLACK);
+  drawCrossyImp(fx, fy, kCrossyTileW, kCrossyTileH, now);
 }
 
 // -----------------------------------------------------------------------------
