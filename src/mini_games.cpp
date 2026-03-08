@@ -2161,10 +2161,6 @@ static bool ensureCrossyLavaZoneSprite(uint8_t frame)
 
   const bool ok = loadCrossyRowSprite(s_crossyLavaZoneSpr[i], s_crossyLavaZoneReady[i], s_crossyLavaZonePath[i],
                                       sizeof(s_crossyLavaZonePath[i]), path);
-
-  Serial.printf("[CROSSY] lava frame=%u ok=%d ready=%d path=%s\n", (unsigned)i, ok ? 1 : 0,
-                s_crossyLavaZoneReady[i] ? 1 : 0, path ? path : "(null)");
-
   return ok;
 }
 
@@ -2465,7 +2461,7 @@ static const char *crossyStonePathForPet()
 
 static void drawCrossyStoneChunk(int x, int y, int w, int h)
 {
-  if (ensureCrossyStoneSprite() && s_crossyStoneReady)
+  if (s_crossyStoneReady)
   {
     s_crossyStoneSpr.pushSprite(&spr, x, y, kSpriteKey);
     return;
@@ -2482,7 +2478,7 @@ static void drawCrossyStoneChunk(int x, int y, int w, int h)
 
 static void drawCrossyImp(int x, int y, int w, int h, uint32_t now)
 {
-  if (ensureCrossyImpSprite() && s_crossyImpReady)
+  if (s_crossyImpReady)
   {
     s_crossyImpSpr.pushSprite(&spr, x, y, kSpriteKey);
     return;
@@ -2562,55 +2558,54 @@ void startCrossyRoad()
 static void crossyStepLanes(uint32_t now)
 {
   const uint32_t kLaneStepMs = 16;
-  if ((uint32_t)(now - s_crossyLastLaneMs) < kLaneStepMs)
-    return;
 
-  s_crossyLastLaneMs = now;
-
-  for (int r = 0; r < kCrossyRows; ++r)
+  while ((uint32_t)(now - s_crossyLastLaneMs) >= kLaneStepMs)
   {
-    CrossyLane &L = s_crossyLanes[r];
-    if (L.type != CROSSY_LANE_WATER)
-      continue;
+    s_crossyLastLaneMs += kLaneStepMs;
 
-    // speed=1 rows move 1 px every 3 ticks
-    // speed=2 rows move 1 px every 2 ticks
-    const uint8_t ticksPerPixel = (L.speed >= 2) ? 2 : 3;
-
-    s_crossyLaneTick[r]++;
-    if (s_crossyLaneTick[r] < ticksPerPixel)
-      continue;
-
-    s_crossyLaneTick[r] = 0;
-
-    const bool carryFrog = (s_crossyPy == r) && crossyPlayerOverlapsMoverInRow(r);
-
-    const int deltaPx = (L.dir > 0) ? 1 : -1;
-    L.offsetPx += deltaPx;
-
-    int moverLenPx = L.moverLen * kCrossyTileW;
-    int periodPx = moverLenPx + L.gapPx;
-
-    L.offsetPx %= periodPx;
-    if (L.offsetPx < 0)
-      L.offsetPx += periodPx;
-
-    if (carryFrog)
+    for (int r = 0; r < kCrossyRows; ++r)
     {
-      // Frog must move with the LOG'S SCREEN DIRECTION,
-      // which is opposite the sign convention of offsetPx in drawCrossyRoad().
-      s_crossyVisualOffsetPx -= deltaPx;
+      CrossyLane &L = s_crossyLanes[r];
+      if (L.type != CROSSY_LANE_WATER)
+        continue;
 
-      while (s_crossyVisualOffsetPx <= -kCrossyTileW)
-      {
-        s_crossyPx -= 1;
-        s_crossyVisualOffsetPx += kCrossyTileW;
-      }
+      // speed=1 rows move 1 px every 3 ticks
+      // speed=2 rows move 1 px every 2 ticks
+      const uint8_t ticksPerPixel = (L.speed >= 2) ? 2 : 3;
 
-      while (s_crossyVisualOffsetPx >= kCrossyTileW)
+      s_crossyLaneTick[r]++;
+      if (s_crossyLaneTick[r] < ticksPerPixel)
+        continue;
+
+      s_crossyLaneTick[r] = 0;
+
+      const bool carryFrog = (s_crossyPy == r) && crossyPlayerOverlapsMoverInRow(r);
+
+      const int deltaPx = (L.dir > 0) ? 1 : -1;
+      L.offsetPx += deltaPx;
+
+      const int moverLenPx = L.moverLen * kCrossyTileW;
+      const int periodPx = moverLenPx + L.gapPx;
+
+      L.offsetPx %= periodPx;
+      if (L.offsetPx < 0)
+        L.offsetPx += periodPx;
+
+      if (carryFrog)
       {
-        s_crossyPx += 1;
-        s_crossyVisualOffsetPx -= kCrossyTileW;
+        s_crossyVisualOffsetPx -= deltaPx;
+
+        while (s_crossyVisualOffsetPx <= -kCrossyTileW)
+        {
+          s_crossyPx -= 1;
+          s_crossyVisualOffsetPx += kCrossyTileW;
+        }
+
+        while (s_crossyVisualOffsetPx >= kCrossyTileW)
+        {
+          s_crossyPx += 1;
+          s_crossyVisualOffsetPx -= kCrossyTileW;
+        }
       }
     }
   }
@@ -2698,10 +2693,7 @@ void updateCrossyRoad(const InputState &input)
   if ((uint32_t)(now - s_crossyLavaAnimMs) >= 180)
   {
     s_crossyLavaAnimMs = now;
-
-    const uint8_t nextFrame = (s_crossyLavaFrame + 1) & 1;
-    if (ensureCrossyLavaZoneSprite(nextFrame) && s_crossyLavaZoneReady[nextFrame])
-      s_crossyLavaFrame = nextFrame;
+    s_crossyLavaFrame ^= 1;
   }
 
   // Clear accept-arming state while actively playing
@@ -2856,11 +2848,8 @@ void drawCrossyRoad()
   const uint32_t now = millis();
   const uint8_t animBaseFrame = s_crossyLavaFrame & 1;
 
-  const bool haveGoal = ensureCrossyGoalZoneSprite();
-  const bool haveStart = ensureCrossyStartZoneSprite();
-
-  ensureCrossyLavaZoneSprite(0);
-  ensureCrossyLavaZoneSprite(1);
+  const bool haveGoal = s_crossyGoalZoneReady;
+  const bool haveStart = s_crossyStartZoneReady;
 
   for (int row = 0; row < kCrossyRows; ++row)
   {
@@ -2901,7 +2890,7 @@ void drawCrossyRoad()
     }
     }
   }
-  
+
     for (int r = 0; r < kCrossyRows; ++r)
     {
       const CrossyLane &L = s_crossyLanes[r];
