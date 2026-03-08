@@ -65,6 +65,14 @@ static void mgApplyResultAndShowReward(bool won);
 static bool tryAwardWinItem_1in4(ItemType *outType);
 static void mgSyncGameTimebases(uint32_t now);
 static inline bool mgInputLockedOut();
+static void freeCrossyZoneSprites();
+static bool loadCrossyRowSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path);
+static void freeCrossyActorSprites();
+static const char *crossyStartZonePathForPet();
+static const char *crossyGoalZonePathForPet();
+static const char *crossyLavaZonePathForPet(uint8_t frame);
+static const char *crossyImpPathForPet();
+static const char *crossyStonePathForPet();
 
 // Crossy Road
 void startCrossyRoad();
@@ -1594,6 +1602,7 @@ void miniGameExitToReturnUi(bool beginLockout)
   freeDodgerBgCache();
   freeDodgerFireballSprites();
   freeDodgerCarSprite();
+  freeCrossyActorSprites();
   invalidateBackgroundCache();
   requestFullUIRedraw();
 
@@ -2057,6 +2066,31 @@ static const int kCrossyOriginY = 1;
 static int s_crossyCarryPxAccum[kCrossyRows] = {0};
 static uint8_t s_crossyLaneTick[kCrossyRows] = {0};
 
+static int s_crossyCarryAnchor[kCrossyRows] = {0};
+static uint32_t s_crossyAnimMs = 0;
+static uint8_t s_crossyLavaFrame = 0;
+static uint32_t s_crossyLavaAnimMs = 0;
+
+static M5Canvas s_crossyStoneSpr(&M5.Display);
+static bool s_crossyStoneReady = false;
+static char s_crossyStonePath[128] = {0};
+
+static M5Canvas s_crossyImpSpr(&M5.Display);
+static bool s_crossyImpReady = false;
+static char s_crossyImpPath[128] = {0};
+
+static M5Canvas s_crossyGoalZoneSpr(&M5.Display);
+static bool s_crossyGoalZoneReady = false;
+static char s_crossyGoalZonePath[128] = {0};
+
+static M5Canvas s_crossyStartZoneSpr(&M5.Display);
+static bool s_crossyStartZoneReady = false;
+static char s_crossyStartZonePath[128] = {0};
+
+static M5Canvas s_crossyLavaZoneSpr[2] = {M5Canvas(&M5.Display), M5Canvas(&M5.Display)};
+static bool s_crossyLavaZoneReady[2] = {false, false};
+static char s_crossyLavaZonePath[2][128] = {{0}, {0}};
+
 enum CrossyLaneType : uint8_t
 {
   CROSSY_LANE_SAFE = 0,
@@ -2093,6 +2127,11 @@ static inline int crossyClamp(int v, int lo, int hi)
   return v;
 }
 
+static void freeCrossyZoneSprites();
+static bool ensureCrossyStartZoneSprite();
+static bool ensureCrossyGoalZoneSprite();
+static bool ensureCrossyLavaZoneSprite(uint8_t frame);
+
 static bool crossyRowIsWater(int row) { return row >= 1 && row <= 5; }
 
 static bool crossyRowIsRoad(int row) { return false; }
@@ -2102,6 +2141,32 @@ static bool crossyRowIsGoal(int row) { return row == 0; }
 static bool crossyRowIsSafe(int row) { return row == 6; }
 
 static bool crossyPlayerOverlapsMoverInRow(int row);
+
+static bool ensureCrossyGoalZoneSprite()
+{
+  return loadCrossyRowSprite(s_crossyGoalZoneSpr, s_crossyGoalZoneReady, s_crossyGoalZonePath,
+                             sizeof(s_crossyGoalZonePath), crossyGoalZonePathForPet());
+}
+
+static bool ensureCrossyStartZoneSprite()
+{
+  return loadCrossyRowSprite(s_crossyStartZoneSpr, s_crossyStartZoneReady, s_crossyStartZonePath,
+                             sizeof(s_crossyStartZonePath), crossyStartZonePathForPet());
+}
+
+static bool ensureCrossyLavaZoneSprite(uint8_t frame)
+{
+  const uint8_t i = frame & 1;
+  const char *path = crossyLavaZonePathForPet(i);
+
+  const bool ok = loadCrossyRowSprite(s_crossyLavaZoneSpr[i], s_crossyLavaZoneReady[i], s_crossyLavaZonePath[i],
+                                      sizeof(s_crossyLavaZonePath[i]), path);
+
+  Serial.printf("[CROSSY] lava frame=%u ok=%d ready=%d path=%s\n", (unsigned)i, ok ? 1 : 0,
+                s_crossyLavaZoneReady[i] ? 1 : 0, path ? path : "(null)");
+
+  return ok;
+}
 
 static void crossyInitLanes()
 {
@@ -2142,16 +2207,246 @@ static void crossyInitLanes()
   }
 }
 
+static void freeCrossyZoneSprites()
+{
+  s_crossyGoalZoneSpr.deleteSprite();
+  s_crossyGoalZoneReady = false;
+  s_crossyGoalZonePath[0] = 0;
+
+  s_crossyStartZoneSpr.deleteSprite();
+  s_crossyStartZoneReady = false;
+  s_crossyStartZonePath[0] = 0;
+
+  for (int i = 0; i < 2; ++i)
+  {
+    s_crossyLavaZoneSpr[i].deleteSprite();
+    s_crossyLavaZoneReady[i] = false;
+    s_crossyLavaZonePath[i][0] = 0;
+  }
+}
+
+static bool loadCrossyRowSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path)
+{
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (ready && strcmp(cachedPath, path) == 0)
+    return true;
+
+  if (ready)
+  {
+    dst.deleteSprite();
+    ready = false;
+    cachedPath[0] = 0;
+  }
+
+  int w = 0;
+  int h = 0;
+  const char *usePath = nullptr;
+  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
+    return false;
+
+  dst.deleteSprite();
+  dst.setColorDepth(16);
+
+  if (!dst.createSprite(w, h))
+    return false;
+
+  dst.fillSprite(TFT_BLACK);
+
+  if (!dst.drawPngFile(SD, usePath, 0, 0))
+  {
+    dst.deleteSprite();
+    ready = false;
+    cachedPath[0] = 0;
+    return false;
+  }
+
+  strlcpy(cachedPath, path, cachedPathSize);
+  ready = true;
+  return true;
+}
+
+static const char *crossyStartZonePathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy/eld/eld_start_zone.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy/dev/dev_start_zone.png";
+  }
+}
+
+static const char *crossyGoalZonePathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy/eld/eld_goal_zone.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy/dev/dev_goal_zone.png";
+  }
+}
+
+static const char *crossyLavaZonePathForPet(uint8_t frame)
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return (frame & 1) ? "/raising_hell/graphics/mini_games/crossy/eld/eld_lava_zone2.png"
+                       : "/raising_hell/graphics/mini_games/crossy/eld/eld_lava_zone1.png";
+  case PET_DEVIL:
+  default:
+    return (frame & 1) ? "/raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone2.png"
+                       : "/raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone1.png";
+  }
+}
+
+static void freeCrossyActorSprites()
+{
+  if (s_crossyStoneReady)
+  {
+    s_crossyStoneSpr.deleteSprite();
+    s_crossyStoneReady = false;
+    s_crossyStonePath[0] = 0;
+  }
+
+  if (s_crossyImpReady)
+  {
+    s_crossyImpSpr.deleteSprite();
+    s_crossyImpReady = false;
+    s_crossyImpPath[0] = 0;
+  }
+}
+
+static bool ensureCrossyStoneSprite()
+{
+  const char *path = crossyStonePathForPet();
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (s_crossyStoneReady && strcmp(s_crossyStonePath, path) == 0)
+    return true;
+
+  if (s_crossyStoneReady)
+  {
+    s_crossyStoneSpr.deleteSprite();
+    s_crossyStoneReady = false;
+    s_crossyStonePath[0] = 0;
+  }
+
+  int w = 0, h = 0;
+  const char *usePath = nullptr;
+  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
+    return false;
+
+  s_crossyStoneSpr.setColorDepth(8);
+  if (!s_crossyStoneSpr.createSprite(w, h))
+    return false;
+
+  s_crossyStoneSpr.fillSprite(kSpriteKey);
+
+  if (!s_crossyStoneSpr.drawPngFile(SD, usePath, 0, 0))
+  {
+    s_crossyStoneSpr.deleteSprite();
+    return false;
+  }
+
+  strlcpy(s_crossyStonePath, path, sizeof(s_crossyStonePath));
+  s_crossyStoneReady = true;
+  return true;
+}
+
+static bool ensureCrossyImpSprite()
+{
+  const char *path = crossyImpPathForPet();
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (s_crossyImpReady && strcmp(s_crossyImpPath, path) == 0)
+    return true;
+
+  if (s_crossyImpReady)
+  {
+    s_crossyImpSpr.deleteSprite();
+    s_crossyImpReady = false;
+    s_crossyImpPath[0] = 0;
+  }
+
+  int w = 0, h = 0;
+  const char *usePath = nullptr;
+  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
+    return false;
+
+  s_crossyImpSpr.setColorDepth(8);
+  if (!s_crossyImpSpr.createSprite(w, h))
+    return false;
+
+  s_crossyImpSpr.fillSprite(kSpriteKey);
+
+  if (!s_crossyImpSpr.drawPngFile(SD, usePath, 0, 0))
+  {
+    s_crossyImpSpr.deleteSprite();
+    return false;
+  }
+
+  strlcpy(s_crossyImpPath, path, sizeof(s_crossyImpPath));
+  s_crossyImpReady = true;
+  return true;
+}
+
+static const char *crossyDirForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy/eld/";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy/dev/";
+  }
+}
+
+static const char *crossyBgFramePathForPet(uint8_t frame)
+{
+  const uint8_t f = (frame & 1) + 1;
+
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    switch (f)
+    {
+    case 1:
+      return "/raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg1.jpg";
+    default:
+      return "/raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg2.jpg";
+    }
+
+  case PET_DEVIL:
+  default:
+    switch (f)
+    {
+    case 1:
+      return "/raising_hell/graphics/mini_games/crossy/dev/crossy_dev_bg1.jpg";
+    default:
+      return "/raising_hell/graphics/mini_games/crossy/dev/crossy_dev_bg2.jpg";
+    }
+  }
+}
+
 static const char *crossyImpPathForPet()
 {
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy_hell/eld/imp.png";
+    return "/raising_hell/graphics/mini_games/crossy/eld/imp.png";
 
   case PET_DEVIL:
   default:
-    return "/raising_hell/graphics/mini_games/crossy_hell/dev/imp.png";
+    return "/raising_hell/graphics/mini_games/crossy/dev/imp.png";
   }
 }
 
@@ -2160,66 +2455,22 @@ static const char *crossyStonePathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy_hell/eld/stone_chunk.png";
+    return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk.png";
 
   case PET_DEVIL:
   default:
-    return "/raising_hell/graphics/mini_games/crossy_hell/dev/stone_chunk.png";
+    return "/raising_hell/graphics/mini_games/crossy/dev/stone_chunk.png";
   }
-}
-
-static const char *crossyLavaBgPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy_hell/eld/lava_bg.png";
-
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy_hell/dev/lava_bg.png";
-  }
-}
-
-static int s_crossyCarryAnchor[kCrossyRows] = {0};
-
-static uint32_t s_crossyAnimMs = 0;
-
-static const char *kCrossyImpPath = "/raising_hell/graphics/mini_games/crossy_hell/imp.png";
-
-static const char *kCrossyStonePath = "/raising_hell/graphics/mini_games/crossy_hell/stone_chunk.png";
-
-// Optional later if you make animated lava frames.
-// For now we will procedurally animate lava so no asset is required.
-static const char *kCrossyLavaBgPath = "/raising_hell/graphics/mini_games/crossy_hell/lava_bg.png";
-
-static void drawCrossyLavaRow(int x, int y, int w, int h, uint32_t now)
-{
-  spr.fillRect(x, y, w, h, TFT_MAROON);
-
-  const int phaseA = (int)((now / 70) % 12);
-  const int phaseB = (int)((now / 110) % 16);
-  const int phaseC = (int)((now / 90) % 10);
-
-  for (int i = -16; i < w + 16; i += 24)
-  {
-    spr.fillCircle(x + i + phaseA, y + 4, 2, TFT_RED);
-    spr.fillCircle(x + i + 10 - phaseB, y + 9, 2, TFT_ORANGE);
-    spr.fillCircle(x + i + 4 + phaseC, y + 14, 1, TFT_YELLOW);
-  }
-
-  spr.drawFastHLine(x, y + 3, w, TFT_RED);
-  spr.drawFastHLine(x, y + 8, w, TFT_ORANGE);
-  spr.drawFastHLine(x, y + 13, w, TFT_YELLOW);
 }
 
 static void drawCrossyStoneChunk(int x, int y, int w, int h)
 {
-  // Try real sprite first
-  if (sprDrawPngFromSD(crossyStonePathForPet(), x, y))
+  if (ensureCrossyStoneSprite() && s_crossyStoneReady)
+  {
+    s_crossyStoneSpr.pushSprite(&spr, x, y, kSpriteKey);
     return;
+  }
 
-  // Fallback stone chunk
   spr.fillRoundRect(x, y + 2, w, h - 4, 3, TFT_DARKGREY);
   spr.drawFastHLine(x + 2, y + 4, w - 4, TFT_LIGHTGREY);
   spr.drawFastHLine(x + 3, y + h - 4, w - 6, TFT_BLACK);
@@ -2231,11 +2482,12 @@ static void drawCrossyStoneChunk(int x, int y, int w, int h)
 
 static void drawCrossyImp(int x, int y, int w, int h, uint32_t now)
 {
-  // Try real sprite first
-  if (sprDrawPngFromSD(crossyImpPathForPet(), x, y))
+  if (ensureCrossyImpSprite() && s_crossyImpReady)
+  {
+    s_crossyImpSpr.pushSprite(&spr, x, y, kSpriteKey);
     return;
+  }
 
-  // Fallback imp
   const int bob = ((now / 120) % 2 == 0) ? 0 : 1;
 
   spr.fillRect(x + 5, y + 5 + bob, w - 10, h - 9, TFT_RED);
@@ -2255,6 +2507,8 @@ static void crossyReset()
   s_crossyVisualOffsetPx = 0;
 
   s_crossyLastLaneMs = millis();
+  s_crossyLavaFrame = 0;
+  s_crossyLavaAnimMs = millis();
 
   memset(s_crossyCarryPxAccum, 0, sizeof(s_crossyCarryPxAccum));
   memset(s_crossyLaneTick, 0, sizeof(s_crossyLaneTick));
@@ -2288,6 +2542,16 @@ void startCrossyRoad()
 
   s_crossyInited = true;
   crossyReset();
+  freeCrossyZoneSprites();
+  freeCrossyActorSprites();
+
+  ensureCrossyStartZoneSprite();
+  ensureCrossyGoalZoneSprite();
+  ensureCrossyLavaZoneSprite(0);
+  ensureCrossyLavaZoneSprite(1);
+
+  ensureCrossyStoneSprite();
+  ensureCrossyImpSprite();
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -2431,6 +2695,15 @@ void updateCrossyRoad(const InputState &input)
   const bool enterOnce = miniGameEnterOnce(input);
   const uint32_t now = millis();
 
+  if ((uint32_t)(now - s_crossyLavaAnimMs) >= 180)
+  {
+    s_crossyLavaAnimMs = now;
+
+    const uint8_t nextFrame = (s_crossyLavaFrame + 1) & 1;
+    if (ensureCrossyLavaZoneSprite(nextFrame) && s_crossyLavaZoneReady[nextFrame])
+      s_crossyLavaFrame = nextFrame;
+  }
+
   // Clear accept-arming state while actively playing
   if (!s_showReward && !g_app.gameOver)
   {
@@ -2561,7 +2834,6 @@ void drawCrossyRoad()
 
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
-  (void)gH;
 
   spr.fillSprite(TFT_BLACK);
 
@@ -2582,1241 +2854,1248 @@ void drawCrossyRoad()
   }
 
   const uint32_t now = millis();
+  const uint8_t animBaseFrame = s_crossyLavaFrame & 1;
+
+  const bool haveGoal = ensureCrossyGoalZoneSprite();
+  const bool haveStart = ensureCrossyStartZoneSprite();
+
+  ensureCrossyLavaZoneSprite(0);
+  ensureCrossyLavaZoneSprite(1);
 
   for (int row = 0; row < kCrossyRows; ++row)
   {
-    const int ry = kCrossyOriginY + row * kCrossyTileH;
-    const int laneW = kCrossyCols * kCrossyTileW;
+    const int y = kCrossyOriginY + row * kCrossyTileH;
 
     switch (s_crossyLanes[row].type)
     {
     case CROSSY_LANE_GOAL:
-      spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_DARKGREEN);
-      for (int x = 0; x < kCrossyCols; ++x)
-      {
-        if ((x % 2) == 0)
-          spr.fillRect(kCrossyOriginX + x * kCrossyTileW + 4, ry + 4, 8, 7, TFT_GREENYELLOW);
-      }
-      break;
-
-    case CROSSY_LANE_WATER:
-      drawCrossyLavaRow(kCrossyOriginX, ry, laneW, kCrossyTileH, now);
+      if (haveGoal && s_crossyGoalZoneReady)
+        s_crossyGoalZoneSpr.pushSprite(&spr, 0, y);
+      else
+        spr.fillRect(0, y, 240, kCrossyTileH, TFT_RED);
       break;
 
     case CROSSY_LANE_SAFE:
       if (row == kCrossyRows - 1)
       {
-        // start ledge / ash bank
-        spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_BROWN);
-        spr.drawFastHLine(kCrossyOriginX, ry + 2, laneW, TFT_DARKGREY);
-        spr.drawFastHLine(kCrossyOriginX, ry + kCrossyTileH - 3, laneW, TFT_BLACK);
+        if (haveStart && s_crossyStartZoneReady)
+          s_crossyStartZoneSpr.pushSprite(&spr, 0, y);
+        else
+          spr.fillRect(0, y, 240, kCrossyTileH, TFT_DARKGREY);
       }
       else
       {
-        spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_DARKGREY);
+        spr.fillRect(0, y, 240, kCrossyTileH, TFT_BLACK);
       }
       break;
 
-    default:
-      spr.fillRect(kCrossyOriginX, ry, laneW, kCrossyTileH, TFT_BLACK);
+    case CROSSY_LANE_WATER:
+    {
+      const uint8_t lavaFrame = (animBaseFrame + row) & 1;
+
+      if (s_crossyLavaZoneReady[lavaFrame])
+        s_crossyLavaZoneSpr[lavaFrame].pushSprite(&spr, 0, y);
+      else
+        spr.fillRect(0, y, 240, kCrossyTileH, TFT_RED);
       break;
     }
+    }
+  }
+  
+    for (int r = 0; r < kCrossyRows; ++r)
+    {
+      const CrossyLane &L = s_crossyLanes[r];
+      if (L.type != CROSSY_LANE_WATER)
+        continue;
+
+      const int moverLenPx = (int)L.moverLen * kCrossyTileW;
+      const int periodPx = moverLenPx + (int)L.gapPx;
+      const int laneW = kCrossyCols * kCrossyTileW;
+
+      if (moverLenPx <= 0 || periodPx <= 0)
+        continue;
+
+      const int y = kCrossyOriginY + r * kCrossyTileH;
+
+      int offset = (int)(L.offsetPx % periodPx);
+      if (offset < 0)
+        offset += periodPx;
+
+      for (int x0 = -periodPx * 2; x0 < laneW + periodPx * 2; x0 += periodPx)
+      {
+        const int x = x0 - offset;
+        const int drawX = kCrossyOriginX + x;
+
+        if (drawX + moverLenPx < kCrossyOriginX)
+          continue;
+        if (drawX > kCrossyOriginX + laneW)
+          continue;
+
+        drawCrossyStoneChunk(drawX, y + 2, moverLenPx - 1, kCrossyTileH - 4);
+      }
+    }
+
+    const int fx = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
+    const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH;
+
+    drawCrossyImp(fx, fy, kCrossyTileW, kCrossyTileH, now);
   }
 
-  for (int r = 0; r < kCrossyRows; ++r)
+  // -----------------------------------------------------------------------------
+  // FIREBALL RUN GLOBALS
+  // -----------------------------------------------------------------------------
+
+  struct DodgerBall
   {
-    const CrossyLane &L = s_crossyLanes[r];
-    if (L.type != CROSSY_LANE_WATER)
-      continue;
+    int16_t x;
+    int16_t y;
+    int16_t vy;
+    uint8_t r;
+    bool active;
+  };
 
-    const int moverLenPx = (int)L.moverLen * kCrossyTileW;
-    const int periodPx = moverLenPx + (int)L.gapPx;
-    const int laneW = kCrossyCols * kCrossyTileW;
+  enum DodgerPhase
+  {
+    DODGER_PHASE_FIREBALLS = 0,
+    DODGER_PHASE_COAST,
+    DODGER_PHASE_GOAL,
+    DODGER_PHASE_IMPACT,
+    DODGER_PHASE_CAR_EXIT,
+    DODGER_PHASE_HOLD,
+    DODGER_PHASE_OFFROAD_CRASH,
+    DODGER_PHASE_OFFROAD_HOLD
+  };
 
-    if (moverLenPx <= 0 || periodPx <= 0)
-      continue;
+  static bool s_dodgerShowIntro = true;
+  static bool s_dodgerDontShowAgain = false; // visual only for now
+  static uint8_t s_dodgerIntroImpFrame = 0;
+  static uint32_t s_dodgerIntroImpAnimMs = 0;
 
-    const int y = kCrossyOriginY + r * kCrossyTileH;
+  static int8_t s_dodgerCrashDir = 0;
+  static constexpr uint32_t kDodgerOffroadHoldMs = 500;
 
-    int offset = (int)(L.offsetPx % periodPx);
-    if (offset < 0)
-      offset += periodPx;
+  static M5Canvas s_dodgerFireballSpr[3] = {M5Canvas(&M5.Display), M5Canvas(&M5.Display), M5Canvas(&M5.Display)};
 
-    for (int x0 = -periodPx * 2; x0 < laneW + periodPx * 2; x0 += periodPx)
+  static bool s_dodgerFreezeScroll = false;
+
+  static bool s_dodgerGoalActive = false;
+  static bool s_dodgerGoalReached = false;
+  static int16_t s_dodgerGoalX = 0;
+  static int16_t s_dodgerGoalY = 0;
+
+  static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
+
+  static constexpr uint32_t kDodgerCoastMs = 100;
+
+  static LGFX_Sprite s_dodgerGoalSpr[2];
+  static bool s_dodgerGoalFrameReady[2] = {false, false};
+  static char s_dodgerGoalFramePath[2][160] = {{0}, {0}};
+  static int s_dodgerGoalW = 0;
+  static int s_dodgerGoalH = 0;
+
+  static LGFX_Sprite s_dodgerGoreSpr;
+  static bool s_dodgerGoreReady = false;
+  static char s_dodgerGorePath[160] = {0};
+
+  static uint8_t s_dodgerGoalAnimFrame = 0;
+  static uint32_t s_dodgerGoalAnimMs = 0;
+
+  static DodgerPhase s_dodgerPhase = DODGER_PHASE_FIREBALLS;
+  static uint32_t s_dodgerPhaseStartMs = 0;
+  static constexpr uint32_t kDodgerGoalHoldMs = 900;
+
+  static bool s_dodgerInited = false;
+  static uint32_t s_dodgerLastStepMs = 0;
+  static uint32_t s_dodgerStartMs = 0;
+  static uint32_t s_dodgerSpawnAccMs = 0;
+
+  static int16_t s_dodgerPx = 0;
+  static int16_t s_dodgerPy = 0;
+  static int16_t s_dodgerSpeed = 3;
+  static float s_dodgerPxF = 0.0f;
+  static uint32_t s_dodgerMoveLastMs = 0;
+
+  static int8_t s_dodgerMoveDir = 0;
+  static uint32_t s_dodgerDirHoldMs = 0;
+
+  static DodgerBall s_dodgerBalls[8];
+
+  static const uint16_t kDodgerKey = kSpriteKey;
+
+  static M5Canvas s_dodgerBgSpr(&M5.Display);
+  static bool s_dodgerBgSprReady = false;
+  static char s_dodgerBgCachePath[128] = {0};
+  static int s_dodgerBgW = 0;
+  static int s_dodgerBgH = 0;
+  static int s_dodgerBgScrollY = 0;
+
+  static bool s_dodgerFireballReady = false;
+  static char s_dodgerFireballDir[128] = {0};
+  static int s_dodgerFireballW = 0;
+  static int s_dodgerFireballH = 0;
+
+  static M5Canvas s_dodgerCarSpr(&M5.Display);
+  static bool s_dodgerCarReady = false;
+  static char s_dodgerCarPath[128] = {0};
+  static int s_dodgerCarW = 0;
+  static int s_dodgerCarH = 0;
+
+  static void freeDodgerGoalFrames()
+  {
+    for (int i = 0; i < 2; ++i)
     {
-      const int x = x0 - offset;
-      const int drawX = kCrossyOriginX + x;
+      if (s_dodgerGoalFrameReady[i])
+        s_dodgerGoalSpr[i].deleteSprite();
 
-      if (drawX + moverLenPx < kCrossyOriginX)
-        continue;
-      if (drawX > kCrossyOriginX + laneW)
-        continue;
+      s_dodgerGoalFrameReady[i] = false;
+      s_dodgerGoalFramePath[i][0] = 0;
+    }
 
-      drawCrossyStoneChunk(drawX, y + 2, moverLenPx - 1, kCrossyTileH - 4);
+    s_dodgerGoalW = 0;
+    s_dodgerGoalH = 0;
+  }
+
+  static void freeDodgerGoreSprite()
+  {
+    if (s_dodgerGoreReady)
+      s_dodgerGoreSpr.deleteSprite();
+
+    s_dodgerGoreReady = false;
+    s_dodgerGorePath[0] = 0;
+  }
+
+  static const char *dodgerGoalFrame1PathForPet()
+  {
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      return "/raising_hell/graphics/mini_games/fbrun/eld/imp_stack1.png";
+    case PET_DEVIL:
+    default:
+      return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png";
     }
   }
 
-  const int fx = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
-  const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH;
-
-  drawCrossyImp(fx, fy, kCrossyTileW, kCrossyTileH, now);
-}
-
-// -----------------------------------------------------------------------------
-// FIREBALL RUN GLOBALS
-// -----------------------------------------------------------------------------
-
-struct DodgerBall
-{
-  int16_t x;
-  int16_t y;
-  int16_t vy;
-  uint8_t r;
-  bool active;
-};
-
-enum DodgerPhase
-{
-  DODGER_PHASE_FIREBALLS = 0,
-  DODGER_PHASE_COAST,
-  DODGER_PHASE_GOAL,
-  DODGER_PHASE_IMPACT,
-  DODGER_PHASE_CAR_EXIT,
-  DODGER_PHASE_HOLD,
-  DODGER_PHASE_OFFROAD_CRASH,
-  DODGER_PHASE_OFFROAD_HOLD
-};
-
-static bool s_dodgerShowIntro = true;
-static bool s_dodgerDontShowAgain = false; // visual only for now
-static uint8_t s_dodgerIntroImpFrame = 0;
-static uint32_t s_dodgerIntroImpAnimMs = 0;
-
-static int8_t s_dodgerCrashDir = 0;
-static constexpr uint32_t kDodgerOffroadHoldMs = 500;
-
-static M5Canvas s_dodgerFireballSpr[3] = {M5Canvas(&M5.Display), M5Canvas(&M5.Display), M5Canvas(&M5.Display)};
-
-static bool s_dodgerFreezeScroll = false;
-
-static bool s_dodgerGoalActive = false;
-static bool s_dodgerGoalReached = false;
-static int16_t s_dodgerGoalX = 0;
-static int16_t s_dodgerGoalY = 0;
-
-static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
-
-static constexpr uint32_t kDodgerCoastMs = 100;
-
-static LGFX_Sprite s_dodgerGoalSpr[2];
-static bool s_dodgerGoalFrameReady[2] = {false, false};
-static char s_dodgerGoalFramePath[2][160] = {{0}, {0}};
-static int s_dodgerGoalW = 0;
-static int s_dodgerGoalH = 0;
-
-static LGFX_Sprite s_dodgerGoreSpr;
-static bool s_dodgerGoreReady = false;
-static char s_dodgerGorePath[160] = {0};
-
-static uint8_t s_dodgerGoalAnimFrame = 0;
-static uint32_t s_dodgerGoalAnimMs = 0;
-
-static DodgerPhase s_dodgerPhase = DODGER_PHASE_FIREBALLS;
-static uint32_t s_dodgerPhaseStartMs = 0;
-static constexpr uint32_t kDodgerGoalHoldMs = 900;
-
-static bool s_dodgerInited = false;
-static uint32_t s_dodgerLastStepMs = 0;
-static uint32_t s_dodgerStartMs = 0;
-static uint32_t s_dodgerSpawnAccMs = 0;
-
-static int16_t s_dodgerPx = 0;
-static int16_t s_dodgerPy = 0;
-static int16_t s_dodgerSpeed = 3;
-static float s_dodgerPxF = 0.0f;
-static uint32_t s_dodgerMoveLastMs = 0;
-
-static int8_t s_dodgerMoveDir = 0;
-static uint32_t s_dodgerDirHoldMs = 0;
-
-static DodgerBall s_dodgerBalls[8];
-
-static const uint16_t kDodgerKey = kSpriteKey;
-
-static M5Canvas s_dodgerBgSpr(&M5.Display);
-static bool s_dodgerBgSprReady = false;
-static char s_dodgerBgCachePath[128] = {0};
-static int s_dodgerBgW = 0;
-static int s_dodgerBgH = 0;
-static int s_dodgerBgScrollY = 0;
-
-static bool s_dodgerFireballReady = false;
-static char s_dodgerFireballDir[128] = {0};
-static int s_dodgerFireballW = 0;
-static int s_dodgerFireballH = 0;
-
-static M5Canvas s_dodgerCarSpr(&M5.Display);
-static bool s_dodgerCarReady = false;
-static char s_dodgerCarPath[128] = {0};
-static int s_dodgerCarW = 0;
-static int s_dodgerCarH = 0;
-
-static void freeDodgerGoalFrames()
-{
-  for (int i = 0; i < 2; ++i)
+  static const char *dodgerGoalFrame2PathForPet()
   {
-    if (s_dodgerGoalFrameReady[i])
-      s_dodgerGoalSpr[i].deleteSprite();
-
-    s_dodgerGoalFrameReady[i] = false;
-    s_dodgerGoalFramePath[i][0] = 0;
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      return "/raising_hell/graphics/mini_games/fbrun/eld/imp_stack2.png";
+    case PET_DEVIL:
+    default:
+      return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png";
+    }
   }
 
-  s_dodgerGoalW = 0;
-  s_dodgerGoalH = 0;
-}
-
-static void freeDodgerGoreSprite()
-{
-  if (s_dodgerGoreReady)
-    s_dodgerGoreSpr.deleteSprite();
-
-  s_dodgerGoreReady = false;
-  s_dodgerGorePath[0] = 0;
-}
-
-static const char *dodgerGoalFrame1PathForPet()
-{
-  switch (pet.type)
+  static const char *dodgerGoalGorePathForPet()
   {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/imp_stack1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png";
-  }
-}
-
-static const char *dodgerGoalFrame2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/imp_stack2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png";
-  }
-}
-
-static const char *dodgerGoalGorePathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/imp_gore.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
-  }
-}
-
-static const char *fireballRunBgPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bg.jpg";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bg.jpg";
-  }
-}
-
-static const char *fireballRunCarPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/car.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/car.png";
-  }
-}
-
-static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int &outH)
-{
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  int w = 0, h = 0;
-  const char *usePath = nullptr;
-
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
-
-  dst.setColorDepth(8);
-
-  if (!dst.createSprite(w, h))
-    return false;
-
-  dst.fillSprite(kDodgerKey);
-
-  if (!dst.drawPngFile(SD, usePath, 0, 0))
-  {
-    dst.deleteSprite();
-    return false;
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      return "/raising_hell/graphics/mini_games/fbrun/eld/imp_gore.png";
+    case PET_DEVIL:
+    default:
+      return "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
+    }
   }
 
-  outW = w;
-  outH = h;
-  return true;
-}
-
-static void freeDodgerGoalFrames();
-static void freeDodgerGoreSprite();
-static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
-{
-  if (!path0 || !path1 || !path0[0] || !path1[0] || !g_sdReady)
-    return false;
-
-  const bool cached = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1] &&
-                      strcmp(s_dodgerGoalFramePath[0], path0) == 0 && strcmp(s_dodgerGoalFramePath[1], path1) == 0;
-
-  if (cached)
-    return true;
-
-  freeDodgerGoalFrames();
-
-  int w0 = 0, h0 = 0;
-  if (!loadDodgerSprite(s_dodgerGoalSpr[0], path0, w0, h0))
+  static const char *fireballRunBgPathForPet()
   {
-    freeDodgerGoalFrames();
-    return false;
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bg.jpg";
+    case PET_DEVIL:
+    default:
+      return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bg.jpg";
+    }
   }
 
-  int w1 = 0, h1 = 0;
-  if (!loadDodgerSprite(s_dodgerGoalSpr[1], path1, w1, h1))
+  static const char *fireballRunCarPathForPet()
   {
-    freeDodgerGoalFrames();
-    return false;
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      return "/raising_hell/graphics/mini_games/fbrun/eld/car.png";
+    case PET_DEVIL:
+    default:
+      return "/raising_hell/graphics/mini_games/fbrun/dev/car.png";
+    }
   }
 
-  s_dodgerGoalFrameReady[0] = true;
-  s_dodgerGoalFrameReady[1] = true;
-
-  strlcpy(s_dodgerGoalFramePath[0], path0, sizeof(s_dodgerGoalFramePath[0]));
-  strlcpy(s_dodgerGoalFramePath[1], path1, sizeof(s_dodgerGoalFramePath[1]));
-
-  s_dodgerGoalW = w0;
-  s_dodgerGoalH = h0;
-
-  return true;
-}
-
-static bool ensureDodgerGoreSprite(const char *path)
-{
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  if (s_dodgerGoreReady && s_dodgerGorePath[0] && strcmp(s_dodgerGorePath, path) == 0)
-    return true;
-
-  freeDodgerGoreSprite();
-
-  int w = 0, h = 0;
-  if (!loadDodgerSprite(s_dodgerGoreSpr, path, w, h))
+  static bool loadDodgerSprite(LGFX_Sprite & dst, const char *path, int &outW, int &outH)
   {
-    freeDodgerGoreSprite();
-    return false;
-  }
-
-  s_dodgerGoreReady = true;
-  strlcpy(s_dodgerGorePath, path, sizeof(s_dodgerGorePath));
-
-  return true;
-}
-
-static void freeDodgerBgCache()
-{
-  if (s_dodgerBgSprReady)
-  {
-    s_dodgerBgSpr.deleteSprite();
-    s_dodgerBgSprReady = false;
-  }
-
-  s_dodgerBgCachePath[0] = 0;
-  s_dodgerBgW = 0;
-  s_dodgerBgH = 0;
-  s_dodgerBgScrollY = 0;
-}
-
-static void freeDodgerFireballSprites()
-{
-  for (int i = 0; i < 3; ++i)
-    s_dodgerFireballSpr[i].deleteSprite();
-
-  s_dodgerFireballReady = false;
-  s_dodgerFireballDir[0] = 0;
-  s_dodgerFireballW = 0;
-  s_dodgerFireballH = 0;
-}
-
-static void freeDodgerCarSprite()
-{
-  if (s_dodgerCarReady)
-  {
-    s_dodgerCarSpr.deleteSprite();
-    s_dodgerCarReady = false;
-  }
-
-  s_dodgerCarPath[0] = 0;
-  s_dodgerCarW = 0;
-  s_dodgerCarH = 0;
-}
-
-static bool ensureDodgerBgCache(const char *path)
-{
-  if (!path || !path[0])
-    return false;
-
-  if (s_dodgerBgSprReady && s_dodgerBgCachePath[0] && strcmp(s_dodgerBgCachePath, path) == 0)
-    return true;
-
-  const int w = (int)spr.width();
-  const int h = (int)spr.height();
-  if (w <= 0 || h <= 0)
-    return false;
-
-  if (!g_sdReady)
-    return false;
-
-  bool isPng = false;
-  if (const char *ext = strrchr(path, '.'))
-    isPng = (strcasecmp(ext, ".png") == 0);
-
-  const char *usePath = path;
-  bool exists = SD.exists(usePath);
-  if (!exists && usePath[0] == '/')
-  {
-    usePath = usePath + 1;
-    exists = SD.exists(usePath);
-  }
-  if (!exists)
-    return false;
-
-  if (!s_dodgerBgSprReady || s_dodgerBgW != w || s_dodgerBgH != h)
-  {
-    s_dodgerBgSpr.deleteSprite();
-    s_dodgerBgSprReady = false;
-
-    s_dodgerBgSpr.setColorDepth(8);
-    if (!s_dodgerBgSpr.createSprite(w, h))
+    if (!path || !path[0] || !g_sdReady)
       return false;
 
-    s_dodgerBgW = w;
-    s_dodgerBgH = h;
-    s_dodgerBgSprReady = true;
+    int w = 0, h = 0;
+    const char *usePath = nullptr;
+
+    if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
+      return false;
+
+    dst.setColorDepth(8);
+
+    if (!dst.createSprite(w, h))
+      return false;
+
+    dst.fillSprite(kDodgerKey);
+
+    if (!dst.drawPngFile(SD, usePath, 0, 0))
+    {
+      dst.deleteSprite();
+      return false;
+    }
+
+    outW = w;
+    outH = h;
+    return true;
   }
 
-  s_dodgerBgSpr.fillSprite(TFT_BLACK);
-
-  bool ok = false;
-  if (isPng)
-    ok = s_dodgerBgSpr.drawPngFile(SD, usePath, 0, 0);
-  else
-    ok = s_dodgerBgSpr.drawJpgFile(SD, usePath, 0, 0);
-
-  if (!ok)
-    return false;
-
-  strlcpy(s_dodgerBgCachePath, path, sizeof(s_dodgerBgCachePath));
-  return true;
-}
-
-static bool ensureDodgerFireballSprites(const char *bgPath)
-{
-  if (!bgPath || !bgPath[0] || !g_sdReady)
-    return false;
-
-  char dir[128];
-  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-  if (!dir[0])
-    return false;
-
-  if (s_dodgerFireballReady && s_dodgerFireballDir[0] && strcmp(s_dodgerFireballDir, dir) == 0)
-    return true;
-
-  freeDodgerFireballSprites();
-
-  char path[192];
-
-  for (int i = 0; i < 3; ++i)
+  static void freeDodgerGoalFrames();
+  static void freeDodgerGoreSprite();
+  static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
   {
-    snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
+    if (!path0 || !path1 || !path0[0] || !path1[0] || !g_sdReady)
+      return false;
+
+    const bool cached = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1] &&
+                        strcmp(s_dodgerGoalFramePath[0], path0) == 0 && strcmp(s_dodgerGoalFramePath[1], path1) == 0;
+
+    if (cached)
+      return true;
+
+    freeDodgerGoalFrames();
+
+    int w0 = 0, h0 = 0;
+    if (!loadDodgerSprite(s_dodgerGoalSpr[0], path0, w0, h0))
+    {
+      freeDodgerGoalFrames();
+      return false;
+    }
+
+    int w1 = 0, h1 = 0;
+    if (!loadDodgerSprite(s_dodgerGoalSpr[1], path1, w1, h1))
+    {
+      freeDodgerGoalFrames();
+      return false;
+    }
+
+    s_dodgerGoalFrameReady[0] = true;
+    s_dodgerGoalFrameReady[1] = true;
+
+    strlcpy(s_dodgerGoalFramePath[0], path0, sizeof(s_dodgerGoalFramePath[0]));
+    strlcpy(s_dodgerGoalFramePath[1], path1, sizeof(s_dodgerGoalFramePath[1]));
+
+    s_dodgerGoalW = w0;
+    s_dodgerGoalH = h0;
+
+    return true;
+  }
+
+  static bool ensureDodgerGoreSprite(const char *path)
+  {
+    if (!path || !path[0] || !g_sdReady)
+      return false;
+
+    if (s_dodgerGoreReady && s_dodgerGorePath[0] && strcmp(s_dodgerGorePath, path) == 0)
+      return true;
+
+    freeDodgerGoreSprite();
+
+    int w = 0, h = 0;
+    if (!loadDodgerSprite(s_dodgerGoreSpr, path, w, h))
+    {
+      freeDodgerGoreSprite();
+      return false;
+    }
+
+    s_dodgerGoreReady = true;
+    strlcpy(s_dodgerGorePath, path, sizeof(s_dodgerGorePath));
+
+    return true;
+  }
+
+  static void freeDodgerBgCache()
+  {
+    if (s_dodgerBgSprReady)
+    {
+      s_dodgerBgSpr.deleteSprite();
+      s_dodgerBgSprReady = false;
+    }
+
+    s_dodgerBgCachePath[0] = 0;
+    s_dodgerBgW = 0;
+    s_dodgerBgH = 0;
+    s_dodgerBgScrollY = 0;
+  }
+
+  static void freeDodgerFireballSprites()
+  {
+    for (int i = 0; i < 3; ++i)
+      s_dodgerFireballSpr[i].deleteSprite();
+
+    s_dodgerFireballReady = false;
+    s_dodgerFireballDir[0] = 0;
+    s_dodgerFireballW = 0;
+    s_dodgerFireballH = 0;
+  }
+
+  static void freeDodgerCarSprite()
+  {
+    if (s_dodgerCarReady)
+    {
+      s_dodgerCarSpr.deleteSprite();
+      s_dodgerCarReady = false;
+    }
+
+    s_dodgerCarPath[0] = 0;
+    s_dodgerCarW = 0;
+    s_dodgerCarH = 0;
+  }
+
+  static bool ensureDodgerBgCache(const char *path)
+  {
+    if (!path || !path[0])
+      return false;
+
+    if (s_dodgerBgSprReady && s_dodgerBgCachePath[0] && strcmp(s_dodgerBgCachePath, path) == 0)
+      return true;
+
+    const int w = (int)spr.width();
+    const int h = (int)spr.height();
+    if (w <= 0 || h <= 0)
+      return false;
+
+    if (!g_sdReady)
+      return false;
+
+    bool isPng = false;
+    if (const char *ext = strrchr(path, '.'))
+      isPng = (strcasecmp(ext, ".png") == 0);
+
+    const char *usePath = path;
+    bool exists = SD.exists(usePath);
+    if (!exists && usePath[0] == '/')
+    {
+      usePath = usePath + 1;
+      exists = SD.exists(usePath);
+    }
+    if (!exists)
+      return false;
+
+    if (!s_dodgerBgSprReady || s_dodgerBgW != w || s_dodgerBgH != h)
+    {
+      s_dodgerBgSpr.deleteSprite();
+      s_dodgerBgSprReady = false;
+
+      s_dodgerBgSpr.setColorDepth(8);
+      if (!s_dodgerBgSpr.createSprite(w, h))
+        return false;
+
+      s_dodgerBgW = w;
+      s_dodgerBgH = h;
+      s_dodgerBgSprReady = true;
+    }
+
+    s_dodgerBgSpr.fillSprite(TFT_BLACK);
+
+    bool ok = false;
+    if (isPng)
+      ok = s_dodgerBgSpr.drawPngFile(SD, usePath, 0, 0);
+    else
+      ok = s_dodgerBgSpr.drawJpgFile(SD, usePath, 0, 0);
+
+    if (!ok)
+      return false;
+
+    strlcpy(s_dodgerBgCachePath, path, sizeof(s_dodgerBgCachePath));
+    return true;
+  }
+
+  static bool ensureDodgerFireballSprites(const char *bgPath)
+  {
+    if (!bgPath || !bgPath[0] || !g_sdReady)
+      return false;
+
+    char dir[128];
+    flappyDirFromBgPath(bgPath, dir, sizeof(dir));
+    if (!dir[0])
+      return false;
+
+    if (s_dodgerFireballReady && s_dodgerFireballDir[0] && strcmp(s_dodgerFireballDir, dir) == 0)
+      return true;
+
+    freeDodgerFireballSprites();
+
+    char path[192];
+
+    for (int i = 0; i < 3; ++i)
+    {
+      snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
+
+      const char *usePath = path;
+      if (!sdExistsTrySlash(path, &usePath))
+      {
+        freeDodgerFireballSprites();
+        return false;
+      }
+
+      int w = 0, h = 0;
+      const char *pngUse = nullptr;
+
+      if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
+      {
+        freeDodgerFireballSprites();
+        return false;
+      }
+
+      s_dodgerFireballSpr[i].setColorDepth(8);
+
+      if (!s_dodgerFireballSpr[i].createSprite(w, h))
+      {
+        freeDodgerFireballSprites();
+        return false;
+      }
+
+      s_dodgerFireballSpr[i].fillSprite(kDodgerKey);
+
+      if (!s_dodgerFireballSpr[i].drawPngFile(SD, pngUse, 0, 0))
+      {
+        freeDodgerFireballSprites();
+        return false;
+      }
+    }
+
+    s_dodgerFireballW = (int)s_dodgerFireballSpr[0].width();
+    s_dodgerFireballH = (int)s_dodgerFireballSpr[0].height();
+    strlcpy(s_dodgerFireballDir, dir, sizeof(s_dodgerFireballDir));
+    s_dodgerFireballReady = true;
+    return true;
+  }
+
+  static bool ensureDodgerCarSprite(const char *path)
+  {
+    if (!path || !path[0] || !g_sdReady)
+      return false;
+
+    if (s_dodgerCarReady && s_dodgerCarPath[0] && strcmp(s_dodgerCarPath, path) == 0)
+      return true;
+
+    freeDodgerCarSprite();
 
     const char *usePath = path;
     if (!sdExistsTrySlash(path, &usePath))
-    {
-      freeDodgerFireballSprites();
       return false;
-    }
 
     int w = 0, h = 0;
     const char *pngUse = nullptr;
-
     if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
+      return false;
+
+    s_dodgerCarSpr.setColorDepth(8);
+
+    if (!s_dodgerCarSpr.createSprite(w, h))
+      return false;
+
+    s_dodgerCarSpr.fillSprite(kDodgerKey);
+
+    if (!s_dodgerCarSpr.drawPngFile(SD, pngUse, 0, 0))
     {
-      freeDodgerFireballSprites();
+      freeDodgerCarSprite();
       return false;
     }
 
-    s_dodgerFireballSpr[i].setColorDepth(8);
-
-    if (!s_dodgerFireballSpr[i].createSprite(w, h))
-    {
-      freeDodgerFireballSprites();
-      return false;
-    }
-
-    s_dodgerFireballSpr[i].fillSprite(kDodgerKey);
-
-    if (!s_dodgerFireballSpr[i].drawPngFile(SD, pngUse, 0, 0))
-    {
-      freeDodgerFireballSprites();
-      return false;
-    }
-  }
-
-  s_dodgerFireballW = (int)s_dodgerFireballSpr[0].width();
-  s_dodgerFireballH = (int)s_dodgerFireballSpr[0].height();
-  strlcpy(s_dodgerFireballDir, dir, sizeof(s_dodgerFireballDir));
-  s_dodgerFireballReady = true;
-  return true;
-}
-
-static bool ensureDodgerCarSprite(const char *path)
-{
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  if (s_dodgerCarReady && s_dodgerCarPath[0] && strcmp(s_dodgerCarPath, path) == 0)
+    s_dodgerCarW = w;
+    s_dodgerCarH = h;
+    strlcpy(s_dodgerCarPath, path, sizeof(s_dodgerCarPath));
+    s_dodgerCarReady = true;
     return true;
-
-  freeDodgerCarSprite();
-
-  const char *usePath = path;
-  if (!sdExistsTrySlash(path, &usePath))
-    return false;
-
-  int w = 0, h = 0;
-  const char *pngUse = nullptr;
-  if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
-    return false;
-
-  s_dodgerCarSpr.setColorDepth(8);
-
-  if (!s_dodgerCarSpr.createSprite(w, h))
-    return false;
-
-  s_dodgerCarSpr.fillSprite(kDodgerKey);
-
-  if (!s_dodgerCarSpr.drawPngFile(SD, pngUse, 0, 0))
-  {
-    freeDodgerCarSprite();
-    return false;
   }
 
-  s_dodgerCarW = w;
-  s_dodgerCarH = h;
-  strlcpy(s_dodgerCarPath, path, sizeof(s_dodgerCarPath));
-  s_dodgerCarReady = true;
-  return true;
-}
-
-static void dodgerReset()
-{
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
-
-  s_dodgerPx = gW / 2;
-  s_dodgerPxF = (float)s_dodgerPx;
-  s_dodgerMoveLastMs = millis();
-  s_dodgerPy = gH - 14;
-  s_dodgerSpeed = 3;
-  s_dodgerMoveDir = 0;
-  s_dodgerDirHoldMs = 0;
-
-  for (auto &b : s_dodgerBalls)
+  static void dodgerReset()
   {
-    b = {0, -200, 2, 4, false};
-  }
+    const int gW = (screenW > 0) ? screenW : 240;
+    const int gH = (screenH > 0) ? screenH : 135;
 
-  s_dodgerStartMs = millis();
-  s_dodgerLastStepMs = millis();
-  s_dodgerSpawnAccMs = 0;
-
-  s_dodgerGoalActive = false;
-  s_dodgerGoalReached = false;
-  s_dodgerGoalX = gW / 2;
-  s_dodgerGoalY = gH / 2 - 20;
-
-  s_dodgerPhase = DODGER_PHASE_FIREBALLS;
-  s_dodgerPhaseStartMs = millis();
-  s_dodgerGoalAnimFrame = 0;
-  s_dodgerGoalAnimMs = millis();
-  s_dodgerCrashDir = 0;
-
-  s_dodgerFreezeScroll = false;
-}
-
-static void dodgerSpawnOne(int difficulty)
-{
-  const int gW = (screenW > 0) ? screenW : 240;
-
-  int slot = -1;
-  for (int i = 0; i < (int)(sizeof(s_dodgerBalls) / sizeof(s_dodgerBalls[0])); ++i)
-  {
-    if (!s_dodgerBalls[i].active)
-    {
-      slot = i;
-      break;
-    }
-  }
-  if (slot < 0)
-    return;
-
-  DodgerBall &b = s_dodgerBalls[slot];
-
-  const int margin = 6;
-  const int roadLeft = 54;
-  const int roadRight = gW - 54;
-
-  b.r = (uint8_t)(3 + (difficulty % 3));
-  b.x = (int16_t)random((long)(roadLeft + margin), (long)(roadRight - margin));
-  b.y = (int16_t)(-(int)(10 + random(40)));
-
-  b.vy = (int16_t)(2 + (difficulty / 5));
-  if (b.vy > 7)
-    b.vy = 7;
-
-  b.active = true;
-}
-
-static inline bool dodgerHit(int ax, int ay, int ar, int bx, int by, int br)
-{
-  const int dx = ax - bx;
-  const int dy = ay - by;
-  const int rr = ar + br;
-  return (dx * dx + dy * dy) <= (rr * rr);
-}
-
-static inline uint32_t dodgerAliveMsNow(uint32_t now)
-{
-  uint32_t elapsed = now - s_dodgerStartMs;
-
-  const uint32_t pausedAccum = mgPauseAccumMs();
-  if (elapsed > pausedAccum)
-    elapsed -= pausedAccum;
-  else
-    elapsed = 0;
-
-  if (mgPauseIsPaused() && mgPauseStartMs() != 0)
-  {
-    uint32_t pausedSoFar = now - mgPauseStartMs();
-    if (elapsed > pausedSoFar)
-      elapsed -= pausedSoFar;
-    else
-      elapsed = 0;
-  }
-
-  return elapsed;
-}
-
-void startInfernalDodger()
-{
-  inputSetTextCapture(false);
-  mgPauseReset();
-
-  g_app.inMiniGame = true;
-  g_app.gameOver = false;
-  playerWon = false;
-  s_resultShown = false;
-
-  s_showReward = false;
-  s_rewardMsg[0] = 0;
-
-  s_prevSelectHeld = false;
-
-  currentMiniGame = MiniGame::INFERNAL_DODGER;
-
-  // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
-  UIState retUi = g_app.uiState;
-  if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
-    retUi = UIState::PET_SCREEN;
-
-  miniGameSetReturnUi(retUi);
-  uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
-
-  s_dodgerInited = false;
-  s_dodgerBgScrollY = 0;
-  s_dodgerFreezeScroll = false;
-
-  freeDodgerBgCache();
-  freeDodgerFireballSprites();
-  freeDodgerCarSprite();
-  freeDodgerGoalFrames();
-  freeDodgerGoreSprite();
-  ensureDodgerBgCache(fireballRunBgPathForPet());
-  ensureDodgerFireballSprites(fireballRunBgPathForPet());
-  ensureDodgerCarSprite(fireballRunCarPathForPet());
-
-  s_dodgerInited = true;
-  dodgerReset();
-
-  invalidateBackgroundCache();
-  s_dodgerShowIntro = true;
-  s_dodgerDontShowAgain = false;
-  s_dodgerIntroImpFrame = 0;
-  s_dodgerIntroImpAnimMs = millis();
-  requestUIRedraw();
-  clearInputLatch();
-  // Prevent the ENTER used to launch the mini-game from being interpreted as
-  // an immediate "enterOnce" inside the mini-game on the first update tick.
-  {
-    auto st = M5Cardputer.Keyboard.keysState();
-    s_prevSelectHeld = st.enter;
-  }
-  mgBeginInputLockout(220);
-}
-
-void updateInfernalDodger(const InputState &input)
-{
-  const bool enterOnce = miniGameEnterOnce(input);
-
-  if (s_showReward)
-  {
-    if (enterOnce)
-      exitMiniGameToReturnUi(true);
-    return;
-  }
-
-  if (g_app.gameOver)
-  {
-    mgApplyResultAndShowReward(playerWon);
-
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
-    mgBeginInputLockout(180);
-    clearInputLatch();
-    inputForceClear();
-    return;
-  }
-
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
-
-  const uint32_t now = millis();
-  const uint32_t aliveMs = dodgerAliveMsNow(now);
-  const int difficulty = (int)(aliveMs / 3000);
-
-  if (s_dodgerShowIntro)
-  {
-    const uint32_t dt = now - s_dodgerIntroImpAnimMs;
-
-    if (dt >= 180)
-    {
-      s_dodgerIntroImpAnimMs = now;
-      s_dodgerIntroImpFrame ^= 1;
-    }
-
-    if (input.mgSpaceOnce)
-      s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
-
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
-
-    if (startPressed && !mgInputLockedOut())
-    {
-      s_dodgerShowIntro = false;
-      dodgerReset();
-      s_dodgerMoveLastMs = now;
-      s_dodgerLastStepMs = now;
-      clearInputLatch();
-      inputForceClear();
-      mgBeginInputLockout(120);
-      requestUIRedraw();
-    }
-
-    return;
-  }
-
-  int roadSpeed = 2 + (difficulty / 4);
-  if (roadSpeed > 4)
-    roadSpeed = 4;
-
-  // prevent acceleration during coast/goal/impact/exit/offroad
-  if (s_dodgerPhase != DODGER_PHASE_FIREBALLS)
-    roadSpeed = 2;
-
-  if (!s_dodgerFreezeScroll)
-    s_dodgerBgScrollY -= roadSpeed;
-
-  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS && aliveMs >= kDodgerGoalSpawnMs)
-  {
-    s_dodgerPhase = DODGER_PHASE_COAST;
-    s_dodgerPhaseStartMs = now;
+    s_dodgerPx = gW / 2;
+    s_dodgerPxF = (float)s_dodgerPx;
+    s_dodgerMoveLastMs = millis();
+    s_dodgerPy = gH - 14;
+    s_dodgerSpeed = 3;
     s_dodgerMoveDir = 0;
+    s_dodgerDirHoldMs = 0;
 
     for (auto &b : s_dodgerBalls)
-      b.active = false;
+    {
+      b = {0, -200, 2, 4, false};
+    }
 
+    s_dodgerStartMs = millis();
+    s_dodgerLastStepMs = millis();
+    s_dodgerSpawnAccMs = 0;
+
+    s_dodgerGoalActive = false;
+    s_dodgerGoalReached = false;
+    s_dodgerGoalX = gW / 2;
+    s_dodgerGoalY = gH / 2 - 20;
+
+    s_dodgerPhase = DODGER_PHASE_FIREBALLS;
+    s_dodgerPhaseStartMs = millis();
+    s_dodgerGoalAnimFrame = 0;
+    s_dodgerGoalAnimMs = millis();
+    s_dodgerCrashDir = 0;
+
+    s_dodgerFreezeScroll = false;
+  }
+
+  static void dodgerSpawnOne(int difficulty)
+  {
+    const int gW = (screenW > 0) ? screenW : 240;
+
+    int slot = -1;
+    for (int i = 0; i < (int)(sizeof(s_dodgerBalls) / sizeof(s_dodgerBalls[0])); ++i)
+    {
+      if (!s_dodgerBalls[i].active)
+      {
+        slot = i;
+        break;
+      }
+    }
+    if (slot < 0)
+      return;
+
+    DodgerBall &b = s_dodgerBalls[slot];
+
+    const int margin = 6;
+    const int roadLeft = 54;
+    const int roadRight = gW - 54;
+
+    b.r = (uint8_t)(3 + (difficulty % 3));
+    b.x = (int16_t)random((long)(roadLeft + margin), (long)(roadRight - margin));
+    b.y = (int16_t)(-(int)(10 + random(40)));
+
+    b.vy = (int16_t)(2 + (difficulty / 5));
+    if (b.vy > 7)
+      b.vy = 7;
+
+    b.active = true;
+  }
+
+  static inline bool dodgerHit(int ax, int ay, int ar, int bx, int by, int br)
+  {
+    const int dx = ax - bx;
+    const int dy = ay - by;
+    const int rr = ar + br;
+    return (dx * dx + dy * dy) <= (rr * rr);
+  }
+
+  static inline uint32_t dodgerAliveMsNow(uint32_t now)
+  {
+    uint32_t elapsed = now - s_dodgerStartMs;
+
+    const uint32_t pausedAccum = mgPauseAccumMs();
+    if (elapsed > pausedAccum)
+      elapsed -= pausedAccum;
+    else
+      elapsed = 0;
+
+    if (mgPauseIsPaused() && mgPauseStartMs() != 0)
+    {
+      uint32_t pausedSoFar = now - mgPauseStartMs();
+      if (elapsed > pausedSoFar)
+        elapsed -= pausedSoFar;
+      else
+        elapsed = 0;
+    }
+
+    return elapsed;
+  }
+
+  void startInfernalDodger()
+  {
+    inputSetTextCapture(false);
+    mgPauseReset();
+
+    g_app.inMiniGame = true;
+    g_app.gameOver = false;
+    playerWon = false;
+    s_resultShown = false;
+
+    s_showReward = false;
+    s_rewardMsg[0] = 0;
+
+    s_prevSelectHeld = false;
+
+    currentMiniGame = MiniGame::INFERNAL_DODGER;
+
+    // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
+    UIState retUi = g_app.uiState;
+    if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
+      retUi = UIState::PET_SCREEN;
+
+    miniGameSetReturnUi(retUi);
+    uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
+
+    s_dodgerInited = false;
+    s_dodgerBgScrollY = 0;
+    s_dodgerFreezeScroll = false;
+
+    freeDodgerBgCache();
+    freeDodgerFireballSprites();
+    freeDodgerCarSprite();
     freeDodgerGoalFrames();
     freeDodgerGoreSprite();
+    ensureDodgerBgCache(fireballRunBgPathForPet());
+    ensureDodgerFireballSprites(fireballRunBgPathForPet());
+    ensureDodgerCarSprite(fireballRunCarPathForPet());
 
-    (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
-    (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
+    s_dodgerInited = true;
+    dodgerReset();
 
-    Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
-                  s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
+    invalidateBackgroundCache();
+    s_dodgerShowIntro = true;
+    s_dodgerDontShowAgain = false;
+    s_dodgerIntroImpFrame = 0;
+    s_dodgerIntroImpAnimMs = millis();
+    requestUIRedraw();
+    clearInputLatch();
+    // Prevent the ENTER used to launch the mini-game from being interpreted as
+    // an immediate "enterOnce" inside the mini-game on the first update tick.
+    {
+      auto st = M5Cardputer.Keyboard.keysState();
+      s_prevSelectHeld = st.enter;
+    }
+    mgBeginInputLockout(220);
   }
 
-  if (s_dodgerPhase == DODGER_PHASE_COAST)
+  void updateInfernalDodger(const InputState &input)
   {
-    const int targetX = gW / 2;
-    const int centerDriftPx = 2;
+    const bool enterOnce = miniGameEnterOnce(input);
 
-    if (s_dodgerPx < targetX)
-      s_dodgerPx += centerDriftPx;
-    else if (s_dodgerPx > targetX)
-      s_dodgerPx -= centerDriftPx;
-
-    if (abs(s_dodgerPx - targetX) < centerDriftPx)
-      s_dodgerPx = targetX;
-
-    s_dodgerPxF = (float)s_dodgerPx;
-
-    if ((now - s_dodgerPhaseStartMs) >= kDodgerCoastMs)
+    if (s_showReward)
     {
-      s_dodgerPhase = DODGER_PHASE_GOAL;
-      s_dodgerPhaseStartMs = now;
-      s_dodgerGoalActive = true;
-      s_dodgerGoalReached = false;
-      s_dodgerGoalX = gW / 2;
-      s_dodgerGoalY = -24;
-      s_dodgerGoalAnimFrame = 0;
-      s_dodgerGoalAnimMs = now;
-    }
-  }
-
-  if ((s_dodgerPhase == DODGER_PHASE_GOAL) && ((now - s_dodgerGoalAnimMs) >= 180))
-  {
-    s_dodgerGoalAnimMs = now;
-    s_dodgerGoalAnimFrame ^= 1;
-  }
-
-  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
-  {
-    const bool leftHeld = input.mgLeftHeld;
-    const bool rightHeld = input.mgRightHeld;
-
-    if (input.mgLeftOnce)
-    {
-      s_dodgerMoveDir = -1;
-      s_dodgerDirHoldMs = now + 140;
-    }
-    if (input.mgRightOnce)
-    {
-      s_dodgerMoveDir = +1;
-      s_dodgerDirHoldMs = now + 140;
+      if (enterOnce)
+        exitMiniGameToReturnUi(true);
+      return;
     }
 
-    if (leftHeld && !rightHeld)
+    if (g_app.gameOver)
     {
-      s_dodgerMoveDir = -1;
-      s_dodgerDirHoldMs = now + 140;
-    }
-    if (rightHeld && !leftHeld)
-    {
-      s_dodgerMoveDir = +1;
-      s_dodgerDirHoldMs = now + 140;
-    }
+      mgApplyResultAndShowReward(playerWon);
 
-    if (!leftHeld && !rightHeld)
-    {
-      if ((int32_t)(now - s_dodgerDirHoldMs) >= 0)
-        s_dodgerMoveDir = 0;
+      s_acceptArmed = false;
+      s_gameOverMs = 0;
+      mgBeginInputLockout(180);
+      clearInputLatch();
+      inputForceClear();
+      return;
     }
 
-    if (input.encoderDelta < 0)
+    const int gW = (screenW > 0) ? screenW : 240;
+    const int gH = (screenH > 0) ? screenH : 135;
+
+    const uint32_t now = millis();
+    const uint32_t aliveMs = dodgerAliveMsNow(now);
+    const int difficulty = (int)(aliveMs / 3000);
+
+    if (s_dodgerShowIntro)
     {
-      s_dodgerMoveDir = -1;
-      s_dodgerDirHoldMs = now + 140;
+      const uint32_t dt = now - s_dodgerIntroImpAnimMs;
+
+      if (dt >= 180)
+      {
+        s_dodgerIntroImpAnimMs = now;
+        s_dodgerIntroImpFrame ^= 1;
+      }
+
+      if (input.mgSpaceOnce)
+        s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
+
+      const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+
+      if (startPressed && !mgInputLockedOut())
+      {
+        s_dodgerShowIntro = false;
+        dodgerReset();
+        s_dodgerMoveLastMs = now;
+        s_dodgerLastStepMs = now;
+        clearInputLatch();
+        inputForceClear();
+        mgBeginInputLockout(120);
+        requestUIRedraw();
+      }
+
+      return;
     }
-    if (input.encoderDelta > 0)
+
+    int roadSpeed = 2 + (difficulty / 4);
+    if (roadSpeed > 4)
+      roadSpeed = 4;
+
+    // prevent acceleration during coast/goal/impact/exit/offroad
+    if (s_dodgerPhase != DODGER_PHASE_FIREBALLS)
+      roadSpeed = 2;
+
+    if (!s_dodgerFreezeScroll)
+      s_dodgerBgScrollY -= roadSpeed;
+
+    if (s_dodgerPhase == DODGER_PHASE_FIREBALLS && aliveMs >= kDodgerGoalSpawnMs)
     {
-      s_dodgerMoveDir = +1;
-      s_dodgerDirHoldMs = now + 140;
-    }
-  }
-  else
-  {
-    s_dodgerMoveDir = 0;
-  }
-
-  // Normal horizontal motion should NOT run during offroad crash/hold,
-  // or it will clamp the car back onto the screen.
-  if (s_dodgerPhase != DODGER_PHASE_OFFROAD_CRASH && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
-  {
-    uint32_t mvDtMs = now - s_dodgerMoveLastMs;
-    s_dodgerMoveLastMs = now;
-    if (mvDtMs > 40)
-      mvDtMs = 40;
-
-    float pxPerSec = 120.0f + (float)(difficulty * 6);
-    if (pxPerSec > 170.0f)
-      pxPerSec = 170.0f;
-
-    const float dt = (float)mvDtMs / 1000.0f;
-    s_dodgerPxF += (float)s_dodgerMoveDir * pxPerSec * dt;
-
-    const float marginF = 6.0f;
-    if (s_dodgerPxF < marginF)
-      s_dodgerPxF = marginF;
-    if (s_dodgerPxF > (float)gW - marginF)
-      s_dodgerPxF = (float)gW - marginF;
-
-    s_dodgerPx = (int16_t)(s_dodgerPxF + 0.5f);
-  }
-  else
-  {
-    s_dodgerMoveLastMs = now;
-  }
-
-  const int roadLeft = 54;
-  const int roadRight = gW - 54;
-
-  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
-  {
-    if (s_dodgerPx < roadLeft || s_dodgerPx > roadRight)
-    {
-      s_dodgerCrashDir = (s_dodgerPx < roadLeft) ? -1 : +1;
-
-      if (s_dodgerMoveDir < 0)
-        s_dodgerCrashDir = -1;
-      else if (s_dodgerMoveDir > 0)
-        s_dodgerCrashDir = +1;
-
-      s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
+      s_dodgerPhase = DODGER_PHASE_COAST;
       s_dodgerPhaseStartMs = now;
       s_dodgerMoveDir = 0;
-      soundError();
+
+      for (auto &b : s_dodgerBalls)
+        b.active = false;
+
+      freeDodgerGoalFrames();
+      freeDodgerGoreSprite();
+
+      (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
+      (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
+
+      Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
+                    s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
     }
-  }
 
-  const uint32_t stepMs = 16;
-  int steps = 0;
-  const int kMaxStepsPerFrame = 4;
+    if (s_dodgerPhase == DODGER_PHASE_COAST)
+    {
+      const int targetX = gW / 2;
+      const int centerDriftPx = 2;
 
-  while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
-  {
-    int spawnEveryMs = 520 - difficulty * 24;
-    if (spawnEveryMs < 220)
-      spawnEveryMs = 220;
+      if (s_dodgerPx < targetX)
+        s_dodgerPx += centerDriftPx;
+      else if (s_dodgerPx > targetX)
+        s_dodgerPx -= centerDriftPx;
+
+      if (abs(s_dodgerPx - targetX) < centerDriftPx)
+        s_dodgerPx = targetX;
+
+      s_dodgerPxF = (float)s_dodgerPx;
+
+      if ((now - s_dodgerPhaseStartMs) >= kDodgerCoastMs)
+      {
+        s_dodgerPhase = DODGER_PHASE_GOAL;
+        s_dodgerPhaseStartMs = now;
+        s_dodgerGoalActive = true;
+        s_dodgerGoalReached = false;
+        s_dodgerGoalX = gW / 2;
+        s_dodgerGoalY = -24;
+        s_dodgerGoalAnimFrame = 0;
+        s_dodgerGoalAnimMs = now;
+      }
+    }
+
+    if ((s_dodgerPhase == DODGER_PHASE_GOAL) && ((now - s_dodgerGoalAnimMs) >= 180))
+    {
+      s_dodgerGoalAnimMs = now;
+      s_dodgerGoalAnimFrame ^= 1;
+    }
 
     if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
     {
-      s_dodgerSpawnAccMs += stepMs;
-      if (s_dodgerSpawnAccMs >= (uint32_t)spawnEveryMs)
+      const bool leftHeld = input.mgLeftHeld;
+      const bool rightHeld = input.mgRightHeld;
+
+      if (input.mgLeftOnce)
       {
-        s_dodgerSpawnAccMs = 0;
-        dodgerSpawnOne(difficulty);
+        s_dodgerMoveDir = -1;
+        s_dodgerDirHoldMs = now + 140;
+      }
+      if (input.mgRightOnce)
+      {
+        s_dodgerMoveDir = +1;
+        s_dodgerDirHoldMs = now + 140;
       }
 
-      for (auto &b : s_dodgerBalls)
+      if (leftHeld && !rightHeld)
       {
-        if (!b.active)
-          continue;
+        s_dodgerMoveDir = -1;
+        s_dodgerDirHoldMs = now + 140;
+      }
+      if (rightHeld && !leftHeld)
+      {
+        s_dodgerMoveDir = +1;
+        s_dodgerDirHoldMs = now + 140;
+      }
 
-        b.y += b.vy;
+      if (!leftHeld && !rightHeld)
+      {
+        if ((int32_t)(now - s_dodgerDirHoldMs) >= 0)
+          s_dodgerMoveDir = 0;
+      }
 
-        if (b.y > gH + 12)
+      if (input.encoderDelta < 0)
+      {
+        s_dodgerMoveDir = -1;
+        s_dodgerDirHoldMs = now + 140;
+      }
+      if (input.encoderDelta > 0)
+      {
+        s_dodgerMoveDir = +1;
+        s_dodgerDirHoldMs = now + 140;
+      }
+    }
+    else
+    {
+      s_dodgerMoveDir = 0;
+    }
+
+    // Normal horizontal motion should NOT run during offroad crash/hold,
+    // or it will clamp the car back onto the screen.
+    if (s_dodgerPhase != DODGER_PHASE_OFFROAD_CRASH && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
+    {
+      uint32_t mvDtMs = now - s_dodgerMoveLastMs;
+      s_dodgerMoveLastMs = now;
+      if (mvDtMs > 40)
+        mvDtMs = 40;
+
+      float pxPerSec = 120.0f + (float)(difficulty * 6);
+      if (pxPerSec > 170.0f)
+        pxPerSec = 170.0f;
+
+      const float dt = (float)mvDtMs / 1000.0f;
+      s_dodgerPxF += (float)s_dodgerMoveDir * pxPerSec * dt;
+
+      const float marginF = 6.0f;
+      if (s_dodgerPxF < marginF)
+        s_dodgerPxF = marginF;
+      if (s_dodgerPxF > (float)gW - marginF)
+        s_dodgerPxF = (float)gW - marginF;
+
+      s_dodgerPx = (int16_t)(s_dodgerPxF + 0.5f);
+    }
+    else
+    {
+      s_dodgerMoveLastMs = now;
+    }
+
+    const int roadLeft = 54;
+    const int roadRight = gW - 54;
+
+    if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+    {
+      if (s_dodgerPx < roadLeft || s_dodgerPx > roadRight)
+      {
+        s_dodgerCrashDir = (s_dodgerPx < roadLeft) ? -1 : +1;
+
+        if (s_dodgerMoveDir < 0)
+          s_dodgerCrashDir = -1;
+        else if (s_dodgerMoveDir > 0)
+          s_dodgerCrashDir = +1;
+
+        s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
+        s_dodgerPhaseStartMs = now;
+        s_dodgerMoveDir = 0;
+        soundError();
+      }
+    }
+
+    const uint32_t stepMs = 16;
+    int steps = 0;
+    const int kMaxStepsPerFrame = 4;
+
+    while ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs && steps < kMaxStepsPerFrame)
+    {
+      int spawnEveryMs = 520 - difficulty * 24;
+      if (spawnEveryMs < 220)
+        spawnEveryMs = 220;
+
+      if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+      {
+        s_dodgerSpawnAccMs += stepMs;
+        if (s_dodgerSpawnAccMs >= (uint32_t)spawnEveryMs)
         {
-          b.active = false;
-          continue;
+          s_dodgerSpawnAccMs = 0;
+          dodgerSpawnOne(difficulty);
         }
 
-        const int pr = 6;
-        if (dodgerHit((int)s_dodgerPx, (int)s_dodgerPy, pr, (int)b.x, (int)b.y, (int)b.r))
+        for (auto &b : s_dodgerBalls)
+        {
+          if (!b.active)
+            continue;
+
+          b.y += b.vy;
+
+          if (b.y > gH + 12)
+          {
+            b.active = false;
+            continue;
+          }
+
+          const int pr = 6;
+          if (dodgerHit((int)s_dodgerPx, (int)s_dodgerPy, pr, (int)b.x, (int)b.y, (int)b.r))
+          {
+            playerWon = false;
+            g_app.gameOver = true;
+            requestUIRedraw();
+            s_resultShown = true;
+            soundError();
+            return;
+          }
+        }
+      }
+      else if (s_dodgerPhase == DODGER_PHASE_GOAL)
+      {
+        const int targetY = gH / 2;
+
+        s_dodgerGoalY += roadSpeed;
+
+        if (s_dodgerGoalY >= targetY)
+        {
+          s_dodgerGoalY = targetY;
+          s_dodgerGoalReached = true;
+          s_dodgerFreezeScroll = true;
+          s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
+          s_dodgerPhaseStartMs = now;
+          soundConfirm();
+        }
+      }
+      else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
+      {
+        s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
+        s_dodgerPhaseStartMs = now;
+      }
+      else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
+      {
+        s_dodgerPy -= 3;
+
+        if (s_dodgerPy < -(s_dodgerCarH > 0 ? s_dodgerCarH : 32))
+        {
+          s_dodgerPhase = DODGER_PHASE_HOLD;
+          s_dodgerPhaseStartMs = now;
+        }
+      }
+      else if (s_dodgerPhase == DODGER_PHASE_HOLD)
+      {
+        if ((now - s_dodgerPhaseStartMs) >= kDodgerGoalHoldMs)
+        {
+          playerWon = true;
+          g_app.gameOver = true;
+          requestUIRedraw();
+          s_resultShown = true;
+          return;
+        }
+      }
+      else if (s_dodgerPhase == DODGER_PHASE_OFFROAD_CRASH)
+      {
+        s_dodgerPx += s_dodgerCrashDir * 4;
+        s_dodgerPxF = (float)s_dodgerPx;
+
+        if ((s_dodgerCrashDir < 0 && s_dodgerPx < -(s_dodgerCarW > 0 ? s_dodgerCarW : 32)) ||
+            (s_dodgerCrashDir > 0 && s_dodgerPx > gW + (s_dodgerCarW > 0 ? s_dodgerCarW : 32)))
+        {
+          s_dodgerPhase = DODGER_PHASE_OFFROAD_HOLD;
+          s_dodgerPhaseStartMs = now;
+        }
+      }
+      else if (s_dodgerPhase == DODGER_PHASE_OFFROAD_HOLD)
+      {
+        if ((now - s_dodgerPhaseStartMs) >= kDodgerOffroadHoldMs)
         {
           playerWon = false;
           g_app.gameOver = true;
           requestUIRedraw();
           s_resultShown = true;
-          soundError();
           return;
         }
       }
-    }
-    else if (s_dodgerPhase == DODGER_PHASE_GOAL)
-    {
-      const int targetY = gH / 2;
 
-      s_dodgerGoalY += roadSpeed;
+      s_dodgerLastStepMs += stepMs;
+      steps++;
+    }
 
-      if (s_dodgerGoalY >= targetY)
-      {
-        s_dodgerGoalY = targetY;
-        s_dodgerGoalReached = true;
-        s_dodgerFreezeScroll = true;
-        s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
-        s_dodgerPhaseStartMs = now;
-        soundConfirm();
-      }
-    }
-    else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
-    {
-      s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
-      s_dodgerPhaseStartMs = now;
-    }
-    else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
-    {
-      s_dodgerPy -= 3;
+    if ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs)
+      s_dodgerLastStepMs = now;
+  }
 
-      if (s_dodgerPy < -(s_dodgerCarH > 0 ? s_dodgerCarH : 32))
-      {
-        s_dodgerPhase = DODGER_PHASE_HOLD;
-        s_dodgerPhaseStartMs = now;
-      }
-    }
-    else if (s_dodgerPhase == DODGER_PHASE_HOLD)
-    {
-      if ((now - s_dodgerPhaseStartMs) >= kDodgerGoalHoldMs)
-      {
-        playerWon = true;
-        g_app.gameOver = true;
-        requestUIRedraw();
-        s_resultShown = true;
-        return;
-      }
-    }
-    else if (s_dodgerPhase == DODGER_PHASE_OFFROAD_CRASH)
-    {
-      s_dodgerPx += s_dodgerCrashDir * 4;
-      s_dodgerPxF = (float)s_dodgerPx;
+  void drawInfernalDodger()
+  {
+    const int gW = (screenW > 0) ? screenW : 240;
+    const int gH = (screenH > 0) ? screenH : 135;
 
-      if ((s_dodgerCrashDir < 0 && s_dodgerPx < -(s_dodgerCarW > 0 ? s_dodgerCarW : 32)) ||
-          (s_dodgerCrashDir > 0 && s_dodgerPx > gW + (s_dodgerCarW > 0 ? s_dodgerCarW : 32)))
-      {
-        s_dodgerPhase = DODGER_PHASE_OFFROAD_HOLD;
-        s_dodgerPhaseStartMs = now;
-      }
-    }
-    else if (s_dodgerPhase == DODGER_PHASE_OFFROAD_HOLD)
+    const char *bgPath = fireballRunBgPathForPet();
+    const char *carPath = fireballRunCarPathForPet();
+
+    const bool haveBg = ensureDodgerBgCache(bgPath);
+    const bool haveFireballs = ensureDodgerFireballSprites(bgPath);
+    const bool haveCar = ensureDodgerCarSprite(carPath);
+
+    const bool haveGoalFrames = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1];
+    const bool haveGore = s_dodgerGoreReady;
+
+    bool drewBg = false;
+    if (haveBg && s_dodgerBgSprReady)
     {
-      if ((now - s_dodgerPhaseStartMs) >= kDodgerOffroadHoldMs)
+      const int bh = (int)s_dodgerBgSpr.height();
+      if (bh > 0)
       {
-        playerWon = false;
-        g_app.gameOver = true;
-        requestUIRedraw();
-        s_resultShown = true;
-        return;
+        int y = -(s_dodgerBgScrollY % bh);
+        if (y > 0)
+          y -= bh;
+
+        s_dodgerBgSpr.pushSprite(&spr, 0, y);
+        s_dodgerBgSpr.pushSprite(&spr, 0, y + bh);
+        drewBg = true;
       }
     }
 
-    s_dodgerLastStepMs += stepMs;
-    steps++;
-  }
+    if (!drewBg)
+      spr.fillSprite(TFT_BLACK);
 
-  if ((int32_t)(now - s_dodgerLastStepMs) >= (int32_t)stepMs)
-    s_dodgerLastStepMs = now;
-}
-
-void drawInfernalDodger()
-{
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
-
-  const char *bgPath = fireballRunBgPathForPet();
-  const char *carPath = fireballRunCarPathForPet();
-
-  const bool haveBg = ensureDodgerBgCache(bgPath);
-  const bool haveFireballs = ensureDodgerFireballSprites(bgPath);
-  const bool haveCar = ensureDodgerCarSprite(carPath);
-
-  const bool haveGoalFrames = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1];
-  const bool haveGore = s_dodgerGoreReady;
-
-  bool drewBg = false;
-  if (haveBg && s_dodgerBgSprReady)
-  {
-    const int bh = (int)s_dodgerBgSpr.height();
-    if (bh > 0)
+    if (s_showReward)
     {
-      int y = -(s_dodgerBgScrollY % bh);
-      if (y > 0)
-        y -= bh;
-
-      s_dodgerBgSpr.pushSprite(&spr, 0, y);
-      s_dodgerBgSpr.pushSprite(&spr, 0, y + bh);
-      drewBg = true;
-    }
-  }
-
-  if (!drewBg)
-    spr.fillSprite(TFT_BLACK);
-
-  if (s_showReward)
-  {
-    drawRewardModal(gW, gH);
-    return;
-  }
-
-  if (g_app.gameOver)
-  {
-    spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
-    spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU LOSE!", gW / 2, gH / 2 - 10, 4);
-
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
-    return;
-  }
-
-  if (s_dodgerShowIntro)
-  {
-    spr.fillSprite(TFT_BLACK);
-    spr.setTextDatum(CC_DATUM);
-
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Arrow keys or A/L to dodge", gW / 2, 8, 2);
-    spr.drawCentreString("Stay on the road, smash the Imp!", gW / 2, 26, 2);
-
-    const int impX = (gW - 48) / 2;
-    const int impY = 44;
-
-    if (ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet()))
-      s_dodgerGoalSpr[s_dodgerIntroImpFrame].pushSprite(&spr, impX, impY, kDodgerKey);
-
-    const int cbY = 102;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_dodgerDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+      drawRewardModal(gW, gH);
+      return;
     }
 
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
-
-    spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
-    return;
-  }
-
-  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
-  {
-    for (auto &b : s_dodgerBalls)
+    if (g_app.gameOver)
     {
-      if (!b.active)
-        continue;
+      spr.setTextDatum(CC_DATUM);
+      spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
+      spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU LOSE!", gW / 2, gH / 2 - 10, 4);
 
-      const int bx = (int)b.x;
-      const int by = (int)b.y;
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+      spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
+      return;
+    }
 
-      if (haveFireballs && s_dodgerFireballReady)
+    if (s_dodgerShowIntro)
+    {
+      spr.fillSprite(TFT_BLACK);
+      spr.setTextDatum(CC_DATUM);
+
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+      spr.drawCentreString("Arrow keys or A/L to dodge", gW / 2, 8, 2);
+      spr.drawCentreString("Stay on the road, smash the Imp!", gW / 2, 26, 2);
+
+      const int impX = (gW - 48) / 2;
+      const int impY = 44;
+
+      if (ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet()))
+        s_dodgerGoalSpr[s_dodgerIntroImpFrame].pushSprite(&spr, impX, impY, kDodgerKey);
+
+      const int cbY = 102;
+      const int cbSize = 10;
+      const int textOffset = 16;
+      const int lineWidth = 150;
+      const int cbX = (gW - lineWidth) / 2;
+
+      spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+      if (s_dodgerDontShowAgain)
       {
-        const int frame = (millis() / 80) % 3;
-        const int w = s_dodgerFireballSpr[frame].width();
-        const int h = s_dodgerFireballSpr[frame].height();
+        spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+        spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+      }
 
-        const int drawX = bx - w / 2;
-        const int drawY = by - h / 2;
+      spr.setTextDatum(ML_DATUM);
+      spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+      spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
 
-        s_dodgerFireballSpr[frame].pushSprite(&spr, drawX, drawY, kDodgerKey);
+      spr.setTextDatum(CC_DATUM);
+      spr.setTextColor(TFT_GREEN, TFT_BLACK);
+      spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
+      return;
+    }
+
+    if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+    {
+      for (auto &b : s_dodgerBalls)
+      {
+        if (!b.active)
+          continue;
+
+        const int bx = (int)b.x;
+        const int by = (int)b.y;
+
+        if (haveFireballs && s_dodgerFireballReady)
+        {
+          const int frame = (millis() / 80) % 3;
+          const int w = s_dodgerFireballSpr[frame].width();
+          const int h = s_dodgerFireballSpr[frame].height();
+
+          const int drawX = bx - w / 2;
+          const int drawY = by - h / 2;
+
+          s_dodgerFireballSpr[frame].pushSprite(&spr, drawX, drawY, kDodgerKey);
+        }
+        else
+        {
+          spr.fillCircle(bx, by, 4, TFT_ORANGE);
+          spr.drawCircle(bx, by, 4, TFT_RED);
+        }
+      }
+    }
+
+    Serial.printf("GOAL draw: active=%d phase=%d ready0=%d ready1=%d x=%d y=%d w=%d h=%d\n", s_dodgerGoalActive ? 1 : 0,
+                  (int)s_dodgerPhase, s_dodgerGoalFrameReady[0] ? 1 : 0, s_dodgerGoalFrameReady[1] ? 1 : 0,
+                  s_dodgerGoalX, s_dodgerGoalY, s_dodgerGoalW, s_dodgerGoalH);
+
+    if (s_dodgerGoalActive)
+    {
+      const int drawX = s_dodgerGoalX - (s_dodgerGoalW / 2);
+      const int drawY = s_dodgerGoalY - (s_dodgerGoalH / 2);
+
+      if (s_dodgerPhase == DODGER_PHASE_IMPACT || s_dodgerPhase == DODGER_PHASE_CAR_EXIT ||
+          s_dodgerPhase == DODGER_PHASE_HOLD)
+      {
+        if (haveGore)
+          s_dodgerGoreSpr.pushSprite(&spr, drawX, drawY, kDodgerKey);
+        else
+          spr.fillRect(drawX, drawY, 48, 16, TFT_RED);
       }
       else
       {
-        spr.fillCircle(bx, by, 4, TFT_ORANGE);
-        spr.drawCircle(bx, by, 4, TFT_RED);
+        if (haveGoalFrames)
+          s_dodgerGoalSpr[s_dodgerGoalAnimFrame].pushSprite(&spr, drawX, drawY, kDodgerKey);
+        else
+          spr.fillRect(drawX, drawY, 48, 16, TFT_RED);
+      }
+    }
+
+    if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
+    {
+      if (haveCar && s_dodgerCarReady)
+      {
+        const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
+        const int drawY = s_dodgerPy - (s_dodgerCarH / 2);
+        s_dodgerCarSpr.pushSprite(&spr, drawX, drawY, kDodgerKey);
+      }
+      else
+      {
+        spr.fillCircle(s_dodgerPx, s_dodgerPy, 6, TFT_GREEN);
+        spr.drawCircle(s_dodgerPx, s_dodgerPy, 6, TFT_DARKGREEN);
       }
     }
   }
 
-  Serial.printf("GOAL draw: active=%d phase=%d ready0=%d ready1=%d x=%d y=%d w=%d h=%d\n", s_dodgerGoalActive ? 1 : 0,
-                (int)s_dodgerPhase, s_dodgerGoalFrameReady[0] ? 1 : 0, s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoalX,
-                s_dodgerGoalY, s_dodgerGoalW, s_dodgerGoalH);
-
-  if (s_dodgerGoalActive)
+  static void mgSyncGameTimebases(uint32_t now)
   {
-    const int drawX = s_dodgerGoalX - (s_dodgerGoalW / 2);
-    const int drawY = s_dodgerGoalY - (s_dodgerGoalH / 2);
+    switch (currentMiniGame)
+    {
+    case MiniGame::FLAPPY_FIREBALL:
+      s_lastStepMs = now;
+      break;
 
-    if (s_dodgerPhase == DODGER_PHASE_IMPACT || s_dodgerPhase == DODGER_PHASE_CAR_EXIT ||
-        s_dodgerPhase == DODGER_PHASE_HOLD)
-    {
-      if (haveGore)
-        s_dodgerGoreSpr.pushSprite(&spr, drawX, drawY, kDodgerKey);
-      else
-        spr.fillRect(drawX, drawY, 48, 16, TFT_RED);
-    }
-    else
-    {
-      if (haveGoalFrames)
-        s_dodgerGoalSpr[s_dodgerGoalAnimFrame].pushSprite(&spr, drawX, drawY, kDodgerKey);
-      else
-        spr.fillRect(drawX, drawY, 48, 16, TFT_RED);
+    case MiniGame::INFERNAL_DODGER:
+      s_dodgerLastStepMs = now;
+      s_dodgerMoveLastMs = now;
+      break;
+
+    case MiniGame::CROSSY_ROAD:
+      s_crossyLastLaneMs = now;
+      break;
+
+    case MiniGame::RESURRECTION:
+      rr_lastMs = now;
+      break;
+
+    default:
+      break;
     }
   }
-
-  if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
-  {
-    if (haveCar && s_dodgerCarReady)
-    {
-      const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
-      const int drawY = s_dodgerPy - (s_dodgerCarH / 2);
-      s_dodgerCarSpr.pushSprite(&spr, drawX, drawY, kDodgerKey);
-    }
-    else
-    {
-      spr.fillCircle(s_dodgerPx, s_dodgerPy, 6, TFT_GREEN);
-      spr.drawCircle(s_dodgerPx, s_dodgerPy, 6, TFT_DARKGREEN);
-    }
-  }
-}
-
-static void mgSyncGameTimebases(uint32_t now)
-{
-  switch (currentMiniGame)
-  {
-  case MiniGame::FLAPPY_FIREBALL:
-    s_lastStepMs = now;
-    break;
-
-  case MiniGame::INFERNAL_DODGER:
-    s_dodgerLastStepMs = now;
-    s_dodgerMoveLastMs = now;
-    break;
-
-  case MiniGame::CROSSY_ROAD:
-    s_crossyLastLaneMs = now;
-    break;
-
-  case MiniGame::RESURRECTION:
-    rr_lastMs = now;
-    break;
-
-  default:
-    break;
-  }
-}
 
 #endif // RH_MINIGAMES_IMPL_IN_PAUSE_MENU
