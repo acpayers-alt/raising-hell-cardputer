@@ -529,6 +529,7 @@ void startFlappyFireball()
   currentMiniGame = MiniGame::FLAPPY_FIREBALL;
   mgAssetsBeginSession(currentMiniGame, "startFlappyFireball");
   mgmem::beginSession(currentMiniGame, pet.type);
+  mgmem::logUsage("flappy-start-beginSession");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
   UIState retUi = g_app.uiState;
@@ -556,29 +557,42 @@ void startFlappyFireball()
   s_lastStepMs = millis();
 
   s_flappyBgScrollX = 0;
+
+  mgmem::logUsage("flappy-before-bg-reset");
   freeFlappyBgCache();
-  ensureFlappyBgCache(flappyBgPathForPet());
-  
+  mgmem::logUsage("flappy-after-bg-reset");
+
+  const char *bgPath = flappyBgPathForPet();
+
+  const bool bgOk = ensureFlappyBgCache(bgPath);
+  mgmem::logUsage("flappy-after-bg-ensure");
+
   freeFlappyPipeSprites();
   freeFlappyFireballSprites();
-  
-  const char *bgPath = flappyBgPathForPet();
-  
+  mgmem::logUsage("flappy-after-sprite-free");
+
   const bool pipeOk = ensureFlappyPipeSprites(bgPath);
   const bool fireballOk = ensureFlappyFireballSprites(bgPath);
   const bool impOk = ensureImpWaveSprites();
-  
-  Serial.printf("FLAPPY preload: pipes=%d fireball=%d imp=%d free=%u largest=%u\n",
-                pipeOk ? 1 : 0,
-                fireballOk ? 1 : 0,
-                impOk ? 1 : 0,
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  mgmem::logUsage("flappy-after-preload");
+
+  Serial.printf(
+      "FLAPPY preload: bg=%d pipes=%d fireball=%d imp=%d free=%u largest=%u\n",
+      bgOk ? 1 : 0,
+      pipeOk ? 1 : 0,
+      fireballOk ? 1 : 0,
+      impOk ? 1 : 0,
+      (unsigned)ESP.getFreeHeap(),
+      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
   inputForceClear();
   mgBeginInputLockout(220);
+
+  mgmem::logUsage("flappy-start-complete");
 }
 
 static bool flappyCollides(int fbX, int fbY, int r, const FlappyPipe &p, int w, int h)
@@ -2235,6 +2249,7 @@ void startCrossyRoad()
   currentMiniGame = MiniGame::CROSSY_ROAD;
   mgAssetsBeginSession(currentMiniGame, "startCrossyRoad");
   mgmem::beginSession(currentMiniGame, pet.type);
+  mgmem::logUsage("crossy-start-beginSession");
   logMiniGameHeap("startCrossyRoad");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
@@ -2247,21 +2262,50 @@ void startCrossyRoad()
 
   s_crossyInited = true;
   crossyReset();
+
+  mgmem::logUsage("crossy-before-asset-free");
+
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
 
-  ensureCrossyStartZoneSprite();
-  ensureCrossyGoalZoneSprite();
+  mgmem::logUsage("crossy-after-asset-free");
+
+  const bool startOk = ensureCrossyStartZoneSprite();
+  mgmem::logUsage("crossy-after-start-zone");
+
+  const bool goalOk = ensureCrossyGoalZoneSprite();
+  mgmem::logUsage("crossy-after-goal-zone");
 
   const bool lava0 = ensureCrossyLavaZoneSprite(0);
+  mgmem::logUsage("crossy-after-lava0");
+
   const bool lava1 = ensureCrossyLavaZoneSprite(1);
+  mgmem::logUsage("crossy-after-lava1");
 
-  Serial.printf("Crossy lava reload: f0=%d f1=%d\n", lava0 ? 1 : 0, lava1 ? 1 : 0);
+  const bool stoneOk = ensureCrossyStoneSprite();
+  mgmem::logUsage("crossy-after-stone-lg");
 
-  ensureCrossyStoneSprite();
-  ensureCrossyStoneSmallSprite();
-  ensureCrossyStoneXSSprite();
-  ensureCrossyImpSprite();
+  const bool stoneSmOk = ensureCrossyStoneSmallSprite();
+  mgmem::logUsage("crossy-after-stone-sm");
+
+  const bool stoneXsOk = ensureCrossyStoneXSSprite();
+  mgmem::logUsage("crossy-after-stone-xs");
+
+  const bool impOk = ensureCrossyImpSprite();
+  mgmem::logUsage("crossy-after-imp");
+
+  Serial.printf(
+      "CROSSY preload: start=%d goal=%d lava0=%d lava1=%d stone=%d stoneSm=%d stoneXs=%d imp=%d free=%u largest=%u\n",
+      startOk ? 1 : 0,
+      goalOk ? 1 : 0,
+      lava0 ? 1 : 0,
+      lava1 ? 1 : 0,
+      stoneOk ? 1 : 0,
+      stoneSmOk ? 1 : 0,
+      stoneXsOk ? 1 : 0,
+      impOk ? 1 : 0,
+      (unsigned)ESP.getFreeHeap(),
+      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   s_crossyWinPoseActive = false;
   s_crossyWinPoseStart = 0;
@@ -2274,6 +2318,8 @@ void startCrossyRoad()
 
   s_crossyWinPoseActive = false;
   s_crossyWinPoseStart = 0;
+
+  mgmem::logUsage("crossy-start-complete");
 }
 
 static void crossyStepLanes(uint32_t now)
@@ -3364,6 +3410,7 @@ void startInfernalDodger()
 
   mgAssetsBeginSession(currentMiniGame, "startInfernalDodger");
   mgmem::beginSession(currentMiniGame, pet.type);
+  mgmem::logUsage("dodger-start-beginSession");
   logMiniGameHeap("startInfernalDodger");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
@@ -3378,16 +3425,37 @@ void startInfernalDodger()
   s_dodgerBgScrollY = 0;
   s_dodgerFreezeScroll = false;
 
+  mgmem::logUsage("dodger-before-asset-free");
+
   freeDodgerBgCache();
   freeDodgerFireballSprites();
   freeDodgerCarSprite();
   freeDodgerGoalFrames();
   freeDodgerGoreSprite();
-  ensureDodgerBgCache(fireballRunBgPathForPet());
-  ensureDodgerFireballSprites(fireballRunBgPathForPet());
-  ensureDodgerCarSprite();
+
+  mgmem::logUsage("dodger-after-asset-free");
+
+  const char *bgPath = fireballRunBgPathForPet();
+
+  const bool bgOk = ensureDodgerBgCache(bgPath);
+  mgmem::logUsage("dodger-after-bg-ensure");
+
+  const bool fireballOk = ensureDodgerFireballSprites(bgPath);
+  mgmem::logUsage("dodger-after-fireballs-ensure");
+
+  const bool carOk = ensureDodgerCarSprite();
+  mgmem::logUsage("dodger-after-car-ensure");
+
   s_dodgerInited = true;
   dodgerReset();
+
+  Serial.printf(
+      "DODGER preload: bg=%d fireballs=%d car=%d free=%u largest=%u\n",
+      bgOk ? 1 : 0,
+      fireballOk ? 1 : 0,
+      carOk ? 1 : 0,
+      (unsigned)ESP.getFreeHeap(),
+      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   invalidateBackgroundCache();
   s_dodgerShowIntro = true;
@@ -3398,6 +3466,8 @@ void startInfernalDodger()
   clearInputLatch();
   inputForceClear();
   mgBeginInputLockout(220);
+
+  mgmem::logUsage("dodger-start-complete");
 }
 
 void updateInfernalDodger(const InputState &input)
