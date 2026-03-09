@@ -1,0 +1,401 @@
+#include "mini_game_runtime.h"
+
+#include <Arduino.h>
+#include <stdio.h>
+
+#include "app_state.h"
+#include "currency.h"
+#include "graphics.h"
+#include "input.h"
+#include "inventory.h"
+#include "mini_game_assets.h"
+#include "mini_game_return_ui.h"
+#include "mg_pause_core.h"
+#include "pet.h"
+#include "save_manager.h"
+#include "sound.h"
+#include "ui_actions.h"
+#include "ui_defs.h"
+#include "ui_runtime.h"
+#include "mg_pause_menu.h"
+
+// cleanup hooks implemented in mini_games.cpp
+extern void freeImpWaveSprites();
+extern void freeFlappyBgCache();
+extern void freeFlappyFireballSprites();
+extern void freeFlappyPipeSprites();
+
+extern void freeDodgerBgCache();
+extern void freeDodgerFireballSprites();
+extern void freeDodgerCarSprite();
+extern void freeDodgerGoalFrames();
+extern void freeDodgerGoreSprite();
+
+extern void freeCrossyZoneSprites();
+extern void freeCrossyActorSprites();
+
+// game update/draw hooks implemented in mini_games.cpp
+extern void updateFlappyFireball(const InputState& input);
+extern void drawFlappyFireball();
+
+extern void updateCrossyRoad(const InputState& input);
+extern void drawCrossyRoad();
+
+extern void updateInfernalDodger(const InputState& input);
+extern void drawInfernalDodger();
+
+extern void updateResurrectionRun(const InputState& input);
+extern void drawResurrectionRun();
+
+// timers owned by mini_games.cpp, synced on pause/resume
+extern uint32_t s_lastStepMs;
+extern uint32_t s_dodgerLastStepMs;
+extern uint32_t s_dodgerMoveLastMs;
+extern uint32_t s_crossyLastLaneMs;
+extern uint32_t rr_lastMs;
+
+// Shared runtime state
+MiniGame currentMiniGame = MiniGame::NONE;
+bool playerWon = false;
+
+static bool s_mgExiting = false;
+
+bool s_acceptArmed = false;
+uint32_t s_gameOverMs = 0;
+
+bool s_showReward = false;
+char s_rewardMsg[64] = {0};
+
+static bool s_prevSelectHeld = false;
+static uint32_t s_mgInputLockoutUntilMs = 0;
+
+static const uint32_t kRewardAcceptDelayMs = 180;
+
+bool mgRewardShowing()
+{
+  return s_showReward;
+}
+
+void mgClearRewardState()
+{
+  s_showReward = false;
+  s_rewardMsg[0] = 0;
+}
+
+bool mgAcceptArmedNow(uint32_t now)
+{
+  if (!s_acceptArmed && s_gameOverMs != 0 && (int32_t)(now - s_gameOverMs) >= 0)
+    s_acceptArmed = true;
+
+  return s_acceptArmed;
+}
+
+void mgResetAcceptState()
+{
+  s_acceptArmed = false;
+  s_gameOverMs = 0;
+}
+
+const char* mgRewardMessage()
+{
+  return s_rewardMsg;
+}
+
+// simple access for per-game files if needed later
+bool mgInputLockedOut()
+{
+  return (int32_t)(millis() - s_mgInputLockoutUntilMs) < 0;
+}
+
+void mgBeginInputLockout(uint32_t ms)
+{
+  s_mgInputLockoutUntilMs = millis() + ms;
+}
+
+bool miniGameEnterOnce(const InputState& input)
+{
+  const bool held = input.mgSelectHeld;
+
+  if (mgInputLockedOut())
+  {
+    s_prevSelectHeld = held;
+    return false;
+  }
+
+  const bool enterOnce = (held && !s_prevSelectHeld);
+  s_prevSelectHeld = held;
+  return enterOnce || input.mgSelectOnce;
+}
+
+static const char* mgItemName(ItemType t)
+{
+  const char* nm = g_app.inventory.getItemLabelForType(t);
+  if (nm && nm[0])
+    return nm;
+
+  switch (t)
+  {
+    case ITEM_SOUL_FOOD:    return "SOUL FOOD";
+    case ITEM_CURSED_RELIC: return "CURSED RELIC";
+    case ITEM_DEMON_BONE:   return "DEMON BONE";
+    case ITEM_RITUAL_CHALK: return "RITUAL CHALK";
+    default:                return "ITEM";
+  }
+}
+
+static int rollMiniGameInfReward()
+{
+  const int r = (int)random(100);
+
+  if (r < 50) return 25;
+  if (r < 80) return 50;
+  if (r < 95) return 75;
+  return 100;
+}
+
+static bool tryAwardWinItem_1in4(ItemType* outType)
+{
+  if (outType)
+    *outType = ITEM_NONE;
+
+  if (random(4) != 0)
+    return false;
+
+  static const ItemType kRewards[] = {
+    ITEM_SOUL_FOOD,
+    ITEM_CURSED_RELIC,
+    ITEM_DEMON_BONE,
+    ITEM_RITUAL_CHALK
+  };
+
+  const int n = (int)(sizeof(kRewards) / sizeof(kRewards[0]));
+  const ItemType t = kRewards[(int)random((long)n)];
+
+  g_app.inventory.addItem(t, 1);
+  if (outType)
+    *outType = t;
+  return true;
+}
+
+void mgApplyResultAndShowReward(bool won)
+{
+  if (won)
+  {
+    pet.addXP(25);
+
+    const int infReward = rollMiniGameInfReward();
+    addInf(infReward);
+
+    pet.happiness = constrain(pet.happiness + 20, 0, 100);
+
+    ItemType rewardType = ITEM_NONE;
+    const bool wonItem = tryAwardWinItem_1in4(&rewardType);
+
+    if (wonItem)
+    {
+      const char* nm = mgItemName(rewardType);
+      snprintf(
+        s_rewardMsg,
+        sizeof(s_rewardMsg),
+        "You win! XP +25  INF +%d  MOOD +20\nRandom Reward: %s +1",
+        infReward,
+        (nm && nm[0]) ? nm : "ITEM");
+    }
+    else
+    {
+      snprintf(
+        s_rewardMsg,
+        sizeof(s_rewardMsg),
+        "You win! XP +25  INF +%d  MOOD +20",
+        infReward);
+    }
+  }
+  else
+  {
+    pet.addXP(5);
+    pet.happiness = constrain(pet.happiness + 10, 0, 100);
+    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5  MOOD +10");
+  }
+
+  saveManagerMarkDirty();
+
+  s_showReward = true;
+  g_app.gameOver = false;
+
+  requestUIRedraw();
+}
+
+void miniGameExitToReturnUi(bool beginLockout)
+{
+  s_mgExiting = true;
+
+  s_showReward = false;
+  s_rewardMsg[0] = 0;
+
+  UIState target = miniGameGetReturnUiOrDefault(UIState::PET_SCREEN);
+  if (target == UIState::MINI_GAME || target == UIState::MG_PAUSE)
+    target = UIState::PET_SCREEN;
+
+  miniGameClearReturnUi();
+
+  g_app.uiState = target;
+
+  g_app.inMiniGame = false;
+  g_app.gameOver = false;
+  playerWon = false;
+
+  mgAssetsEndSession(currentMiniGame, "miniGameExitToReturnUi");
+  currentMiniGame = MiniGame::NONE;
+
+  mgPauseReset();
+  clearInputLatch();
+  inputForceClear();
+  s_prevSelectHeld = false;
+
+  freeImpWaveSprites();
+
+  freeFlappyBgCache();
+  freeFlappyFireballSprites();
+  freeFlappyPipeSprites();
+
+  freeDodgerBgCache();
+  freeDodgerFireballSprites();
+  freeDodgerCarSprite();
+  freeDodgerGoalFrames();
+  freeDodgerGoreSprite();
+
+  freeCrossyZoneSprites();
+  freeCrossyActorSprites();
+
+  invalidateBackgroundCache();
+  requestFullUIRedraw();
+
+  if (beginLockout)
+    mgBeginInputLockout(220);
+}
+
+void mgSyncGameTimebases(uint32_t now)
+{
+  switch (currentMiniGame)
+  {
+    case MiniGame::FLAPPY_FIREBALL:
+      s_lastStepMs = now;
+      break;
+
+    case MiniGame::INFERNAL_DODGER:
+      s_dodgerLastStepMs = now;
+      s_dodgerMoveLastMs = now;
+      break;
+
+    case MiniGame::CROSSY_ROAD:
+      s_crossyLastLaneMs = now;
+      break;
+
+    case MiniGame::RESURRECTION:
+      rr_lastMs = now;
+      break;
+
+    default:
+      break;
+  }
+}
+
+void updateMiniGame(const InputState& input)
+{
+  if (g_app.uiState != UIState::MINI_GAME)
+    return;
+  if (!g_app.inMiniGame)
+    return;
+  if (currentMiniGame == MiniGame::NONE)
+    return;
+
+  const uint32_t now = millis();
+
+  const uint8_t p = mgPauseHandle(input);
+  mgPauseUpdateClocks(now);
+
+  if (p == MGPAUSE_EXIT)
+  {
+    miniGameExitToReturnUi(true);
+    requestUIRedraw();
+    return;
+  }
+
+  if (p == MGPAUSE_CONSUME)
+  {
+    if (mgPauseIsPaused())
+      mgSyncGameTimebases(now);
+
+    requestUIRedraw();
+    return;
+  }
+
+  if (mgPauseIsPaused())
+  {
+    mgSyncGameTimebases(now);
+    requestUIRedraw();
+    return;
+  }
+
+  switch (currentMiniGame)
+  {
+    case MiniGame::FLAPPY_FIREBALL:
+      updateFlappyFireball(input);
+      break;
+
+    case MiniGame::CROSSY_ROAD:
+      updateCrossyRoad(input);
+      break;
+
+    case MiniGame::INFERNAL_DODGER:
+      updateInfernalDodger(input);
+      break;
+
+    case MiniGame::RESURRECTION:
+      updateResurrectionRun(input);
+      break;
+
+    default:
+      break;
+  }
+
+  requestUIRedraw();
+}
+
+void drawMiniGame()
+{
+  if (g_app.uiState != UIState::MINI_GAME)
+    return;
+  if (!g_app.inMiniGame)
+    return;
+  if (currentMiniGame == MiniGame::NONE)
+    return;
+
+  const uint32_t now = millis();
+  mgPauseUpdateClocks(now);
+
+  switch (currentMiniGame)
+  {
+    case MiniGame::FLAPPY_FIREBALL:
+      drawFlappyFireball();
+      break;
+
+    case MiniGame::CROSSY_ROAD:
+      drawCrossyRoad();
+      break;
+
+    case MiniGame::INFERNAL_DODGER:
+      drawInfernalDodger();
+      break;
+
+    case MiniGame::RESURRECTION:
+      drawResurrectionRun();
+      break;
+
+    default:
+      break;
+  }
+
+  if (mgPauseIsPaused())
+    mgDrawPauseOverlay();
+}

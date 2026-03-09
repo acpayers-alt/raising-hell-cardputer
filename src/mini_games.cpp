@@ -21,6 +21,8 @@
 #include "esp_heap_caps.h"
 #include <stdint.h>
 
+#include "mini_game_assets.h"
+#include "mini_game_runtime.h"
 #include "mini_games.h"
 
 #include <Arduino.h>
@@ -47,114 +49,60 @@
 #include "save_manager.h"
 #include "ui_actions.h"
 
+static inline void exitMiniGameToReturnUi(bool beginLockout = true) { miniGameExitToReturnUi(beginLockout); }
+
 // -----------------------------------------------------------------------------
 // Mini-game input helpers / shared state
 // -----------------------------------------------------------------------------
-static bool s_mgExiting = false;
-
-static bool s_acceptArmed = false;
-static uint32_t s_gameOverMs = 0;
-
-static bool s_showReward = false;
-static char s_rewardMsg[64] = {0};
-
 // Forward decls used by multiple mini-games / defined later in this file
-static int rollMiniGameInfReward();
-static void exitMiniGameToReturnUi(bool beginLockout = true);
-static void mgApplyResultAndShowReward(bool won);
-static bool tryAwardWinItem_1in4(ItemType *outType);
-static void mgSyncGameTimebases(uint32_t now);
-static inline bool mgInputLockedOut();
-static void freeCrossyZoneSprites();
-static bool loadCrossyRowSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path);
-static void freeCrossyActorSprites();
+void freeCrossyZoneSprites();
+void freeCrossyActorSprites();
 static const char *crossyStartZonePathForPet();
 static const char *crossyGoalZonePathForPet();
 static const char *crossyLavaZonePathForPet(uint8_t frame);
 static const char *crossyStonePathForPet();
+void freeFlappyBgCache();
+static void logMiniGameHeap(const char *tag);
 
-// Crossy Road
+// I should sort these better
 void startCrossyRoad();
 void updateCrossyRoad(const InputState &input);
 void drawCrossyRoad();
-
-// IMPORTANT:
-// We synthesize "Enter once" from selectHeld edge. Do NOT reset this to false
-// during transitions, or holding Enter will instantly auto-dismiss the next screen.
-static bool s_prevSelectHeld = false;
-
-static bool miniGameEnterOnce(const InputState &input)
-{
-  const bool held = input.mgSelectHeld;
-
-  // During launch/transition lockout, do NOT generate an enterOnce edge.
-  // Still track held state so we don't synthesize a fake edge when lockout ends.
-  if (mgInputLockedOut())
-  {
-    s_prevSelectHeld = held;
-    return false;
-  }
-
-  const bool enterOnce = (held && !s_prevSelectHeld);
-  s_prevSelectHeld = held;
-  return enterOnce || input.mgSelectOnce;
-}
-
-static const char *mgItemName(ItemType t)
-{
-  // Preferred: use inventory’s label function (old reference behavior).
-  // If this doesn't compile, see fallback note below.
-  const char *nm = g_app.inventory.getItemLabelForType(t);
-  if (nm && nm[0])
-    return nm;
-
-  // Fallback: keep something readable even if labels aren’t available.
-  switch (t)
-  {
-  case ITEM_SOUL_FOOD:
-    return "SOUL FOOD";
-  case ITEM_CURSED_RELIC:
-    return "CURSED RELIC";
-  case ITEM_DEMON_BONE:
-    return "DEMON BONE";
-  case ITEM_RITUAL_CHALK:
-    return "RITUAL CHALK";
-  default:
-    return "ITEM";
-  }
-}
+void freeFlappyFireballSprites();
+void freeFlappyPipeSprites();
+void freeDodgerGoalFrames();
+void freeDodgerGoreSprite();
 
 // -----------------------------------------------------------------------------
 // Mini-game global state
 // -----------------------------------------------------------------------------
-MiniGame currentMiniGame = MiniGame::NONE;
-bool playerWon = false;
 
 // Simple mini-game state
 static bool s_resultShown = false;
 
-static uint32_t s_mgInputLockoutUntilMs = 0;
-
-static inline void mgBeginInputLockout(uint32_t ms) { s_mgInputLockoutUntilMs = millis() + ms; }
-
-static inline bool mgInputLockedOut() { return (int32_t)(millis() - s_mgInputLockoutUntilMs) < 0; }
-
 static constexpr uint32_t kSurviveWinMs = 15000; // or whatever your old value was
 
-static void mgArmAccept(uint32_t now, uint32_t delayMs = 180)
-{
-  s_acceptArmed = false;
-  s_gameOverMs = now + delayMs;
-}
-
-static bool mgAcceptArmedNow(uint32_t now)
-{
-  if (!s_acceptArmed && (int32_t)(now - s_gameOverMs) >= 0)
-    s_acceptArmed = true;
-  return s_acceptArmed && !mgInputLockedOut();
-}
-
 static const uint16_t kSpriteKey = 0x0841; // very dark grey
+
+static void logMiniGameHeap(const char *tag) { mgAssetsLogHeap(tag); }
+
+static void logSpriteAllocOk(const char *tag, int w, int h, int depth)
+{
+  Serial.printf("[MG SPR OK] %s %dx%d depth=%d free=%u largest=%u\n", tag, w, h, depth, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
+
+static void logSpriteAllocFail(const char *tag, int w, int h, int depth)
+{
+  Serial.printf("[MG SPR FAIL] %s %dx%d depth=%d free=%u largest=%u\n", tag, w, h, depth, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
+
+static void logSpriteLoadFail(const char *tag, const char *path)
+{
+  Serial.printf("[MG SPR LOAD FAIL] %s path='%s' free=%u largest=%u\n", tag, path ? path : "(null)",
+                (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
 
 // -----------------------------------------------------------------------------
 // FLAPPY FIREBALL GLOBALS
@@ -218,15 +166,14 @@ static int s_flappyBgH = 0;
 static int s_fbX = 0;
 static int s_fbY = 0;
 static int s_fbVY = 0;
-static uint32_t s_lastStepMs = 0;
+uint32_t s_lastStepMs = 0;
 static int s_flappyBgScrollX = 0;
 
 // Survive timer
 static const uint32_t s_flappyWinMs = kSurviveWinMs;
 
-// Cache: decoded background image (assumed SCREEN_W x SCREEN_H)
-static uint16_t *s_flappyBgCache = nullptr;
-static char s_flappyBgCachePath[128] = {0};
+// Shared fullscreen background now lives in mini_game_assets.cpp
+// Keep only width/height bookkeeping local for flappy scroll math.
 
 // Flappy pipe sprites (8bpp, cached)
 static M5Canvas s_flappyPipeUpSpr(&M5.Display);
@@ -236,15 +183,10 @@ static int s_flappyPipeW = 0;
 static int s_flappyPipeH = 0;
 static char s_flappyPipeDir[128] = {0}; // folder containing bg + spikes
 
-// Flappy background cache (8bpp to fit non-PSRAM heaps)
-static M5Canvas s_flappyBgSpr(&M5.Display);
-static bool s_flappyBgSprReady = false;
-static void freeFlappyBgCache();
-
 // Fireball Run background Cache
-static void freeDodgerBgCache();
-static void freeDodgerFireballSprites();
-static void freeDodgerCarSprite();
+void freeDodgerBgCache();
+void freeDodgerFireballSprites();
+void freeDodgerCarSprite();
 static bool ensureDodgerBgCache(const char *path);
 static bool ensureDodgerFireballSprites(const char *dir);
 static bool ensureDodgerCarSprite(const char *path);
@@ -256,20 +198,22 @@ struct FlappyPipe
   bool passed;
 };
 
-static void freeImpWaveSprites()
+void freeImpWaveSprites()
 {
   for (int i = 0; i < 2; ++i)
-    s_impWaveSpr[i].deleteSprite();
+    mgAssetsReleaseSprite(s_impWaveSpr[i], "flappy-imp-release");
+
   s_impWaveSprReady = false;
 }
 
 // -----------------------------------------------------------------------------
 // Flappy fireball sprite (3-frame PNG animation) - cached per flappy folder
 // -----------------------------------------------------------------------------
-static void freeFlappyFireballSprites()
+void freeFlappyFireballSprites()
 {
   for (int i = 0; i < 3; ++i)
-    s_flappyFireballSpr[i].deleteSprite();
+    mgAssetsReleaseSprite(s_flappyFireballSpr[i], "flappy-fireball-release");
+
   s_flappyFireballReady = false;
   s_flappyFireballDir[0] = 0;
   s_flappyFireballW = 0;
@@ -431,67 +375,18 @@ static bool sdExistsTrySlash(const char *path, const char **outUsePath)
   return false;
 }
 
-static void freeFlappyPipeSprites()
+void freeFlappyPipeSprites()
 {
   if (s_flappyPipeSprReady)
   {
-    s_flappyPipeUpSpr.deleteSprite();
-    s_flappyPipeDownSpr.deleteSprite();
+    mgAssetsReleaseSprite(s_flappyPipeUpSpr, "flappy-pipe-up-release");
+    mgAssetsReleaseSprite(s_flappyPipeDownSpr, "flappy-pipe-down-release");
     s_flappyPipeSprReady = false;
   }
+
   s_flappyPipeW = 0;
   s_flappyPipeH = 0;
   s_flappyPipeDir[0] = 0;
-}
-
-static bool flappyReadPngDimsTrySlash(const char *path, int *outW, int *outH, const char **outUsePath)
-{
-  if (outW)
-    *outW = 0;
-  if (outH)
-    *outH = 0;
-  if (outUsePath)
-    *outUsePath = nullptr;
-
-  if (!g_sdReady || !path || !path[0])
-    return false;
-
-  const char *usePath = path;
-  if (!sdExistsTrySlash(path, &usePath))
-    return false;
-
-  File f = SD.open(usePath, "r");
-  if (!f)
-    return false;
-
-  // PNG signature (8) + IHDR chunk header (8) + width/height (8) = 24 bytes
-  uint8_t b[24];
-  const int n = f.read(b, sizeof(b));
-  f.close();
-  if (n != (int)sizeof(b))
-    return false;
-
-  static const uint8_t sig[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
-  if (memcmp(b, sig, 8) != 0)
-    return false;
-
-  // Expect "IHDR" at bytes 12..15
-  if (!(b[12] == 'I' && b[13] == 'H' && b[14] == 'D' && b[15] == 'R'))
-    return false;
-
-  const int w = (int)((uint32_t)b[16] << 24 | (uint32_t)b[17] << 16 | (uint32_t)b[18] << 8 | (uint32_t)b[19]);
-  const int h = (int)((uint32_t)b[20] << 24 | (uint32_t)b[21] << 16 | (uint32_t)b[22] << 8 | (uint32_t)b[23]);
-
-  if (w <= 0 || h <= 0)
-    return false;
-
-  if (outW)
-    *outW = w;
-  if (outH)
-    *outH = h;
-  if (outUsePath)
-    *outUsePath = usePath;
-  return true;
 }
 
 static bool ensureImpWaveSprites()
@@ -506,26 +401,7 @@ static bool ensureImpWaveSprites()
 
   for (int i = 0; i < 2; ++i)
   {
-    int w = 0, h = 0;
-    const char *usePath = nullptr;
-
-    if (!flappyReadPngDimsTrySlash(paths[i], &w, &h, &usePath))
-    {
-      freeImpWaveSprites();
-      return false;
-    }
-
-    s_impWaveSpr[i].setColorDepth(8);
-
-    if (!s_impWaveSpr[i].createSprite(w, h))
-    {
-      freeImpWaveSprites();
-      return false;
-    }
-
-    s_impWaveSpr[i].fillSprite(kFireKey);
-
-    if (!s_impWaveSpr[i].drawPngFile(SD, usePath, 0, 0))
+    if (!mgAssetsLoadSprite(s_impWaveSpr[i], paths[i], 8, kFireKey, "flappy-imp-load"))
     {
       freeImpWaveSprites();
       return false;
@@ -538,9 +414,7 @@ static bool ensureImpWaveSprites()
 
 static bool ensureFlappyFireballSprites(const char *bgPath)
 {
-  if (!bgPath || !bgPath[0])
-    return false;
-  if (!g_sdReady)
+  if (!bgPath || !bgPath[0] || !g_sdReady)
     return false;
 
   char dir[128];
@@ -548,7 +422,6 @@ static bool ensureFlappyFireballSprites(const char *bgPath)
   if (!dir[0])
     return false;
 
-  // Already loaded for this folder?
   if (s_flappyFireballReady && s_flappyFireballDir[0] && strcmp(s_flappyFireballDir, dir) == 0)
     return true;
 
@@ -560,34 +433,7 @@ static bool ensureFlappyFireballSprites(const char *bgPath)
   {
     snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
 
-    const char *usePath = path;
-    if (!sdExistsTrySlash(path, &usePath))
-    {
-      freeFlappyFireballSprites();
-      return false;
-    }
-
-    int w = 0, h = 0;
-    const char *pngUse = nullptr;
-
-    if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
-    {
-      freeFlappyFireballSprites();
-      return false;
-    }
-
-    s_flappyFireballSpr[i].setColorDepth(8);
-
-    if (!s_flappyFireballSpr[i].createSprite(w, h))
-    {
-      freeFlappyFireballSprites();
-      return false;
-    }
-
-    // Fill with colorkey so pushSprite(..., kFireballKey) works
-    s_flappyFireballSpr[i].fillSprite(kFireKey);
-
-    if (!s_flappyFireballSpr[i].drawPngFile(SD, pngUse, 0, 0))
+    if (!mgAssetsLoadSprite(s_flappyFireballSpr[i], path, 8, kFireKey, "flappy-fireball-load"))
     {
       freeFlappyFireballSprites();
       return false;
@@ -603,11 +449,10 @@ static bool ensureFlappyFireballSprites(const char *bgPath)
 }
 
 static const uint16_t kPipeKey = kSpriteKey;
+
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
-  if (!bgPath || !bgPath[0])
-    return false;
-  if (!g_sdReady)
+  if (!bgPath || !bgPath[0] || !g_sdReady)
     return false;
 
   char dir[128];
@@ -615,67 +460,31 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
   if (!dir[0])
     return false;
 
-  // If already loaded for this folder, we're good.
   if (s_flappyPipeSprReady && s_flappyPipeDir[0] && strcmp(s_flappyPipeDir, dir) == 0)
     return true;
 
-  // Build spike paths (same folder as bg image)
   char upPath[192];
   char downPath[192];
   snprintf(upPath, sizeof(upPath), "%srock_spike_up.png", dir);
   snprintf(downPath, sizeof(downPath), "%srock_spike_down.png", dir);
 
-  const char *useUp = upPath;
-  const char *useDown = downPath;
-
-  if (!sdExistsTrySlash(upPath, &useUp))
-    return false;
-  if (!sdExistsTrySlash(downPath, &useDown))
-    return false;
-
-  // Reload
   freeFlappyPipeSprites();
 
-  // Read PNG sizes so our sprites are big enough (prevents drawPngFile() failing)
-  const char *useUpPath = nullptr;
-  const char *useDnPath = nullptr;
-  int upW = 0, upH = 0;
-  int dnW = 0, dnH = 0;
-
-  // Read actual PNG dimensions (handles leading slash variants via outUsePath)
-  if (!flappyReadPngDimsTrySlash(useUp, &upW, &upH, &useUpPath))
-    return false;
-  if (!flappyReadPngDimsTrySlash(useDown, &dnW, &dnH, &useDnPath))
-    return false;
-
-  const int w = (upW > dnW) ? upW : dnW;
-  const int h = (upH > dnH) ? upH : dnH;
-
-  s_flappyPipeUpSpr.setColorDepth(8);
-  s_flappyPipeDownSpr.setColorDepth(8);
-
-  if (!s_flappyPipeUpSpr.createSprite(w, h))
-    return false;
-  if (!s_flappyPipeDownSpr.createSprite(w, h))
+  if (!mgAssetsLoadSprite(s_flappyPipeUpSpr, upPath, 8, kPipeKey, "flappy-pipe-up-load"))
   {
-    s_flappyPipeUpSpr.deleteSprite();
+    s_flappyPipeSprReady = false;
     return false;
   }
 
-  s_flappyPipeUpSpr.fillSprite(kPipeKey);
-  s_flappyPipeDownSpr.fillSprite(kPipeKey);
-
-  const bool okUp = s_flappyPipeUpSpr.drawPngFile(SD, useUpPath, 0, 0);
-  const bool okDn = s_flappyPipeDownSpr.drawPngFile(SD, useDnPath, 0, 0);
-
-  if (!okUp || !okDn)
+  if (!mgAssetsLoadSprite(s_flappyPipeDownSpr, downPath, 8, kPipeKey, "flappy-pipe-down-load"))
   {
-    freeFlappyPipeSprites();
+    mgAssetsReleaseSprite(s_flappyPipeUpSpr, "flappy-pipe-up-release-on-fail");
+    s_flappyPipeSprReady = false;
     return false;
   }
 
-  s_flappyPipeW = w;
-  s_flappyPipeH = h;
+  s_flappyPipeW = (int)s_flappyPipeUpSpr.width();
+  s_flappyPipeH = (int)s_flappyPipeUpSpr.height();
   strlcpy(s_flappyPipeDir, dir, sizeof(s_flappyPipeDir));
   s_flappyPipeSprReady = true;
   return true;
@@ -693,20 +502,18 @@ void startFlappyFireball()
   playerWon = false;
   s_resultShown = false;
 
-  s_showReward = false;
-  s_rewardMsg[0] = 0;
-
-  s_acceptArmed = false;
-  s_gameOverMs = 0;
-
-  s_prevSelectHeld = false;
+  mgClearRewardState();
+  mgResetAcceptState();
 
   currentMiniGame = MiniGame::FLAPPY_FIREBALL;
+  mgAssetsBeginSession(currentMiniGame, "startFlappyFireball");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
   UIState retUi = g_app.uiState;
   if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
     retUi = UIState::PET_SCREEN;
+
+  logMiniGameHeap("startFlappyFireball");
 
   miniGameSetReturnUi(retUi);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
@@ -735,6 +542,7 @@ void startFlappyFireball()
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
+  inputForceClear();
   mgBeginInputLockout(220);
 }
 
@@ -911,56 +719,27 @@ void updateFlappyFireball(const InputState &input)
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
-  // If we're actively playing (not reward, not game over), clear accept-arming state.
-  // This prevents stale arming timers from carrying across rounds.
-  if (!s_showReward && !g_app.gameOver)
-  {
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
-  }
-
   // ---------------------------------------------------------------------------
-  // Reward modal: require an "armed" ENTER (prevents instant skip)
+  // Reward modal
   // ---------------------------------------------------------------------------
-  if (s_showReward)
+  if (mgRewardShowing())
   {
-    // If we just entered the reward modal, arm acceptance after a short delay.
-    if (s_gameOverMs == 0)
+    if (enterOnce && !mgInputLockedOut())
     {
-      s_acceptArmed = false;
-      s_gameOverMs = now + 180;
-      mgBeginInputLockout(180);
-      clearInputLatch();
-      inputForceClear();
-      return;
-    }
-
-    if (!s_acceptArmed && (int32_t)(now - s_gameOverMs) >= 0)
-      s_acceptArmed = true;
-
-    if (enterOnce && s_acceptArmed && !mgInputLockedOut())
-    {
-      // Reset arming state for the next transition
-      s_acceptArmed = false;
-      s_gameOverMs = 0;
-
+      mgClearRewardState();
+      mgResetAcceptState();
       exitMiniGameToReturnUi(true);
     }
     return;
   }
 
   // ---------------------------------------------------------------------------
-  // Game over: transition directly into the reward modal (legacy behavior)
+  // Game over: transition directly into the reward modal
   // ---------------------------------------------------------------------------
   if (g_app.gameOver)
   {
-    // Apply result + show reward immediately; the reward modal itself is armed
-    // (so holding ENTER won't instantly dismiss it).
     mgApplyResultAndShowReward(playerWon);
-
-    // Arm acceptance for the reward modal and swallow any lingering input.
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
+    mgResetAcceptState();
     mgBeginInputLockout(180);
     clearInputLatch();
     inputForceClear();
@@ -1106,16 +885,17 @@ static void drawRewardModal(int gW, int gH)
   // ---------------------------------------------------------
   // Reward body text (supports 1 or 2 lines)
   // ---------------------------------------------------------
-  const char *nl = strchr(s_rewardMsg, '\n');
+  const char *msg = mgRewardMessage();
+  const char *nl = strchr(msg, '\n');
 
   if (nl)
   {
     char line1[64];
-    size_t len = (size_t)(nl - s_rewardMsg);
+    size_t len = (size_t)(nl - msg);
     if (len > sizeof(line1) - 1)
       len = sizeof(line1) - 1;
 
-    memcpy(line1, s_rewardMsg, len);
+    memcpy(line1, msg, len);
     line1[len] = 0;
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -1127,7 +907,7 @@ static void drawRewardModal(int gW, int gH)
   else
   {
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString(s_rewardMsg, gW / 2, gH / 2, 2);
+    spr.drawCentreString(msg, gW / 2, gH / 2, 2);
   }
 
   // ---------------------------------------------------------
@@ -1152,117 +932,36 @@ static const char *flappyBgPathForPet()
   }
 }
 
-static void freeFlappyBgCache()
+void freeFlappyBgCache()
 {
-  // If you’ve moved to sprite-cache only, keep this harmless (or delete the malloc cache entirely)
-  if (s_flappyBgCache)
-  {
-    free(s_flappyBgCache);
-    s_flappyBgCache = nullptr;
-  }
-
-  s_flappyBgCachePath[0] = 0;
+  mgAssetsReleaseSharedBgIfOwner(MiniGame::FLAPPY_FIREBALL);
   s_flappyBgW = 0;
   s_flappyBgH = 0;
-
-  // also free the sprite cache
-  if (s_flappyBgSprReady)
-  {
-    s_flappyBgSpr.deleteSprite();
-    s_flappyBgSprReady = false;
-  }
 }
 
 static bool s_flappyBgCacheDisabled = false;
 
 static bool ensureFlappyBgCache(const char *path)
 {
-  if (!path || !path[0])
+  if (!mgAssetsEnsureSharedBg(MiniGame::FLAPPY_FIREBALL, path))
     return false;
 
-  // already cached for this path?
-  if (s_flappyBgSprReady && s_flappyBgCachePath[0] && strcmp(s_flappyBgCachePath, path) == 0)
-    return true;
-
-  const int w = (int)spr.width();
-  const int h = (int)spr.height();
-  if (w <= 0 || h <= 0)
-    return false;
-
-  if (!g_sdReady)
-  {
-    Serial.println("[FLAPPY] SD not ready (g_sdReady=false)");
-    return false;
-  }
-
-  // detect png vs jpg
-  bool isPng = false;
-  if (const char *ext = strrchr(path, '.'))
-  {
-    isPng = (strcasecmp(ext, ".png") == 0);
-  }
-
-  // Try both with and without leading slash
-  const char *usePath = path;
-  bool exists = SD.exists(usePath);
-  if (!exists && usePath[0] == '/')
-  {
-    usePath = usePath + 1;
-    exists = SD.exists(usePath);
-  }
-
-  Serial.printf("[FLAPPY] bg path='%s' try='%s' exists=%d isPng=%d\n", path, usePath, (int)exists, (int)isPng);
-
-  if (!exists)
-    return false;
-
-  // (Re)create an 8bpp cache sprite if needed (fits heap without PSRAM)
-  if (!s_flappyBgSprReady || s_flappyBgW != w || s_flappyBgH != h)
-  {
-    s_flappyBgSpr.deleteSprite();
-    s_flappyBgSprReady = false;
-
-    s_flappyBgSpr.setColorDepth(8);
-    if (!s_flappyBgSpr.createSprite(w, h))
-    {
-      Serial.printf("[FLAPPY] bg cache sprite create FAIL w=%d h=%d free=%u largest=%u\n", w, h,
-                    (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-      return false;
-    }
-
-    s_flappyBgW = w;
-    s_flappyBgH = h;
-    s_flappyBgSprReady = true;
-  }
-
-  s_flappyBgSpr.fillSprite(TFT_BLACK);
-
-  bool ok = false;
-  if (isPng)
-    ok = s_flappyBgSpr.drawPngFile(SD, usePath, 0, 0);
-  else
-    ok = s_flappyBgSpr.drawJpgFile(SD, usePath, 0, 0);
-
-  Serial.printf("[FLAPPY] bg cache draw -> %s\n", ok ? "OK" : "FAIL");
-  if (!ok)
-    return false;
-
-  strncpy(s_flappyBgCachePath, path, sizeof(s_flappyBgCachePath) - 1);
-  s_flappyBgCachePath[sizeof(s_flappyBgCachePath) - 1] = 0;
+  s_flappyBgW = mgAssetsSharedBgW();
+  s_flappyBgH = mgAssetsSharedBgH();
   return true;
 }
 
 static void drawFlappyScrollingBg(int scrollX)
 {
-  // If cache missing, fall back to black.
-  if (!s_flappyBgSprReady)
+  M5Canvas *bg = mgAssetsSharedBg();
+  if (!bg)
   {
     spr.fillSprite(TFT_BLACK);
     return;
   }
 
-  const int w = s_flappyBgW;
-  const int h = s_flappyBgH;
+  const int w = mgAssetsSharedBgW();
+  const int h = mgAssetsSharedBgH();
   if (w <= 0 || h <= 0)
   {
     spr.fillSprite(TFT_BLACK);
@@ -1274,26 +973,9 @@ static void drawFlappyScrollingBg(int scrollX)
   if (scrollX < 0)
     scrollX += w;
 
-  uint16_t *dst = (uint16_t *)spr.getBuffer();
-  if (!dst)
-  {
-    spr.fillSprite(TFT_BLACK);
-    return;
-  }
-
-  // Copy each scanline in two chunks (wrap-around).
-  for (int y = 0; y < h; ++y)
-  {
-    const uint16_t *srcRow = s_flappyBgCache + (size_t)y * (size_t)w;
-    uint16_t *dstRow = dst + (size_t)y * (size_t)w;
-
-    const int leftW = w - scrollX;
-    const int rightW = scrollX;
-
-    memcpy(dstRow, srcRow + scrollX, (size_t)leftW * sizeof(uint16_t));
-    if (rightW > 0)
-      memcpy(dstRow + leftW, srcRow, (size_t)rightW * sizeof(uint16_t));
-  }
+  int x = -scrollX;
+  bg->pushSprite(&spr, x, 0);
+  bg->pushSprite(&spr, x + w, 0);
 }
 
 void drawFlappyFireball()
@@ -1308,17 +990,21 @@ void drawFlappyFireball()
 
   if (bgPath && bgPath[0] && ensureFlappyBgCache(bgPath))
   {
-    const int bw = (int)s_flappyBgSpr.width();
-    if (bw > 0)
+    M5Canvas *bg = mgAssetsSharedBg();
+    if (bg)
     {
-      // Wrap scroll into [0, bw)
-      int x = -(s_flappyBgScrollX % bw);
-      if (x > 0)
-        x -= bw;
+      const int bw = (int)bg->width();
+      if (bw > 0)
+      {
+        // Wrap scroll into [0, bw)
+        int x = -(s_flappyBgScrollX % bw);
+        if (x > 0)
+          x -= bw;
 
-      s_flappyBgSpr.pushSprite(&spr, x, 0);
-      s_flappyBgSpr.pushSprite(&spr, x + bw, 0);
-      drewBg = true;
+        bg->pushSprite(&spr, x, 0);
+        bg->pushSprite(&spr, x + bw, 0);
+        drewBg = true;
+      }
     }
   }
 
@@ -1327,7 +1013,7 @@ void drawFlappyFireball()
     spr.fillSprite(TFT_BLACK);
   }
 
-  if (s_showReward)
+  if (mgRewardShowing())
   {
     drawRewardModal(gW, gH);
     return;
@@ -1387,55 +1073,32 @@ void drawFlappyFireball()
     const int impY = 40;
 
     if (ensureImpWaveSprites())
-    {
       s_impWaveSpr[s_impFrame].pushSprite(&spr, impX, impY, kFireKey);
-    }
 
-    if (s_flappyShowIntro)
+    const int cbY = 100;
+    const int cbSize = 10;
+    const int textOffset = 16;
+    const int lineWidth = 150;
+    const int cbX = (gW - lineWidth) / 2;
+
+    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+    if (s_flappyDontShowAgain)
     {
-      spr.fillSprite(TFT_BLACK);
-      spr.setTextDatum(CC_DATUM);
-
-      spr.setTextColor(TFT_WHITE, TFT_BLACK);
-      spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
-      spr.drawCentreString("Torch the Imp!", gW / 2, 22, 2);
-
-      const int impX = (gW - 48) / 2;
-      const int impY = 42;
-
-      const char *impSprite = kImpWaveFrames[s_impFrame];
-      sprDrawPngFromSD(impSprite, impX, impY);
-
-      const int cbY = 100;
-      const int cbSize = 10;
-      const int textOffset = 16;
-      const int lineWidth = 150; // approximate width of checkbox + text
-
-      const int cbX = (gW - lineWidth) / 2;
-
-      spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-      if (s_flappyDontShowAgain)
-      {
-        spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-        spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-      }
-
-      spr.setTextDatum(ML_DATUM);
-      spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-      spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
-
-      spr.setTextDatum(CC_DATUM);
-      spr.setTextColor(TFT_GREEN, TFT_BLACK);
-      spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
-      return;
+      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
     }
+
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
 
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(TFT_GREEN, TFT_BLACK);
     spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
     return;
   }
+
   if (s_flappyGoalActive && !s_impBurnDone)
   {
     const int islandW = 48;
@@ -1484,246 +1147,6 @@ void drawFlappyFireball()
 }
 
 // -----------------------------------------------------------------------------
-// Random INF reward (WIN only)
-// -----------------------------------------------------------------------------
-static int rollMiniGameInfReward()
-{
-  const int r = (int)random(100);
-
-  if (r < 50)
-    return 25;
-  if (r < 80)
-    return 50;
-  if (r < 95)
-    return 75;
-  return 100;
-}
-
-// -----------------------------------------------------------------------------
-// Mini-game reward (WIN only): 25% chance to win ONE random item
-// -----------------------------------------------------------------------------
-static bool tryAwardWinItem_1in4(ItemType *outType)
-{
-  if (outType)
-    *outType = ITEM_NONE;
-
-  if (random(4) != 0)
-    return false;
-
-  static const ItemType kRewards[] = {ITEM_SOUL_FOOD, ITEM_CURSED_RELIC, ITEM_DEMON_BONE, ITEM_RITUAL_CHALK};
-
-  const int n = (int)(sizeof(kRewards) / sizeof(kRewards[0]));
-  const ItemType t = kRewards[(int)random((long)n)];
-
-  g_app.inventory.addItem(t, 1);
-  if (outType)
-    *outType = t;
-  return true;
-}
-
-static void mgApplyResultAndShowReward(bool won)
-{
-  // Old rules (from your reference):
-  // WIN  => XP +25, INF +roll, MOOD +20, 25% chance random item +1 (also show name)
-  // LOSE => XP +5,  MOOD +10
-
-  if (won)
-  {
-    pet.addXP(25);
-
-    const int infReward = rollMiniGameInfReward();
-    addInf(infReward);
-
-    pet.happiness = constrain(pet.happiness + 20, 0, 100);
-
-    ItemType rewardType = ITEM_NONE;
-    const bool wonItem = tryAwardWinItem_1in4(&rewardType);
-
-    if (wonItem)
-    {
-      const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +25  INF +%d  MOOD +20\nRandom Reward: %s +1", infReward,
-               (nm && nm[0]) ? nm : "ITEM");
-    }
-    else
-    {
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +25  INF +%d  MOOD +20", infReward);
-    }
-  }
-  else
-  {
-    pet.addXP(5);
-    pet.happiness = constrain(pet.happiness + 10, 0, 100);
-
-    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5  MOOD +10");
-  }
-
-  saveManagerMarkDirty();
-
-  // Show modal (and clear gameOver so we don’t re-enter result logic)
-  s_showReward = true;
-  g_app.gameOver = false;
-
-  requestUIRedraw();
-}
-
-void miniGameExitToReturnUi(bool beginLockout)
-{
-  s_mgExiting = true;
-
-  s_showReward = false;
-  s_rewardMsg[0] = 0;
-
-  // Decide where we're going FIRST, and switch away from MINI_GAME / MG_PAUSE.
-  UIState target = miniGameGetReturnUiOrDefault(UIState::PET_SCREEN);
-  if (target == UIState::MINI_GAME || target == UIState::MG_PAUSE)
-    target = UIState::PET_SCREEN;
-
-  miniGameClearReturnUi();
-
-  // IMPORTANT: switch UI state BEFORE clearing currentMiniGame,
-  // so MG_PAUSE doesn't render one frame with "NO MINI GAME".
-  g_app.uiState = target;
-
-  // Now tear down the mini-game
-  g_app.inMiniGame = false;
-  g_app.gameOver = false;
-  playerWon = false;
-  currentMiniGame = MiniGame::NONE;
-
-  mgPauseReset();
-  clearInputLatch();
-
-  // Prevent Exit-confirm ENTER from triggering other UI confirms
-  inputForceClear();
-  s_prevSelectHeld = false;
-  freeImpWaveSprites();
-  freeDodgerBgCache();
-  freeDodgerFireballSprites();
-  freeDodgerCarSprite();
-  freeCrossyActorSprites();
-  invalidateBackgroundCache();
-  requestFullUIRedraw();
-
-  if (beginLockout)
-    mgBeginInputLockout(220);
-}
-
-// Back-compat: older call sites used this name.
-static void exitMiniGameToReturnUi(bool beginLockout) { miniGameExitToReturnUi(beginLockout); }
-
-static void mgSyncGameTimebases(uint32_t now);
-
-// -----------------------------------------------------------------------------
-// Universal mini-game update/draw dispatch + pause overlay
-// -----------------------------------------------------------------------------
-
-static void mgSyncGameTimebases(uint32_t now);
-
-void updateMiniGame(const InputState &input)
-{
-  // If we are not on the MINI_GAME UI anymore, never run mini-game logic.
-  if (g_app.uiState != UIState::MINI_GAME)
-    return;
-
-  if (!g_app.inMiniGame)
-    return;
-
-  if (currentMiniGame == MiniGame::NONE)
-    return;
-
-  const uint32_t now = millis();
-
-  // Pause/menu logic first (ESC/menu must always work).
-  const uint8_t p = mgPauseHandle(input);
-  mgPauseUpdateClocks(now);
-
-  if (p == MGPAUSE_EXIT)
-  {
-    miniGameExitToReturnUi(true);
-    requestUIRedraw();
-    return;
-  }
-
-  if (p == MGPAUSE_CONSUME)
-  {
-    if (mgPauseIsPaused())
-      mgSyncGameTimebases(now);
-
-    requestUIRedraw();
-    return;
-  }
-
-  if (mgPauseIsPaused())
-  {
-    mgSyncGameTimebases(now);
-    requestUIRedraw();
-    return;
-  }
-
-  // Gameplay update dispatch
-  switch (currentMiniGame)
-  {
-  case MiniGame::FLAPPY_FIREBALL:
-    updateFlappyFireball(input);
-    break;
-
-  case MiniGame::CROSSY_ROAD:
-    updateCrossyRoad(input);
-    break;
-
-  case MiniGame::INFERNAL_DODGER:
-    updateInfernalDodger(input);
-    break;
-
-  case MiniGame::RESURRECTION:
-    updateResurrectionRun(input);
-    break;
-
-  default:
-    break;
-  }
-
-  requestUIRedraw();
-}
-
-void drawMiniGame()
-{
-  if (g_app.uiState != UIState::MINI_GAME)
-    return;
-  if (!g_app.inMiniGame)
-    return;
-  if (currentMiniGame == MiniGame::NONE)
-    return;
-
-  const uint32_t now = millis();
-  mgPauseUpdateClocks(now);
-
-  switch (currentMiniGame)
-  {
-  case MiniGame::FLAPPY_FIREBALL:
-    drawFlappyFireball();
-    break;
-  case MiniGame::CROSSY_ROAD:
-    drawCrossyRoad();
-    break;
-  case MiniGame::INFERNAL_DODGER:
-    drawInfernalDodger();
-    break;
-  case MiniGame::RESURRECTION:
-    drawResurrectionRun();
-    break;
-  default:
-    break;
-  }
-
-  if (mgPauseIsPaused())
-  {
-    mgDrawPauseOverlay();
-  }
-}
-
-// -----------------------------------------------------------------------------
 // Resurrection Run (side-scroller runner)
 // -----------------------------------------------------------------------------
 
@@ -1737,7 +1160,7 @@ static float rr_vy = 0.0f;
 static bool rr_onGround = true;
 
 static int rr_distance = 0;
-static uint32_t rr_lastMs = 0;
+uint32_t rr_lastMs = 0;
 
 struct RRObs
 {
@@ -1841,11 +1264,11 @@ void startResurrectionRun()
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   // Hard reset any previous end-of-game modal state so retries don't instantly re-trigger.
-  s_showReward = false;
-  s_rewardMsg[0] = 0;
+  mgClearRewardState();
+  mgResetAcceptState();
 
-  s_prevSelectHeld = false;
   clearInputLatch();
+  inputForceClear();
   mgBeginInputLockout(220);
 
   rr_active = true;
@@ -1872,37 +1295,12 @@ void updateResurrectionRun(const InputState &input)
 {
   const uint32_t now = millis();
 
-  // Clear accept-arming state while actively playing
-  if (!rr_gameOver)
-  {
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
-  }
-
   if (rr_gameOver)
   {
     const bool enterOnce = miniGameEnterOnce(input);
 
-    // First frame of game-over: arm acceptance after a short delay and swallow input
-    if (s_gameOverMs == 0)
+    if (enterOnce && !mgInputLockedOut())
     {
-      s_acceptArmed = false;
-      s_gameOverMs = now + 180;
-      mgBeginInputLockout(180);
-      clearInputLatch();
-      inputForceClear();
-      return;
-    }
-
-    if (!s_acceptArmed && (int32_t)(now - s_gameOverMs) >= 0)
-      s_acceptArmed = true;
-
-    if (enterOnce && s_acceptArmed && !mgInputLockedOut())
-    {
-      // Consume accept so it can't double-trigger
-      s_acceptArmed = false;
-      s_gameOverMs = 0;
-
       rr_active = false;
       rr_gameOver = false;
 
@@ -2153,7 +1551,7 @@ static int s_crossyVisualOffsetPx = 0;
 static CrossyFacing s_crossyFacing = CROSSY_FACE_DOWN;
 
 static bool s_crossyInited = false;
-static uint32_t s_crossyLastLaneMs = 0;
+uint32_t s_crossyLastLaneMs = 0;
 
 static inline int crossyClamp(int v, int lo, int hi)
 {
@@ -2164,14 +1562,21 @@ static inline int crossyClamp(int v, int lo, int hi)
   return v;
 }
 
-static const char *crossyStoneXSPathForPet();
-static bool ensureCrossyStoneXSSprite();
+static const char *crossyStartZonePathForPet();
+static const char *crossyGoalZonePathForPet();
+static const char *crossyLavaZonePathForPet(uint8_t frame);
+static const char *crossyStonePathForPet();
 static const char *crossyStoneSmallPathForPet();
-static void freeCrossyZoneSprites();
+static const char *crossyStoneXSPathForPet();
+static const char *crossyImpPathForPet(CrossyFacing facing);
+
 static bool ensureCrossyStartZoneSprite();
 static bool ensureCrossyGoalZoneSprite();
 static bool ensureCrossyLavaZoneSprite(uint8_t frame);
-static const char *crossyImpPathForPet(CrossyFacing facing);
+static bool ensureCrossyStoneSprite();
+static bool ensureCrossyStoneSmallSprite();
+static bool ensureCrossyStoneXSSprite();
+static bool ensureCrossyImpSprite();
 
 static bool crossyRowIsWater(int row) { return row >= 1 && row <= 5; }
 
@@ -2185,31 +1590,60 @@ static bool crossyPlayerOverlapsMoverInRow(int row);
 
 static bool ensureCrossyGoalZoneSprite()
 {
-  return loadCrossyRowSprite(s_crossyGoalZoneSpr, s_crossyGoalZoneReady, s_crossyGoalZonePath,
-                             sizeof(s_crossyGoalZonePath), crossyGoalZonePathForPet());
+  return mgAssetsLoadCachedSprite(
+      s_crossyGoalZoneSpr,
+      s_crossyGoalZoneReady,
+      s_crossyGoalZonePath,
+      sizeof(s_crossyGoalZonePath),
+      crossyGoalZonePathForPet(),
+      8,
+      kSpriteKey,
+      "crossy-goal-load",
+      "crossy-goal-release");
 }
 
 static bool ensureCrossyStartZoneSprite()
 {
-  return loadCrossyRowSprite(s_crossyStartZoneSpr, s_crossyStartZoneReady, s_crossyStartZonePath,
-                             sizeof(s_crossyStartZonePath), crossyStartZonePathForPet());
+  return mgAssetsLoadCachedSprite(
+      s_crossyStartZoneSpr,
+      s_crossyStartZoneReady,
+      s_crossyStartZonePath,
+      sizeof(s_crossyStartZonePath),
+      crossyStartZonePathForPet(),
+      8,
+      kSpriteKey,
+      "crossy-start-load",
+      "crossy-start-release");
 }
 
 static bool ensureCrossyLavaZoneSprite(uint8_t frame)
 {
   const uint8_t i = frame & 1;
-  const char *path = crossyLavaZonePathForPet(i);
 
-  const bool ok = loadCrossyRowSprite(s_crossyLavaZoneSpr[i], s_crossyLavaZoneReady[i], s_crossyLavaZonePath[i],
-                                      sizeof(s_crossyLavaZonePath[i]), path);
-  return ok;
+  return mgAssetsLoadCachedSprite(
+      s_crossyLavaZoneSpr[i],
+      s_crossyLavaZoneReady[i],
+      s_crossyLavaZonePath[i],
+      sizeof(s_crossyLavaZonePath[i]),
+      crossyLavaZonePathForPet(i),
+      16,
+      TFT_BLACK,
+      (i == 0) ? "crossy-lava0-load" : "crossy-lava1-load",
+      (i == 0) ? "crossy-lava0-release" : "crossy-lava1-release");
 }
 
 static bool ensureCrossyIntroSprite()
 {
-  const char *path = "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png";
-
-  return loadCrossyRowSprite(s_crossyIntroSpr, s_crossyIntroReady, s_crossyIntroPath, sizeof(s_crossyIntroPath), path);
+  return mgAssetsLoadCachedSprite(
+      s_crossyIntroSpr,
+      s_crossyIntroReady,
+      s_crossyIntroPath,
+      sizeof(s_crossyIntroPath),
+      "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png",
+      8,
+      kSpriteKey,
+      "crossy-intro-load",
+      "crossy-intro-release");
 }
 
 static void crossyInitLanes()
@@ -2292,7 +1726,7 @@ static void crossyInitLanes()
   }
 }
 
-static void freeCrossyZoneSprites()
+void freeCrossyZoneSprites()
 {
   s_crossyGoalZoneSpr.deleteSprite();
   s_crossyGoalZoneReady = false;
@@ -2304,7 +1738,7 @@ static void freeCrossyZoneSprites()
 
   for (int i = 0; i < 2; ++i)
   {
-    s_crossyLavaZoneSpr[i].deleteSprite();
+    mgAssetsReleaseSprite(s_crossyLavaZoneSpr[i], (i == 0) ? "crossy-lava0-release" : "crossy-lava1-release");
     s_crossyLavaZoneReady[i] = false;
     s_crossyLavaZonePath[i][0] = 0;
   }
@@ -2317,13 +1751,35 @@ static void freeCrossyZoneSprites()
   }
 }
 
+static bool drawCrossyLavaZoneRow(int row, int y)
+{
+  const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
+  const char *path = crossyLavaZonePathForPet(lavaFrame);
+
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  const char *usePath = nullptr;
+  if (!sdExistsTrySlash(path, &usePath))
+    return false;
+
+  return spr.drawPngFile(SD, usePath, 0, y);
+}
+
 static bool loadCrossyRowSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path)
 {
   if (!path || !path[0] || !g_sdReady)
     return false;
 
   if (ready && strcmp(cachedPath, path) == 0)
-    return true;
+  {
+    if (dst.width() > 0 && dst.height() > 0)
+      return true;
+
+    // Cached state lied; force reload
+    ready = false;
+    cachedPath[0] = 0;
+  }
 
   if (ready)
   {
@@ -2335,16 +1791,16 @@ static bool loadCrossyRowSprite(M5Canvas &dst, bool &ready, char *cachedPath, si
   int w = 0;
   int h = 0;
   const char *usePath = nullptr;
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
+  if (!mgAssetsReadPngDims(path, &w, &h, &usePath))
     return false;
 
   dst.deleteSprite();
-  dst.setColorDepth(16);
+  dst.setColorDepth(8);
 
   if (!dst.createSprite(w, h))
     return false;
 
-  dst.fillSprite(TFT_BLACK);
+  dst.fillSprite(kSpriteKey);
 
   if (!dst.drawPngFile(SD, usePath, 0, 0))
   {
@@ -2397,30 +1853,32 @@ static const char *crossyLavaZonePathForPet(uint8_t frame)
   }
 }
 
-static void freeCrossyActorSprites()
+void freeCrossyActorSprites()
 {
   if (s_crossyStoneReady)
   {
-    s_crossyStoneSpr.deleteSprite();
+    mgAssetsReleaseSprite(s_crossyStoneSpr, "crossy-stone-release");
     s_crossyStoneReady = false;
     s_crossyStonePath[0] = 0;
   }
 
   if (s_crossyImpReady)
   {
-    s_crossyImpSpr.deleteSprite();
+    mgAssetsReleaseSprite(s_crossyImpSpr, "crossy-imp-release");
     s_crossyImpReady = false;
     s_crossyImpPath[0] = 0;
   }
+
   if (s_crossyStoneSmallReady)
   {
-    s_crossyStoneSmallSpr.deleteSprite();
+    mgAssetsReleaseSprite(s_crossyStoneSmallSpr, "crossy-stone-small-release");
     s_crossyStoneSmallReady = false;
     s_crossyStoneSmallPath[0] = 0;
   }
+
   if (s_crossyStoneXSReady)
   {
-    s_crossyStoneXSSpr.deleteSprite();
+    mgAssetsReleaseSprite(s_crossyStoneXSSpr, "crossy-stone-xs-release");
     s_crossyStoneXSReady = false;
     s_crossyStoneXSPath[0] = 0;
   }
@@ -2428,116 +1886,58 @@ static void freeCrossyActorSprites()
 
 static bool ensureCrossyStoneSprite()
 {
-  const char *path = crossyStonePathForPet();
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  if (s_crossyStoneReady && strcmp(s_crossyStonePath, path) == 0)
-    return true;
-
-  if (s_crossyStoneReady)
-  {
-    s_crossyStoneSpr.deleteSprite();
-    s_crossyStoneReady = false;
-    s_crossyStonePath[0] = 0;
-  }
-
-  int w = 0, h = 0;
-  const char *usePath = nullptr;
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
-
-  s_crossyStoneSpr.setColorDepth(8);
-  if (!s_crossyStoneSpr.createSprite(w, h))
-    return false;
-
-  s_crossyStoneSpr.fillSprite(kSpriteKey);
-
-  if (!s_crossyStoneSpr.drawPngFile(SD, usePath, 0, 0))
-  {
-    s_crossyStoneSpr.deleteSprite();
-    return false;
-  }
-
-  strlcpy(s_crossyStonePath, path, sizeof(s_crossyStonePath));
-  s_crossyStoneReady = true;
-  return true;
+  return mgAssetsLoadCachedSprite(
+      s_crossyStoneSpr,
+      s_crossyStoneReady,
+      s_crossyStonePath,
+      sizeof(s_crossyStonePath),
+      crossyStonePathForPet(),
+      8,
+      kSpriteKey,
+      "crossy-stone-load",
+      "crossy-stone-release");
 }
 
 static bool ensureCrossyStoneSmallSprite()
 {
-  const char *path = crossyStoneSmallPathForPet();
-  if (!path || !path[0] || !g_sdReady)
-    return false;
+  return mgAssetsLoadCachedSprite(
+      s_crossyStoneSmallSpr,
+      s_crossyStoneSmallReady,
+      s_crossyStoneSmallPath,
+      sizeof(s_crossyStoneSmallPath),
+      crossyStoneSmallPathForPet(),
+      8,
+      kSpriteKey,
+      "crossy-stone-small-load",
+      "crossy-stone-small-release");
+}
 
-  if (s_crossyStoneSmallReady && strcmp(s_crossyStoneSmallPath, path) == 0)
-    return true;
-
-  if (s_crossyStoneSmallReady)
-  {
-    s_crossyStoneSmallSpr.deleteSprite();
-    s_crossyStoneSmallReady = false;
-    s_crossyStoneSmallPath[0] = 0;
-  }
-
-  int w = 0, h = 0;
-  const char *usePath = nullptr;
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
-
-  s_crossyStoneSmallSpr.setColorDepth(8);
-  if (!s_crossyStoneSmallSpr.createSprite(w, h))
-    return false;
-
-  s_crossyStoneSmallSpr.fillSprite(kSpriteKey);
-
-  if (!s_crossyStoneSmallSpr.drawPngFile(SD, usePath, 0, 0))
-  {
-    s_crossyStoneSmallSpr.deleteSprite();
-    return false;
-  }
-
-  strlcpy(s_crossyStoneSmallPath, path, sizeof(s_crossyStoneSmallPath));
-  s_crossyStoneSmallReady = true;
-  return true;
+static bool ensureCrossyStoneXSSprite()
+{
+  return mgAssetsLoadCachedSprite(
+      s_crossyStoneXSSpr,
+      s_crossyStoneXSReady,
+      s_crossyStoneXSPath,
+      sizeof(s_crossyStoneXSPath),
+      crossyStoneXSPathForPet(),
+      8,
+      kSpriteKey,
+      "crossy-stone-xs-load",
+      "crossy-stone-xs-release");
 }
 
 static bool ensureCrossyImpSprite()
 {
-  const char *path = crossyImpPathForPet(s_crossyFacing);
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  if (s_crossyImpReady && strcmp(s_crossyImpPath, path) == 0)
-    return true;
-
-  if (s_crossyImpReady)
-  {
-    s_crossyImpSpr.deleteSprite();
-    s_crossyImpReady = false;
-    s_crossyImpPath[0] = 0;
-  }
-
-  int w = 0, h = 0;
-  const char *usePath = nullptr;
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
-
-  s_crossyImpSpr.setColorDepth(8);
-  if (!s_crossyImpSpr.createSprite(w, h))
-    return false;
-
-  s_crossyImpSpr.fillSprite(kSpriteKey);
-
-  if (!s_crossyImpSpr.drawPngFile(SD, usePath, 0, 0))
-  {
-    s_crossyImpSpr.deleteSprite();
-    return false;
-  }
-
-  strlcpy(s_crossyImpPath, path, sizeof(s_crossyImpPath));
-  s_crossyImpReady = true;
-  return true;
+  return mgAssetsLoadCachedSprite(
+      s_crossyImpSpr,
+      s_crossyImpReady,
+      s_crossyImpPath,
+      sizeof(s_crossyImpPath),
+      crossyImpPathForPet(s_crossyFacing),
+      8,
+      kSpriteKey,
+      "crossy-imp-load",
+      "crossy-imp-release");
 }
 
 static const char *crossyDirForPet()
@@ -2638,44 +2038,6 @@ static const char *crossyStoneXSPathForPet()
   default:
     return "/raising_hell/graphics/mini_games/crossy/dev/stone_chunk_xs.png";
   }
-}
-
-static bool ensureCrossyStoneXSSprite()
-{
-  const char *path = crossyStoneXSPathForPet();
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  if (s_crossyStoneXSReady && strcmp(s_crossyStoneXSPath, path) == 0)
-    return true;
-
-  if (s_crossyStoneXSReady)
-  {
-    s_crossyStoneXSSpr.deleteSprite();
-    s_crossyStoneXSReady = false;
-    s_crossyStoneXSPath[0] = 0;
-  }
-
-  int w = 0, h = 0;
-  const char *usePath = nullptr;
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
-
-  s_crossyStoneXSSpr.setColorDepth(8);
-  if (!s_crossyStoneXSSpr.createSprite(w, h))
-    return false;
-
-  s_crossyStoneXSSpr.fillSprite(kSpriteKey);
-
-  if (!s_crossyStoneXSSpr.drawPngFile(SD, usePath, 0, 0))
-  {
-    s_crossyStoneXSSpr.deleteSprite();
-    return false;
-  }
-
-  strlcpy(s_crossyStoneXSPath, path, sizeof(s_crossyStoneXSPath));
-  s_crossyStoneXSReady = true;
-  return true;
 }
 
 static const char *crossyStonePathForPet()
@@ -2794,10 +2156,12 @@ void startCrossyRoad()
   s_crossyIntroImpFrame = 0;
   s_crossyIntroImpAnimMs = millis();
 
-  s_showReward = false;
-  s_rewardMsg[0] = 0;
+  mgClearRewardState();
+  mgResetAcceptState();
 
   currentMiniGame = MiniGame::CROSSY_ROAD;
+  mgAssetsBeginSession(currentMiniGame, "startCrossyRoad");
+  logMiniGameHeap("startCrossyRoad");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
   UIState retUi = g_app.uiState;
@@ -2814,8 +2178,11 @@ void startCrossyRoad()
 
   ensureCrossyStartZoneSprite();
   ensureCrossyGoalZoneSprite();
-  ensureCrossyLavaZoneSprite(0);
-  ensureCrossyLavaZoneSprite(1);
+
+  const bool lava0 = ensureCrossyLavaZoneSprite(0);
+  const bool lava1 = ensureCrossyLavaZoneSprite(1);
+
+  Serial.printf("Crossy lava reload: f0=%d f1=%d\n", lava0 ? 1 : 0, lava1 ? 1 : 0);
 
   ensureCrossyStoneSprite();
   ensureCrossyStoneSmallSprite();
@@ -2828,7 +2195,11 @@ void startCrossyRoad()
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
+  inputForceClear();
   mgBeginInputLockout(220);
+
+  s_crossyWinPoseActive = false;
+  s_crossyWinPoseStart = 0;
 }
 
 static void crossyStepLanes(uint32_t now)
@@ -2998,35 +2369,15 @@ void updateCrossyRoad(const InputState &input)
     s_crossyLavaFrame ^= 1;
   }
 
-  // Clear accept-arming state while actively playing
-  if (!s_showReward && !g_app.gameOver)
-  {
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
-  }
-
   // ---------------------------------------------------------------------------
-  // Reward modal: require an "armed" ENTER (prevents instant skip)
+  // Reward modal
   // ---------------------------------------------------------------------------
-  if (s_showReward)
+  if (mgRewardShowing())
   {
-    if (s_gameOverMs == 0)
+    if (enterOnce && !mgInputLockedOut())
     {
-      s_acceptArmed = false;
-      s_gameOverMs = now + 180;
-      mgBeginInputLockout(180);
-      clearInputLatch();
-      inputForceClear();
-      return;
-    }
-
-    if (!s_acceptArmed && (int32_t)(now - s_gameOverMs) >= 0)
-      s_acceptArmed = true;
-
-    if (enterOnce && s_acceptArmed && !mgInputLockedOut())
-    {
-      s_acceptArmed = false;
-      s_gameOverMs = 0;
+      mgClearRewardState();
+      mgResetAcceptState();
       exitMiniGameToReturnUi(true);
     }
     return;
@@ -3038,9 +2389,7 @@ void updateCrossyRoad(const InputState &input)
   if (g_app.gameOver)
   {
     mgApplyResultAndShowReward(playerWon);
-
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
+    mgResetAcceptState();
     mgBeginInputLockout(180);
     clearInputLatch();
     inputForceClear();
@@ -3055,9 +2404,12 @@ void updateCrossyRoad(const InputState &input)
 
   if (s_crossyWinPoseActive)
   {
+    // tiny victory bounce while posing
+    s_crossyVisualOffsetPx = ((millis() / 120) % 2) ? -2 : 0;
 
     if ((uint32_t)(now - s_crossyWinPoseStart) >= 800)
     {
+      s_crossyVisualOffsetPx = 0; // reset after pose
       s_crossyWinPoseActive = false;
       playerWon = true;
       g_app.gameOver = true;
@@ -3217,9 +2569,19 @@ void drawCrossyRoad()
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
+  const uint8_t animBaseFrame = s_crossyLavaFrame & 1;
+
+  const bool haveGoal = ensureCrossyGoalZoneSprite();
+  const bool haveStart = ensureCrossyStartZoneSprite();
+  const bool haveLava0 = ensureCrossyLavaZoneSprite(0);
+  const bool haveLava1 = ensureCrossyLavaZoneSprite(1);
+
+  (void)haveLava0;
+  (void)haveLava1;
+
   spr.fillSprite(TFT_BLACK);
 
-  if (s_showReward)
+  if (mgRewardShowing())
   {
     drawRewardModal(gW, gH);
     return;
@@ -3244,14 +2606,19 @@ void drawCrossyRoad()
     spr.drawCentreString("Escape Hell! Use Arrow Keys", gW / 2, 8, 2);
     spr.drawCentreString("Avoid Lava, Exit between Torches!", gW / 2, 26, 2);
 
-    ensureCrossyIntroSprite();
+    const char *introPath = "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png";
 
-    if (s_crossyIntroReady)
-    {
-      const int ix = (gW - s_crossyIntroSpr.width()) / 2;
+    int iw = 0, ih = 0;
+    const char *useIntroPath = nullptr;
+
+    if (mgAssetsReadPngDims(introPath, &iw, &ih, &useIntroPath))    {
+      const int ix = (gW - iw) / 2;
       const int iy = 48;
-
-      s_crossyIntroSpr.pushSprite(&spr, ix, iy, kSpriteKey);
+      sprDrawPngFromSD(useIntroPath ? useIntroPath : introPath, ix, iy);
+    }
+    else
+    {
+      sprDrawPngFromSD(introPath, (gW - 68) / 2, 48);
     }
 
     const int cbY = 102;
@@ -3279,10 +2646,6 @@ void drawCrossyRoad()
   }
 
   const uint32_t now = millis();
-  const uint8_t animBaseFrame = s_crossyLavaFrame & 1;
-
-  const bool haveGoal = s_crossyGoalZoneReady;
-  const bool haveStart = s_crossyStartZoneReady;
 
   for (int row = 0; row < kCrossyRows; ++row)
   {
@@ -3294,7 +2657,7 @@ void drawCrossyRoad()
       if (haveGoal && s_crossyGoalZoneReady)
         s_crossyGoalZoneSpr.pushSprite(&spr, 0, y);
       else
-        spr.fillRect(0, y, 240, kCrossyTileH, TFT_RED);
+        spr.fillRect(0, y, gW, kCrossyTileH, TFT_RED);
       break;
 
     case CROSSY_LANE_SAFE:
@@ -3313,12 +2676,13 @@ void drawCrossyRoad()
 
     case CROSSY_LANE_WATER:
     {
-      const uint8_t lavaFrame = (animBaseFrame + row) & 1;
+      const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
 
-      if (s_crossyLavaZoneReady[lavaFrame])
+      if (ensureCrossyLavaZoneSprite(lavaFrame) && s_crossyLavaZoneReady[lavaFrame])
         s_crossyLavaZoneSpr[lavaFrame].pushSprite(&spr, 0, y);
       else
         spr.fillRect(0, y, 240, kCrossyTileH, TFT_RED);
+
       break;
     }
     }
@@ -3427,7 +2791,7 @@ static uint32_t s_dodgerPhaseStartMs = 0;
 static constexpr uint32_t kDodgerGoalHoldMs = 900;
 
 static bool s_dodgerInited = false;
-static uint32_t s_dodgerLastStepMs = 0;
+uint32_t s_dodgerLastStepMs = 0;
 static uint32_t s_dodgerStartMs = 0;
 static uint32_t s_dodgerSpawnAccMs = 0;
 
@@ -3435,7 +2799,7 @@ static int16_t s_dodgerPx = 0;
 static int16_t s_dodgerPy = 0;
 static int16_t s_dodgerSpeed = 3;
 static float s_dodgerPxF = 0.0f;
-static uint32_t s_dodgerMoveLastMs = 0;
+uint32_t s_dodgerMoveLastMs = 0;
 
 static int8_t s_dodgerMoveDir = 0;
 static uint32_t s_dodgerDirHoldMs = 0;
@@ -3444,11 +2808,6 @@ static DodgerBall s_dodgerBalls[8];
 
 static const uint16_t kDodgerKey = kSpriteKey;
 
-static M5Canvas s_dodgerBgSpr(&M5.Display);
-static bool s_dodgerBgSprReady = false;
-static char s_dodgerBgCachePath[128] = {0};
-static int s_dodgerBgW = 0;
-static int s_dodgerBgH = 0;
 static int s_dodgerBgScrollY = 0;
 
 static bool s_dodgerFireballReady = false;
@@ -3462,7 +2821,7 @@ static char s_dodgerCarPath[128] = {0};
 static int s_dodgerCarW = 0;
 static int s_dodgerCarH = 0;
 
-static void freeDodgerGoalFrames()
+void freeDodgerGoalFrames()
 {
   for (int i = 0; i < 2; ++i)
   {
@@ -3477,7 +2836,7 @@ static void freeDodgerGoalFrames()
   s_dodgerGoalH = 0;
 }
 
-static void freeDodgerGoreSprite()
+void freeDodgerGoreSprite()
 {
   if (s_dodgerGoreReady)
     s_dodgerGoreSpr.deleteSprite();
@@ -3554,8 +2913,7 @@ static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int 
   int w = 0, h = 0;
   const char *usePath = nullptr;
 
-  if (!flappyReadPngDimsTrySlash(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
+  if (!mgAssetsReadPngDims(path, &w, &h, &usePath) || w <= 0 || h <= 0)    return false;
 
   dst.setColorDepth(8);
 
@@ -3575,8 +2933,6 @@ static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int 
   return true;
 }
 
-static void freeDodgerGoalFrames();
-static void freeDodgerGoreSprite();
 static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
 {
   if (!path0 || !path1 || !path0[0] || !path1[0] || !g_sdReady)
@@ -3639,24 +2995,16 @@ static bool ensureDodgerGoreSprite(const char *path)
   return true;
 }
 
-static void freeDodgerBgCache()
+void freeDodgerBgCache()
 {
-  if (s_dodgerBgSprReady)
-  {
-    s_dodgerBgSpr.deleteSprite();
-    s_dodgerBgSprReady = false;
-  }
-
-  s_dodgerBgCachePath[0] = 0;
-  s_dodgerBgW = 0;
-  s_dodgerBgH = 0;
+  mgAssetsReleaseSharedBgIfOwner(MiniGame::INFERNAL_DODGER);
   s_dodgerBgScrollY = 0;
 }
 
-static void freeDodgerFireballSprites()
+void freeDodgerFireballSprites()
 {
   for (int i = 0; i < 3; ++i)
-    s_dodgerFireballSpr[i].deleteSprite();
+    mgAssetsReleaseSprite(s_dodgerFireballSpr[i], "dodger-fireball-release");
 
   s_dodgerFireballReady = false;
   s_dodgerFireballDir[0] = 0;
@@ -3664,11 +3012,11 @@ static void freeDodgerFireballSprites()
   s_dodgerFireballH = 0;
 }
 
-static void freeDodgerCarSprite()
+void freeDodgerCarSprite()
 {
   if (s_dodgerCarReady)
   {
-    s_dodgerCarSpr.deleteSprite();
+    mgAssetsReleaseSprite(s_dodgerCarSpr, "dodger-car-release");
     s_dodgerCarReady = false;
   }
 
@@ -3677,64 +3025,7 @@ static void freeDodgerCarSprite()
   s_dodgerCarH = 0;
 }
 
-static bool ensureDodgerBgCache(const char *path)
-{
-  if (!path || !path[0])
-    return false;
-
-  if (s_dodgerBgSprReady && s_dodgerBgCachePath[0] && strcmp(s_dodgerBgCachePath, path) == 0)
-    return true;
-
-  const int w = (int)spr.width();
-  const int h = (int)spr.height();
-  if (w <= 0 || h <= 0)
-    return false;
-
-  if (!g_sdReady)
-    return false;
-
-  bool isPng = false;
-  if (const char *ext = strrchr(path, '.'))
-    isPng = (strcasecmp(ext, ".png") == 0);
-
-  const char *usePath = path;
-  bool exists = SD.exists(usePath);
-  if (!exists && usePath[0] == '/')
-  {
-    usePath = usePath + 1;
-    exists = SD.exists(usePath);
-  }
-  if (!exists)
-    return false;
-
-  if (!s_dodgerBgSprReady || s_dodgerBgW != w || s_dodgerBgH != h)
-  {
-    s_dodgerBgSpr.deleteSprite();
-    s_dodgerBgSprReady = false;
-
-    s_dodgerBgSpr.setColorDepth(8);
-    if (!s_dodgerBgSpr.createSprite(w, h))
-      return false;
-
-    s_dodgerBgW = w;
-    s_dodgerBgH = h;
-    s_dodgerBgSprReady = true;
-  }
-
-  s_dodgerBgSpr.fillSprite(TFT_BLACK);
-
-  bool ok = false;
-  if (isPng)
-    ok = s_dodgerBgSpr.drawPngFile(SD, usePath, 0, 0);
-  else
-    ok = s_dodgerBgSpr.drawJpgFile(SD, usePath, 0, 0);
-
-  if (!ok)
-    return false;
-
-  strlcpy(s_dodgerBgCachePath, path, sizeof(s_dodgerBgCachePath));
-  return true;
-}
+static bool ensureDodgerBgCache(const char *path) { return mgAssetsEnsureSharedBg(MiniGame::INFERNAL_DODGER, path); }
 
 static bool ensureDodgerFireballSprites(const char *bgPath)
 {
@@ -3757,33 +3048,7 @@ static bool ensureDodgerFireballSprites(const char *bgPath)
   {
     snprintf(path, sizeof(path), "%sfireball%d.png", dir, i + 1);
 
-    const char *usePath = path;
-    if (!sdExistsTrySlash(path, &usePath))
-    {
-      freeDodgerFireballSprites();
-      return false;
-    }
-
-    int w = 0, h = 0;
-    const char *pngUse = nullptr;
-
-    if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
-    {
-      freeDodgerFireballSprites();
-      return false;
-    }
-
-    s_dodgerFireballSpr[i].setColorDepth(8);
-
-    if (!s_dodgerFireballSpr[i].createSprite(w, h))
-    {
-      freeDodgerFireballSprites();
-      return false;
-    }
-
-    s_dodgerFireballSpr[i].fillSprite(kDodgerKey);
-
-    if (!s_dodgerFireballSpr[i].drawPngFile(SD, pngUse, 0, 0))
+    if (!mgAssetsLoadSprite(s_dodgerFireballSpr[i], path, 8, kDodgerKey, "dodger-fireball-load"))
     {
       freeDodgerFireballSprites();
       return false;
@@ -3807,30 +3072,14 @@ static bool ensureDodgerCarSprite(const char *path)
 
   freeDodgerCarSprite();
 
-  const char *usePath = path;
-  if (!sdExistsTrySlash(path, &usePath))
-    return false;
-
-  int w = 0, h = 0;
-  const char *pngUse = nullptr;
-  if (!flappyReadPngDimsTrySlash(usePath, &w, &h, &pngUse) || w <= 0 || h <= 0)
-    return false;
-
-  s_dodgerCarSpr.setColorDepth(8);
-
-  if (!s_dodgerCarSpr.createSprite(w, h))
-    return false;
-
-  s_dodgerCarSpr.fillSprite(kDodgerKey);
-
-  if (!s_dodgerCarSpr.drawPngFile(SD, pngUse, 0, 0))
+  if (!mgAssetsLoadSprite(s_dodgerCarSpr, path, 8, kDodgerKey, "dodger-car-load"))
   {
-    freeDodgerCarSprite();
+    s_dodgerCarReady = false;
     return false;
   }
 
-  s_dodgerCarW = w;
-  s_dodgerCarH = h;
+  s_dodgerCarW = (int)s_dodgerCarSpr.width();
+  s_dodgerCarH = (int)s_dodgerCarSpr.height();
   strlcpy(s_dodgerCarPath, path, sizeof(s_dodgerCarPath));
   s_dodgerCarReady = true;
   return true;
@@ -3945,12 +3194,13 @@ void startInfernalDodger()
   playerWon = false;
   s_resultShown = false;
 
-  s_showReward = false;
-  s_rewardMsg[0] = 0;
-
-  s_prevSelectHeld = false;
+  mgClearRewardState();
+  mgResetAcceptState();
 
   currentMiniGame = MiniGame::INFERNAL_DODGER;
+
+  mgAssetsBeginSession(currentMiniGame, "startInfernalDodger");
+  logMiniGameHeap("startInfernalDodger");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
   UIState retUi = g_app.uiState;
@@ -3983,12 +3233,7 @@ void startInfernalDodger()
   s_dodgerIntroImpAnimMs = millis();
   requestUIRedraw();
   clearInputLatch();
-  // Prevent the ENTER used to launch the mini-game from being interpreted as
-  // an immediate "enterOnce" inside the mini-game on the first update tick.
-  {
-    auto st = M5Cardputer.Keyboard.keysState();
-    s_prevSelectHeld = st.enter;
-  }
+  inputForceClear();
   mgBeginInputLockout(220);
 }
 
@@ -3996,19 +3241,21 @@ void updateInfernalDodger(const InputState &input)
 {
   const bool enterOnce = miniGameEnterOnce(input);
 
-  if (s_showReward)
+  if (mgRewardShowing())
   {
-    if (enterOnce)
+    if (enterOnce && !mgInputLockedOut())
+    {
+      mgClearRewardState();
+      mgResetAcceptState();
       exitMiniGameToReturnUi(true);
+    }
     return;
   }
 
   if (g_app.gameOver)
   {
     mgApplyResultAndShowReward(playerWon);
-
-    s_acceptArmed = false;
-    s_gameOverMs = 0;
+    mgResetAcceptState();
     mgBeginInputLockout(180);
     clearInputLatch();
     inputForceClear();
@@ -4349,25 +3596,36 @@ void drawInfernalDodger()
   const bool haveGore = s_dodgerGoreReady;
 
   bool drewBg = false;
-  if (haveBg && s_dodgerBgSprReady)
+
+  M5Canvas *bg = mgAssetsSharedBg();
+  if (haveBg && bg)
   {
-    const int bh = (int)s_dodgerBgSpr.height();
+    const int bh = (int)bg->height();
     if (bh > 0)
     {
       int y = -(s_dodgerBgScrollY % bh);
       if (y > 0)
         y -= bh;
 
-      s_dodgerBgSpr.pushSprite(&spr, 0, y);
-      s_dodgerBgSpr.pushSprite(&spr, 0, y + bh);
+      while (y < SCREEN_H)
+      {
+        bg->pushSprite(&spr, 0, y);
+        bg->pushSprite(&spr, 0, y + bh);
+        y += bh * 2;
+      }
+
       drewBg = true;
+    }
+    else
+    {
+      spr.fillSprite(TFT_BLACK);
     }
   }
 
   if (!drewBg)
     spr.fillSprite(TFT_BLACK);
 
-  if (s_showReward)
+  if (mgRewardShowing())
   {
     drawRewardModal(gW, gH);
     return;
@@ -4396,8 +3654,9 @@ void drawInfernalDodger()
     const int impX = (gW - 48) / 2;
     const int impY = 44;
 
-    if (ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet()))
-      s_dodgerGoalSpr[s_dodgerIntroImpFrame].pushSprite(&spr, impX, impY, kDodgerKey);
+    const char *introImp = (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1PathForPet() : dodgerGoalFrame2PathForPet();
+
+    sprDrawPngFromSD(introImp, impX, impY);
 
     const int cbY = 102;
     const int cbSize = 10;
@@ -4491,32 +3750,6 @@ void drawInfernalDodger()
       spr.fillCircle(s_dodgerPx, s_dodgerPy, 6, TFT_GREEN);
       spr.drawCircle(s_dodgerPx, s_dodgerPy, 6, TFT_DARKGREEN);
     }
-  }
-}
-
-static void mgSyncGameTimebases(uint32_t now)
-{
-  switch (currentMiniGame)
-  {
-  case MiniGame::FLAPPY_FIREBALL:
-    s_lastStepMs = now;
-    break;
-
-  case MiniGame::INFERNAL_DODGER:
-    s_dodgerLastStepMs = now;
-    s_dodgerMoveLastMs = now;
-    break;
-
-  case MiniGame::CROSSY_ROAD:
-    s_crossyLastLaneMs = now;
-    break;
-
-  case MiniGame::RESURRECTION:
-    rr_lastMs = now;
-    break;
-
-  default:
-    break;
   }
 }
 
