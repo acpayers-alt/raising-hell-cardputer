@@ -62,6 +62,7 @@ static const char *crossyGoalZonePathForPet();
 static const char *crossyLavaZonePathForPet(uint8_t frame);
 static const char *crossyStonePathForPet();
 void freeFlappyBgCache();
+static bool ensureFlappyBgCache(const char *path);
 static void logMiniGameHeap(const char *tag);
 
 // I should sort these better
@@ -112,6 +113,12 @@ static void logSpriteLoadFail(const char *tag, const char *path)
 static bool s_flappyShowIntro = true;
 static bool s_flappyDontShowAgain = false; // visual only for now
 
+// BACKGROUND
+static bool s_flappyBgReady = false;
+static bool s_flappyBgLoadFailed = false;
+static char s_flappyBgPath[160] = {0};
+static const char *flappyBgPathForPet();
+
 // FIREBALL
 static M5Canvas s_flappyFireballSpr[3];
 static bool s_flappyFireballReady = false;
@@ -146,9 +153,32 @@ static const char *const kImpBurnFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn5.png",
 };
 
+static const char *flappyImpWave1PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/imp_wave1.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png";
+  }
+}
+
+static const char *flappyImpWave2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/imp_wave2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png";
+  }
+}
+
 // SPIKES
 static const uint16_t kFireKey = kSpriteKey;
-static const char *flappyBgPathForPet();
 
 // GOALS
 static bool s_flappyInited = false;
@@ -263,6 +293,7 @@ static bool sdExistsTrySlashLocal(const char *path, const char **outUse)
 // (This preserves transparency and avoids maintaining a separate alpha-capable cache.)
 static FlappyPipe s_pipes[3];
 static bool s_flappyPipeFsSet = false;
+static bool s_flappyPipeLoadFailed = false;
 static int s_flappyPipeImgW = 0;
 static int s_flappyPipeImgH = 0;
 static int s_flappyPipePetType = -1;
@@ -387,28 +418,11 @@ void freeFlappyPipeSprites()
   s_flappyPipeW = 0;
   s_flappyPipeH = 0;
   s_flappyPipeDir[0] = 0;
+  s_flappyPipeLoadFailed = false;
 }
 
 static bool ensureImpWaveSprites()
 {
-  if (s_impWaveSprReady)
-    return true;
-
-  const char *paths[2] = {
-      "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png",
-      "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png",
-  };
-
-  for (int i = 0; i < 2; ++i)
-  {
-    if (!mgAssetsLoadSprite(s_impWaveSpr[i], paths[i], 8, kFireKey, "flappy-imp-load"))
-    {
-      freeImpWaveSprites();
-      return false;
-    }
-  }
-
-  s_impWaveSprReady = true;
   return true;
 }
 
@@ -452,6 +466,9 @@ static const uint16_t kPipeKey = kSpriteKey;
 
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
+  if (s_flappyPipeLoadFailed)
+  return false;
+  
   if (!bgPath || !bgPath[0] || !g_sdReady)
     return false;
 
@@ -472,14 +489,14 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
 
   if (!mgAssetsLoadSprite(s_flappyPipeUpSpr, upPath, 8, kPipeKey, "flappy-pipe-up-load"))
   {
-    s_flappyPipeSprReady = false;
+    s_flappyPipeLoadFailed = true;
     return false;
   }
 
   if (!mgAssetsLoadSprite(s_flappyPipeDownSpr, downPath, 8, kPipeKey, "flappy-pipe-down-load"))
   {
     mgAssetsReleaseSprite(s_flappyPipeUpSpr, "flappy-pipe-up-release-on-fail");
-    s_flappyPipeSprReady = false;
+    s_flappyPipeLoadFailed = true;
     return false;
   }
 
@@ -535,10 +552,23 @@ void startFlappyFireball()
 
   s_flappyBgScrollX = 0;
   freeFlappyBgCache();
-
+  ensureFlappyBgCache(flappyBgPathForPet());
+  
   freeFlappyPipeSprites();
-  ensureFlappyFireballSprites(flappyBgPathForPet());
-  ensureImpWaveSprites();
+  freeFlappyFireballSprites();
+  
+  const char *bgPath = flappyBgPathForPet();
+  
+  const bool pipeOk = ensureFlappyPipeSprites(bgPath);
+  const bool fireballOk = ensureFlappyFireballSprites(bgPath);
+  const bool impOk = ensureImpWaveSprites();
+  
+  Serial.printf("FLAPPY preload: pipes=%d fireball=%d imp=%d free=%u largest=%u\n",
+                pipeOk ? 1 : 0,
+                fireballOk ? 1 : 0,
+                impOk ? 1 : 0,
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
   invalidateBackgroundCache();
   requestUIRedraw();
   clearInputLatch();
@@ -937,17 +967,48 @@ void freeFlappyBgCache()
   mgAssetsReleaseSharedBgIfOwner(MiniGame::FLAPPY_FIREBALL);
   s_flappyBgW = 0;
   s_flappyBgH = 0;
+  s_flappyBgReady = false;
+  s_flappyBgLoadFailed = false;
+  s_flappyBgPath[0] = 0;
 }
 
 static bool s_flappyBgCacheDisabled = false;
 
 static bool ensureFlappyBgCache(const char *path)
 {
-  if (!mgAssetsEnsureSharedBg(MiniGame::FLAPPY_FIREBALL, path))
+  if (!path || !path[0] || !g_sdReady)
     return false;
+
+  if (s_flappyBgReady && strcmp(s_flappyBgPath, path) == 0)
+    return true;
+
+  if (s_flappyBgLoadFailed && strcmp(s_flappyBgPath, path) == 0)
+    return false;
+
+  s_flappyBgReady = false;
+  s_flappyBgLoadFailed = false;
+  strlcpy(s_flappyBgPath, path, sizeof(s_flappyBgPath));
+
+  if (!mgAssetsEnsureSharedBg(MiniGame::FLAPPY_FIREBALL, path))
+  {
+    s_flappyBgLoadFailed = true;
+    s_flappyBgW = 0;
+    s_flappyBgH = 0;
+    return false;
+  }
 
   s_flappyBgW = mgAssetsSharedBgW();
   s_flappyBgH = mgAssetsSharedBgH();
+
+  if (s_flappyBgW <= 0 || s_flappyBgH <= 0 || mgAssetsSharedBg() == nullptr)
+  {
+    s_flappyBgLoadFailed = true;
+    s_flappyBgW = 0;
+    s_flappyBgH = 0;
+    return false;
+  }
+
+  s_flappyBgReady = true;
   return true;
 }
 
@@ -983,36 +1044,6 @@ void drawFlappyFireball()
   const int gW = (int)spr.width();
   const int gH = (int)spr.height();
 
-  const char *bgPath = flappyBgPathForPet();
-  const bool haveFireball = ensureFlappyFireballSprites(bgPath);
-
-  bool drewBg = false;
-
-  if (bgPath && bgPath[0] && ensureFlappyBgCache(bgPath))
-  {
-    M5Canvas *bg = mgAssetsSharedBg();
-    if (bg)
-    {
-      const int bw = (int)bg->width();
-      if (bw > 0)
-      {
-        // Wrap scroll into [0, bw)
-        int x = -(s_flappyBgScrollX % bw);
-        if (x > 0)
-          x -= bw;
-
-        bg->pushSprite(&spr, x, 0);
-        bg->pushSprite(&spr, x + bw, 0);
-        drewBg = true;
-      }
-    }
-  }
-
-  if (!drewBg)
-  {
-    spr.fillSprite(TFT_BLACK);
-  }
-
   if (mgRewardShowing())
   {
     drawRewardModal(gW, gH);
@@ -1021,6 +1052,7 @@ void drawFlappyFireball()
 
   if (g_app.gameOver)
   {
+    spr.fillSprite(TFT_BLACK);
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
     spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU LOSE!", gW / 2, gH / 2 - 10, 4);
@@ -1030,10 +1062,82 @@ void drawFlappyFireball()
     return;
   }
 
-  const int gapH = 64;
+  if (s_flappyShowIntro)
+  {
+    spr.fillSprite(TFT_BLACK);
+    spr.setTextDatum(CC_DATUM);
 
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
+    spr.drawCentreString("Torch the Imp!", gW / 2, 22, 2);
+
+    const int impX = (gW - 48) / 2;
+    const int impY = 40;
+
+    if (ensureImpWaveSprites())
+    {
+      const char *impSprite = (s_impFrame == 0)
+                                  ? flappyImpWave1PathForPet()
+                                  : flappyImpWave2PathForPet();
+    
+      if (impSprite)
+        sprDrawPngFromSD(impSprite, impX, impY);
+    }
+
+    const int cbY = 100;
+    const int cbSize = 10;
+    const int textOffset = 16;
+    const int lineWidth = 150;
+    const int cbX = (gW - lineWidth) / 2;
+
+    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+    if (s_flappyDontShowAgain)
+    {
+      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+    }
+
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
+    return;
+  }
+
+  const char *bgPath = flappyBgPathForPet();
+  const bool haveFireball = ensureFlappyFireballSprites(bgPath);
   const bool havePipes = ensureFlappyPipeSprites(bgPath);
 
+  bool drewBg = false;
+
+  if (s_flappyBgReady)
+  {
+    M5Canvas *bg = mgAssetsSharedBg();
+    const int bw = s_flappyBgW;
+    const int bh = s_flappyBgH;
+
+    if (bg && bw > 0 && bh > 0)
+    {
+      int x = -(s_flappyBgScrollX % bw);
+      if (x > 0)
+        x -= bw;
+
+      bg->pushSprite(&spr, x, 0);
+      bg->pushSprite(&spr, x + bw, 0);
+      drewBg = true;
+    }
+  }
+
+  if (!drewBg)
+  {
+    spr.fillSprite(TFT_BLACK);
+  }
+
+  const int gapH = 64;
   const int pipeW = 26;
 
   for (int i = 0; i < 3; ++i)
@@ -1060,45 +1164,6 @@ void drawFlappyFireball()
     }
   }
 
-  if (s_flappyShowIntro)
-  {
-    spr.fillSprite(TFT_BLACK);
-    spr.setTextDatum(CC_DATUM);
-
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
-    spr.drawCentreString("Torch the Imp!", gW / 2, 22, 2);
-
-    const int impX = (gW - 48) / 2;
-    const int impY = 40;
-
-    if (ensureImpWaveSprites())
-      s_impWaveSpr[s_impFrame].pushSprite(&spr, impX, impY, kFireKey);
-
-    const int cbY = 100;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_flappyDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-    }
-
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
-
-    spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
-    return;
-  }
-
   if (s_flappyGoalActive && !s_impBurnDone)
   {
     const int islandW = 48;
@@ -1114,7 +1179,14 @@ void drawFlappyFireball()
     if (!s_impHit)
     {
       if (ensureImpWaveSprites())
-        s_impWaveSpr[s_impFrame].pushSprite(&spr, impX, impY, kFireKey);
+      {
+        const char *impSprite = (s_impFrame == 0)
+                                    ? flappyImpWave1PathForPet()
+                                    : flappyImpWave2PathForPet();
+    
+        if (impSprite)
+          sprDrawPngFromSD(impSprite, impX, impY);
+      }
     }
     else
     {
@@ -1122,7 +1194,7 @@ void drawFlappyFireball()
       if (impSprite)
         sprDrawPngFromSD(impSprite, impX, impY);
     }
-  }
+    }
 
   if (!s_impHit)
   {
@@ -2905,6 +2977,156 @@ static const char *fireballRunCarPathForPet()
   }
 }
 
+static bool ensureDodgerFireballSpriteFrame(uint8_t frame)
+{
+  if (!g_sdReady)
+    return false;
+
+  const uint8_t i = frame % 3;
+
+  char dir[128];
+  flappyDirFromBgPath(fireballRunBgPathForPet(), dir, sizeof(dir));
+  if (!dir[0])
+    return false;
+
+  char path[192];
+  snprintf(path, sizeof(path), "%sfireball%d.png", dir, (int)i + 1);
+
+  static const char *kLoadTags[3] = {
+      "dodger-fireball1-load",
+      "dodger-fireball2-load",
+      "dodger-fireball3-load"};
+
+  static const char *kReleaseTags[3] = {
+      "dodger-fireball1-release",
+      "dodger-fireball2-release",
+      "dodger-fireball3-release"};
+
+  bool ok = mgAssetsLoadCachedSprite(
+      s_dodgerFireballSpr[i],
+      s_dodgerFireballReady,
+      s_dodgerFireballDir,
+      sizeof(s_dodgerFireballDir),
+      path,
+      8,
+      kDodgerKey,
+      kLoadTags[i],
+      kReleaseTags[i]);
+
+  if (ok)
+  {
+    s_dodgerFireballW = (int)s_dodgerFireballSpr[i].width();
+    s_dodgerFireballH = (int)s_dodgerFireballSpr[i].height();
+  }
+
+  return ok;
+}
+
+static bool ensureDodgerCarSprite()
+{
+  return mgAssetsLoadCachedSprite(
+      s_dodgerCarSpr,
+      s_dodgerCarReady,
+      s_dodgerCarPath,
+      sizeof(s_dodgerCarPath),
+      fireballRunCarPathForPet(),
+      8,
+      kDodgerKey,
+      "dodger-car-load",
+      "dodger-car-release");
+}
+
+static bool ensureDodgerGoalFrameSprite(uint8_t frame)
+{
+  const uint8_t i = frame & 1;
+  const char *path = (i == 0) ? dodgerGoalFrame1PathForPet()
+                              : dodgerGoalFrame2PathForPet();
+
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (s_dodgerGoalFrameReady[i] &&
+      strcmp(s_dodgerGoalFramePath[i], path) == 0)
+    return true;
+
+  if (s_dodgerGoalFrameReady[i])
+  {
+    s_dodgerGoalSpr[i].deleteSprite();
+    s_dodgerGoalFrameReady[i] = false;
+    s_dodgerGoalFramePath[i][0] = 0;
+  }
+
+  int w = 0;
+  int h = 0;
+  const char *usePath = nullptr;
+  if (!mgAssetsReadPngDims(path, &w, &h, &usePath))
+    return false;
+
+  s_dodgerGoalSpr[i].setColorDepth(8);
+  if (!s_dodgerGoalSpr[i].createSprite(w, h))
+    return false;
+
+  s_dodgerGoalSpr[i].fillSprite(kDodgerKey);
+
+  if (!s_dodgerGoalSpr[i].drawPngFile(SD, usePath ? usePath : path, 0, 0))
+  {
+    s_dodgerGoalSpr[i].deleteSprite();
+    s_dodgerGoalFrameReady[i] = false;
+    s_dodgerGoalFramePath[i][0] = 0;
+    return false;
+  }
+
+  strlcpy(s_dodgerGoalFramePath[i], path, sizeof(s_dodgerGoalFramePath[i]));
+  s_dodgerGoalFrameReady[i] = true;
+
+  s_dodgerGoalW = w;
+  s_dodgerGoalH = h;
+  return true;
+}
+
+static bool ensureDodgerGoalFrames()
+{
+  const bool ok0 = ensureDodgerGoalFrameSprite(0);
+  const bool ok1 = ensureDodgerGoalFrameSprite(1);
+  return ok0 && ok1;
+}
+
+static bool ensureDodgerGoreSprite()
+{
+  const char *path = dodgerGoalGorePathForPet();
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (s_dodgerGoreReady && strcmp(s_dodgerGorePath, path) == 0)
+    return true;
+
+  freeDodgerGoreSprite();
+
+  int w = 0;
+  int h = 0;
+  const char *usePath = nullptr;
+  if (!mgAssetsReadPngDims(path, &w, &h, &usePath))
+    return false;
+
+  s_dodgerGoreSpr.setColorDepth(8);
+  if (!s_dodgerGoreSpr.createSprite(w, h))
+    return false;
+
+  s_dodgerGoreSpr.fillSprite(kDodgerKey);
+
+  if (!s_dodgerGoreSpr.drawPngFile(SD, usePath ? usePath : path, 0, 0))
+  {
+    s_dodgerGoreSpr.deleteSprite();
+    s_dodgerGoreReady = false;
+    s_dodgerGorePath[0] = 0;
+    return false;
+  }
+
+  strlcpy(s_dodgerGorePath, path, sizeof(s_dodgerGorePath));
+  s_dodgerGoreReady = true;
+  return true;
+}
+
 static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int &outH)
 {
   if (!path || !path[0] || !g_sdReady)
@@ -3221,8 +3443,7 @@ void startInfernalDodger()
   freeDodgerGoreSprite();
   ensureDodgerBgCache(fireballRunBgPathForPet());
   ensureDodgerFireballSprites(fireballRunBgPathForPet());
-  ensureDodgerCarSprite(fireballRunCarPathForPet());
-
+  ensureDodgerCarSprite();
   s_dodgerInited = true;
   dodgerReset();
 
@@ -3322,8 +3543,8 @@ void updateInfernalDodger(const InputState &input)
     freeDodgerGoalFrames();
     freeDodgerGoreSprite();
 
-    (void)ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
-    (void)ensureDodgerGoreSprite(dodgerGoalGorePathForPet());
+    (void)ensureDodgerGoalFrames();
+    (void)ensureDodgerGoreSprite();
 
     Serial.printf("GOAL preload: f0=%d f1=%d gore=%d w=%d h=%d\n", s_dodgerGoalFrameReady[0] ? 1 : 0,
                   s_dodgerGoalFrameReady[1] ? 1 : 0, s_dodgerGoreReady ? 1 : 0, s_dodgerGoalW, s_dodgerGoalH);
@@ -3589,11 +3810,16 @@ void drawInfernalDodger()
   const char *carPath = fireballRunCarPathForPet();
 
   const bool haveBg = ensureDodgerBgCache(bgPath);
-  const bool haveFireballs = ensureDodgerFireballSprites(bgPath);
-  const bool haveCar = ensureDodgerCarSprite(carPath);
+  
+  const bool haveFireballs =
+  ensureDodgerFireballSpriteFrame(0) &&
+  ensureDodgerFireballSpriteFrame(1) &&
+  ensureDodgerFireballSpriteFrame(2);
 
-  const bool haveGoalFrames = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1];
-  const bool haveGore = s_dodgerGoreReady;
+const bool haveCar = ensureDodgerCarSprite();
+
+const bool haveGoalFrames = ensureDodgerGoalFrames();
+const bool haveGore = ensureDodgerGoreSprite();
 
   bool drewBg = false;
 

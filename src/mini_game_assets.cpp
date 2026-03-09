@@ -369,3 +369,45 @@ bool mgAssetsReadPngDims(const char *path, int *outW, int *outH, const char **ou
   if (outUsePath) *outUsePath = usePath;
   return true;
 }
+
+bool mgAssetsLoadCachedSprite(
+    M5Canvas &dst,
+    bool &ready,
+    char *cachedPath,
+    size_t cachedPathSize,
+    const char *path,
+    uint8_t colorDepth,
+    uint16_t transparentKey,
+    const char *loadTag,
+    const char *releaseTag)
+{
+  if (!path || !path[0] || !g_sdReady)
+    return false;
+
+  if (ready && strcmp(cachedPath, path) == 0)
+  {
+    if (dst.width() > 0 && dst.height() > 0)
+      return true;
+
+    ready = false;
+    cachedPath[0] = 0;
+  }
+
+  if (ready)
+  {
+    mgAssetsReleaseSprite(dst, releaseTag);
+    ready = false;
+    cachedPath[0] = 0;
+  }
+
+  if (!mgAssetsLoadSprite(dst, path, colorDepth, transparentKey, loadTag))
+  {
+    ready = false;
+    cachedPath[0] = 0;
+    return false;
+  }
+
+  strlcpy(cachedPath, path, cachedPathSize);
+  ready = true;
+  return true;
+}
