@@ -5,18 +5,7 @@
 #include <Arduino.h>
 
 // -----------------------------------------------------------------------------
-// Mini-game asset manager (first pass)
-// -----------------------------------------------------------------------------
-// First pass scope:
-// - one shared fullscreen background sprite slot
-// - heap logging helpers
-// - explicit owner tracking for the shared bg slot
-//
-// Later passes can add:
-// - keyed sprite registry
-// - per-game asset packs
-// - budget enforcement
-// - shared transient slots
+// Low-level mini-game asset helpers
 // -----------------------------------------------------------------------------
 
 void mgAssetsLogHeap(const char *tag);
@@ -38,22 +27,47 @@ M5Canvas *mgAssetsSharedBg();
 int mgAssetsSharedBgW();
 int mgAssetsSharedBgH();
 
-bool mgAssetsLoadSprite(M5Canvas &dst, const char *path, int colorDepth = 8, uint16_t fillColor = TFT_BLACK,
+bool mgAssetsLoadSprite(M5Canvas &dst,
+                        const char *path,
+                        int colorDepth = 8,
+                        uint16_t fillColor = TFT_BLACK,
                         const char *tag = nullptr);
 
 void mgAssetsReleaseSprite(M5Canvas &dst, const char *tag = nullptr);
 
 bool mgAssetsReadPngDims(const char *path, int *outW, int *outH, const char **outUsePath = nullptr);
 
-bool mgAssetsLoadSpriteFromPath(M5Canvas &dst, const char *path, uint8_t depth, uint16_t transparentKey,
-                                const char *tag);
-bool mgAssetsLoadCachedSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path,
-                              uint8_t depth, uint16_t transparentKey, const char *loadTag, const char *releaseTag);
+bool mgAssetsLoadCachedSprite(M5Canvas &dst,
+                              bool &ready,
+                              char *cachedPath,
+                              size_t cachedPathSize,
+                              const char *path,
+                              uint8_t depth,
+                              uint16_t transparentKey,
+                              const char *loadTag,
+                              const char *releaseTag);
 
-bool mgAssetsLoadSpriteFromPath(M5Canvas &dst, const char *path, uint8_t depth, uint16_t transparentKey,
-                                const char *tag);
+// -----------------------------------------------------------------------------
+// Higher-level mini-game memory/session wrapper
+// -----------------------------------------------------------------------------
+// First pass:
+// - explicit current session tracking
+// - one shared fullscreen bg slot
+// - no sprite registry yet
+// - games can migrate gradually
+// -----------------------------------------------------------------------------
 
-bool mgAssetsLoadCachedSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path,
-                              uint8_t depth, uint16_t transparentKey, const char *loadTag, const char *releaseTag);
+namespace mgmem
+{
+  void beginSession(MiniGame game, int petType);
+  void endSession();
 
-                              
+  bool ensureSharedBg(const char *path, M5Canvas *&out, int &outW, int &outH);
+
+  size_t freeBytes();
+  size_t largestBlock();
+  void logUsage(const char *tag);
+
+  MiniGame currentGame();
+  int currentPetType();
+}

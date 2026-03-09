@@ -49,7 +49,11 @@
 #include "save_manager.h"
 #include "ui_actions.h"
 
-static inline void exitMiniGameToReturnUi(bool beginLockout = true) { miniGameExitToReturnUi(beginLockout); }
+static inline void exitMiniGameToReturnUi(bool beginLockout = true)
+{
+  mgmem::endSession();
+  miniGameExitToReturnUi(beginLockout);
+}
 
 // -----------------------------------------------------------------------------
 // Mini-game input helpers / shared state
@@ -524,6 +528,7 @@ void startFlappyFireball()
 
   currentMiniGame = MiniGame::FLAPPY_FIREBALL;
   mgAssetsBeginSession(currentMiniGame, "startFlappyFireball");
+  mgmem::beginSession(currentMiniGame, pet.type);
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
   UIState retUi = g_app.uiState;
@@ -1112,30 +1117,26 @@ void drawFlappyFireball()
   const bool haveFireball = ensureFlappyFireballSprites(bgPath);
   const bool havePipes = ensureFlappyPipeSprites(bgPath);
 
+  M5Canvas *bg = nullptr;
+  int bw = 0;
+  int bh = 0;
+  const bool haveBg = mgmem::ensureSharedBg(flappyBgPathForPet(), bg, bw, bh);
+
   bool drewBg = false;
 
-  if (s_flappyBgReady)
+  if (haveBg && bg && bw > 0 && bh > 0)
   {
-    M5Canvas *bg = mgAssetsSharedBg();
-    const int bw = s_flappyBgW;
-    const int bh = s_flappyBgH;
+    int x = -(s_flappyBgScrollX % bw);
+    if (x > 0)
+      x -= bw;
 
-    if (bg && bw > 0 && bh > 0)
-    {
-      int x = -(s_flappyBgScrollX % bw);
-      if (x > 0)
-        x -= bw;
-
-      bg->pushSprite(&spr, x, 0);
-      bg->pushSprite(&spr, x + bw, 0);
-      drewBg = true;
-    }
+    bg->pushSprite(&spr, x, 0);
+    bg->pushSprite(&spr, x + bw, 0);
+    drewBg = true;
   }
 
   if (!drewBg)
-  {
     spr.fillSprite(TFT_BLACK);
-  }
 
   const int gapH = 64;
   const int pipeW = 26;
@@ -2233,6 +2234,7 @@ void startCrossyRoad()
 
   currentMiniGame = MiniGame::CROSSY_ROAD;
   mgAssetsBeginSession(currentMiniGame, "startCrossyRoad");
+  mgmem::beginSession(currentMiniGame, pet.type);
   logMiniGameHeap("startCrossyRoad");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
@@ -2746,18 +2748,33 @@ void drawCrossyRoad()
       }
       break;
 
-    case CROSSY_LANE_WATER:
-    {
-      const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
-
-      if (ensureCrossyLavaZoneSprite(lavaFrame) && s_crossyLavaZoneReady[lavaFrame])
-        s_crossyLavaZoneSpr[lavaFrame].pushSprite(&spr, 0, y);
-      else
-        spr.fillRect(0, y, 240, kCrossyTileH, TFT_RED);
-
-      break;
-    }
-    }
+      case CROSSY_LANE_WATER:
+      {
+        const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
+  
+        if (ensureCrossyLavaZoneSprite(lavaFrame) && s_crossyLavaZoneReady[lavaFrame])
+        {
+          const int tileW = (int)s_crossyLavaZoneSpr[lavaFrame].width();
+          const int tileH = (int)s_crossyLavaZoneSpr[lavaFrame].height();
+  
+          if (tileW > 0 && tileH > 0)
+          {
+            for (int x = 0; x < gW; x += tileW)
+              s_crossyLavaZoneSpr[lavaFrame].pushSprite(&spr, x, y);
+          }
+          else
+          {
+            spr.fillRect(0, y, gW, kCrossyTileH, TFT_RED);
+          }
+        }
+        else
+        {
+          spr.fillRect(0, y, gW, kCrossyTileH, TFT_RED);
+        }
+  
+        break;
+      }
+        }
   }
 
   for (int r = 0; r < kCrossyRows; ++r)
@@ -3346,6 +3363,7 @@ void startInfernalDodger()
   currentMiniGame = MiniGame::INFERNAL_DODGER;
 
   mgAssetsBeginSession(currentMiniGame, "startInfernalDodger");
+  mgmem::beginSession(currentMiniGame, pet.type);
   logMiniGameHeap("startInfernalDodger");
 
   // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
@@ -3725,37 +3743,33 @@ void drawInfernalDodger()
   const int gH = (screenH > 0) ? screenH : 135;
 
   const char *bgPath = fireballRunBgPathForPet();
-  const char *carPath = fireballRunCarPathForPet();
 
-  const bool haveBg = (mgAssetsSharedBg() != nullptr) && (mgAssetsSharedBgH() > 0);
+  M5Canvas *bg = nullptr;
+  int bw = 0;
+  int bh = 0;
+  const bool haveBg = mgAssetsEnsureSharedBg(MiniGame::INFERNAL_DODGER, bgPath);
+
+  if (haveBg)
+  {
+    bg = mgAssetsSharedBg();
+    bw = mgAssetsSharedBgW();
+    bh = mgAssetsSharedBgH();
+  }
+
   const bool haveFireballs = s_dodgerFireballReady;
   const bool haveCar = s_dodgerCarReady;
-  
+
   bool drewBg = false;
 
-  M5Canvas *bg = mgAssetsSharedBg();
-  if (haveBg && bg)
+  if (haveBg && bg && bw > 0 && bh > 0)
   {
-    const int bh = (int)bg->height();
-    if (bh > 0)
-    {
-      int y = -(s_dodgerBgScrollY % bh);
-      if (y > 0)
-        y -= bh;
+    int y = -(s_dodgerBgScrollY % bh);
+    if (y > 0)
+      y -= bh;
 
-      while (y < SCREEN_H)
-      {
-        bg->pushSprite(&spr, 0, y);
-        bg->pushSprite(&spr, 0, y + bh);
-        y += bh * 2;
-      }
-
-      drewBg = true;
-    }
-    else
-    {
-      spr.fillSprite(TFT_BLACK);
-    }
+    bg->pushSprite(&spr, 0, y);
+    bg->pushSprite(&spr, 0, y + bh);
+    drewBg = true;
   }
 
   if (!drewBg)
@@ -3790,7 +3804,9 @@ void drawInfernalDodger()
     const int impX = (gW - 48) / 2;
     const int impY = 44;
 
-    const char *introImp = (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1PathForPet() : dodgerGoalFrame2PathForPet();
+    const char *introImp = (s_dodgerIntroImpFrame == 0)
+                               ? dodgerGoalFrame1PathForPet()
+                               : dodgerGoalFrame2PathForPet();
 
     sprDrawPngFromSD(introImp, impX, impY);
 
@@ -3828,7 +3844,7 @@ void drawInfernalDodger()
       const int bx = (int)b.x;
       const int by = (int)b.y;
 
-      if (haveFireballs && s_dodgerFireballReady)
+      if (haveFireballs)
       {
         const int frame = (millis() / 80) % 3;
         const int w = s_dodgerFireballSpr[frame].width();
@@ -3853,16 +3869,17 @@ void drawInfernalDodger()
         (s_dodgerPhase == DODGER_PHASE_IMPACT) ||
         (s_dodgerPhase == DODGER_PHASE_CAR_EXIT) ||
         (s_dodgerPhase == DODGER_PHASE_HOLD);
-  
+
     const char *goalPath = gorePhase
-        ? dodgerGoalGorePathForPet()
-        : ((s_dodgerGoalAnimFrame & 1) ? dodgerGoalFrame2PathForPet()
-                                       : dodgerGoalFrame1PathForPet());
-  
+                               ? dodgerGoalGorePathForPet()
+                               : ((s_dodgerGoalAnimFrame & 1)
+                                      ? dodgerGoalFrame2PathForPet()
+                                      : dodgerGoalFrame1PathForPet());
+
     int iw = 0;
     int ih = 0;
     const char *usePath = nullptr;
-  
+
     if (goalPath && mgAssetsReadPngDims(goalPath, &iw, &ih, &usePath) && iw > 0 && ih > 0)
     {
       const int drawX = s_dodgerGoalX - (iw / 2);
@@ -3874,10 +3891,10 @@ void drawInfernalDodger()
       spr.fillRect(s_dodgerGoalX - 24, s_dodgerGoalY - 8, 48, 16, TFT_RED);
     }
   }
-  
+
   if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
   {
-    if (haveCar && s_dodgerCarReady)
+    if (haveCar)
     {
       const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
       const int drawY = s_dodgerPy - (s_dodgerCarH / 2);

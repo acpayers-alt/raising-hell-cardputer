@@ -85,12 +85,12 @@ bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
 
   // Already loaded and matches exactly.
   if (s_sharedBgReady &&
-      s_sharedBgOwner == owner &&
-      s_sharedBgPath[0] &&
-      strcmp(s_sharedBgPath, path) == 0)
-  {
-    return true;
-  }
+    s_sharedBgPath[0] &&
+    strcmp(s_sharedBgPath, path) == 0)
+{
+  s_sharedBgOwner = owner;
+  return true;
+}
 
   const int w = (int)spr.width();
   const int h = (int)spr.height();
@@ -410,4 +410,87 @@ bool mgAssetsLoadCachedSprite(
   strlcpy(cachedPath, path, cachedPathSize);
   ready = true;
   return true;
+}
+
+namespace
+{
+  static MiniGame s_mgmemCurrentGame = MiniGame::NONE;
+  static int s_mgmemCurrentPetType = -1;
+}
+
+namespace mgmem
+{
+  void beginSession(MiniGame game, int petType)
+  {
+    s_mgmemCurrentGame = game;
+    s_mgmemCurrentPetType = petType;
+
+    char tag[64];
+    snprintf(tag, sizeof(tag), "mgmem.begin game=%d pet=%d", (int)game, petType);
+    mgAssetsLogHeap(tag);
+  }
+
+  void endSession()
+  {
+    if (s_mgmemCurrentGame != MiniGame::NONE)
+      mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
+
+    char tag[64];
+    snprintf(tag, sizeof(tag), "mgmem.end game=%d pet=%d",
+             (int)s_mgmemCurrentGame,
+             s_mgmemCurrentPetType);
+    mgAssetsLogHeap(tag);
+
+    s_mgmemCurrentGame = MiniGame::NONE;
+    s_mgmemCurrentPetType = -1;
+  }
+
+  bool ensureSharedBg(const char *path, M5Canvas *&out, int &outW, int &outH)
+  {
+    out = nullptr;
+    outW = 0;
+    outH = 0;
+
+    if (s_mgmemCurrentGame == MiniGame::NONE)
+      return false;
+
+    if (!mgAssetsEnsureSharedBg(s_mgmemCurrentGame, path))
+      return false;
+
+    out = mgAssetsSharedBg();
+    outW = mgAssetsSharedBgW();
+    outH = mgAssetsSharedBgH();
+
+    return (out != nullptr && outW > 0 && outH > 0);
+  }
+
+  size_t freeBytes()
+  {
+    return (size_t)ESP.getFreeHeap();
+  }
+
+  size_t largestBlock()
+  {
+    return (size_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+  }
+
+  void logUsage(const char *tag)
+  {
+    Serial.printf("[MGMEM] %s free=%u largest=%u game=%d pet=%d\n",
+                  tag ? tag : "(null)",
+                  (unsigned)freeBytes(),
+                  (unsigned)largestBlock(),
+                  (int)s_mgmemCurrentGame,
+                  s_mgmemCurrentPetType);
+  }
+
+  MiniGame currentGame()
+  {
+    return s_mgmemCurrentGame;
+  }
+
+  int currentPetType()
+  {
+    return s_mgmemCurrentPetType;
+  }
 }
