@@ -121,29 +121,9 @@ static inline void exitMiniGameToReturnUi(bool beginLockout)
 // Simple mini-game state
 static bool s_resultShown = false;
 
-static constexpr uint32_t kSurviveWinMs = 15000; // or whatever your old value was
-
 static const uint16_t kSpriteKey = 0x0841; // very dark grey
 
 static void logMiniGameHeap(const char *tag) { mgAssetsLogHeap(tag); }
-
-static void logSpriteAllocOk(const char *tag, int w, int h, int depth)
-{
-  Serial.printf("[MG SPR OK] %s %dx%d depth=%d free=%u largest=%u\n", tag, w, h, depth, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-}
-
-static void logSpriteAllocFail(const char *tag, int w, int h, int depth)
-{
-  Serial.printf("[MG SPR FAIL] %s %dx%d depth=%d free=%u largest=%u\n", tag, w, h, depth, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-}
-
-static void logSpriteLoadFail(const char *tag, const char *path)
-{
-  Serial.printf("[MG SPR LOAD FAIL] %s path='%s' free=%u largest=%u\n", tag, path ? path : "(null)",
-                (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-}
 
 // -----------------------------------------------------------------------------
 // FLAPPY FIREBALL GLOBALS
@@ -174,13 +154,7 @@ static uint32_t s_impHoldMs = 0;
 
 static constexpr uint32_t kImpWaveFrameMs = 180;
 static constexpr uint32_t kImpBurnFrameMs = 180;
-static constexpr uint32_t kImpBurnHoldMs = 600;
 static constexpr uint32_t kImpLastFrameHoldMs = 500;
-
-static const char *const kImpWaveFrames[] = {
-    "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png",
-    "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png",
-};
 
 static const char *const kImpBurnFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn1.png",
@@ -220,13 +194,11 @@ static const uint16_t kFireKey = kSpriteKey;
 // GOALS
 static bool s_flappyInited = false;
 static bool s_flappyPlaying = false;
-static bool s_flappyCrashed = false;
 static int s_flappyDistancePx = 0;
 static bool s_flappyGoalActive = false;
 static int s_flappyGoalX = 0;
 static int s_flappyGoalY = 0;
 static bool s_flappyGoalReached = false;
-static int s_flappyGoalR = 10;
 static uint32_t s_flappyStartMs = 0;
 static int s_flappyBgW = 0;
 static int s_flappyBgH = 0;
@@ -235,9 +207,6 @@ static int s_fbY = 0;
 static int s_fbVY = 0;
 uint32_t s_lastStepMs = 0;
 static int s_flappyBgScrollX = 0;
-
-// Survive timer
-static const uint32_t s_flappyWinMs = kSurviveWinMs;
 
 // Shared fullscreen background now lives in mini_game_assets.cpp
 // Keep only width/height bookkeeping local for flappy scroll math.
@@ -282,62 +251,13 @@ void freeFlappyFireballSprites()
   s_flappyFireballH = 0;
 }
 
-static bool flappyDirFromPath(const char *path, char *out, size_t outSz)
-{
-  if (!path || !path[0] || !out || outSz == 0)
-    return false;
-  const char *last = strrchr(path, '/');
-  if (!last)
-    return false;
-
-  const size_t len = (size_t)(last - path) + 1; // include trailing '/'
-  if (len >= outSz)
-    return false;
-
-  memcpy(out, path, len);
-  out[len] = 0;
-  return true;
-}
-
-static bool sdExistsTrySlashLocal(const char *path, const char **outUse)
-{
-  if (!path || !path[0])
-    return false;
-  if (SD.exists(path))
-  {
-    if (outUse)
-      *outUse = path;
-    return true;
-  }
-  if (path[0] == '/' && SD.exists(path + 1))
-  {
-    if (outUse)
-      *outUse = path + 1;
-    return true;
-  }
-  return false;
-}
-
 // -----------------------------------------------------------------------------
 // Flappy pipe sprites (stalagmites/stalactites)
 // -----------------------------------------------------------------------------
 // We keep this simple: read PNG dimensions once, then draw the PNGs directly.
 // (This preserves transparency and avoids maintaining a separate alpha-capable cache.)
 static FlappyPipe s_pipes[3];
-static bool s_flappyPipeFsSet = false;
 static bool s_flappyPipeLoadFailed = false;
-static int s_flappyPipeImgW = 0;
-static int s_flappyPipeImgH = 0;
-static int s_flappyPipePetType = -1;
-
-static inline void flappyEnsurePipeFileStorage()
-{
-  if (!s_flappyPipeFsSet)
-  {
-    spr.setFileStorage(SD);
-    s_flappyPipeFsSet = true;
-  }
-}
 
 static int flappyRandGapY(int h)
 {
@@ -352,9 +272,7 @@ static int flappyRandGapY(int h)
 
 static void flappyResetWorld(int w, int h)
 {
-  s_flappyStartMs = millis();
   s_flappyPlaying = true;
-  s_flappyCrashed = false;
 
   s_flappyDistancePx = 0;
 
@@ -564,11 +482,6 @@ void startFlappyFireball()
 
   miniGameSetReturnUi(retUi);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
-
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
-  (void)gW;
-  (void)gH;
 
   s_flappyInited = true;
   s_flappyShowIntro = true;
@@ -1010,8 +923,6 @@ void freeFlappyBgCache()
   s_flappyBgPath[0] = 0;
 }
 
-static bool s_flappyBgCacheDisabled = false;
-
 static bool ensureFlappyBgCache(const char *path)
 {
   if (!path || !path[0] || !g_sdReady)
@@ -1048,33 +959,6 @@ static bool ensureFlappyBgCache(const char *path)
 
   s_flappyBgReady = true;
   return true;
-}
-
-static void drawFlappyScrollingBg(int scrollX)
-{
-  M5Canvas *bg = mgAssetsSharedBg();
-  if (!bg)
-  {
-    spr.fillSprite(TFT_BLACK);
-    return;
-  }
-
-  const int w = mgAssetsSharedBgW();
-  const int h = mgAssetsSharedBgH();
-  if (w <= 0 || h <= 0)
-  {
-    spr.fillSprite(TFT_BLACK);
-    return;
-  }
-
-  // normalize scroll into [0..w-1]
-  scrollX %= w;
-  if (scrollX < 0)
-    scrollX += w;
-
-  int x = -scrollX;
-  bg->pushSprite(&spr, x, 0);
-  bg->pushSprite(&spr, x + w, 0);
 }
 
 void drawFlappyFireball()
@@ -1619,7 +1503,6 @@ void drawResurrectionRun()
 // -----------------------------------------------------------------------------
 static bool s_crossyShowIntro = true;
 static bool s_crossyDontShowAgain = false; // visual only for now
-static uint8_t s_crossyIntroImpFrame = 0;
 static uint32_t s_crossyIntroImpAnimMs = 0;
 
 static const int kCrossyCols = 15;
@@ -1634,15 +1517,9 @@ static const int kCrossyOriginY = 1;
 static int s_crossyCarryPxAccum[kCrossyRows] = {0};
 static uint8_t s_crossyLaneTick[kCrossyRows] = {0};
 
-static int s_crossyCarryAnchor[kCrossyRows] = {0};
-static uint32_t s_crossyAnimMs = 0;
 static uint8_t s_crossyLavaFrame = 0;
 static uint32_t s_crossyLavaAnimMs = 0;
 static uint8_t s_crossyLandingGraceFrames = 0;
-
-static M5Canvas s_crossyImpSpr(&M5.Display);
-static bool s_crossyImpReady = false;
-static char s_crossyImpPath[128] = {0};
 
 static uint32_t s_crossyWinPoseStart = 0;
 static bool s_crossyWinPoseActive = false;
@@ -1700,10 +1577,6 @@ static inline int crossyClamp(int v, int lo, int hi)
   return v;
 }
 
-static const char *crossyStartZonePathForPet();
-static const char *crossyGoalZonePathForPet();
-static const char *crossyLavaZonePathForPet(uint8_t frame);
-static const char *crossyStonePathForPet();
 static const char *crossyStoneSmallPathForPet();
 static const char *crossyStoneXSPathForPet();
 static const char *crossyImpPathForPet(CrossyFacing facing);
@@ -1714,21 +1587,10 @@ static bool ensureCrossyLavaZoneSprite(uint8_t frame);
 static bool ensureCrossyStoneSprite();
 static bool ensureCrossyStoneSmallSprite();
 static bool ensureCrossyStoneXSSprite();
-static bool ensureCrossyImpSprite();
-
-static M5Canvas s_crossyLavaZoneSpr[2] = {M5Canvas(&M5.Display), M5Canvas(&M5.Display)};
-static bool s_crossyLavaZoneReady[2] = {false, false};
-static bool s_crossyLavaZoneLoadFailed[2] = {false, false};
-static char s_crossyLavaZonePath[2][128] = {{0}, {0}};
-static bool s_crossyImpLoadFailed = false;
 
 static bool crossyRowIsWater(int row) { return row >= 1 && row <= 5; }
 
-static bool crossyRowIsRoad(int row) { return false; }
-
 static bool crossyRowIsGoal(int row) { return row == 0; }
-
-static bool crossyRowIsSafe(int row) { return row == 6; }
 
 static bool crossyPlayerOverlapsMoverInRow(int row);
 
@@ -1746,22 +1608,10 @@ static bool ensureCrossyStartZoneSprite()
 static bool ensureCrossyLavaZoneSprite(uint8_t frame)
 {
   const uint8_t i = frame & 1;
+  const char *assetId = (i == 0) ? "lava_zone_0" : "lava_zone_1";
 
-  if (s_crossyLavaZoneReady[i])
-    return true;
-
-  if (s_crossyLavaZoneLoadFailed[i])
-    return false;
-
-  const bool ok = mgAssetsLoadCachedSprite(s_crossyLavaZoneSpr[i], s_crossyLavaZoneReady[i], s_crossyLavaZonePath[i],
-                                           sizeof(s_crossyLavaZonePath[i]), crossyLavaZonePathForPet(i), 16, TFT_BLACK,
-                                           (i == 0) ? "crossy-lava0-load" : "crossy-lava1-load",
-                                           (i == 0) ? "crossy-lava0-release" : "crossy-lava1-release");
-
-  if (!ok)
-    s_crossyLavaZoneLoadFailed[i] = true;
-
-  return ok;
+  M5Canvas *sprPtr = nullptr;
+  return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, assetId, crossyLavaZonePathForPet(i), 16, TFT_BLACK, sprPtr);
 }
 
 static bool ensureCrossyIntroSprite()
@@ -1856,80 +1706,8 @@ void freeCrossyZoneSprites()
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "goal_zone");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "start_zone");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "intro_goal");
-
-  for (int i = 0; i < 2; ++i)
-  {
-    mgAssetsReleaseSprite(s_crossyLavaZoneSpr[i], (i == 0) ? "crossy-lava0-release" : "crossy-lava1-release");
-    s_crossyLavaZoneReady[i] = false;
-    s_crossyLavaZonePath[i][0] = 0;
-  }
-
-  s_crossyLavaZoneLoadFailed[0] = false;
-  s_crossyLavaZoneLoadFailed[1] = false;
-}
-
-static bool drawCrossyLavaZoneRow(int row, int y)
-{
-  const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
-  const char *path = crossyLavaZonePathForPet(lavaFrame);
-
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  const char *usePath = nullptr;
-  if (!sdExistsTrySlash(path, &usePath))
-    return false;
-
-  return spr.drawPngFile(SD, usePath, 0, y);
-}
-
-static bool loadCrossyRowSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path)
-{
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  if (ready && strcmp(cachedPath, path) == 0)
-  {
-    if (dst.width() > 0 && dst.height() > 0)
-      return true;
-
-    // Cached state lied; force reload
-    ready = false;
-    cachedPath[0] = 0;
-  }
-
-  if (ready)
-  {
-    dst.deleteSprite();
-    ready = false;
-    cachedPath[0] = 0;
-  }
-
-  int w = 0;
-  int h = 0;
-  const char *usePath = nullptr;
-  if (!mgAssetsReadPngDims(path, &w, &h, &usePath))
-    return false;
-
-  dst.deleteSprite();
-  dst.setColorDepth(8);
-
-  if (!dst.createSprite(w, h))
-    return false;
-
-  dst.fillSprite(kSpriteKey);
-
-  if (!dst.drawPngFile(SD, usePath, 0, 0))
-  {
-    dst.deleteSprite();
-    ready = false;
-    cachedPath[0] = 0;
-    return false;
-  }
-
-  strlcpy(cachedPath, path, cachedPathSize);
-  ready = true;
-  return true;
+  mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_0");
+  mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_1");
 }
 
 static const char *crossyStartZonePathForPet()
@@ -1993,52 +1771,6 @@ static bool ensureCrossyStoneXSSprite()
 {
   M5Canvas *sprPtr = nullptr;
   return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "stone_xs", crossyStoneXSPathForPet(), 8, kSpriteKey, sprPtr);
-}
-
-static bool ensureCrossyImpSprite()
-{
-  const char *path = crossyImpPathForPet(s_crossyFacing);
-  const char *usePath = nullptr;
-  return sdExistsTrySlash(path, &usePath);
-}
-
-static const char *crossyDirForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/";
-  }
-}
-
-static const char *crossyBgFramePathForPet(uint8_t frame)
-{
-  const uint8_t f = (frame & 1) + 1;
-
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    switch (f)
-    {
-    case 1:
-      return "/raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg1.jpg";
-    default:
-      return "/raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg2.jpg";
-    }
-
-  case PET_DEVIL:
-  default:
-    switch (f)
-    {
-    case 1:
-      return "/raising_hell/graphics/mini_games/crossy/dev/crossy_dev_bg1.jpg";
-    default:
-      return "/raising_hell/graphics/mini_games/crossy/dev/crossy_dev_bg2.jpg";
-    }
-  }
 }
 
 static const char *crossyImpPathForPet(CrossyFacing facing)
@@ -2209,11 +1941,8 @@ void startCrossyRoad()
   playerWon = false;
   s_resultShown = false;
 
-  s_crossyAnimMs = millis();
-
   s_crossyShowIntro = true;
   s_crossyDontShowAgain = false;
-  s_crossyIntroImpFrame = 0;
   s_crossyIntroImpAnimMs = millis();
 
   mgClearRewardState();
@@ -2240,10 +1969,6 @@ void startCrossyRoad()
 
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
-  s_crossyImpLoadFailed = false;
-
-  s_crossyLavaZoneLoadFailed[0] = false;
-  s_crossyLavaZoneLoadFailed[1] = false;
 
   mgmem::logUsage("crossy-after-asset-free");
 
@@ -2276,9 +2001,6 @@ void startCrossyRoad()
       startOk ? 1 : 0, goalOk ? 1 : 0, lava0 ? 1 : 0, lava1 ? 1 : 0, stoneOk ? 1 : 0, stoneSmOk ? 1 : 0,
       stoneXsOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-
-  s_crossyWinPoseActive = false;
-  s_crossyWinPoseStart = 0;
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -2418,36 +2140,6 @@ static bool crossyOnLog()
   return crossyPlayerOverlapsMoverInRow(s_crossyPy);
 }
 
-static void crossyCarryPlayerOnLog()
-{
-  if (s_crossyPy < 0 || s_crossyPy >= kCrossyRows)
-    return;
-
-  const CrossyLane &L = s_crossyLanes[s_crossyPy];
-  if (L.type != CROSSY_LANE_WATER)
-    return;
-
-  // IMPORTANT:
-  // Draw code uses x = x0 - offset, so positive offset means the platform
-  // moves LEFT on screen. Frog must move with the platform, so carry is the
-  // NEGATIVE of the offset direction.
-  const int deltaPx = -(int)L.speed * (L.dir > 0 ? 1 : -1);
-
-  s_crossyCarryPxAccum[s_crossyPy] += deltaPx;
-
-  while (s_crossyCarryPxAccum[s_crossyPy] >= kCrossyTileW)
-  {
-    s_crossyPx += 1;
-    s_crossyCarryPxAccum[s_crossyPy] -= kCrossyTileW;
-  }
-
-  while (s_crossyCarryPxAccum[s_crossyPy] <= -kCrossyTileW)
-  {
-    s_crossyPx -= 1;
-    s_crossyCarryPxAccum[s_crossyPy] += kCrossyTileW;
-  }
-}
-
 void updateCrossyRoad(const InputState &input)
 {
   const bool enterOnce = miniGameEnterOnce(input);
@@ -2514,10 +2206,7 @@ void updateCrossyRoad(const InputState &input)
     const uint32_t dt = now - s_crossyIntroImpAnimMs;
 
     if (dt >= 180)
-    {
       s_crossyIntroImpAnimMs = now;
-      s_crossyIntroImpFrame ^= 1;
-    }
 
     if (input.mgSpaceOnce)
       s_crossyDontShowAgain = !s_crossyDontShowAgain;
@@ -2657,8 +2346,6 @@ void drawCrossyRoad()
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
-  const uint8_t animBaseFrame = s_crossyLavaFrame & 1;
-
   const bool haveGoal = ensureCrossyGoalZoneSprite();
   const bool haveStart = ensureCrossyStartZoneSprite();
 
@@ -2677,6 +2364,19 @@ void drawCrossyRoad()
 
   const bool haveLava0 = ensureCrossyLavaZoneSprite(0);
   const bool haveLava1 = ensureCrossyLavaZoneSprite(1);
+
+  M5Canvas *lavaZoneSpr0 = nullptr;
+  M5Canvas *lavaZoneSpr1 = nullptr;
+
+  if (haveLava0)
+  {
+    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_0", crossyLavaZonePathForPet(0), 16, TFT_BLACK, lavaZoneSpr0);
+  }
+
+  if (haveLava1)
+  {
+    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_1", crossyLavaZonePathForPet(1), 16, TFT_BLACK, lavaZoneSpr1);
+  }
 
   (void)haveLava0;
   (void)haveLava1;
@@ -2793,15 +2493,17 @@ void drawCrossyRoad()
     {
       const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
 
-      if (ensureCrossyLavaZoneSprite(lavaFrame) && s_crossyLavaZoneReady[lavaFrame])
+      M5Canvas *lavaSpr = (lavaFrame == 0) ? lavaZoneSpr0 : lavaZoneSpr1;
+
+      if (lavaSpr && lavaSpr->width() > 0 && lavaSpr->height() > 0)
       {
-        const int tileW = (int)s_crossyLavaZoneSpr[lavaFrame].width();
-        const int tileH = (int)s_crossyLavaZoneSpr[lavaFrame].height();
+        const int tileW = (int)lavaSpr->width();
+        const int tileH = (int)lavaSpr->height();
 
         if (tileW > 0 && tileH > 0)
         {
           for (int x = 0; x < gW; x += tileW)
-            s_crossyLavaZoneSpr[lavaFrame].pushSprite(&spr, x, y);
+            lavaSpr->pushSprite(&spr, x, y);
         }
         else
         {
@@ -2944,9 +2646,6 @@ static int s_dodgerFireballH = 0;
 static int s_dodgerCarW = 0;
 static int s_dodgerCarH = 0;
 
-static bool ensureDodgerGoalFrames(const char *path0, const char *path1);
-static bool ensureDodgerGoreSprite(const char *path);
-
 void freeDodgerGoalFrames()
 {
   for (int i = 0; i < 2; ++i)
@@ -3031,54 +2730,6 @@ static const char *fireballRunCarPathForPet()
   }
 }
 
-static bool ensureDodgerFireballSpriteFrame(uint8_t frame)
-{
-  if (!g_sdReady)
-    return false;
-
-  const uint8_t i = frame % 3;
-
-  char dir[128];
-  flappyDirFromBgPath(fireballRunBgPathForPet(), dir, sizeof(dir));
-  if (!dir[0])
-    return false;
-
-  char path[192];
-  snprintf(path, sizeof(path), "%sfireball%d.png", dir, (int)i + 1);
-
-  const char *assetId = (i == 0) ? "fireball1" : (i == 1) ? "fireball2" : "fireball3";
-
-  M5Canvas *fb = nullptr;
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, assetId, path, 8, kDodgerKey, fb))
-    return false;
-
-  if (!fb || fb->width() <= 0 || fb->height() <= 0)
-    return false;
-
-  s_dodgerFireballW = (int)fb->width();
-  s_dodgerFireballH = (int)fb->height();
-  return true;
-}
-
-static bool ensureDodgerCarSprite()
-{
-  M5Canvas *car = nullptr;
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "car", fireballRunCarPathForPet(), 8, kDodgerKey, car))
-    return false;
-
-  if (!car || car->width() <= 0 || car->height() <= 0)
-    return false;
-
-  s_dodgerCarW = (int)car->width();
-  s_dodgerCarH = (int)car->height();
-  return true;
-}
-
-static bool ensureDodgerGoalFrames()
-{
-  return ensureDodgerGoalFrames(dodgerGoalFrame1PathForPet(), dodgerGoalFrame2PathForPet());
-}
-
 static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int &outH)
 {
   if (!path || !path[0] || !g_sdReady)
@@ -3146,8 +2797,6 @@ static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
 
   return true;
 }
-
-static bool ensureDodgerGoreSprite() { return ensureDodgerGoreSprite(dodgerGoalGorePathForPet()); }
 
 static bool ensureDodgerGoreSprite(const char *path)
 {
@@ -3402,7 +3051,7 @@ void startInfernalDodger()
   const bool fireballOk = ensureDodgerFireballSprites(bgPath);
   mgmem::logUsage("dodger-after-fireballs-ensure");
 
-  const bool carOk = ensureDodgerCarSprite();
+  const bool carOk = ensureDodgerCarSprite(fireballRunCarPathForPet());
   mgmem::logUsage("dodger-after-car-ensure");
 
   s_dodgerInited = true;
