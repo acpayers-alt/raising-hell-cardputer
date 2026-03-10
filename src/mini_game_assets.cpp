@@ -483,6 +483,16 @@ namespace mgmem
 {
   void beginSession(MiniGame game, int petType)
   {
+    if (s_mgmemCurrentGame != MiniGame::NONE)
+    {
+      Serial.printf("[MGMEM] beginSession resetting stale game=%d before game=%d\n",
+                    (int)s_mgmemCurrentGame,
+                    (int)game);
+
+      releaseAllForCurrentGame();
+      mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
+    }
+
     s_mgmemCurrentGame = game;
     s_mgmemCurrentPetType = petType;
 
