@@ -1221,12 +1221,36 @@ static const char *resRunSkyTilePathForPet()
   }
 }
 
+enum RRPhase : uint8_t
+{
+  RR_PHASE_RUN = 0,
+  RR_PHASE_HAND_ENTER,
+  RR_PHASE_HAND_HOLD,
+  RR_PHASE_HAND_CONTACT,
+  RR_PHASE_HAND_EXIT,
+  RR_PHASE_WIN_HOLD
+};
+
+static RRPhase s_rrPhase = RR_PHASE_RUN;
+static uint32_t s_rrPhaseStartMs = 0;
+
+static bool s_rrHandActive = false;
+static bool s_rrHandTouched = false;
+static int s_rrHandX = 0;
+static int s_rrHandY = 0;
+
+static constexpr int kRrHandTriggerDist = 2200;
+static constexpr int kRrHandEnterSpeed = 2;
+static constexpr int kRrHandExitSpeed = 3;
+static constexpr uint32_t kRrHandHoldMs = 250;
+static constexpr uint32_t kRrHandContactHoldMs = 350;
+static constexpr uint32_t kRrWinHoldMs = 500;
+
 static bool ensureResRunSkySprite()
 {
   M5Canvas *sky = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile",
-                                 resRunSkyTilePathForPet(), 8, kSpriteKey, sky))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile", resRunSkyTilePathForPet(), 8, kSpriteKey, sky))
     return false;
 
   if (!sky || sky->width() <= 0 || sky->height() <= 0)
@@ -1284,8 +1308,8 @@ static const uint8_t RR_SPIKE = 0;
 static const uint8_t RR_LOW_FIRE = 1;
 
 static const RRSpawn rr_script[] = {
-    {260, RR_SPIKE, 0},  {520, RR_SPIKE, 0},  {780, RR_LOW_FIRE, 0},  {1020, RR_SPIKE, 0}, {1280, RR_LOW_FIRE, 0},
-    {1520, RR_SPIKE, 0}, {1780, RR_SPIKE, 0}, {2040, RR_LOW_FIRE, 0}, {2280, RR_SPIKE, 0}, {2540, RR_LOW_FIRE, 0},
+    {520, RR_SPIKE, 0},     {860, RR_LOW_FIRE, 0}, {1200, RR_SPIKE, 0},
+    {1540, RR_LOW_FIRE, 0}, {1880, RR_SPIKE, 0},   {2220, RR_LOW_FIRE, 0},
 };
 
 static const int rr_scriptCount = (int)(sizeof(rr_script) / sizeof(rr_script[0]));
@@ -1303,21 +1327,106 @@ static constexpr int kRrPlayerW = 48;
 static constexpr int kRrPlayerH = 24;
 static constexpr int kRrPlayerDuckH = 16;
 
-static constexpr int kRrJumpObsW = 34;
-static constexpr int kRrJumpObsH = 24;
+static constexpr int kRrJumpObsW = 44;
+static constexpr int kRrJumpObsH = 30;
 
-static constexpr int kRrDuckObsW = 44;
-static constexpr int kRrDuckObsH = 18;
-static constexpr int kRrDuckObsClearance = 10;
+static constexpr int kRrDuckObsW = 52;
+static constexpr int kRrDuckObsH = 24;
+static constexpr int kRrDuckObsClearance = 8;
+
+// Collision tuning (smaller than drawn sprites)
+static constexpr int kRrPlayerHitInsetX = 10;
+static constexpr int kRrPlayerHitInsetY = 4;
+
+static constexpr int kRrJumpObsHitInsetX = 8;
+static constexpr int kRrJumpObsHitInsetY = 8;
+
+static constexpr int kRrDuckObsHitInsetX = 10;
+static constexpr int kRrDuckObsHitInsetY = 6;
 
 static int s_rrSnakeW = 0;
 static int s_rrSnakeH = 0;
 static int s_rrGroundW = 0;
 static int s_rrGroundH = 0;
+
+static int s_rrHandW = 0;
+static int s_rrHandH = 0;
+static int s_rrLadybugW = 0;
+static int s_rrLadybugH = 0;
+
+static uint32_t s_rrHandAnimMs = 0;
+static uint8_t s_rrHandAnimFrame = 0;
+
+static uint32_t s_rrLadybugAnimMs = 0;
+static uint8_t s_rrLadybugAnimFrame = 0;
+
 static uint32_t s_rrAnimMs = 0;
 static uint8_t s_rrAnimFrame = 0;
 
+static int s_rrPlayerGoalOffsetX = 0;
+static constexpr int kRrGoalWalkSpeed = 2;
+
 static const uint16_t kResRunKey = kSpriteKey;
+
+static const char *resRunHand1PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/hand_1.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/hand_1.png";
+  }
+}
+
+static const char *resRunHand2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/hand_2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/hand_2.png";
+  }
+}
+
+static const char *resRunLadybugGroundPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/ladybug_ground.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_ground.png";
+  }
+}
+
+static const char *resRunLadybugFly1PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/ladybug_fly1.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly1.png";
+  }
+}
+
+static const char *resRunLadybugFly2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/ladybug_fly2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly2.png";
+  }
+}
 
 static const char *resRunSnakeRun1PathForPet()
 {
@@ -1343,6 +1452,30 @@ static const char *resRunSnakeRun2PathForPet()
   }
 }
 
+static const char *resRunSnakeWin1PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/snake_win1.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/snake_win1.png";
+  }
+}
+
+static const char *resRunSnakeWin2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/snake_win2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/snake_win2.png";
+  }
+}
+
 static const char *resRunBranchGroundPathForPet()
 {
   switch (pet.type)
@@ -1355,12 +1488,57 @@ static const char *resRunBranchGroundPathForPet()
   }
 }
 
+static bool ensureResRunHandSprites()
+{
+  M5Canvas *hand1 = nullptr;
+  M5Canvas *hand2 = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_1", resRunHand1PathForPet(), 8, kResRunKey, hand1))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_2", resRunHand2PathForPet(), 8, kResRunKey, hand2))
+    return false;
+
+  if (!hand1 || hand1->width() <= 0 || hand1->height() <= 0)
+    return false;
+
+  s_rrHandW = (int)hand1->width();
+  s_rrHandH = (int)hand1->height();
+  return true;
+}
+
+static bool ensureResRunLadybugSprites()
+{
+  M5Canvas *groundBug = nullptr;
+  M5Canvas *fly1 = nullptr;
+  M5Canvas *fly2 = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_ground", resRunLadybugGroundPathForPet(), 8, kResRunKey,
+                           groundBug))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly1", resRunLadybugFly1PathForPet(), 8, kResRunKey, fly1))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly2", resRunLadybugFly2PathForPet(), 8, kResRunKey, fly2))
+    return false;
+
+  if (!groundBug || groundBug->width() <= 0 || groundBug->height() <= 0)
+    return false;
+
+  s_rrLadybugW = (int)groundBug->width();
+  s_rrLadybugH = (int)groundBug->height();
+  return true;
+}
+
 static bool ensureResRunSnakeSprites()
 {
   M5Canvas *run1 = nullptr;
   M5Canvas *run2 = nullptr;
   M5Canvas *crouch = nullptr;
   M5Canvas *jump = nullptr;
+  M5Canvas *win1 = nullptr;
+  M5Canvas *win2 = nullptr;
 
   if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey, run1))
     return false;
@@ -1373,6 +1551,12 @@ static bool ensureResRunSnakeSprites()
     return false;
 
   if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump", resRunSnakeJumpPathForPet(), 8, kResRunKey, jump))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win1", resRunSnakeWin1PathForPet(), 8, kResRunKey, win1))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win2", resRunSnakeWin2PathForPet(), 8, kResRunKey, win2))
     return false;
 
   if (!run1 || run1->width() <= 0 || run1->height() <= 0)
@@ -1420,6 +1604,13 @@ void freeResRunSprites()
   mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_jump");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "branch_ground");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "sky_tile");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "hand_1");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "hand_2");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "ladybug_ground");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "ladybug_fly1");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "ladybug_fly2");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_win1");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_win2");
 
   s_rrSnakeW = 0;
   s_rrSnakeH = 0;
@@ -1431,6 +1622,10 @@ void freeResRunSprites()
   s_rrGroundH = 0;
   s_rrSkyW = 0;
   s_rrSkyH = 0;
+  s_rrHandW = 0;
+  s_rrHandH = 0;
+  s_rrLadybugW = 0;
+  s_rrLadybugH = 0;
 }
 
 static void rrResetRunState()
@@ -1454,6 +1649,15 @@ static void rrResetRunState()
   rr_boosting = false;
   rr_boostEndMs = 0;
   rr_boostCooldownEndMs = 0;
+
+  s_rrPhase = RR_PHASE_RUN;
+  s_rrPhaseStartMs = millis();
+
+  s_rrHandActive = false;
+  s_rrHandTouched = false;
+  s_rrHandX = (screenW > 0) ? screenW : 240;
+  s_rrHandY = ((screenH > 0) ? screenH : 135) - kRrGroundH - s_rrHandH + 8;
+  s_rrPlayerGoalOffsetX = 0;
 }
 
 static void rrFinishRun(bool won)
@@ -1542,28 +1746,24 @@ void startResurrectionRun()
   miniGameSetReturnUi(retUi);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
-  const bool snakeOk  = ensureResRunSnakeSprites();
+  const bool snakeOk = ensureResRunSnakeSprites();
   const bool groundOk = ensureResRunGroundSprite();
-  const bool skyOk    = ensureResRunSkySprite();
-  
-  Serial.printf(
-      "RESRUN preload: snake=%d ground=%d sky=%d run=%dx%d crouch=%dx%d jump=%dx%d sky=%dx%d free=%u largest=%u\n",
-      snakeOk ? 1 : 0,
-      groundOk ? 1 : 0,
-      skyOk ? 1 : 0,
-      s_rrSnakeW, s_rrSnakeH,
-      s_rrSnakeCrouchW, s_rrSnakeCrouchH,
-      s_rrSnakeJumpW, s_rrSnakeJumpH,
-      s_rrSkyW, s_rrSkyH,
-      (unsigned)ESP.getFreeHeap(),
-      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  const bool skyOk = ensureResRunSkySprite();
+  const bool handOk = ensureResRunHandSprites();
+  const bool ladybugOk = ensureResRunLadybugSprites();
+
+  Serial.printf("RESRUN preload: snake=%d ground=%d sky=%d hand=%d ladybug=%d run=%dx%d crouch=%dx%d jump=%dx%d "
+                "sky=%dx%d hand=%dx%d bug=%dx%d free=%u largest=%u\n",
+                snakeOk ? 1 : 0, groundOk ? 1 : 0, skyOk ? 1 : 0, handOk ? 1 : 0, ladybugOk ? 1 : 0, s_rrSnakeW,
+                s_rrSnakeH, s_rrSnakeCrouchW, s_rrSnakeCrouchH, s_rrSnakeJumpW, s_rrSnakeJumpH, s_rrSkyW, s_rrSkyH,
+                s_rrHandW, s_rrHandH, s_rrLadybugW, s_rrLadybugH, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   g_app.inMiniGame = true;
   g_app.gameOver = false;
   playerWon = false;
   s_resultShown = false;
 
-  // Reset shared result / reward flow state so retries start clean.
   mgClearRewardState();
   mgResetAcceptState();
 
@@ -1578,12 +1778,28 @@ void startResurrectionRun()
   invalidateBackgroundCache();
   s_rrAnimMs = millis();
   s_rrAnimFrame = 0;
+  s_rrHandAnimMs = millis();
+  s_rrHandAnimFrame = 0;
+  s_rrLadybugAnimMs = millis();
+  s_rrLadybugAnimFrame = 0;
   requestUIRedraw();
 }
 
 void updateResurrectionRun(const InputState &input)
 {
   const uint32_t now = millis();
+
+  if ((uint32_t)(now - s_rrHandAnimMs) >= 220)
+  {
+    s_rrHandAnimMs = now;
+    s_rrHandAnimFrame ^= 1;
+  }
+
+  if ((uint32_t)(now - s_rrLadybugAnimMs) >= 160)
+  {
+    s_rrLadybugAnimMs = now;
+    s_rrLadybugAnimFrame ^= 1;
+  }
 
   if ((uint32_t)(now - s_rrAnimMs) >= 120)
   {
@@ -1646,16 +1862,15 @@ void updateResurrectionRun(const InputState &input)
 
   const bool jumpOnce = input.mgUpOnce;
   const bool jumpHeld = input.mgUpHeld;
-
   const bool boostOnce = input.mgSelectOnce;
 
-  if (jumpOnce && rr_onGround)
+  if (jumpOnce && rr_onGround && s_rrPhase == RR_PHASE_RUN)
   {
     rr_vy = -220.0f;
     rr_onGround = false;
   }
 
-  if (boostOnce && !rr_boosting && (int32_t)(now - rr_boostCooldownEndMs) >= 0)
+  if (boostOnce && !rr_boosting && (int32_t)(now - rr_boostCooldownEndMs) >= 0 && s_rrPhase == RR_PHASE_RUN)
   {
     rr_boosting = true;
     rr_boostEndMs = now + kRrBoostMs;
@@ -1676,46 +1891,185 @@ void updateResurrectionRun(const InputState &input)
   }
 
   const int speed = rr_boosting ? kRrBoostSpeed : kRrBaseSpeed;
-  rr_distance += (int)(speed * dt);
-
-  while (rr_nextSpawn < rr_scriptCount && rr_distance >= rr_script[rr_nextSpawn].triggerDist)
-  {
-    rrSpawnObstacle(rr_script[rr_nextSpawn].type);
-    rr_nextSpawn++;
-  }
-
-  if (rr_distance >= rr_courseLen)
-  {
-    rrFinishRun(true);
-    return;
-  }
-
+  const bool scrollWorld =
+      (s_rrPhase == RR_PHASE_RUN) || (s_rrPhase == RR_PHASE_HAND_ENTER) || (s_rrPhase == RR_PHASE_HAND_HOLD);
   const int h = (screenH > 0) ? screenH : 135;
-
+  const int gW = (screenW > 0) ? screenW : 240;
   const int groundY = h - kRrGroundH;
   const int px = kRrPlayerX;
   int py = groundY - kRrPlayerH + (int)rr_y;
   const int pw = kRrPlayerW;
   int ph = rr_ducking ? kRrPlayerDuckH : kRrPlayerH;
+
   if (rr_ducking)
     py = groundY - ph + (int)rr_y;
 
-  for (auto &o : rr_obs)
+  if (scrollWorld)
+    rr_distance += (int)(speed * dt);
+
+  if (s_rrPhase == RR_PHASE_RUN)
   {
-    if (!o.active)
-      continue;
-
-    const int ox = o.x - rr_distance;
-    const int oy = o.y;
-
-    if (rrAabb(px, py, pw, ph, ox, oy, o.w, o.h))
+    while (rr_nextSpawn < rr_scriptCount && rr_distance >= rr_script[rr_nextSpawn].triggerDist)
     {
-      rrFinishRun(false);
-      return;
+      rrSpawnObstacle(rr_script[rr_nextSpawn].type);
+      rr_nextSpawn++;
     }
 
-    if (ox < -40)
-      o.active = false;
+    if (s_rrPhase == RR_PHASE_HAND_ENTER)
+    {
+      s_rrHandY = groundY - s_rrHandH + 8;
+  
+      const int targetX = gW - s_rrHandW;
+      if (s_rrHandX > targetX)
+        s_rrHandX -= kRrHandEnterSpeed;
+  
+      if (s_rrHandX <= targetX)
+      {
+        s_rrHandX = targetX;
+        s_rrPhase = RR_PHASE_HAND_HOLD;
+        s_rrPhaseStartMs = now;
+      }
+      return;
+    }
+  }
+
+  if (s_rrPhase == RR_PHASE_RUN)
+  {
+    const int playerHitX = px + kRrPlayerHitInsetX;
+    const int playerHitY = py + kRrPlayerHitInsetY;
+    const int playerHitW = pw - (kRrPlayerHitInsetX * 2);
+    const int playerHitH = ph - (kRrPlayerHitInsetY * 2);
+
+    for (auto &o : rr_obs)
+    {
+      if (!o.active)
+        continue;
+
+      const int ox = o.x - rr_distance;
+      const int oy = o.y;
+
+      int obsHitInsetX = 0;
+      int obsHitInsetY = 0;
+
+      if (o.h >= kRrJumpObsH)
+      {
+        obsHitInsetX = kRrJumpObsHitInsetX;
+        obsHitInsetY = kRrJumpObsHitInsetY;
+      }
+      else
+      {
+        obsHitInsetX = kRrDuckObsHitInsetX;
+        obsHitInsetY = kRrDuckObsHitInsetY;
+      }
+
+      const int obsHitX = ox + obsHitInsetX;
+      const int obsHitY = oy + obsHitInsetY;
+      const int obsHitW = o.w - (obsHitInsetX * 2);
+      const int obsHitH = o.h - (obsHitInsetY * 2);
+
+      if (obsHitW > 0 && obsHitH > 0 &&
+          rrAabb(playerHitX, playerHitY, playerHitW, playerHitH, obsHitX, obsHitY, obsHitW, obsHitH))
+      {
+        rrFinishRun(false);
+        return;
+      }
+
+      if (ox < -40)
+        o.active = false;
+    }
+  }
+
+  if (s_rrPhase == RR_PHASE_HAND_ENTER)
+  {
+    s_rrHandY = groundY - s_rrHandH + 8;
+    s_rrHandX -= kRrHandEnterSpeed;
+
+    const int targetX = gW - s_rrHandW;
+    if (s_rrHandX <= targetX)
+    {
+      s_rrHandX = targetX;
+      s_rrPhase = RR_PHASE_HAND_HOLD;
+      s_rrPhaseStartMs = now;
+    }
+    return;
+  }
+
+  if (s_rrPhase == RR_PHASE_HAND_HOLD)
+  {
+    s_rrHandY = groundY - s_rrHandH + 8;
+    s_rrHandX = gW - s_rrHandW; // hand stays planted once fully emerged
+
+    const int touchX = s_rrHandX + 12;
+    const int snakeFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
+
+    if (!s_rrHandTouched)
+    {
+      if (snakeFrontX < touchX)
+      {
+        s_rrPlayerGoalOffsetX += kRrGoalWalkSpeed;
+
+        const int newFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
+        if (newFrontX >= touchX)
+        {
+          s_rrPlayerGoalOffsetX -= (newFrontX - touchX);
+          s_rrHandTouched = true;
+          s_rrPhase = RR_PHASE_HAND_CONTACT;
+          s_rrPhaseStartMs = now;
+        }
+      }
+      else
+      {
+        s_rrHandTouched = true;
+        s_rrPhase = RR_PHASE_HAND_CONTACT;
+        s_rrPhaseStartMs = now;
+      }
+    }
+    return;
+  }
+  
+  if (s_rrPhase == RR_PHASE_HAND_CONTACT)
+  {
+    s_rrHandY = groundY - s_rrHandH + 8;
+
+    const int targetFrontX = s_rrHandX + 12;
+    s_rrPlayerGoalOffsetX = targetFrontX - kRrPlayerX - pw;
+
+    if ((now - s_rrPhaseStartMs) >= kRrHandContactHoldMs)
+    {
+      s_rrPhase = RR_PHASE_HAND_EXIT;
+      s_rrPhaseStartMs = now;
+    }
+    return;
+  }
+
+  if (s_rrPhase == RR_PHASE_HAND_EXIT)
+  {
+    s_rrHandY = groundY - s_rrHandH + 8;
+    s_rrHandX += kRrHandExitSpeed;
+
+    // Snake stays locked in the contact position for the rest of the sequence.
+    if (s_rrHandX >= gW + 4)
+    {
+      s_rrHandActive = false;
+      s_rrPhase = RR_PHASE_WIN_HOLD;
+      s_rrPhaseStartMs = now;
+    }
+    return;
+  }
+
+  if (s_rrPhase == RR_PHASE_WIN_HOLD)
+  {
+    if ((now - s_rrPhaseStartMs) >= kRrWinHoldMs)
+    {
+      rrFinishRun(true);
+      return;
+    }
+  }
+
+  if (rr_distance >= rr_courseLen && s_rrPhase == RR_PHASE_RUN)
+  {
+    rrFinishRun(true);
+    return;
   }
 }
 
@@ -1737,36 +2091,59 @@ void drawResurrectionRun()
   const bool haveSnake = ensureResRunSnakeSprites();
   const bool haveGround = ensureResRunGroundSprite();
   const bool haveSky = ensureResRunSkySprite();
+  const bool haveHand = ensureResRunHandSprites();
+  const bool haveLadybug = ensureResRunLadybugSprites();
 
   M5Canvas *snake1 = nullptr;
   M5Canvas *snake2 = nullptr;
   M5Canvas *snakeCrouch = nullptr;
   M5Canvas *snakeJump = nullptr;
+  M5Canvas *snakeWin1 = nullptr;
+  M5Canvas *snakeWin2 = nullptr;
   M5Canvas *groundSpr = nullptr;
   M5Canvas *skySpr = nullptr;
+  M5Canvas *hand1 = nullptr;
+  M5Canvas *hand2 = nullptr;
+  M5Canvas *ladybugGround = nullptr;
+  M5Canvas *ladybugFly1 = nullptr;
+  M5Canvas *ladybugFly2 = nullptr;
 
   if (haveSnake)
   {
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1",
-                        resRunSnakeRun1PathForPet(), 8, kResRunKey, snake1);
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2",
-                        resRunSnakeRun2PathForPet(), 8, kResRunKey, snake2);
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_crouch",
-                        resRunSnakeCrouchPathForPet(), 8, kResRunKey, snakeCrouch);
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump",
-                        resRunSnakeJumpPathForPet(), 8, kResRunKey, snakeJump);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey, snake1);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2", resRunSnakeRun2PathForPet(), 8, kResRunKey, snake2);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_crouch", resRunSnakeCrouchPathForPet(), 8, kResRunKey,
+                        snakeCrouch);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump", resRunSnakeJumpPathForPet(), 8, kResRunKey, snakeJump);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win1", resRunSnakeWin1PathForPet(), 8, kResRunKey, snakeWin1);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win2", resRunSnakeWin2PathForPet(), 8, kResRunKey, snakeWin2);
   }
 
   if (haveGround)
   {
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "branch_ground",
-                        resRunBranchGroundPathForPet(), 8, kResRunKey, groundSpr);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "branch_ground", resRunBranchGroundPathForPet(), 8, kResRunKey,
+                        groundSpr);
   }
 
   if (haveSky)
   {
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile",
-                        resRunSkyTilePathForPet(), 8, kResRunKey, skySpr);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile", resRunSkyTilePathForPet(), 8, kResRunKey, skySpr);
+  }
+
+  if (haveHand)
+  {
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_1", resRunHand1PathForPet(), 8, kResRunKey, hand1);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_2", resRunHand2PathForPet(), 8, kResRunKey, hand2);
+  }
+
+  if (haveLadybug)
+  {
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_ground", resRunLadybugGroundPathForPet(), 8, kResRunKey,
+                        ladybugGround);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly1", resRunLadybugFly1PathForPet(), 8, kResRunKey,
+                        ladybugFly1);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly2", resRunLadybugFly2PathForPet(), 8, kResRunKey,
+                        ladybugFly2);
   }
 
   if (skySpr && skySpr->width() > 0 && skySpr->height() > 0)
@@ -1811,23 +2188,39 @@ void drawResurrectionRun()
   const int pw = kRrPlayerW;
   int ph = rr_ducking ? kRrPlayerDuckH : kRrPlayerH;
 
+  int snakeDrawX = px;
+
+  if (s_rrPhase != RR_PHASE_RUN)
+    snakeDrawX += s_rrPlayerGoalOffsetX;
+
   if (rr_ducking)
     py = groundY - ph + (int)rr_y;
 
   M5Canvas *snakeSpr = nullptr;
 
-  if (!rr_onGround && snakeJump && snakeJump->width() > 0 && snakeJump->height() > 0)
+  if (s_rrHandTouched && snakeWin1 && snakeWin2 && snakeWin1->width() > 0 && snakeWin1->height() > 0 &&
+      snakeWin2->width() > 0 && snakeWin2->height() > 0)
+  {
+    snakeSpr = (s_rrAnimFrame == 0) ? snakeWin1 : snakeWin2;
+  }
+  else if (!rr_onGround && snakeJump && snakeJump->width() > 0 && snakeJump->height() > 0)
+  {
     snakeSpr = snakeJump;
+  }
   else if (rr_ducking && snakeCrouch && snakeCrouch->width() > 0 && snakeCrouch->height() > 0)
+  {
     snakeSpr = snakeCrouch;
+  }
   else
+  {
     snakeSpr = (s_rrAnimFrame == 0) ? snake1 : snake2;
+  }
 
   if (snakeSpr && snakeSpr->width() > 0 && snakeSpr->height() > 0)
   {
     const int drawX = px;
     const int drawY = groundY - (int)snakeSpr->height() + 4 + (int)rr_y;
-    snakeSpr->pushSprite(&spr, drawX, drawY, kResRunKey);
+    snakeSpr->pushSprite(&spr, snakeDrawX, drawY, kResRunKey);
   }
   else
   {
@@ -1835,19 +2228,40 @@ void drawResurrectionRun()
     spr.fillCircle(px + pw - 8, py + ph / 2, 5, TFT_RED);
   }
 
+  if (s_rrHandActive)
+  {
+    M5Canvas *goalHand = s_rrHandTouched ? hand2 : hand1;
+
+    if (goalHand && goalHand->width() > 0 && goalHand->height() > 0)
+    {
+      goalHand->pushSprite(&spr, s_rrHandX, s_rrHandY, kResRunKey);
+    }
+  }
+
   for (auto &o : rr_obs)
   {
     if (!o.active)
       continue;
 
-    int ox = o.x - rr_distance;
-    if (ox < -40 || ox > gW + 40)
+    const int ox = o.x - rr_distance;
+    if (ox < -80 || ox > gW + 80)
       continue;
 
-    if (o.h >= kRrJumpObsH)
-      spr.fillTriangle(ox, o.y + o.h, ox + o.w / 2, o.y, ox + o.w, o.y + o.h, TFT_DARKGREEN);
+    if (ladybugGround && ladybugGround->width() > 0 && ladybugGround->height() > 0)
+    {
+      const int drawW = o.w;
+      const int drawH = o.h;
+      const int drawX = ox;
+      const int drawY = o.y;
+
+      ladybugGround->pushRotateZoom(&spr, drawX + drawW / 2, drawY + drawH / 2, 0.0f,
+                                    (float)drawW / (float)ladybugGround->width(),
+                                    (float)drawH / (float)ladybugGround->height(), kResRunKey);
+    }
     else
+    {
       spr.fillRoundRect(ox, o.y, o.w, o.h, 4, TFT_GREEN);
+    }
   }
 
   int barW = gW - 20;
