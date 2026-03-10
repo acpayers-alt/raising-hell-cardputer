@@ -1892,7 +1892,8 @@ void updateResurrectionRun(const InputState &input)
 
   const int speed = rr_boosting ? kRrBoostSpeed : kRrBaseSpeed;
   const bool scrollWorld =
-      (s_rrPhase == RR_PHASE_RUN) || (s_rrPhase == RR_PHASE_HAND_ENTER) || (s_rrPhase == RR_PHASE_HAND_HOLD);
+      (s_rrPhase == RR_PHASE_RUN) || (s_rrPhase == RR_PHASE_HAND_ENTER);
+            
   const int h = (screenH > 0) ? screenH : 135;
   const int gW = (screenW > 0) ? screenW : 240;
   const int groundY = h - kRrGroundH;
@@ -1915,118 +1916,115 @@ void updateResurrectionRun(const InputState &input)
       rr_nextSpawn++;
     }
 
-    if (s_rrPhase == RR_PHASE_HAND_ENTER)
+    if (rr_distance >= kRrHandTriggerDist)
     {
+      s_rrPhase = RR_PHASE_HAND_ENTER;
+      s_rrPhaseStartMs = now;
+      s_rrHandActive = true;
+      s_rrHandTouched = false;
+      s_rrHandX = gW;
       s_rrHandY = groundY - s_rrHandH + 8;
-  
-      const int targetX = gW - s_rrHandW;
-      if (s_rrHandX > targetX)
-        s_rrHandX -= kRrHandEnterSpeed;
-  
-      if (s_rrHandX <= targetX)
-      {
-        s_rrHandX = targetX;
-        s_rrPhase = RR_PHASE_HAND_HOLD;
-        s_rrPhaseStartMs = now;
-      }
-      return;
-    }
-  }
 
-  if (s_rrPhase == RR_PHASE_RUN)
-  {
-    const int playerHitX = px + kRrPlayerHitInsetX;
-    const int playerHitY = py + kRrPlayerHitInsetY;
-    const int playerHitW = pw - (kRrPlayerHitInsetX * 2);
-    const int playerHitH = ph - (kRrPlayerHitInsetY * 2);
-
-    for (auto &o : rr_obs)
-    {
-      if (!o.active)
-        continue;
-
-      const int ox = o.x - rr_distance;
-      const int oy = o.y;
-
-      int obsHitInsetX = 0;
-      int obsHitInsetY = 0;
-
-      if (o.h >= kRrJumpObsH)
-      {
-        obsHitInsetX = kRrJumpObsHitInsetX;
-        obsHitInsetY = kRrJumpObsHitInsetY;
-      }
-      else
-      {
-        obsHitInsetX = kRrDuckObsHitInsetX;
-        obsHitInsetY = kRrDuckObsHitInsetY;
-      }
-
-      const int obsHitX = ox + obsHitInsetX;
-      const int obsHitY = oy + obsHitInsetY;
-      const int obsHitW = o.w - (obsHitInsetX * 2);
-      const int obsHitH = o.h - (obsHitInsetY * 2);
-
-      if (obsHitW > 0 && obsHitH > 0 &&
-          rrAabb(playerHitX, playerHitY, playerHitW, playerHitH, obsHitX, obsHitY, obsHitW, obsHitH))
-      {
-        rrFinishRun(false);
-        return;
-      }
-
-      if (ox < -40)
+      for (auto &o : rr_obs)
         o.active = false;
     }
-  }
+      }
 
-  if (s_rrPhase == RR_PHASE_HAND_ENTER)
-  {
-    s_rrHandY = groundY - s_rrHandH + 8;
-    s_rrHandX -= kRrHandEnterSpeed;
-
-    const int targetX = gW - s_rrHandW;
-    if (s_rrHandX <= targetX)
-    {
-      s_rrHandX = targetX;
-      s_rrPhase = RR_PHASE_HAND_HOLD;
-      s_rrPhaseStartMs = now;
-    }
-    return;
-  }
-
-  if (s_rrPhase == RR_PHASE_HAND_HOLD)
-  {
-    s_rrHandY = groundY - s_rrHandH + 8;
-    s_rrHandX = gW - s_rrHandW; // hand stays planted once fully emerged
-
-    const int touchX = s_rrHandX + 12;
-    const int snakeFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
-
-    if (!s_rrHandTouched)
-    {
-      if (snakeFrontX < touchX)
+      if (s_rrPhase == RR_PHASE_RUN)
       {
-        s_rrPlayerGoalOffsetX += kRrGoalWalkSpeed;
-
-        const int newFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
-        if (newFrontX >= touchX)
+        const int playerHitX = px + kRrPlayerHitInsetX;
+        const int playerHitY = py + kRrPlayerHitInsetY;
+        const int playerHitW = pw - (kRrPlayerHitInsetX * 2);
+        const int playerHitH = ph - (kRrPlayerHitInsetY * 2);
+    
+        for (auto &o : rr_obs)
         {
-          s_rrPlayerGoalOffsetX -= (newFrontX - touchX);
-          s_rrHandTouched = true;
-          s_rrPhase = RR_PHASE_HAND_CONTACT;
-          s_rrPhaseStartMs = now;
+          if (!o.active)
+            continue;
+    
+          const int ox = o.x - rr_distance;
+          const int oy = o.y;
+    
+          int obsHitInsetX = 0;
+          int obsHitInsetY = 0;
+    
+          if (o.h >= kRrJumpObsH)
+          {
+            obsHitInsetX = kRrJumpObsHitInsetX;
+            obsHitInsetY = kRrJumpObsHitInsetY;
+          }
+          else
+          {
+            obsHitInsetX = kRrDuckObsHitInsetX;
+            obsHitInsetY = kRrDuckObsHitInsetY;
+          }
+    
+          const int obsHitX = ox + obsHitInsetX;
+          const int obsHitY = oy + obsHitInsetY;
+          const int obsHitW = o.w - (obsHitInsetX * 2);
+          const int obsHitH = o.h - (obsHitInsetY * 2);
+    
+          if (obsHitW > 0 && obsHitH > 0 &&
+              rrAabb(playerHitX, playerHitY, playerHitW, playerHitH, obsHitX, obsHitY, obsHitW, obsHitH))
+          {
+            rrFinishRun(false);
+            return;
+          }
+    
+          if (ox < -40)
+            o.active = false;
         }
       }
-      else
+    
+      if (s_rrPhase == RR_PHASE_HAND_ENTER)
       {
-        s_rrHandTouched = true;
-        s_rrPhase = RR_PHASE_HAND_CONTACT;
-        s_rrPhaseStartMs = now;
+        s_rrHandY = groundY - s_rrHandH + 8;
+    
+        const int handScreenX = s_rrHandX - rr_distance;
+        const int targetScreenX = gW - s_rrHandW;
+    
+        if (handScreenX <= targetScreenX)
+        {
+          s_rrPhase = RR_PHASE_HAND_HOLD;
+          s_rrPhaseStartMs = now;
+          s_rrHandX = targetScreenX;
+        }
+        return;
       }
-    }
-    return;
-  }
-  
+    
+      if (s_rrPhase == RR_PHASE_HAND_HOLD)
+      {
+        s_rrHandY = groundY - s_rrHandH + 8;
+        s_rrHandX = gW - s_rrHandW;
+    
+        const int touchX = s_rrHandX + 12;
+        const int snakeFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
+    
+        if (!s_rrHandTouched)
+        {
+          if (snakeFrontX < touchX)
+          {
+            s_rrPlayerGoalOffsetX += kRrGoalWalkSpeed;
+    
+            const int newFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
+            if (newFrontX >= touchX)
+            {
+              s_rrPlayerGoalOffsetX -= (newFrontX - touchX);
+              s_rrHandTouched = true;
+              s_rrPhase = RR_PHASE_HAND_CONTACT;
+              s_rrPhaseStartMs = now;
+            }
+          }
+          else
+          {
+            s_rrHandTouched = true;
+            s_rrPhase = RR_PHASE_HAND_CONTACT;
+            s_rrPhaseStartMs = now;
+          }
+        }
+        return;
+      }
+      
   if (s_rrPhase == RR_PHASE_HAND_CONTACT)
   {
     s_rrHandY = groundY - s_rrHandH + 8;
@@ -2234,8 +2232,9 @@ void drawResurrectionRun()
 
     if (goalHand && goalHand->width() > 0 && goalHand->height() > 0)
     {
-      goalHand->pushSprite(&spr, s_rrHandX, s_rrHandY, kResRunKey);
-    }
+      const int handDrawX = (s_rrPhase == RR_PHASE_HAND_ENTER) ? (s_rrHandX - rr_distance) : s_rrHandX;
+      goalHand->pushSprite(&spr, handDrawX, s_rrHandY, kResRunKey);
+        }
   }
 
   for (auto &o : rr_obs)
