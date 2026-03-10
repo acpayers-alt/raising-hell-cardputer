@@ -55,8 +55,6 @@ static inline void exitMiniGameToReturnUi(bool beginLockout = true);
 // Mini-game input helpers / shared state
 // -----------------------------------------------------------------------------
 // Forward decls used by multiple mini-games / defined later in this file
-void freeCrossyZoneSprites();
-void freeCrossyActorSprites();
 static const char *crossyStartZonePathForPet();
 static const char *crossyGoalZonePathForPet();
 static const char *crossyLavaZonePathForPet(uint8_t frame);
@@ -66,6 +64,8 @@ static bool ensureFlappyBgCache(const char *path);
 static void logMiniGameHeap(const char *tag);
 
 // I should sort these better
+void freeCrossyZoneSprites();
+void freeCrossyActorSprites();
 void startCrossyRoad();
 void updateCrossyRoad(const InputState &input);
 void drawCrossyRoad();
@@ -77,6 +77,7 @@ void freeImpWaveSprites();
 void freeDodgerBgCache();
 void freeDodgerFireballSprites();
 void freeDodgerCarSprite();
+void freeResRunSprites();
 
 static void releaseMiniGameAssetsFor(MiniGame game)
 {
@@ -100,6 +101,10 @@ static void releaseMiniGameAssetsFor(MiniGame game)
     freeDodgerCarSprite();
     freeDodgerGoalFrames();
     freeDodgerGoreSprite();
+    break;
+
+  case MiniGame::RESURRECTION:
+    freeResRunSprites();
     break;
 
   default:
@@ -1170,7 +1175,7 @@ void drawFlappyFireball()
 }
 
 // -----------------------------------------------------------------------------
-// Resurrection Run (side-scroller runner)
+// Resurrection Run (side-scroller runner) GLOBALS
 // -----------------------------------------------------------------------------
 
 static bool rr_active = false;
@@ -1185,7 +1190,76 @@ static bool rr_onGround = true;
 static int rr_distance = 0;
 uint32_t rr_lastMs = 0;
 
+static bool rr_boosting = false;
+static uint32_t rr_boostEndMs = 0;
+static uint32_t rr_boostCooldownEndMs = 0;
+
+static constexpr int kRrBaseSpeed = 290;
+static constexpr int kRrBoostSpeed = 430;
+static constexpr uint32_t kRrBoostMs = 180;
+static constexpr uint32_t kRrBoostCooldownMs = 600;
+
+static int s_rrSnakeCrouchW = 0;
+static int s_rrSnakeCrouchH = 0;
+static int s_rrSnakeJumpW = 0;
+static int s_rrSnakeJumpH = 0;
+
+static int s_rrSkyW = 0;
+static int s_rrSkyH = 0;
+
 static void rrResetObstacles();
+
+static const char *resRunSkyTilePathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/sky_tile.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/sky_tile.png";
+  }
+}
+
+static bool ensureResRunSkySprite()
+{
+  M5Canvas *sky = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile",
+                                 resRunSkyTilePathForPet(), 8, kSpriteKey, sky))
+    return false;
+
+  if (!sky || sky->width() <= 0 || sky->height() <= 0)
+    return false;
+
+  s_rrSkyW = (int)sky->width();
+  s_rrSkyH = (int)sky->height();
+  return true;
+}
+
+static const char *resRunSnakeCrouchPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/snake_crouch.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/snake_crouch.png";
+  }
+}
+
+static const char *resRunSnakeJumpPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/snake_jump.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/snake_jump.png";
+  }
+}
 
 struct RRObs
 {
@@ -1217,6 +1291,148 @@ static const RRSpawn rr_script[] = {
 static const int rr_scriptCount = (int)(sizeof(rr_script) / sizeof(rr_script[0]));
 static int rr_nextSpawn = 0;
 
+// -----------------------------------------------------------------------------
+// Resurrection Run visual/layout tuning
+// -----------------------------------------------------------------------------
+static constexpr int kRrSkyH = 64;
+static constexpr int kRrGroundH = 28;
+static constexpr int kRrGroundInset = 6;
+
+static constexpr int kRrPlayerX = 44;
+static constexpr int kRrPlayerW = 48;
+static constexpr int kRrPlayerH = 24;
+static constexpr int kRrPlayerDuckH = 16;
+
+static constexpr int kRrJumpObsW = 34;
+static constexpr int kRrJumpObsH = 24;
+
+static constexpr int kRrDuckObsW = 44;
+static constexpr int kRrDuckObsH = 18;
+static constexpr int kRrDuckObsClearance = 10;
+
+static int s_rrSnakeW = 0;
+static int s_rrSnakeH = 0;
+static int s_rrGroundW = 0;
+static int s_rrGroundH = 0;
+static uint32_t s_rrAnimMs = 0;
+static uint8_t s_rrAnimFrame = 0;
+
+static const uint16_t kResRunKey = kSpriteKey;
+
+static const char *resRunSnakeRun1PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/snake_run1.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/snake_run1.png";
+  }
+}
+
+static const char *resRunSnakeRun2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/snake_run2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/snake_run2.png";
+  }
+}
+
+static const char *resRunBranchGroundPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/resrun/eld/branch_ground.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/resrun/dev/branch_ground.png";
+  }
+}
+
+static bool ensureResRunSnakeSprites()
+{
+  M5Canvas *run1 = nullptr;
+  M5Canvas *run2 = nullptr;
+  M5Canvas *crouch = nullptr;
+  M5Canvas *jump = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey, run1))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2", resRunSnakeRun2PathForPet(), 8, kResRunKey, run2))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_crouch", resRunSnakeCrouchPathForPet(), 8, kResRunKey,
+                           crouch))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump", resRunSnakeJumpPathForPet(), 8, kResRunKey, jump))
+    return false;
+
+  if (!run1 || run1->width() <= 0 || run1->height() <= 0)
+    return false;
+
+  s_rrSnakeW = (int)run1->width();
+  s_rrSnakeH = (int)run1->height();
+
+  if (crouch && crouch->width() > 0 && crouch->height() > 0)
+  {
+    s_rrSnakeCrouchW = (int)crouch->width();
+    s_rrSnakeCrouchH = (int)crouch->height();
+  }
+
+  if (jump && jump->width() > 0 && jump->height() > 0)
+  {
+    s_rrSnakeJumpW = (int)jump->width();
+    s_rrSnakeJumpH = (int)jump->height();
+  }
+
+  return true;
+}
+
+static bool ensureResRunGroundSprite()
+{
+  M5Canvas *ground = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "branch_ground", resRunBranchGroundPathForPet(), 8, kResRunKey,
+                           ground))
+    return false;
+
+  if (!ground || ground->width() <= 0 || ground->height() <= 0)
+    return false;
+
+  s_rrGroundW = (int)ground->width();
+  s_rrGroundH = (int)ground->height();
+  return true;
+}
+
+void freeResRunSprites()
+{
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_run1");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_run2");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_crouch");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_jump");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "branch_ground");
+  mgmem::releaseSprite(MiniGame::RESURRECTION, "sky_tile");
+
+  s_rrSnakeW = 0;
+  s_rrSnakeH = 0;
+  s_rrSnakeCrouchW = 0;
+  s_rrSnakeCrouchH = 0;
+  s_rrSnakeJumpW = 0;
+  s_rrSnakeJumpH = 0;
+  s_rrGroundW = 0;
+  s_rrGroundH = 0;
+  s_rrSkyW = 0;
+  s_rrSkyH = 0;
+}
+
 static void rrResetRunState()
 {
   rr_active = true;
@@ -1234,6 +1450,10 @@ static void rrResetRunState()
   rr_courseLen = 2600;
   rrResetObstacles();
   rr_nextSpawn = 0;
+
+  rr_boosting = false;
+  rr_boostEndMs = 0;
+  rr_boostCooldownEndMs = 0;
 }
 
 static void rrFinishRun(bool won)
@@ -1257,6 +1477,7 @@ static void rrSpawnObstacle(uint8_t type)
 {
   const int w = (screenW > 0) ? screenW : 240;
   const int h = (screenH > 0) ? screenH : 135;
+
   int slot = -1;
   for (int i = 0; i < (int)(sizeof(rr_obs) / sizeof(rr_obs[0])); i++)
   {
@@ -1269,25 +1490,25 @@ static void rrSpawnObstacle(uint8_t type)
   if (slot < 0)
     return;
 
-  const int spawnScreenLead = 60;
+  const int spawnScreenLead = 72;
   const int spawnWorldX = rr_distance + w + spawnScreenLead;
 
-  const int groundY = h - 18;
+  const int groundY = h - kRrGroundH;
 
   if (type == RR_SPIKE)
   {
     rr_obs[slot].x = spawnWorldX;
-    rr_obs[slot].y = groundY - 14;
-    rr_obs[slot].w = 16;
-    rr_obs[slot].h = 14;
+    rr_obs[slot].y = groundY - kRrJumpObsH;
+    rr_obs[slot].w = kRrJumpObsW;
+    rr_obs[slot].h = kRrJumpObsH;
     rr_obs[slot].active = true;
   }
   else
   {
     rr_obs[slot].x = spawnWorldX;
-    rr_obs[slot].y = groundY - 32;
-    rr_obs[slot].w = 18;
-    rr_obs[slot].h = 10;
+    rr_obs[slot].y = groundY - kRrPlayerH - kRrDuckObsClearance;
+    rr_obs[slot].w = kRrDuckObsW;
+    rr_obs[slot].h = kRrDuckObsH;
     rr_obs[slot].active = true;
   }
 }
@@ -1312,6 +1533,30 @@ void startResurrectionRun()
   mgAssetsBeginSession(currentMiniGame, "startResurrectionRun");
   mgmem::beginSession(currentMiniGame, pet.type);
   mgmem::logUsage("rr beginSession");
+  freeResRunSprites();
+
+  UIState retUi = g_app.uiState;
+  if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
+    retUi = UIState::PET_SCREEN;
+
+  miniGameSetReturnUi(retUi);
+  uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
+
+  const bool snakeOk  = ensureResRunSnakeSprites();
+  const bool groundOk = ensureResRunGroundSprite();
+  const bool skyOk    = ensureResRunSkySprite();
+  
+  Serial.printf(
+      "RESRUN preload: snake=%d ground=%d sky=%d run=%dx%d crouch=%dx%d jump=%dx%d sky=%dx%d free=%u largest=%u\n",
+      snakeOk ? 1 : 0,
+      groundOk ? 1 : 0,
+      skyOk ? 1 : 0,
+      s_rrSnakeW, s_rrSnakeH,
+      s_rrSnakeCrouchW, s_rrSnakeCrouchH,
+      s_rrSnakeJumpW, s_rrSnakeJumpH,
+      s_rrSkyW, s_rrSkyH,
+      (unsigned)ESP.getFreeHeap(),
+      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   g_app.inMiniGame = true;
   g_app.gameOver = false;
@@ -1331,12 +1576,24 @@ void startResurrectionRun()
   mgmem::logUsage("rr ready");
 
   invalidateBackgroundCache();
+  s_rrAnimMs = millis();
+  s_rrAnimFrame = 0;
   requestUIRedraw();
 }
 
 void updateResurrectionRun(const InputState &input)
 {
   const uint32_t now = millis();
+
+  if ((uint32_t)(now - s_rrAnimMs) >= 120)
+  {
+    s_rrAnimMs = now;
+    s_rrAnimFrame ^= 1;
+  }
+
+  if (rr_boosting && (int32_t)(now - rr_boostEndMs) >= 0)
+    rr_boosting = false;
+
   const bool enterOnce = miniGameEnterOnce(input);
 
   if (mgRewardShowing())
@@ -1385,15 +1642,25 @@ void updateResurrectionRun(const InputState &input)
     dtMs = 40;
   const float dt = dtMs / 1000.0f;
 
-  rr_ducking = (input.mgDownHeld || input.mgSpaceHeld);
+  rr_ducking = input.mgDownHeld;
 
-  const bool jumpOnce = input.mgSelectOnce || input.mgUpOnce;
-  const bool jumpHeld = input.mgSelectHeld || input.mgUpHeld;
+  const bool jumpOnce = input.mgUpOnce;
+  const bool jumpHeld = input.mgUpHeld;
+
+  const bool boostOnce = input.mgSelectOnce;
 
   if (jumpOnce && rr_onGround)
   {
     rr_vy = -220.0f;
     rr_onGround = false;
+  }
+
+  if (boostOnce && !rr_boosting && (int32_t)(now - rr_boostCooldownEndMs) >= 0)
+  {
+    rr_boosting = true;
+    rr_boostEndMs = now + kRrBoostMs;
+    rr_boostCooldownEndMs = now + kRrBoostCooldownMs;
+    soundConfirm();
   }
 
   const float gravity = (jumpHeld && rr_vy < 0.0f) ? 520.0f : 720.0f;
@@ -1408,7 +1675,7 @@ void updateResurrectionRun(const InputState &input)
     rr_onGround = true;
   }
 
-  const int speed = 290;
+  const int speed = rr_boosting ? kRrBoostSpeed : kRrBaseSpeed;
   rr_distance += (int)(speed * dt);
 
   while (rr_nextSpawn < rr_scriptCount && rr_distance >= rr_script[rr_nextSpawn].triggerDist)
@@ -1425,11 +1692,11 @@ void updateResurrectionRun(const InputState &input)
 
   const int h = (screenH > 0) ? screenH : 135;
 
-  const int groundY = h - 18;
-  const int px = 48;
-  int py = groundY - 18 + (int)rr_y;
-  int pw = 16;
-  int ph = rr_ducking ? 10 : 16;
+  const int groundY = h - kRrGroundH;
+  const int px = kRrPlayerX;
+  int py = groundY - kRrPlayerH + (int)rr_y;
+  const int pw = kRrPlayerW;
+  int ph = rr_ducking ? kRrPlayerDuckH : kRrPlayerH;
   if (rr_ducking)
     py = groundY - ph + (int)rr_y;
 
@@ -1465,36 +1732,135 @@ void drawResurrectionRun()
     return;
   }
 
-  const int groundY = gH - 18;
-  spr.drawLine(0, groundY, gW, groundY, TFT_DARKGREY);
+  const int groundY = gH - kRrGroundH;
 
-  int px = 48;
-  int py = groundY - 18 + (int)rr_y;
-  int pw = 16;
-  int ph = rr_ducking ? 10 : 16;
+  const bool haveSnake = ensureResRunSnakeSprites();
+  const bool haveGround = ensureResRunGroundSprite();
+  const bool haveSky = ensureResRunSkySprite();
+
+  M5Canvas *snake1 = nullptr;
+  M5Canvas *snake2 = nullptr;
+  M5Canvas *snakeCrouch = nullptr;
+  M5Canvas *snakeJump = nullptr;
+  M5Canvas *groundSpr = nullptr;
+  M5Canvas *skySpr = nullptr;
+
+  if (haveSnake)
+  {
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1",
+                        resRunSnakeRun1PathForPet(), 8, kResRunKey, snake1);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2",
+                        resRunSnakeRun2PathForPet(), 8, kResRunKey, snake2);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_crouch",
+                        resRunSnakeCrouchPathForPet(), 8, kResRunKey, snakeCrouch);
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump",
+                        resRunSnakeJumpPathForPet(), 8, kResRunKey, snakeJump);
+  }
+
+  if (haveGround)
+  {
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "branch_ground",
+                        resRunBranchGroundPathForPet(), 8, kResRunKey, groundSpr);
+  }
+
+  if (haveSky)
+  {
+    mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile",
+                        resRunSkyTilePathForPet(), 8, kResRunKey, skySpr);
+  }
+
+  if (skySpr && skySpr->width() > 0 && skySpr->height() > 0)
+  {
+    const int tileW = (int)skySpr->width();
+    const int tileH = (int)skySpr->height();
+    const int skyScrollX = (rr_distance / 6) % tileW;
+
+    for (int y = 0; y < groundY; y += tileH)
+    {
+      for (int x = -skyScrollX; x < gW; x += tileW)
+        skySpr->pushSprite(&spr, x, y, kResRunKey);
+    }
+  }
+  else
+  {
+    spr.fillRect(0, 0, gW, groundY, TFT_CYAN);
+  }
+
+  if (groundSpr && groundSpr->width() > 0 && groundSpr->height() > 0)
+  {
+    const int tileW = (int)groundSpr->width();
+    const int tileH = (int)groundSpr->height();
+    const int scrollX = (rr_distance / 2) % tileW;
+    const int groundDrawY = gH - tileH;
+
+    for (int x = -scrollX; x < gW; x += tileW)
+      groundSpr->pushSprite(&spr, x, groundDrawY, kResRunKey);
+
+    if (groundDrawY > groundY)
+      spr.fillRect(0, groundY, gW, groundDrawY - groundY, TFT_BROWN);
+  }
+  else
+  {
+    spr.fillRect(0, groundY, gW, kRrGroundH, TFT_BROWN);
+  }
+
+  spr.drawFastHLine(0, groundY, gW, TFT_DARKGREY);
+
+  const int px = kRrPlayerX;
+  int py = groundY - kRrPlayerH + (int)rr_y;
+  const int pw = kRrPlayerW;
+  int ph = rr_ducking ? kRrPlayerDuckH : kRrPlayerH;
+
   if (rr_ducking)
     py = groundY - ph + (int)rr_y;
-  spr.fillRect(px, py, pw, ph, TFT_GREEN);
+
+  M5Canvas *snakeSpr = nullptr;
+
+  if (!rr_onGround && snakeJump && snakeJump->width() > 0 && snakeJump->height() > 0)
+    snakeSpr = snakeJump;
+  else if (rr_ducking && snakeCrouch && snakeCrouch->width() > 0 && snakeCrouch->height() > 0)
+    snakeSpr = snakeCrouch;
+  else
+    snakeSpr = (s_rrAnimFrame == 0) ? snake1 : snake2;
+
+  if (snakeSpr && snakeSpr->width() > 0 && snakeSpr->height() > 0)
+  {
+    const int drawX = px;
+    const int drawY = groundY - (int)snakeSpr->height() + 4 + (int)rr_y;
+    snakeSpr->pushSprite(&spr, drawX, drawY, kResRunKey);
+  }
+  else
+  {
+    spr.fillRoundRect(px, py, pw, ph, 6, TFT_GREEN);
+    spr.fillCircle(px + pw - 8, py + ph / 2, 5, TFT_RED);
+  }
 
   for (auto &o : rr_obs)
   {
     if (!o.active)
       continue;
+
     int ox = o.x - rr_distance;
     if (ox < -40 || ox > gW + 40)
       continue;
-    spr.fillRect(ox, o.y, o.w, o.h, TFT_RED);
+
+    if (o.h >= kRrJumpObsH)
+      spr.fillTriangle(ox, o.y + o.h, ox + o.w / 2, o.y, ox + o.w, o.y + o.h, TFT_DARKGREEN);
+    else
+      spr.fillRoundRect(ox, o.y, o.w, o.h, 4, TFT_GREEN);
   }
 
   int barW = gW - 20;
   int barX = 10;
-  int barY = 6;
+  int barY = 8;
   spr.drawRect(barX, barY, barW, 6, TFT_DARKGREY);
+
   int fill = (rr_distance * (barW - 2)) / rr_courseLen;
   if (fill < 0)
     fill = 0;
   if (fill > barW - 2)
     fill = barW - 2;
+
   spr.fillRect(barX + 1, barY + 1, fill, 4, TFT_YELLOW);
 }
 
