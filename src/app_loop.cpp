@@ -140,6 +140,11 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   appServicesTick(now);
 
+  const bool inDeathFlow =
+  (g_app.uiState == UIState::DEATH) ||
+  (g_app.uiState == UIState::MINI_GAME) ||
+  (g_app.uiState == UIState::BURIAL_SCREEN);
+
   // ---------------------------------------------------------------------------
   // SCREEN OFF PATH
   // ---------------------------------------------------------------------------
@@ -165,8 +170,8 @@ void appMainLoopTick()
 
     // Near-death beep MUST work even with screen off.
     soundLowHealthTick((uint8_t)pet.health, sleepingNow_off,
-                       /*screenOn=*/false,
-                       /*inDeathScreen=*/(g_app.uiState == UIState::DEATH));
+    /*screenOn=*/false,
+    /*inDeathScreen=*/inDeathFlow);
 
     if (motionAvailable && motionShakeDetected())
     {
@@ -612,9 +617,6 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   // Pet tick (ALWAYS run even if Console is open)
   // ---------------------------------------------------------------------------
-  const bool inDeathFlow = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::MINI_GAME) ||
-                           (g_app.uiState == UIState::BURIAL_SCREEN);
-
   if (!inDeathFlow)
   {
     if (isPetSleepingNow())
@@ -651,8 +653,8 @@ void appMainLoopTick()
   s_prevSleeping = sleepingNow2;
 
   soundLowHealthTick((uint8_t)pet.health, sleepingNow2,
-                     /*screenOn=*/isScreenOn(),
-                     /*inDeathScreen=*/(g_app.uiState == UIState::DEATH));
+  /*screenOn=*/isScreenOn(),
+  /*inDeathScreen=*/inDeathFlow);
 
   if (g_sdReady)
   {

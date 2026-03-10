@@ -1177,6 +1177,9 @@ void drawFlappyFireball()
 // -----------------------------------------------------------------------------
 // Resurrection Run (side-scroller runner) GLOBALS
 // -----------------------------------------------------------------------------
+static bool s_rrShowIntro = true;
+static bool s_rrDontShowAgain = false; // visual only for now
+static uint32_t s_rrIntroAnimMs = 0;
 
 static bool rr_active = false;
 static bool rr_gameOver = false;
@@ -1776,6 +1779,9 @@ void startResurrectionRun()
   mgmem::logUsage("rr ready");
 
   invalidateBackgroundCache();
+  s_rrShowIntro = true;
+  s_rrDontShowAgain = false;
+  s_rrIntroAnimMs = millis();
   s_rrAnimMs = millis();
   s_rrAnimFrame = 0;
   s_rrHandAnimMs = millis();
@@ -1851,6 +1857,31 @@ void updateResurrectionRun(const InputState &input)
 
   if (rr_gameOver)
     return;
+
+    if (s_rrShowIntro)
+    {
+      if (input.mgSpaceOnce)
+        s_rrDontShowAgain = !s_rrDontShowAgain;
+  
+      const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+  
+      if (startPressed && !mgInputLockedOut())
+      {
+        s_rrShowIntro = false;
+        rrResetRunState();
+        rr_lastMs = now;
+        s_rrAnimMs = now;
+        s_rrHandAnimMs = now;
+        s_rrLadybugAnimMs = now;
+  
+        clearInputLatch();
+        inputForceClear();
+        mgBeginInputLockout(120);
+        requestUIRedraw();
+      }
+  
+      return;
+    }
 
   uint32_t dtMs = now - rr_lastMs;
   rr_lastMs = now;
@@ -2144,6 +2175,69 @@ void drawResurrectionRun()
                         ladybugFly2);
   }
 
+  if (s_rrShowIntro)
+  {
+    spr.fillSprite(TFT_BLACK);
+    spr.setTextDatum(CC_DATUM);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Up/Down to Jump/Duck G to boost", gW / 2, 8, 2);
+    spr.drawCentreString("Deliver the apple to our ally", gW / 2, 26, 2);
+
+    M5Canvas *introSnake1 = nullptr;
+    M5Canvas *introSnake2 = nullptr;
+
+    if (haveSnake)
+    {
+      mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey,
+                          introSnake1);
+      mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2", resRunSnakeRun2PathForPet(), 8, kResRunKey,
+                          introSnake2);
+    }
+
+    M5Canvas *introSnake = (s_rrAnimFrame == 0) ? introSnake1 : introSnake2;
+
+    if (introSnake && introSnake->width() > 0 && introSnake->height() > 0)
+    {
+      const int sx = (gW - (int)introSnake->width()) / 2;
+      const int sy = (gH / 2) - ((int)introSnake->height() / 2) + 6;
+      introSnake->pushSprite(&spr, sx, sy, kResRunKey);
+    }
+
+    const int cbY = 102;
+    const int cbSize = 10;
+    const int textOffset = 16;
+    const int lineWidth = 150;
+    const int cbX = (gW - lineWidth) / 2;
+
+    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+    if (s_rrDontShowAgain)
+    {
+      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+    }
+
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
+    return;
+  }
+  
+  if (g_app.gameOver)
+  {
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
+    spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU LOSE!", gW / 2, gH / 2 - 10, 4);
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
+    return;
+  }
+
   if (skySpr && skySpr->width() > 0 && skySpr->height() > 0)
   {
     const int tileW = (int)skySpr->width();
@@ -2187,7 +2281,6 @@ void drawResurrectionRun()
   int ph = rr_ducking ? kRrPlayerDuckH : kRrPlayerH;
 
   int snakeDrawX = px;
-
   if (s_rrPhase != RR_PHASE_RUN)
     snakeDrawX += s_rrPlayerGoalOffsetX;
 
@@ -2216,7 +2309,6 @@ void drawResurrectionRun()
 
   if (snakeSpr && snakeSpr->width() > 0 && snakeSpr->height() > 0)
   {
-    const int drawX = px;
     const int drawY = groundY - (int)snakeSpr->height() + 4 + (int)rr_y;
     snakeSpr->pushSprite(&spr, snakeDrawX, drawY, kResRunKey);
   }
@@ -2234,7 +2326,7 @@ void drawResurrectionRun()
     {
       const int handDrawX = (s_rrPhase == RR_PHASE_HAND_ENTER) ? (s_rrHandX - rr_distance) : s_rrHandX;
       goalHand->pushSprite(&spr, handDrawX, s_rrHandY, kResRunKey);
-        }
+    }
   }
 
   for (auto &o : rr_obs)

@@ -60,7 +60,6 @@ void uiChoosePetHandle(InputState& in)
   #if PUBLIC_BUILD
   static const PetType kChoices[] = {
     PET_DEVIL,
-    PET_ELDRITCH,
   };
 #else
   static const PetType kChoices[] = {

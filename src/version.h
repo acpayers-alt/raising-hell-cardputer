@@ -6,4 +6,4 @@
 
 #define RH_VERSION_LABEL "alpha"
 
-#define RH_VERSION_STRING "v0.2.0-alpha"
+#define RH_VERSION_STRING "v0.7.0-playtest1"

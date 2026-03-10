@@ -3168,22 +3168,8 @@ static void drawPetSleepingScreen() { drawSleepScreen(); }
 
 static void drawMiniGameScreen()
 {
-  // Real mini-games render full-screen into spr.
-  // The placeholder screen was left over from earlier scaffolding.
   if (currentMiniGame == MiniGame::NONE)
-  {
-    spr.fillSprite(TFT_BLACK);
-    spr.setTextDatum(MC_DATUM);
-    spr.setTextFont(2);
-    spr.setTextSize(1);
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawString("NO MINI GAME", SCREEN_W / 2, SCREEN_H / 2 - 6);
-    spr.setTextFont(1);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("(currentMiniGame == NONE)", SCREEN_W / 2, SCREEN_H / 2 + 10);
-    spr.setTextDatum(TL_DATUM);
     return;
-  }
 
   drawMiniGame();
 }

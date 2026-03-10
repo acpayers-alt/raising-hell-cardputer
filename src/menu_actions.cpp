@@ -11,6 +11,7 @@
 #include "ui_state_settings.h"
 #include "death_state.h"
 #include "graphics.h"  
+#include "mini_game_runtime.h"
 
 // ==================================================================
 // MAIN DISPATCHER (thin wrapper)
@@ -34,9 +35,6 @@ void onResurrectionMiniGameResult(bool success)
     currentMiniGame  = MiniGame::NONE;
     g_app.inMiniGame = false;
     g_app.gameOver   = false;
-
-    g_app.currentTab = Tab::TAB_PET;
-    g_app.uiState    = UIState::PET_SCREEN;
 
     requestUIRedraw();
     invalidateBackgroundCache();

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "app_state.h"
 #include "currency.h"
@@ -71,6 +72,8 @@ static uint32_t s_mgInputLockoutUntilMs = 0;
 
 static const uint32_t kRewardAcceptDelayMs = 180;
 
+void mgSetRewardMessage(const char *msg);
+
 bool mgRewardShowing()
 {
   return s_showReward;
@@ -99,6 +102,17 @@ void mgResetAcceptState()
 const char* mgRewardMessage()
 {
   return s_rewardMsg;
+}
+
+void mgSetRewardMessage(const char *msg)
+{
+  if (!msg)
+  {
+    s_rewardMsg[0] = 0;
+    return;
+  }
+
+  strlcpy(s_rewardMsg, msg, sizeof(s_rewardMsg));
 }
 
 // simple access for per-game files if needed later
@@ -179,6 +193,30 @@ static bool tryAwardWinItem_1in4(ItemType* outType)
 
 void mgApplyResultAndShowReward(bool won)
 {
+  if (currentMiniGame == MiniGame::RESURRECTION)
+  {
+    if (won)
+    {
+      snprintf(
+        s_rewardMsg,
+        sizeof(s_rewardMsg),
+        "Fall of Man has begun\nYou may return to life");
+    }
+    else
+    {
+      snprintf(
+        s_rewardMsg,
+        sizeof(s_rewardMsg),
+        "Resurrection failed\nDeath still holds you");
+    }
+
+    saveManagerMarkDirty();
+    s_showReward = true;
+    g_app.gameOver = false;
+    requestUIRedraw();
+    return;
+  }
+
   if (won)
   {
     pet.addXP(25);
