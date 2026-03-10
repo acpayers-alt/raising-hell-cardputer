@@ -64,6 +64,16 @@ namespace mgmem
 
   bool ensureSharedBg(const char *path, M5Canvas *&out, int &outW, int &outH);
 
+  bool ensureSprite(MiniGame owner,
+                    const char *assetId,
+                    const char *path,
+                    uint8_t colorDepth,
+                    uint16_t transparentKey,
+                    M5Canvas *&out);
+
+  void releaseSprite(MiniGame owner, const char *assetId);
+  void releaseAllForCurrentGame();
+
   size_t freeBytes();
   size_t largestBlock();
   void logUsage(const char *tag);

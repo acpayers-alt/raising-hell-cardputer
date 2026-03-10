@@ -18,6 +18,67 @@ namespace
   static int s_sharedBgW = 0;
   static int s_sharedBgH = 0;
 
+  // ---------------------------------------------------------------------------
+  // Sprite slot registry
+  // ---------------------------------------------------------------------------
+
+  struct MgSpriteSlot
+  {
+    bool inUse = false;
+    MiniGame owner = MiniGame::NONE;
+    char assetId[48] = {0};
+    char path[128] = {0};
+    uint8_t depth = 0;
+    uint16_t transparentKey = 0;
+    M5Canvas canvas = M5Canvas(&M5.Display);
+  };
+
+  static constexpr int kMgSpriteSlotCount = 16;
+  static MgSpriteSlot s_spriteSlots[kMgSpriteSlotCount];
+
+  static MgSpriteSlot *findSpriteSlot(MiniGame owner, const char *assetId)
+  {
+    if (!assetId || !assetId[0])
+      return nullptr;
+
+    for (int i = 0; i < kMgSpriteSlotCount; ++i)
+    {
+      MgSpriteSlot &slot = s_spriteSlots[i];
+      if (!slot.inUse)
+        continue;
+      if (slot.owner != owner)
+        continue;
+      if (strcmp(slot.assetId, assetId) != 0)
+        continue;
+      return &slot;
+    }
+    return nullptr;
+  }
+
+  static MgSpriteSlot *findFreeSpriteSlot()
+  {
+    for (int i = 0; i < kMgSpriteSlotCount; ++i)
+    {
+      if (!s_spriteSlots[i].inUse)
+        return &s_spriteSlots[i];
+    }
+    return nullptr;
+  }
+
+  static void clearSpriteSlot(MgSpriteSlot &slot, const char *tag)
+  {
+    slot.canvas.deleteSprite();
+    slot.inUse = false;
+    slot.owner = MiniGame::NONE;
+    slot.assetId[0] = 0;
+    slot.path[0] = 0;
+    slot.depth = 0;
+    slot.transparentKey = 0;
+
+    if (tag && tag[0])
+      mgAssetsLogHeap(tag);
+  }
+
   static bool resolveSdPath(const char* path, const char** outUsePath)
   {
     if (!path || !path[0])
@@ -433,7 +494,10 @@ namespace mgmem
   void endSession()
   {
     if (s_mgmemCurrentGame != MiniGame::NONE)
+    {
+      releaseAllForCurrentGame();
       mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
+    }
 
     char tag[64];
     snprintf(tag, sizeof(tag), "mgmem.end game=%d pet=%d",
@@ -462,6 +526,89 @@ namespace mgmem
     outH = mgAssetsSharedBgH();
 
     return (out != nullptr && outW > 0 && outH > 0);
+  }
+
+  bool ensureSprite(MiniGame owner,
+                    const char *assetId,
+                    const char *path,
+                    uint8_t colorDepth,
+                    uint16_t transparentKey,
+                    M5Canvas *&out)
+  {
+    out = nullptr;
+
+    if (owner == MiniGame::NONE || !assetId || !assetId[0] || !path || !path[0])
+      return false;
+
+    MgSpriteSlot *slot = findSpriteSlot(owner, assetId);
+    if (slot)
+    {
+      const bool samePath = strcmp(slot->path, path) == 0;
+      const bool sameDepth = (slot->depth == colorDepth);
+      const bool sameKey = (slot->transparentKey == transparentKey);
+      const bool spriteReady = (slot->canvas.width() > 0 && slot->canvas.height() > 0);
+
+      if (samePath && sameDepth && sameKey && spriteReady)
+      {
+        out = &slot->canvas;
+        return true;
+      }
+
+      clearSpriteSlot(*slot, "mgmem.ensureSprite.reload-old");
+    }
+    else
+    {
+      slot = findFreeSpriteSlot();
+      if (!slot)
+      {
+        Serial.printf("[MGMEM] ensureSprite FAIL no free slots owner=%d asset=%s\n",
+                      (int)owner, assetId);
+        mgAssetsLogHeap("mgmem.ensureSprite.no-slot");
+        return false;
+      }
+    }
+
+    if (!mgAssetsLoadSprite(slot->canvas, path, colorDepth, transparentKey, assetId))
+    {
+      clearSpriteSlot(*slot, "mgmem.ensureSprite.load-fail");
+      return false;
+    }
+
+    slot->inUse = true;
+    slot->owner = owner;
+    strlcpy(slot->assetId, assetId, sizeof(slot->assetId));
+    strlcpy(slot->path, path, sizeof(slot->path));
+    slot->depth = colorDepth;
+    slot->transparentKey = transparentKey;
+
+    out = &slot->canvas;
+    return true;
+  }
+
+  void releaseSprite(MiniGame owner, const char *assetId)
+  {
+    MgSpriteSlot *slot = findSpriteSlot(owner, assetId);
+    if (!slot)
+      return;
+
+    clearSpriteSlot(*slot, assetId);
+  }
+
+  void releaseAllForCurrentGame()
+  {
+    if (s_mgmemCurrentGame == MiniGame::NONE)
+      return;
+
+    for (int i = 0; i < kMgSpriteSlotCount; ++i)
+    {
+      MgSpriteSlot &slot = s_spriteSlots[i];
+      if (!slot.inUse)
+        continue;
+      if (slot.owner != s_mgmemCurrentGame)
+        continue;
+
+      clearSpriteSlot(slot, "mgmem.releaseAllForCurrentGame");
+    }
   }
 
   size_t freeBytes()
