@@ -35,5 +35,4 @@ void mgDrawPauseOverlay()
 
   spr.setTextDatum(BC_DATUM);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawCentreString("ESC: Resume   ENTER: Select", gW/2, by + bh - 8, 1);
 }

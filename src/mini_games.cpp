@@ -4364,15 +4364,16 @@ void drawInfernalDodger()
   }
 
   const bool needFireballs =
-  (s_dodgerPhase == DODGER_PHASE_FIREBALLS) || (s_dodgerPhase == DODGER_PHASE_COAST);
+  (s_dodgerPhase == DODGER_PHASE_FIREBALLS) ||
+  (s_dodgerPhase == DODGER_PHASE_COAST);
 
 const bool haveFireballs = needFireballs && ensureDodgerFireballSprites(bgPath);
 const bool haveCar = ensureDodgerCarSprite(fireballRunCarPathForPet());
 
-  M5Canvas *fbFrame0 = nullptr;
-  M5Canvas *fbFrame1 = nullptr;
-  M5Canvas *fbFrame2 = nullptr;
-  M5Canvas *carSpr = nullptr;
+M5Canvas *fbFrame0 = nullptr;
+M5Canvas *fbFrame1 = nullptr;
+M5Canvas *fbFrame2 = nullptr;
+M5Canvas *carSpr = nullptr;
 
   if (needFireballs && haveFireballs)
   {

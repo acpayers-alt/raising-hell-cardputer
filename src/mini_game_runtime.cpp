@@ -35,6 +35,8 @@ extern void freeDodgerGoreSprite();
 extern void freeCrossyZoneSprites();
 extern void freeCrossyActorSprites();
 
+extern void freeResRunSprites();
+
 // game update/draw hooks implemented in mini_games.cpp
 extern void updateFlappyFireball(const InputState& input);
 extern void drawFlappyFireball();
@@ -283,6 +285,7 @@ void miniGameExitToReturnUi(bool beginLockout)
   playerWon = false;
 
   mgAssetsEndSession(currentMiniGame, "miniGameExitToReturnUi");
+  mgmem::endSession();
   currentMiniGame = MiniGame::NONE;
 
   mgPauseReset();
@@ -305,6 +308,8 @@ void miniGameExitToReturnUi(bool beginLockout)
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
 
+  freeResRunSprites();
+  
   invalidateBackgroundCache();
   requestFullUIRedraw();
 
