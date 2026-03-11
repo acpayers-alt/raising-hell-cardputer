@@ -79,6 +79,13 @@ void freeDodgerFireballSprites();
 void freeDodgerCarSprite();
 void freeResRunSprites();
 
+static bool ensureDodgerGoalFrames(const char *path0, const char *path1);
+static bool ensureDodgerGoreSprite(const char *path);
+
+static const char *dodgerGoalFrame1ResolvedPath();
+static const char *dodgerGoalFrame2ResolvedPath();
+static const char *dodgerGoalGoreResolvedPath();
+
 static void releaseMiniGameAssetsFor(MiniGame game)
 {
   switch (game)
@@ -1858,30 +1865,30 @@ void updateResurrectionRun(const InputState &input)
   if (rr_gameOver)
     return;
 
-    if (s_rrShowIntro)
+  if (s_rrShowIntro)
+  {
+    if (input.mgSpaceOnce)
+      s_rrDontShowAgain = !s_rrDontShowAgain;
+
+    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+
+    if (startPressed && !mgInputLockedOut())
     {
-      if (input.mgSpaceOnce)
-        s_rrDontShowAgain = !s_rrDontShowAgain;
-  
-      const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
-  
-      if (startPressed && !mgInputLockedOut())
-      {
-        s_rrShowIntro = false;
-        rrResetRunState();
-        rr_lastMs = now;
-        s_rrAnimMs = now;
-        s_rrHandAnimMs = now;
-        s_rrLadybugAnimMs = now;
-  
-        clearInputLatch();
-        inputForceClear();
-        mgBeginInputLockout(120);
-        requestUIRedraw();
-      }
-  
-      return;
+      s_rrShowIntro = false;
+      rrResetRunState();
+      rr_lastMs = now;
+      s_rrAnimMs = now;
+      s_rrHandAnimMs = now;
+      s_rrLadybugAnimMs = now;
+
+      clearInputLatch();
+      inputForceClear();
+      mgBeginInputLockout(120);
+      requestUIRedraw();
     }
+
+    return;
+  }
 
   uint32_t dtMs = now - rr_lastMs;
   rr_lastMs = now;
@@ -1922,9 +1929,8 @@ void updateResurrectionRun(const InputState &input)
   }
 
   const int speed = rr_boosting ? kRrBoostSpeed : kRrBaseSpeed;
-  const bool scrollWorld =
-      (s_rrPhase == RR_PHASE_RUN) || (s_rrPhase == RR_PHASE_HAND_ENTER);
-            
+  const bool scrollWorld = (s_rrPhase == RR_PHASE_RUN) || (s_rrPhase == RR_PHASE_HAND_ENTER);
+
   const int h = (screenH > 0) ? screenH : 135;
   const int gW = (screenW > 0) ? screenW : 240;
   const int groundY = h - kRrGroundH;
@@ -1959,103 +1965,103 @@ void updateResurrectionRun(const InputState &input)
       for (auto &o : rr_obs)
         o.active = false;
     }
+  }
+
+  if (s_rrPhase == RR_PHASE_RUN)
+  {
+    const int playerHitX = px + kRrPlayerHitInsetX;
+    const int playerHitY = py + kRrPlayerHitInsetY;
+    const int playerHitW = pw - (kRrPlayerHitInsetX * 2);
+    const int playerHitH = ph - (kRrPlayerHitInsetY * 2);
+
+    for (auto &o : rr_obs)
+    {
+      if (!o.active)
+        continue;
+
+      const int ox = o.x - rr_distance;
+      const int oy = o.y;
+
+      int obsHitInsetX = 0;
+      int obsHitInsetY = 0;
+
+      if (o.h >= kRrJumpObsH)
+      {
+        obsHitInsetX = kRrJumpObsHitInsetX;
+        obsHitInsetY = kRrJumpObsHitInsetY;
+      }
+      else
+      {
+        obsHitInsetX = kRrDuckObsHitInsetX;
+        obsHitInsetY = kRrDuckObsHitInsetY;
       }
 
-      if (s_rrPhase == RR_PHASE_RUN)
+      const int obsHitX = ox + obsHitInsetX;
+      const int obsHitY = oy + obsHitInsetY;
+      const int obsHitW = o.w - (obsHitInsetX * 2);
+      const int obsHitH = o.h - (obsHitInsetY * 2);
+
+      if (obsHitW > 0 && obsHitH > 0 &&
+          rrAabb(playerHitX, playerHitY, playerHitW, playerHitH, obsHitX, obsHitY, obsHitW, obsHitH))
       {
-        const int playerHitX = px + kRrPlayerHitInsetX;
-        const int playerHitY = py + kRrPlayerHitInsetY;
-        const int playerHitW = pw - (kRrPlayerHitInsetX * 2);
-        const int playerHitH = ph - (kRrPlayerHitInsetY * 2);
-    
-        for (auto &o : rr_obs)
-        {
-          if (!o.active)
-            continue;
-    
-          const int ox = o.x - rr_distance;
-          const int oy = o.y;
-    
-          int obsHitInsetX = 0;
-          int obsHitInsetY = 0;
-    
-          if (o.h >= kRrJumpObsH)
-          {
-            obsHitInsetX = kRrJumpObsHitInsetX;
-            obsHitInsetY = kRrJumpObsHitInsetY;
-          }
-          else
-          {
-            obsHitInsetX = kRrDuckObsHitInsetX;
-            obsHitInsetY = kRrDuckObsHitInsetY;
-          }
-    
-          const int obsHitX = ox + obsHitInsetX;
-          const int obsHitY = oy + obsHitInsetY;
-          const int obsHitW = o.w - (obsHitInsetX * 2);
-          const int obsHitH = o.h - (obsHitInsetY * 2);
-    
-          if (obsHitW > 0 && obsHitH > 0 &&
-              rrAabb(playerHitX, playerHitY, playerHitW, playerHitH, obsHitX, obsHitY, obsHitW, obsHitH))
-          {
-            rrFinishRun(false);
-            return;
-          }
-    
-          if (ox < -40)
-            o.active = false;
-        }
+        rrFinishRun(false);
+        return;
       }
-    
-      if (s_rrPhase == RR_PHASE_HAND_ENTER)
+
+      if (ox < -40)
+        o.active = false;
+    }
+  }
+
+  if (s_rrPhase == RR_PHASE_HAND_ENTER)
+  {
+    s_rrHandY = groundY - s_rrHandH + 8;
+
+    const int handScreenX = s_rrHandX - rr_distance;
+    const int targetScreenX = gW - s_rrHandW;
+
+    if (handScreenX <= targetScreenX)
+    {
+      s_rrPhase = RR_PHASE_HAND_HOLD;
+      s_rrPhaseStartMs = now;
+      s_rrHandX = targetScreenX;
+    }
+    return;
+  }
+
+  if (s_rrPhase == RR_PHASE_HAND_HOLD)
+  {
+    s_rrHandY = groundY - s_rrHandH + 8;
+    s_rrHandX = gW - s_rrHandW;
+
+    const int touchX = s_rrHandX + 12;
+    const int snakeFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
+
+    if (!s_rrHandTouched)
+    {
+      if (snakeFrontX < touchX)
       {
-        s_rrHandY = groundY - s_rrHandH + 8;
-    
-        const int handScreenX = s_rrHandX - rr_distance;
-        const int targetScreenX = gW - s_rrHandW;
-    
-        if (handScreenX <= targetScreenX)
+        s_rrPlayerGoalOffsetX += kRrGoalWalkSpeed;
+
+        const int newFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
+        if (newFrontX >= touchX)
         {
-          s_rrPhase = RR_PHASE_HAND_HOLD;
+          s_rrPlayerGoalOffsetX -= (newFrontX - touchX);
+          s_rrHandTouched = true;
+          s_rrPhase = RR_PHASE_HAND_CONTACT;
           s_rrPhaseStartMs = now;
-          s_rrHandX = targetScreenX;
         }
-        return;
       }
-    
-      if (s_rrPhase == RR_PHASE_HAND_HOLD)
+      else
       {
-        s_rrHandY = groundY - s_rrHandH + 8;
-        s_rrHandX = gW - s_rrHandW;
-    
-        const int touchX = s_rrHandX + 12;
-        const int snakeFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
-    
-        if (!s_rrHandTouched)
-        {
-          if (snakeFrontX < touchX)
-          {
-            s_rrPlayerGoalOffsetX += kRrGoalWalkSpeed;
-    
-            const int newFrontX = kRrPlayerX + s_rrPlayerGoalOffsetX + pw;
-            if (newFrontX >= touchX)
-            {
-              s_rrPlayerGoalOffsetX -= (newFrontX - touchX);
-              s_rrHandTouched = true;
-              s_rrPhase = RR_PHASE_HAND_CONTACT;
-              s_rrPhaseStartMs = now;
-            }
-          }
-          else
-          {
-            s_rrHandTouched = true;
-            s_rrPhase = RR_PHASE_HAND_CONTACT;
-            s_rrPhaseStartMs = now;
-          }
-        }
-        return;
+        s_rrHandTouched = true;
+        s_rrPhase = RR_PHASE_HAND_CONTACT;
+        s_rrPhaseStartMs = now;
       }
-      
+    }
+    return;
+  }
+
   if (s_rrPhase == RR_PHASE_HAND_CONTACT)
   {
     s_rrHandY = groundY - s_rrHandH + 8;
@@ -2227,7 +2233,7 @@ void drawResurrectionRun()
     spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
     return;
   }
-  
+
   if (g_app.gameOver)
   {
     spr.setTextDatum(CC_DATUM);
@@ -3469,10 +3475,7 @@ static bool s_dodgerGoalActive = false;
 static bool s_dodgerGoalReached = false;
 static int16_t s_dodgerGoalX = 0;
 static int16_t s_dodgerGoalY = 0;
-
-static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
-
-static constexpr uint32_t kDodgerCoastMs = 100;
+static int s_dodgerGoalSpawnScrollY = 0;
 
 static LGFX_Sprite s_dodgerGoalSpr[2];
 static bool s_dodgerGoalFrameReady[2] = {false, false};
@@ -3489,7 +3492,15 @@ static uint32_t s_dodgerGoalAnimMs = 0;
 
 static DodgerPhase s_dodgerPhase = DODGER_PHASE_FIREBALLS;
 static uint32_t s_dodgerPhaseStartMs = 0;
+
+static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
+static constexpr uint32_t kDodgerCoastMs = 1400;
+static constexpr uint32_t kDodgerImpactHoldMs = 120;
+static int s_dodgerCarExitVy = 2;
 static constexpr uint32_t kDodgerGoalHoldMs = 900;
+static constexpr uint32_t kDodgerGoalPauseMs = 180;
+static constexpr uint32_t kDodgerCoastDelayMs = 450;
+static constexpr int kDodgerRoadScrollSpeed = 3;
 
 static bool s_dodgerInited = false;
 uint32_t s_dodgerLastStepMs = 0;
@@ -3519,23 +3530,20 @@ static int s_dodgerCarH = 0;
 
 void freeDodgerGoalFrames()
 {
-  for (int i = 0; i < 2; ++i)
-  {
-    if (s_dodgerGoalFrameReady[i])
-      s_dodgerGoalSpr[i].deleteSprite();
+  mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1");
+  mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_frame_2");
 
-    s_dodgerGoalFrameReady[i] = false;
-    s_dodgerGoalFramePath[i][0] = 0;
-  }
-
+  s_dodgerGoalFrameReady[0] = false;
+  s_dodgerGoalFrameReady[1] = false;
+  s_dodgerGoalFramePath[0][0] = 0;
+  s_dodgerGoalFramePath[1][0] = 0;
   s_dodgerGoalW = 0;
   s_dodgerGoalH = 0;
 }
 
 void freeDodgerGoreSprite()
 {
-  if (s_dodgerGoreReady)
-    s_dodgerGoreSpr.deleteSprite();
+  mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_gore");
 
   s_dodgerGoreReady = false;
   s_dodgerGorePath[0] = 0;
@@ -3589,6 +3597,48 @@ static const char *fireballRunBgPathForPet()
   }
 }
 
+static const char *dodgerGoalFrame1ResolvedPath()
+{
+  const char *usePath = nullptr;
+  const char *petPath = dodgerGoalFrame1PathForPet();
+  if (sdExistsTrySlash(petPath, &usePath))
+    return usePath ? usePath : petPath;
+
+  const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png";
+  if (sdExistsTrySlash(fallback, &usePath))
+    return usePath ? usePath : fallback;
+
+  return nullptr;
+}
+
+static const char *dodgerGoalFrame2ResolvedPath()
+{
+  const char *usePath = nullptr;
+  const char *petPath = dodgerGoalFrame2PathForPet();
+  if (sdExistsTrySlash(petPath, &usePath))
+    return usePath ? usePath : petPath;
+
+  const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png";
+  if (sdExistsTrySlash(fallback, &usePath))
+    return usePath ? usePath : fallback;
+
+  return nullptr;
+}
+
+static const char *dodgerGoalGoreResolvedPath()
+{
+  const char *usePath = nullptr;
+  const char *petPath = dodgerGoalGorePathForPet();
+  if (sdExistsTrySlash(petPath, &usePath))
+    return usePath ? usePath : petPath;
+
+  const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
+  if (sdExistsTrySlash(fallback, &usePath))
+    return usePath ? usePath : fallback;
+
+  return nullptr;
+}
+
 static const char *fireballRunCarPathForPet()
 {
   switch (pet.type)
@@ -3635,37 +3685,24 @@ static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
   if (!path0 || !path1 || !path0[0] || !path1[0] || !g_sdReady)
     return false;
 
-  const bool cached = s_dodgerGoalFrameReady[0] && s_dodgerGoalFrameReady[1] &&
-                      strcmp(s_dodgerGoalFramePath[0], path0) == 0 && strcmp(s_dodgerGoalFramePath[1], path1) == 0;
+  M5Canvas *goal1 = nullptr;
+  M5Canvas *goal2 = nullptr;
 
-  if (cached)
-    return true;
-
-  freeDodgerGoalFrames();
-
-  int w0 = 0, h0 = 0;
-  if (!loadDodgerSprite(s_dodgerGoalSpr[0], path0, w0, h0))
-  {
-    freeDodgerGoalFrames();
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1", path0, 8, kDodgerKey, goal1))
     return false;
-  }
 
-  int w1 = 0, h1 = 0;
-  if (!loadDodgerSprite(s_dodgerGoalSpr[1], path1, w1, h1))
-  {
-    freeDodgerGoalFrames();
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_2", path1, 8, kDodgerKey, goal2))
     return false;
-  }
+
+  if (!goal1 || !goal2 || goal1->width() <= 0 || goal1->height() <= 0)
+    return false;
 
   s_dodgerGoalFrameReady[0] = true;
   s_dodgerGoalFrameReady[1] = true;
-
   strlcpy(s_dodgerGoalFramePath[0], path0, sizeof(s_dodgerGoalFramePath[0]));
   strlcpy(s_dodgerGoalFramePath[1], path1, sizeof(s_dodgerGoalFramePath[1]));
-
-  s_dodgerGoalW = w0;
-  s_dodgerGoalH = h0;
-
+  s_dodgerGoalW = (int)goal1->width();
+  s_dodgerGoalH = (int)goal1->height();
   return true;
 }
 
@@ -3674,22 +3711,19 @@ static bool ensureDodgerGoreSprite(const char *path)
   if (!path || !path[0] || !g_sdReady)
     return false;
 
-  if (s_dodgerGoreReady && s_dodgerGorePath[0] && strcmp(s_dodgerGorePath, path) == 0)
-    return true;
+  M5Canvas *gore = nullptr;
+  const bool ok =
+      mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_gore", path, 8, kDodgerKey, gore) &&
+      gore && gore->width() > 0 && gore->height() > 0;
 
-  freeDodgerGoreSprite();
+  s_dodgerGoreReady = ok;
 
-  int w = 0;
-  int h = 0;
-  if (!loadDodgerSprite(s_dodgerGoreSpr, path, w, h))
-  {
-    freeDodgerGoreSprite();
-    return false;
-  }
+  if (ok)
+    strlcpy(s_dodgerGorePath, path, sizeof(s_dodgerGorePath));
+  else
+    s_dodgerGorePath[0] = 0;
 
-  s_dodgerGoreReady = true;
-  strlcpy(s_dodgerGorePath, path, sizeof(s_dodgerGorePath));
-  return true;
+  return ok;
 }
 
 void freeDodgerBgCache()
@@ -3799,6 +3833,8 @@ static void dodgerReset()
   s_dodgerGoalReached = false;
   s_dodgerGoalX = gW / 2;
   s_dodgerGoalY = gH / 2 - 20;
+  s_dodgerGoalSpawnScrollY = 0;
+  s_dodgerCarExitVy = 2;
 
   s_dodgerPhase = DODGER_PHASE_FIREBALLS;
   s_dodgerPhaseStartMs = millis();
@@ -3925,12 +3961,23 @@ void startInfernalDodger()
   const bool carOk = ensureDodgerCarSprite(fireballRunCarPathForPet());
   mgmem::logUsage("dodger-after-car-ensure");
 
+  const char *goalFrame1Path = dodgerGoalFrame1ResolvedPath();
+  const char *goalFrame2Path = dodgerGoalFrame2ResolvedPath();
+  const char *goalGorePath = dodgerGoalGoreResolvedPath();
+
+  const bool goalOk = (goalFrame1Path && goalFrame2Path);
+  const bool goreOk = ensureDodgerGoreSprite(goalGorePath);
+
+  mgmem::logUsage("dodger-after-goal-ensure");
+mgmem::logUsage("dodger-after-gore-ensure");
+
   s_dodgerInited = true;
   dodgerReset();
 
-  Serial.printf("DODGER preload: bg=%d fireballs=%d car=%d free=%u largest=%u\n", bgOk ? 1 : 0, fireballOk ? 1 : 0,
-                carOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  Serial.printf("DODGER preload: bg=%d fireballs=%d car=%d goal=%d gore=%d free=%u largest=%u\n",
+    bgOk ? 1 : 0, fireballOk ? 1 : 0, carOk ? 1 : 0, goalOk ? 1 : 0, goreOk ? 1 : 0,
+    (unsigned)ESP.getFreeHeap(),
+    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   invalidateBackgroundCache();
   s_dodgerShowIntro = true;
@@ -4007,46 +4054,44 @@ void updateInfernalDodger(const InputState &input)
     return;
   }
 
-  int roadSpeed = 2 + (difficulty / 4);
-  if (roadSpeed > 4)
-    roadSpeed = 4;
-
-  // prevent acceleration during coast/goal/impact/exit/offroad
-  if (s_dodgerPhase != DODGER_PHASE_FIREBALLS)
-    roadSpeed = 2;
-
-  if (!s_dodgerFreezeScroll)
-    s_dodgerBgScrollY -= roadSpeed;
+  const int roadSpeed = kDodgerRoadScrollSpeed;
 
   if (s_dodgerPhase == DODGER_PHASE_FIREBALLS && aliveMs >= kDodgerGoalSpawnMs)
   {
     s_dodgerPhase = DODGER_PHASE_COAST;
     s_dodgerPhaseStartMs = now;
     s_dodgerMoveDir = 0;
-
+  
     for (auto &b : s_dodgerBalls)
       b.active = false;
-
-    freeDodgerGoalFrames();
-    freeDodgerGoreSprite();
+  
+    freeDodgerFireballSprites();
+    mgmem::logUsage("dodger-after-fireball-unload");
   }
-
+  
   if (s_dodgerPhase == DODGER_PHASE_COAST)
   {
-    const int targetX = gW / 2;
-    const int centerDriftPx = 2;
+    const uint32_t coastElapsed = now - s_dodgerPhaseStartMs;
 
-    if (s_dodgerPx < targetX)
-      s_dodgerPx += centerDriftPx;
-    else if (s_dodgerPx > targetX)
-      s_dodgerPx -= centerDriftPx;
+    if (coastElapsed >= kDodgerCoastDelayMs)
+    {
+      const int targetX = gW / 2;
+      const int centerDriftPx = 1;
 
-    if (abs(s_dodgerPx - targetX) < centerDriftPx)
-      s_dodgerPx = targetX;
+      if (s_dodgerPx < targetX)
+        s_dodgerPx += centerDriftPx;
+      else if (s_dodgerPx > targetX)
+        s_dodgerPx -= centerDriftPx;
 
-    s_dodgerPxF = (float)s_dodgerPx;
+      if (abs(s_dodgerPx - targetX) < centerDriftPx)
+        s_dodgerPx = targetX;
 
-    if ((now - s_dodgerPhaseStartMs) >= kDodgerCoastMs)
+      s_dodgerPxF = (float)s_dodgerPx;
+    }
+
+    const bool coastDone = (coastElapsed >= (kDodgerCoastDelayMs + kDodgerCoastMs)) && (s_dodgerPx == (gW / 2));
+
+    if (coastDone)
     {
       s_dodgerPhase = DODGER_PHASE_GOAL;
       s_dodgerPhaseStartMs = now;
@@ -4054,8 +4099,10 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerGoalReached = false;
       s_dodgerGoalX = gW / 2;
       s_dodgerGoalY = -24;
+      s_dodgerGoalSpawnScrollY = s_dodgerBgScrollY;
       s_dodgerGoalAnimFrame = 0;
       s_dodgerGoalAnimMs = now;
+      s_dodgerFreezeScroll = false;
     }
   }
 
@@ -4174,6 +4221,9 @@ void updateInfernalDodger(const InputState &input)
     if (spawnEveryMs < 220)
       spawnEveryMs = 220;
 
+    if (!s_dodgerFreezeScroll)
+      s_dodgerBgScrollY -= roadSpeed;
+
     if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
     {
       s_dodgerSpawnAccMs += stepMs;
@@ -4182,7 +4232,10 @@ void updateInfernalDodger(const InputState &input)
         s_dodgerSpawnAccMs = 0;
         dodgerSpawnOne(difficulty);
       }
+    }
 
+    if (s_dodgerPhase == DODGER_PHASE_FIREBALLS || s_dodgerPhase == DODGER_PHASE_COAST)
+    {
       for (auto &b : s_dodgerBalls)
       {
         if (!b.active)
@@ -4212,26 +4265,35 @@ void updateInfernalDodger(const InputState &input)
     {
       const int targetY = gH / 2;
 
-      s_dodgerGoalY += roadSpeed;
+      const int scrollDelta = s_dodgerGoalSpawnScrollY - s_dodgerBgScrollY;
+      s_dodgerGoalY = -24 + scrollDelta;
 
       if (s_dodgerGoalY >= targetY)
       {
         s_dodgerGoalY = targetY;
         s_dodgerGoalReached = true;
         s_dodgerFreezeScroll = true;
+        s_dodgerCarExitVy = roadSpeed;
+        s_dodgerPhase = DODGER_PHASE_IMPACT;
+        s_dodgerPhaseStartMs = now;
+      }
+    }
+    else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
+    {
+      s_dodgerPy -= s_dodgerCarExitVy;
+
+      const int impactY = s_dodgerGoalY + 4;
+      if (s_dodgerPy <= impactY)
+      {
+        s_dodgerPy = impactY;
         s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
         s_dodgerPhaseStartMs = now;
         soundConfirm();
       }
     }
-    else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
-    {
-      s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
-      s_dodgerPhaseStartMs = now;
-    }
     else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
     {
-      s_dodgerPy -= 3;
+      s_dodgerPy -= s_dodgerCarExitVy;
 
       if (s_dodgerPy < -(s_dodgerCarH > 0 ? s_dodgerCarH : 32))
       {
@@ -4301,26 +4363,29 @@ void drawInfernalDodger()
     bh = mgAssetsSharedBgH();
   }
 
-  const bool haveFireballs = ensureDodgerFireballSprites(bgPath);
-  const bool haveCar = ensureDodgerCarSprite(fireballRunCarPathForPet());
+  const bool needFireballs =
+  (s_dodgerPhase == DODGER_PHASE_FIREBALLS) || (s_dodgerPhase == DODGER_PHASE_COAST);
+
+const bool haveFireballs = needFireballs && ensureDodgerFireballSprites(bgPath);
+const bool haveCar = ensureDodgerCarSprite(fireballRunCarPathForPet());
 
   M5Canvas *fbFrame0 = nullptr;
   M5Canvas *fbFrame1 = nullptr;
   M5Canvas *fbFrame2 = nullptr;
   M5Canvas *carSpr = nullptr;
 
-  if (haveFireballs)
+  if (needFireballs && haveFireballs)
   {
     char dir[128];
     flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-
+  
     char path1[192];
     char path2[192];
     char path3[192];
     snprintf(path1, sizeof(path1), "%sfireball1.png", dir);
     snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
     snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
-
+  
     mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball1", path1, 8, kDodgerKey, fbFrame0);
     mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball2", path2, 8, kDodgerKey, fbFrame1);
     mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball3", path3, 8, kDodgerKey, fbFrame2);
@@ -4376,9 +4441,18 @@ void drawInfernalDodger()
     const int impX = (gW - 48) / 2;
     const int impY = 44;
 
-    const char *introImp = (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1PathForPet() : dodgerGoalFrame2PathForPet();
+    const char *introImp =
+    (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1ResolvedPath() : dodgerGoalFrame2ResolvedPath();
 
-    sprDrawPngFromSD(introImp, impX, impY);
+if (introImp && introImp[0])
+  sprDrawPngFromSD(introImp, impX, impY);
+else
+  spr.fillRect(impX, impY, 48, 48, TFT_RED);
+
+if (introImp && introImp[0])
+  sprDrawPngFromSD(introImp, impX, impY);
+else
+  spr.fillRect(impX, impY, 48, 48, TFT_RED);
 
     const int cbY = 102;
     const int cbSize = 10;
@@ -4404,7 +4478,7 @@ void drawInfernalDodger()
     return;
   }
 
-  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS)
+  if (s_dodgerPhase == DODGER_PHASE_FIREBALLS || s_dodgerPhase == DODGER_PHASE_COAST)
   {
     for (auto &b : s_dodgerBalls)
     {
@@ -4439,28 +4513,55 @@ void drawInfernalDodger()
 
   if (s_dodgerGoalActive)
   {
-    const bool gorePhase = (s_dodgerPhase == DODGER_PHASE_IMPACT) || (s_dodgerPhase == DODGER_PHASE_CAR_EXIT) ||
-                           (s_dodgerPhase == DODGER_PHASE_HOLD);
-
-    const char *goalPath =
-        gorePhase ? dodgerGoalGorePathForPet()
-                  : ((s_dodgerGoalAnimFrame & 1) ? dodgerGoalFrame2PathForPet() : dodgerGoalFrame1PathForPet());
-
-    int iw = 0;
-    int ih = 0;
-    const char *usePath = nullptr;
-
-    if (goalPath && mgAssetsReadPngDims(goalPath, &iw, &ih, &usePath) && iw > 0 && ih > 0)
+    const bool gorePhase = (s_dodgerPhase == DODGER_PHASE_CAR_EXIT) || (s_dodgerPhase == DODGER_PHASE_HOLD);
+  
+    if (gorePhase)
     {
-      const int drawX = s_dodgerGoalX - (iw / 2);
-      const int drawY = s_dodgerGoalY - (ih / 2);
-      sprDrawPngFromSD(usePath ? usePath : goalPath, drawX, drawY);
+      M5Canvas *goreSpr = nullptr;
+      const char *gorePath = dodgerGoalGoreResolvedPath();
+  
+      if (gorePath &&
+          ensureDodgerGoreSprite(gorePath) &&
+          mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_gore", gorePath, 8, kDodgerKey, goreSpr) &&
+          goreSpr && goreSpr->width() > 0 && goreSpr->height() > 0)
+      {
+        const int drawX = s_dodgerGoalX - ((int)goreSpr->width() / 2);
+        const int drawY = s_dodgerGoalY - ((int)goreSpr->height() / 2);
+        goreSpr->pushSprite(&spr, drawX, drawY, kDodgerKey);
+      }
+      else
+      {
+        spr.fillRect(s_dodgerGoalX - 24, s_dodgerGoalY - 8, 48, 16, TFT_RED);
+      }
     }
     else
     {
-      spr.fillRect(s_dodgerGoalX - 24, s_dodgerGoalY - 8, 48, 16, TFT_RED);
+      const char *goalPath =
+          (s_dodgerGoalAnimFrame & 1) ? dodgerGoalFrame2ResolvedPath() : dodgerGoalFrame1ResolvedPath();
+    
+      if (goalPath && goalPath[0])
+      {
+        int iw = 0;
+        int ih = 0;
+        const char *usePath = nullptr;
+    
+        if (mgAssetsReadPngDims(goalPath, &iw, &ih, &usePath) && iw > 0 && ih > 0)
+        {
+          const int drawX = s_dodgerGoalX - (iw / 2);
+          const int drawY = s_dodgerGoalY - (ih / 2);
+          sprDrawPngFromSD(usePath ? usePath : goalPath, drawX, drawY);
+        }
+        else
+        {
+          spr.fillRect(s_dodgerGoalX - 24, s_dodgerGoalY - 8, 48, 16, TFT_RED);
+        }
+      }
+      else
+      {
+        spr.fillRect(s_dodgerGoalX - 24, s_dodgerGoalY - 8, 48, 16, TFT_RED);
+      }
     }
-  }
+    }
 
   if (s_dodgerPhase != DODGER_PHASE_HOLD && s_dodgerPhase != DODGER_PHASE_OFFROAD_HOLD)
   {
