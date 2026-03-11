@@ -35,6 +35,8 @@ bool mgAssetsLoadSprite(M5Canvas &dst,
 
 void mgAssetsReleaseSprite(M5Canvas &dst, const char *tag = nullptr);
 
+bool mgAssetsReadImageDims(const char *path, int *outW, int *outH, const char **outUsePath = nullptr);
+
 bool mgAssetsReadPngDims(const char *path, int *outW, int *outH, const char **outUsePath = nullptr);
 
 bool mgAssetsLoadCachedSprite(M5Canvas &dst,

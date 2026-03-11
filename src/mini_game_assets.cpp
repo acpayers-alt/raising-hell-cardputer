@@ -112,6 +112,8 @@ namespace
   }
 }
 
+static bool readJpegDims(const char *usePath, int *outW, int *outH);
+
 void mgAssetsLogHeap(const char* tag)
 {
   Serial.printf(
@@ -146,26 +148,23 @@ bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
 
   // Already loaded and matches exactly.
   if (s_sharedBgReady &&
-    s_sharedBgPath[0] &&
-    strcmp(s_sharedBgPath, path) == 0)
-{
-  s_sharedBgOwner = owner;
-  return true;
-}
-
-  const int w = (int)spr.width();
-  const int h = (int)spr.height();
-  if (w <= 0 || h <= 0)
-    return false;
-
-  const char* usePath = path;
-  if (!resolveSdPath(path, &usePath))
+      s_sharedBgPath[0] &&
+      strcmp(s_sharedBgPath, path) == 0)
   {
-    Serial.printf("[MG ASSET] shared bg missing path='%s'\n", path);
+    s_sharedBgOwner = owner;
+    return true;
+  }
+
+  const char *usePath = nullptr;
+  int w = 0;
+  int h = 0;
+  if (!mgAssetsReadImageDims(path, &w, &h, &usePath) || w <= 0 || h <= 0)
+  {
+    Serial.printf("[MG ASSET] shared bg invalid dims path='%s'\n", path);
     return false;
   }
 
-  const bool isPng = isPngPath(path);
+  const bool isPng = isPngPath(usePath);
 
   mgAssetsLogHeap("shared-bg-before-load");
 
@@ -208,8 +207,8 @@ bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
   s_sharedBgOwner = owner;
   strlcpy(s_sharedBgPath, path, sizeof(s_sharedBgPath));
 
-  Serial.printf("[MG ASSET] shared bg ready owner=%d path='%s'\n", (int)owner, s_sharedBgPath);
-  mgAssetsLogHeap("shared-bg-after-load");
+  Serial.printf("[MG ASSET] shared bg ready owner=%d path='%s' w=%d h=%d\n",
+    (int)owner, s_sharedBgPath, s_sharedBgW, s_sharedBgH);  mgAssetsLogHeap("shared-bg-after-load");
   return true;
 }
 
@@ -311,33 +310,10 @@ bool mgAssetsLoadSprite(
 
   int w = 0;
   int h = 0;
-
-  if (isPngPath(usePath))
+  if (!mgAssetsReadImageDims(path, &w, &h, &usePath))
   {
-    File f = SD.open(usePath, "r");
-    if (!f)
-      return false;
-
-    uint8_t b[24];
-    const int n = f.read(b, sizeof(b));
-    f.close();
-
-    static const uint8_t sig[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
-    if (n != (int)sizeof(b) || memcmp(b, sig, 8) != 0)
-      return false;
-    if (!(b[12] == 'I' && b[13] == 'H' && b[14] == 'D' && b[15] == 'R'))
-      return false;
-
-    w = (int)((uint32_t)b[16] << 24 | (uint32_t)b[17] << 16 | (uint32_t)b[18] << 8 | (uint32_t)b[19]);
-    h = (int)((uint32_t)b[20] << 24 | (uint32_t)b[21] << 16 | (uint32_t)b[22] << 8 | (uint32_t)b[23]);
-  }
-  else
-  {
-    // JPG path: let drawJpgFile decode into a display-sized sprite only after allocation.
-    // For now, use the screen sprite dimensions as a conservative fallback.
-    // We can improve JPG dimension probing later if needed.
-    w = (int)spr.width();
-    h = (int)spr.height();
+    Serial.printf("[MG ASSET] failed to read image dims path='%s'\n", path);
+    return false;
   }
 
   if (w <= 0 || h <= 0)
@@ -377,6 +353,117 @@ bool mgAssetsLoadSprite(
 
   mgAssetsLogHeap(tag ? tag : "sprite-after-load");
   return true;
+}
+
+bool mgAssetsReadImageDims(const char *path, int *outW, int *outH, const char **outUsePath)
+{
+  if (outW) *outW = 0;
+  if (outH) *outH = 0;
+  if (outUsePath) *outUsePath = nullptr;
+
+  if (!g_sdReady || !path || !path[0])
+    return false;
+
+  const char *usePath = path;
+  if (!resolveSdPath(path, &usePath))
+    return false;
+
+  if (outUsePath)
+    *outUsePath = usePath;
+
+  if (isPngPath(usePath))
+    return mgAssetsReadPngDims(path, outW, outH, outUsePath);
+
+  return readJpegDims(usePath, outW, outH);
+}
+
+static bool readJpegDims(const char *usePath, int *outW, int *outH)
+{
+  if (outW) *outW = 0;
+  if (outH) *outH = 0;
+
+  if (!usePath || !usePath[0] || !g_sdReady)
+    return false;
+
+  File f = SD.open(usePath, "r");
+  if (!f)
+    return false;
+
+  auto readByte = [&](uint8_t &b) -> bool
+  {
+    int v = f.read();
+    if (v < 0)
+      return false;
+    b = (uint8_t)v;
+    return true;
+  };
+
+  uint8_t b0 = 0, b1 = 0;
+  if (!readByte(b0) || !readByte(b1) || b0 != 0xFF || b1 != 0xD8)
+  {
+    f.close();
+    return false;
+  }
+
+  while (true)
+  {
+    uint8_t ff = 0;
+    if (!readByte(ff))
+      break;
+
+    if (ff != 0xFF)
+      continue;
+
+    uint8_t marker = 0;
+    do
+    {
+      if (!readByte(marker))
+      {
+        f.close();
+        return false;
+      }
+    } while (marker == 0xFF);
+
+    if (marker == 0xD9 || marker == 0xDA)
+      break;
+
+    uint8_t lenHi = 0, lenLo = 0;
+    if (!readByte(lenHi) || !readByte(lenLo))
+      break;
+
+    uint16_t segLen = (uint16_t(lenHi) << 8) | uint16_t(lenLo);
+    if (segLen < 2)
+      break;
+
+    const bool isSOF =
+      marker == 0xC0 || marker == 0xC1 || marker == 0xC2 ||
+      marker == 0xC3 || marker == 0xC5 || marker == 0xC6 ||
+      marker == 0xC7 || marker == 0xC9 || marker == 0xCA ||
+      marker == 0xCB || marker == 0xCD || marker == 0xCE ||
+      marker == 0xCF;
+
+    if (isSOF)
+    {
+      uint8_t precision = 0, hHi = 0, hLo = 0, wHi = 0, wLo = 0;
+      if (!readByte(precision) || !readByte(hHi) || !readByte(hLo) ||
+          !readByte(wHi) || !readByte(wLo))
+      {
+        f.close();
+        return false;
+      }
+
+      if (outH) *outH = (int)(((uint16_t)hHi << 8) | (uint16_t)hLo);
+      if (outW) *outW = (int)(((uint16_t)wHi << 8) | (uint16_t)wLo);
+      f.close();
+      return true;
+    }
+
+    if (!f.seek(f.position() + (segLen - 2)))
+      break;
+  }
+
+  f.close();
+  return false;
 }
 
 bool mgAssetsReadPngDims(const char *path, int *outW, int *outH, const char **outUsePath)
