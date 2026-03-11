@@ -19,6 +19,16 @@ void uiMiniGameHandle(InputState& in)
     return;
   }
 
+  // ESC during a mini-game intro cancels the mini-game instead of pausing.
+  if (miniGameIsShowingIntro() &&
+  currentMiniGame != MiniGame::RESURRECTION &&
+  in.mgQuitOnce)
+{
+miniGameCancelFromIntro();
+requestFullUIRedraw();
+return;
+}
+
   // Pause-gate handles ESC toggle and pause menu interaction.
   const MgPauseGateResult gate = mgPauseGateHandle(in);
 
@@ -31,8 +41,6 @@ void uiMiniGameHandle(InputState& in)
 
   if (gate == MgPauseGateResult::MG_GATE_SKIP)
   {
-    // If we just paused, immediately swap to MG_PAUSE so the draw path
-    // renders the mini-game frame + overlay this tick.
     if (mgPauseIsPaused())
     {
       uiActionEnterStateClean(UIState::MG_PAUSE, g_app.currentTab, false, in, 150);
@@ -41,11 +49,9 @@ void uiMiniGameHandle(InputState& in)
     return;
   }
 
-  // Running: update/draw mini game
   updateMiniGame(in);
   drawMiniGame();
 
-  // If paused got activated during update, switch to MG_PAUSE UI state.
   if (mgPauseIsPaused())
   {
     uiActionEnterStateClean(UIState::MG_PAUSE, g_app.currentTab, false, in, 150);

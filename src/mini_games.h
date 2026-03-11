@@ -40,3 +40,7 @@ void drawInfernalDodger();
 
 // Implemented in menu_actions.cpp (mini_games.cpp calls this)
 void onResurrectionMiniGameResult(bool success);
+
+//Pause Menu Helpers
+bool miniGameIsShowingIntro();
+void miniGameCancelFromIntro();

@@ -751,6 +751,12 @@ void updateFlappyFireball(const InputState &input)
       s_impFrame = (s_impFrame + 1) % 2;
     }
 
+    if (input.mgQuitOnce && !mgInputLockedOut())
+    {
+      miniGameCancelFromIntro();
+            return;
+    }
+
     const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
 
     if (startPressed && !mgInputLockedOut())
@@ -1749,11 +1755,8 @@ void startResurrectionRun()
   mgmem::logUsage("rr beginSession");
   freeResRunSprites();
 
-  UIState retUi = g_app.uiState;
-  if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
-    retUi = UIState::PET_SCREEN;
-
-  miniGameSetReturnUi(retUi);
+  miniGameSetReturnUi(UIState::DEATH);
+  
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   const bool snakeOk = ensureResRunSnakeSprites();
@@ -1865,13 +1868,13 @@ void updateResurrectionRun(const InputState &input)
   if (rr_gameOver)
     return;
 
-  if (s_rrShowIntro)
-  {
-    if (input.mgSpaceOnce)
-      s_rrDontShowAgain = !s_rrDontShowAgain;
-
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
-
+    if (s_rrShowIntro)
+    {
+      if (input.mgSpaceOnce)
+        s_rrDontShowAgain = !s_rrDontShowAgain;
+  
+      const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+      
     if (startPressed && !mgInputLockedOut())
     {
       s_rrShowIntro = false;
@@ -3088,6 +3091,12 @@ void updateCrossyRoad(const InputState &input)
     if (input.mgSpaceOnce)
       s_crossyDontShowAgain = !s_crossyDontShowAgain;
 
+      if (input.mgQuitOnce && !mgInputLockedOut())
+      {
+        miniGameCancelFromIntro();
+                return;
+      }
+
     const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
 
     if (startPressed && !mgInputLockedOut())
@@ -3908,6 +3917,59 @@ static inline uint32_t dodgerAliveMsNow(uint32_t now)
   return elapsed;
 }
 
+//SHARED MINI GAME INTRO INTERRUPT
+bool miniGameIsShowingIntro()
+{
+  switch (currentMiniGame)
+  {
+  case MiniGame::FLAPPY_FIREBALL:
+    return s_flappyShowIntro;
+
+  case MiniGame::CROSSY_ROAD:
+    return s_crossyShowIntro;
+
+  case MiniGame::INFERNAL_DODGER:
+    return s_dodgerShowIntro;
+
+  case MiniGame::RESURRECTION:
+    return s_rrShowIntro;
+
+  default:
+    return false;
+  }
+}
+
+void miniGameCancelFromIntro()
+{
+  bool refundEnergy = false;
+
+  switch (currentMiniGame)
+  {
+  case MiniGame::FLAPPY_FIREBALL:
+  case MiniGame::CROSSY_ROAD:
+  case MiniGame::INFERNAL_DODGER:
+    refundEnergy = true;
+    break;
+
+  case MiniGame::RESURRECTION:
+  default:
+    refundEnergy = false;
+    break;
+  }
+
+  if (refundEnergy)
+  {
+    pet.energy = constrain(pet.energy + 10, 0, 100);
+    saveManagerMarkDirty();
+  }
+
+  clearInputLatch();
+  inputForceClear();
+  mgPauseReset();
+  exitMiniGameToReturnUi(true);
+  requestFullUIRedraw();
+}
+
 void startInfernalDodger()
 {
   inputSetTextCapture(false);
@@ -4036,6 +4098,12 @@ void updateInfernalDodger(const InputState &input)
 
     if (input.mgSpaceOnce)
       s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
+
+      if (input.mgQuitOnce && !mgInputLockedOut())
+      {
+        miniGameCancelFromIntro();
+                return;
+      }
 
     const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
 
