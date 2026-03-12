@@ -11,6 +11,7 @@
 #include <SD.h>
 #include <string.h>
 #include "ui_invalidate.h"
+#include "ui_runtime.h"
 
 static AssetOtaConfig s_cfg{};
 static AssetOtaState s_state{};
@@ -85,6 +86,7 @@ static void restoreMainUiSprite()
   spr.fillScreen(TFT_BLACK);
   invalidateBackgroundCache();
   requestUIRedraw();
+  renderUI();
 }
 
 static void setFailure(AssetOtaError err)
@@ -342,6 +344,7 @@ bool assetOtaCheckNow(String *outMessage)
 
   if (changed.empty())
   {
+    Serial.printf("[OTA] no changes; version=%s\n", remoteManifest.packVersion.c_str());
     (void)assetManifestSaveLocal(remoteManifest);
     s_installedVersion = remoteManifest.packVersion;
     s_status = AssetOtaStatus::SUCCESS;
@@ -420,6 +423,10 @@ bool assetOtaCheckNow(String *outMessage)
   s_status = AssetOtaStatus::SUCCESS;
   assetOtaStateDefaults(s_state);
   assetOtaStateSave(s_state);
+
+  Serial.printf("[OTA] install success; version=%s files=%u\n",
+                remoteManifest.packVersion.c_str(),
+                (unsigned)changed.size());
 
   if (outMessage)
   {

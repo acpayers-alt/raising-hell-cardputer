@@ -1,5 +1,6 @@
 #include "ui_settings_menu.h"
 
+#include "app_loop.h"
 #include "app_state.h"
 #include "menu_actions.h"
 #include "save_manager.h"
@@ -323,18 +324,30 @@ static void actWifi_CheckAssetOta(InputState &)
   String msg;
   const bool ok = assetOtaCheckNow(&msg);
 
-  if (msg.isEmpty())
-    msg = ok ? "Asset OTA done" : "Asset OTA failed";
-
-  ui_showMessage(msg.c_str());
+  // OTA tears down and rebuilds the main sprite. Force a clean UI refresh.
+  invalidateBackgroundCache();
   requestUIRedraw();
+  renderUI();
+  inputForceClear();
+  clearInputLatch();
+
+  const bool alreadyInstalled = (msg.indexOf("already installed") >= 0);
+  const bool didInstall = (msg.indexOf("installed (") >= 0);
+
+  // Only show a blocking popup for failures or real installs.
+  if (!ok || didInstall)
+  {
+    if (msg.isEmpty())
+      msg = ok ? "Asset OTA done" : "Asset OTA failed";
+
+    ui_showMessage(msg.c_str());
+    requestUIRedraw();
+  }
 
   if (ok)
     playBeep();
   else
     soundError();
-
-  clearInputLatch();
 }
 
 // ------------------------------------------------------------
@@ -425,7 +438,15 @@ static MenuItem kScreenItems[] = {
 static void actWifi_AssetOtaAutoToggle(InputState &)
 {
   const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
-  assetOtaSetAutoCheckEnabled(!enabled);
+  const bool nextEnabled = !enabled;
+
+  assetOtaSetAutoCheckEnabled(nextEnabled);
+
+  // If the user turns auto-check on manually, do not auto-run it immediately.
+  // Defer the first automatic run until the next boot.
+  if (nextEnabled)
+    suppressAssetOtaAutoCheckThisBoot();
+
   requestUIRedraw();
   playBeep();
   clearInputLatch();

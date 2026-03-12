@@ -49,6 +49,12 @@ static uint32_t s_hbNextMs = 0;
 static bool s_bootKeepAwakeInited = false;
 static uint32_t s_bootKeepAwakeUntilMs = 0;
 static bool s_prevSleeping = false;
+static bool s_assetOtaAutoCheckedThisBoot = false;
+
+void suppressAssetOtaAutoCheckThisBoot()
+{
+  s_assetOtaAutoCheckedThisBoot = true;
+}
 
 void appServicesTick(uint32_t nowMs)
 {
@@ -74,6 +80,60 @@ static inline UIState uiStateForTab(Tab t)
     default:
       return UIState::PET_SCREEN;
   }
+}
+
+static void maybeRunAssetOtaAutoCheck()
+{
+  if (s_assetOtaAutoCheckedThisBoot)
+    return;
+
+  if (!assetOtaGetConfig().autoCheckEnabled)
+    return;
+
+  if (!g_sdReady)
+    return;
+
+  if (!wifiIsEnabled())
+    return;
+
+  if (!wifiIsConnectedNow())
+    return;
+
+  // Never auto-run while the user is actively in Settings.
+  if (g_app.uiState == UIState::SETTINGS)
+    return;
+
+  // Avoid running during setup / modal / boot-time flows.
+  switch (g_app.uiState)
+  {
+    case UIState::WIFI_SETUP:
+    case UIState::SET_TIME:
+    case UIState::POWER_MENU:
+    case UIState::DEATH:
+    case UIState::BURIAL_SCREEN:
+    case UIState::MINI_GAME:
+    case UIState::HATCHING:
+    case UIState::EVOLUTION:
+    case UIState::CHOOSE_PET:
+    case UIState::NAME_PET:
+      return;
+
+    default:
+      break;
+  }
+
+  s_assetOtaAutoCheckedThisBoot = true;
+
+  String msg;
+  const bool ok = assetOtaCheckNow(&msg);
+
+  if (!msg.isEmpty() && msg.indexOf("already installed") < 0)
+    ui_showMessage(msg.c_str());
+
+  if (ok)
+    playBeep();
+  else
+    soundError();
 }
 
 void appMainLoopTick()
@@ -646,6 +706,8 @@ void appMainLoopTick()
   // Menu input (includes global interceptors)
   // ---------------------------------------------------------------------------
   handleMenuInput(input);
+
+  maybeRunAssetOtaAutoCheck();
 
   const bool sleepingNow2 = isPetSleepingNow();
 
