@@ -154,7 +154,8 @@ static bool ensureSaveDir();
 static void tryRemove(const char *path);
 
 static bool loadSettingsFromSD_internal(bool *outLoadedOld = nullptr);
-static void saveSettingsToSD_internal();
+static bool saveSettingsToSD_internal();
+static bool saveGameOptionsToSD_internal();
 
 static bool loadSaveFromSD_internal();
 static bool saveSaveToSD_internal();
@@ -202,10 +203,19 @@ static bool loadGameOptionsFromSD_internal()
   if (!ensureSaveDir())
     return false;
 
-  File f = SD.open(GAMEOPT_PATH, FILE_READ);
-  if (!f)
-    return false;
-
+    if (!SD.exists(GAMEOPT_PATH))
+    {
+      DBG_ON("[SAVE] gameopt missing, using defaults\n");
+      return false;
+    }
+    
+    File f = SD.open(GAMEOPT_PATH, FILE_READ);
+    if (!f)
+    {
+      DBG_ON("[SAVE] gameopt open failed\n");
+      return false;
+    }
+    
   if ((size_t)f.size() != sizeof(GameOptionsData))
   {
     f.close();
@@ -244,18 +254,18 @@ static bool loadGameOptionsFromSD_internal()
   return true;
 }
 
-static void saveGameOptionsToSD_internal()
+static bool saveGameOptionsToSD_internal()
 {
   if (!g_sdReady)
-    return;
+    return false;
   if (!ensureSaveDir())
-    return;
+    return false;
 
   tryRemove(GAMEOPT_TMP_PATH);
 
   File f = SD.open(GAMEOPT_TMP_PATH, FILE_WRITE);
   if (!f)
-    return;
+    return false;
 
   const size_t w = f.write((const uint8_t *)&g_gameopt, sizeof(g_gameopt));
   f.flush();
@@ -264,7 +274,7 @@ static void saveGameOptionsToSD_internal()
   if (w != sizeof(g_gameopt))
   {
     tryRemove(GAMEOPT_TMP_PATH);
-    return;
+    return false;
   }
 
   tryRemove(GAMEOPT_PATH);
@@ -272,8 +282,10 @@ static void saveGameOptionsToSD_internal()
   {
     DBG_ON("[SAVE] rename failed: %s -> %s\n", GAMEOPT_TMP_PATH, GAMEOPT_PATH);
     tryRemove(GAMEOPT_TMP_PATH);
-    return;
+    return false;
   }
+
+  return true;
 }
 
 // ============================================================
@@ -479,22 +491,25 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   if (sz == NEW_SZ)
   {
     const int r = f.read((uint8_t *)&tmp, NEW_SZ);
-    ok = (r == (int)NEW_SZ);
+    if (r == (int)NEW_SZ)
+    {
+      ok = true;
 
-    if (tmp.brightnessLevel > 2)
-      tmp.brightnessLevel = 1;
-    if (tmp.tzIndex > 64)
-      tmp.tzIndex = 2;
-    if (tmp.autoScreenTimeoutSel > 3)
-      tmp.autoScreenTimeoutSel = 0;
+      if (tmp.brightnessLevel > 2)
+        tmp.brightnessLevel = 1;
+      if (tmp.tzIndex > 64)
+        tmp.tzIndex = 2;
+      if (tmp.autoScreenTimeoutSel > 3)
+        tmp.autoScreenTimeoutSel = 0;
 
-    tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
 
-    tmp.soundEnabled = (tmp.soundEnabled != 0);
-    tmp.wifiEnabled = (tmp.wifiEnabled != 0);
-    tmp.petDeathEnabled = (tmp.petDeathEnabled != 0);
-    tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
-    tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
+      tmp.soundEnabled = (tmp.soundEnabled != 0);
+      tmp.wifiEnabled = (tmp.wifiEnabled != 0);
+      tmp.petDeathEnabled = (tmp.petDeathEnabled != 0);
+      tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
+      tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
+    }
   }
   else if (sz == OLD_SZ_7)
   {
@@ -605,10 +620,19 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       loadedOld = true;
     }
   }
+  else
+  {
+    DBG_ON("[SAVE] settings size unsupported: %u\n", (unsigned)sz);
+  }
 
   f.close();
+
   if (!ok)
+  {
+    DBG_ON("[SAVE] settings read failed size=%u\n", (unsigned)sz);
     return false;
+  }
+
   if (outLoadedOld)
     *outLoadedOld = loadedOld;
 
@@ -640,12 +664,12 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   return true;
 }
 
-static void saveSettingsToSD_internal()
+static bool saveSettingsToSD_internal()
 {
   if (!g_sdReady)
-    return;
+    return false;
   if (!ensureSaveDir())
-    return;
+    return false;
 
   g_settings.brightnessLevel = brightnessLevel;
   g_settings.autoScreenOffEnabled = g_app.autoScreenOffEnabled;
@@ -663,7 +687,7 @@ static void saveSettingsToSD_internal()
 
   File f = SD.open(SET_TMP_PATH, FILE_WRITE);
   if (!f)
-    return;
+    return false;
 
   const size_t w = f.write((const uint8_t *)&g_settings, sizeof(SettingsData));
   f.flush();
@@ -672,7 +696,7 @@ static void saveSettingsToSD_internal()
   if (w != sizeof(SettingsData))
   {
     tryRemove(SET_TMP_PATH);
-    return;
+    return false;
   }
 
   tryRemove(SET_PATH);
@@ -680,8 +704,10 @@ static void saveSettingsToSD_internal()
   {
     DBG_ON("[SAVE] rename failed: %s -> %s\n", SET_TMP_PATH, SET_PATH);
     tryRemove(SET_TMP_PATH);
-    return;
+    return false;
   }
+
+  return true;
 }
 
 static void newPetInternalNoSave(bool resetName)
@@ -727,6 +753,13 @@ static bool loadSaveFromSD_internal()
   const size_t sz = (size_t)f.size();
   g_lastLoadSize = (uint32_t)sz;
 
+  if (sz < sizeof(uint32_t) + sizeof(uint16_t))
+  {
+    g_lastLoadErr = SLE_READ_FAIL;
+    f.close();
+    return false;
+  }
+
   SavePayload p{};
   memset(&p, 0, sizeof(p));
 
@@ -754,9 +787,15 @@ static bool loadSaveFromSD_internal()
   p.magic = SAVE_MAGIC;
   p.version = SAVE_VERSION;
 
+  if (p.version == SAVE_VERSION && sz < sizeof(SavePayload))
+  {
+    g_lastLoadErr = SLE_READ_FAIL;
+    return false;
+  }
+
   unpack(p);
 
-  (void)saveSaveToSD_internal();
+  //  (void)saveSaveToSD_internal();
   return true;
 }
 
@@ -907,9 +946,10 @@ bool saveManagerSave()
   if (!g_sdReady)
     return false;
 
-  saveSettingsToSD_internal();
+  const bool settingsOk = saveSettingsToSD_internal();
+  const bool saveOk = saveSaveToSD_internal();
+  const bool ok = settingsOk && saveOk;
 
-  const bool ok = saveSaveToSD_internal();
   if (ok)
   {
     dirty = false;
@@ -923,8 +963,9 @@ bool saveManagerSave()
   }
   else
   {
-    DBGLN_ON("[SAVE] SAVE FAIL");
+    DBG_ON("[SAVE] SAVE FAIL settings=%d save=%d\n", settingsOk ? 1 : 0, saveOk ? 1 : 0);
   }
+
   return ok;
 }
 
@@ -949,11 +990,26 @@ void saveManagerForce()
   if (!g_sdReady)
     return;
 
-  saveSettingsToSD_internal();
+  const bool settingsOk = saveSettingsToSD_internal();
 
   if (!dirty)
+  {
+    if (!settingsOk)
+      DBG_ON("[SAVE] FORCE settings write failed\n");
     return;
-  (void)saveManagerSave();
+  }
+
+  const bool saveOk = saveSaveToSD_internal();
+  if (settingsOk && saveOk)
+  {
+    dirty = false;
+    lastSaveMs = millis();
+    DBGLN_ON("[SAVE] FORCE OK");
+  }
+  else
+  {
+    DBG_ON("[SAVE] FORCE FAIL settings=%d save=%d\n", settingsOk ? 1 : 0, saveOk ? 1 : 0);
+  }
 }
 
 bool loadSettingsFromSD()
@@ -1004,7 +1060,9 @@ void saveManagerSetDecayMode(uint8_t m)
   if (m > 5)
     m = 2;
   g_gameopt.decayMode = m;
-  saveGameOptionsToSD_internal();
+
+  if (!saveGameOptionsToSD_internal())
+    DBG_ON("[SAVE] game options write failed\n");
 }
 
 static void tryRemove(const char *path)
