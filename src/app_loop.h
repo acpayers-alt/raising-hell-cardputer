@@ -8,4 +8,3 @@ void appMainLoopTick();
 // (keyboard update, sound tick, power button tick, etc).
 void appServicesTick(uint32_t nowMs);
 
-void suppressAssetOtaAutoCheckThisBoot();

@@ -435,23 +435,6 @@ static MenuItem kScreenItems[] = {
     {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
 };
 
-static void actWifi_AssetOtaAutoToggle(InputState &)
-{
-  const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
-  const bool nextEnabled = !enabled;
-
-  assetOtaSetAutoCheckEnabled(nextEnabled);
-
-  // If the user turns auto-check on manually, do not auto-run it immediately.
-  // Defer the first automatic run until the next boot.
-  if (nextEnabled)
-    suppressAssetOtaAutoCheckThisBoot();
-
-  requestUIRedraw();
-  playBeep();
-  clearInputLatch();
-}
-
 static void actWifi_AssetOtaChannelToggle(InputState &)
 {
   const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
@@ -469,9 +452,8 @@ static MenuItem kWifiItems[] = {
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
     {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
     {"Check Asset OTA", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
-    {"OTA Auto Check", actWifi_AssetOtaAutoToggle, actWifi_AssetOtaAutoToggle, actWifi_AssetOtaAutoToggle, nullptr},
-    {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr},
-};
+    {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
+  };
 
 static MenuItem kGameItems[] = {
     {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},

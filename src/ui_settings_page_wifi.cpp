@@ -43,18 +43,8 @@ void Handle_WIFI(InputState& input, int move) {
     return;
   }
 
-  // Asset OTA auto-check toggle on row 5
+  // Asset OTA channel cycle on row 5
   if (g_wifi.wifiSettingsIndex == 5 && (input.leftOnce || input.rightOnce)) {
-    const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
-    assetOtaSetAutoCheckEnabled(!enabled);
-    requestUIRedraw();
-    playBeep();
-    clearInputLatch();
-    return;
-  }
-
-  // Asset OTA channel cycle on row 6
-  if (g_wifi.wifiSettingsIndex == 6 && (input.leftOnce || input.rightOnce)) {
     const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
     const AssetOtaChannel next =
         (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
@@ -131,16 +121,7 @@ void Handle_WIFI(InputState& input, int move) {
         return;
       }
 
-      case 5: { // Asset OTA Auto Check
-        const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
-        assetOtaSetAutoCheckEnabled(!enabled);
-        requestUIRedraw();
-        playBeep();
-        clearInputLatch();
-        return;
-      }
-
-      case 6: { // Asset OTA Channel
+      case 5: { // Asset OTA Channel
         const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
         const AssetOtaChannel next =
             (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;

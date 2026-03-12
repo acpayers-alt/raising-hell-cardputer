@@ -34,6 +34,7 @@
 #include "ui_runtime.h"
 
 #include "anim_clips.h"
+#include "asset_ota.h"
 #include "boot_state.h"
 #include "brightness_state.h"
 #include "build_flags.h"
@@ -61,8 +62,8 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
-#include "asset_ota.h"
 
+// --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
 static void drawBurialScreen();
 
@@ -1971,23 +1972,12 @@ static void drawWifiSettingsMenu()
   else
     snprintf(otaCheckLine, sizeof(otaCheckLine), "Check Asset OTA");
 
-  char otaAutoLine[32];
-  snprintf(otaAutoLine, sizeof(otaAutoLine), "OTA Auto Check: %s",
-           assetOtaGetConfig().autoCheckEnabled ? "ON" : "OFF");
-
   char otaChannelLine[32];
   snprintf(otaChannelLine, sizeof(otaChannelLine), "OTA Channel: %s",
            ((AssetOtaChannel)assetOtaGetConfig().channel == AssetOtaChannel::DEV) ? "Dev" : "Public");
 
-  const char *labels[] = {
-      wLine,
-      "Set WiFi Network",
-      "Reset WiFi Settings",
-      tzLine,
-      otaCheckLine,
-      otaAutoLine,
-      otaChannelLine};
-  const int totalItems = 7;
+  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaCheckLine, otaChannelLine};
+  const int totalItems = 6;
 
   g_wifi.wifiSettingsIndex = clampi(g_wifi.wifiSettingsIndex, 0, totalItems - 1);
 
@@ -3022,6 +3012,51 @@ void drawInventoryMenu()
 static const char *g_petBgCachedPath = nullptr;
 static PetType g_petBgCachedType = (PetType)255;
 static uint8_t g_petBgCachedStage = 255;
+
+// -----------------------------------------------------------------------------
+// Memory Release helper for OTA Assets
+// -----------------------------------------------------------------------------
+void graphicsReleasePetLayerForOta()
+{
+  petLayer.deleteSprite();
+  petLayerReady = false;
+
+  g_petBgCachedPath = nullptr;
+  g_petBgCachedType = (PetType)255;
+  g_petBgCachedStage = 255;
+  g_forcePetBgCache = true;
+}
+
+void graphicsRecoverAfterOta()
+{
+  petLayer.deleteSprite();
+  petLayerReady = false;
+
+  spr.deleteSprite();
+  Serial.printf("[OTA/UI] before recreate free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  if (!spr.createSprite(screenW, screenH))
+  {
+    Serial.printf("[OTA/UI] main sprite recreate failed free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+                  (unsigned)ESP.getMaxAllocHeap());
+    return;
+  }
+
+  spr.setTextScroll(false);
+  spr.fillScreen(TFT_BLACK);
+
+  g_petBgCachedPath = nullptr;
+  g_petBgCachedType = (PetType)255;
+  g_petBgCachedStage = 255;
+  g_forcePetBgCache = true;
+
+  bgDrawnForState = false;
+  lastDrawnState = (UIState)255;
+
+  invalidateBackgroundCache();
+  requestUIRedraw();
+}
 
 static void cachePetAreaBackgroundIfNeeded(bool force)
 {

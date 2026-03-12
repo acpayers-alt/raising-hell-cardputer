@@ -7,6 +7,7 @@
 #include <WiFiClientSecure.h>
 
 #include "asset_ota_config.h"
+#include "graphics.h"
 #include "sdcard.h"
 
 static bool parseManifestJson(const String &json, AssetManifestData *out)
@@ -167,40 +168,37 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   if (!out || !url || !url[0])
     return false;
 
+  graphicsReleasePetLayerForOta();
+
   Serial.printf("[OTA] manifest url=%s\n", url);
-  Serial.printf("[OTA] pre-http free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
   http.setReuse(false);
+  http.setTimeout(15000);
+  http.addHeader("Accept", "application/json");
+  http.setUserAgent("RaisingHellCardputer/1.0");
 
   const String sUrl(url);
   bool began = false;
 
+  WiFiClient plainClient;
+  WiFiClientSecure secureClient;
+
   if (sUrl.startsWith("https://"))
   {
-    WiFiClientSecure *client = new WiFiClientSecure();
-    if (!client)
-    {
-      Serial.println("[OTA] manifest secure client alloc failed");
-      return false;
-    }
-    client->setInsecure();
-    client->setTimeout(15000);
-    client->setHandshakeTimeout(15);
-    began = http.begin(*client, url);
+    secureClient.setInsecure();
+    secureClient.setTimeout(15000);
+    secureClient.setHandshakeTimeout(15);
+    began = http.begin(secureClient, url);
   }
   else
   {
-    WiFiClient *client = new WiFiClient();
-    if (!client)
-    {
-      Serial.println("[OTA] manifest client alloc failed");
-      return false;
-    }
-    began = http.begin(*client, url);
+    began = http.begin(plainClient, url);
   }
+
+  Serial.printf("[OTA] post-begin began=%d free=%u largest=%u\n", began ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   if (!began)
   {
@@ -208,10 +206,15 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
+  Serial.printf("[OTA] pre-GET free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+
   const int code = http.GET();
   Serial.printf("[OTA] manifest http code=%d\n", code);
+
   if (code != HTTP_CODE_OK)
   {
+    String errBody = http.getString();
+    Serial.printf("[OTA] manifest error body: %s\n", errBody.c_str());
     http.end();
     return false;
   }
@@ -224,42 +227,53 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   Serial.printf("[OTA] manifest bytes=%u\n", (unsigned)payload.length());
 
   if (payload.isEmpty())
+  {
+    Serial.println("[OTA] manifest payload empty");
     return false;
+  }
 
-  return parseManifestJson(payload, out);
+  const bool parsed = parseManifestJson(payload, out);
+  Serial.printf("[OTA] manifest parsed=%d\n", parsed ? 1 : 0);
+  if (!parsed)
+  {
+    Serial.println("[OTA] manifest parse failed");
+    Serial.println(payload);
+    return false;
+  }
+
+  return true;
 }
 
-void assetManifestBuildDiff(const AssetManifestData &localManifest,
-  const AssetManifestData &remoteManifest,
-  std::vector<AssetManifestFile> &outChangedFiles)
+void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetManifestData &remoteManifest,
+                            std::vector<AssetManifestFile> &outChangedFiles)
 {
-outChangedFiles.clear();
+  outChangedFiles.clear();
 
-for (const auto &rf : remoteManifest.files)
-{
-bool foundSame = false;
+  for (const auto &rf : remoteManifest.files)
+  {
+    bool foundSame = false;
 
-for (const auto &lf : localManifest.files)
-{
-if (lf.path != rf.path)
-continue;
+    for (const auto &lf : localManifest.files)
+    {
+      if (lf.path != rf.path)
+        continue;
 
-const bool sameSize = (lf.size == rf.size);
-const bool sameHash = (lf.sha256.equalsIgnoreCase(rf.sha256));
+      const bool sameSize = (lf.size == rf.size);
+      const bool sameHash = (lf.sha256.equalsIgnoreCase(rf.sha256));
 
-if (sameSize && sameHash)
-{
-String livePath = "/";
-livePath += rf.path;
+      if (sameSize && sameHash)
+      {
+        String livePath = "/";
+        livePath += rf.path;
 
-if (SD.exists(livePath.c_str()))
-foundSame = true;
-}
+        if (SD.exists(livePath.c_str()))
+          foundSame = true;
+      }
 
-break;
-}
+      break;
+    }
 
-if (!foundSame)
-outChangedFiles.push_back(rf);
-}
+    if (!foundSame)
+      outChangedFiles.push_back(rf);
+  }
 }

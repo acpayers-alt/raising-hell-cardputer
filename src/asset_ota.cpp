@@ -19,6 +19,13 @@ static AssetOtaStatus s_status = AssetOtaStatus::IDLE;
 static AssetOtaError s_lastErr = AssetOtaError::NONE;
 static String s_installedVersion;
 static bool s_inited = false;
+static bool s_loadedFromSd = false;
+static bool s_graphicsReleasedForOta = false;
+
+bool assetOtaDidReleaseGraphics()
+{
+  return s_graphicsReleasedForOta;
+}
 
 static const char *statusString(AssetOtaStatus st)
 {
@@ -78,15 +85,14 @@ static const char *errorString(AssetOtaError err)
   return "Unknown";
 }
 
+// OTA frees the main UI sprite to recover heap for TLS.
+// Recreate it and immediately force a redraw so the screen
+// does not remain blank while the app continues running.
 static void restoreMainUiSprite()
 {
-  spr.deleteSprite();
-  spr.createSprite(SCREEN_W, SCREEN_H);
-  spr.setTextScroll(false);
-  spr.fillScreen(TFT_BLACK);
-  invalidateBackgroundCache();
-  requestUIRedraw();
-  renderUI();
+  // Intentionally do nothing here.
+  // Rebuild the UI sprite only after assetOtaCheckNow() returns,
+  // when manifest/download locals have gone out of scope.
 }
 
 static void setFailure(AssetOtaError err)
@@ -175,6 +181,32 @@ static bool writeLegacyMarker(const char *version)
   return true;
 }
 
+static void loadAssetOtaFromSdIfAvailable()
+{
+  if (!g_sdReady)
+    return;
+
+  assetOtaEnsureCoreDirs();
+  (void)assetOtaConfigLoad(&s_cfg);
+  (void)assetOtaStateLoad(&s_state);
+
+  AssetManifestData local;
+  if (assetManifestLoadLocal(&local))
+    s_installedVersion = local.packVersion;
+  else
+    s_installedVersion = "";
+
+  if (s_state.inProgress)
+  {
+    removeTree(assetOtaStagingRoot());
+    assetOtaEnsureCoreDirs();
+    assetOtaStateDefaults(s_state);
+    assetOtaStateSave(s_state);
+  }
+
+  s_loadedFromSd = true;
+}
+
 void assetOtaInit()
 {
   if (s_inited)
@@ -184,23 +216,7 @@ void assetOtaInit()
   assetOtaStateDefaults(s_state);
 
   if (g_sdReady)
-  {
-    assetOtaEnsureCoreDirs();
-    (void)assetOtaConfigLoad(&s_cfg);
-    (void)assetOtaStateLoad(&s_state);
-
-    AssetManifestData local;
-    if (assetManifestLoadLocal(&local))
-      s_installedVersion = local.packVersion;
-
-    if (s_state.inProgress)
-    {
-      removeTree(assetOtaStagingRoot());
-      assetOtaEnsureCoreDirs();
-      assetOtaStateDefaults(s_state);
-      assetOtaStateSave(s_state);
-    }
-  }
+    loadAssetOtaFromSdIfAvailable();
 
   s_status = AssetOtaStatus::IDLE;
   s_lastErr = AssetOtaError::NONE;
@@ -211,12 +227,19 @@ void assetOtaTick()
 {
   if (!s_inited)
     assetOtaInit();
+
+  if (!s_loadedFromSd && g_sdReady)
+    loadAssetOtaFromSdIfAvailable();
 }
 
 const AssetOtaConfig &assetOtaGetConfig()
 {
   if (!s_inited)
     assetOtaInit();
+
+  if (!s_loadedFromSd && g_sdReady)
+    loadAssetOtaFromSdIfAvailable();
+
   return s_cfg;
 }
 
@@ -254,14 +277,7 @@ bool assetOtaCheckNow(String *outMessage)
   if (!s_inited)
     assetOtaInit();
 
-  Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-
-  invalidateBackgroundCache();
-  spr.deleteSprite();
-
-  Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
+  s_graphicsReleasedForOta = false;
 
   if (!g_sdReady)
   {
@@ -330,11 +346,11 @@ bool assetOtaCheckNow(String *outMessage)
   {
     setFailure(AssetOtaError::JSON_FAIL);
     if (outMessage)
-      *outMessage = "Remote manifest failed";
+      *outMessage = "Manifest download/parse failed";
     restoreMainUiSprite();
     return false;
   }
-
+  
   strncpy(s_state.targetPackVersion, remoteManifest.packVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
   assetOtaStateSave(s_state);
@@ -359,6 +375,16 @@ bool assetOtaCheckNow(String *outMessage)
     restoreMainUiSprite();
     return true;
   }
+
+  Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  invalidateBackgroundCache();
+  spr.deleteSprite();
+  s_graphicsReleasedForOta = true;
+
+  Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   for (size_t i = 0; i < changed.size(); ++i)
   {

@@ -8,6 +8,9 @@
 #define TFT_BLACK 0x0000
 #endif
 
+void graphicsRecoverAfterOta();
+void graphicsReleasePetLayerForOta();
+
 // -----------------------------------------------------------------------------
 // Modal / messages
 // -----------------------------------------------------------------------------

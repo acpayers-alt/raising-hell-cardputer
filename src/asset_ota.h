@@ -16,3 +16,5 @@ AssetOtaStatus assetOtaStatus();
 AssetOtaError assetOtaLastError();
 const char *assetOtaStatusString();
 const char *assetOtaLastErrorString();
+
+bool assetOtaDidReleaseGraphics();
