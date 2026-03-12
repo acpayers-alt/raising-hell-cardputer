@@ -3,7 +3,8 @@
 #include <Arduino.h>
 #include <SD.h>
 #include <string.h>
-
+#include "graphics.h"
+#include "display.h"
 #include "asset_downloader.h"
 #include "asset_manifest.h"
 #include "asset_ota_config.h"
@@ -233,6 +234,18 @@ bool assetOtaCheckNow(String *outMessage)
 
   if (!s_inited)
     assetOtaInit();
+
+  Serial.printf("[OTA] before cleanup free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  // --- FREE GRAPHICS MEMORY BEFORE HTTPS ---
+  invalidateBackgroundCache();
+  spr.deleteSprite();
+
+  Serial.printf("[OTA] after cleanup free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   if (!g_sdReady)
   {

@@ -16,10 +16,10 @@ static const char *kStagingRoot = "/raising_hell/assets_staging";
 static const char *kLegacyMarkerPath = "/raising_hell/ASSET_MANIFEST.txt";
 
 static const char *kPublicManifestUrl =
-    "http://192.168.1.76:8000/manifest-public.json";
+"https://assets.raisinghellgame.com/manifest-public.json";
 
 static const char *kDevManifestUrl =
-    "http://192.168.1.76:8000/manifest-dev.json";
+"https://assets.raisinghellgame.com/manifest-dev.json";
 
 const char *assetOtaConfigPath() { return kCfgPath; }
 const char *assetOtaConfigTmpPath() { return kCfgTmpPath; }
