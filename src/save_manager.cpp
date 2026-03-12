@@ -151,6 +151,7 @@ static void pack(SavePayload &p);
 static void unpack(const SavePayload &p);
 static void newPetInternal();
 static bool ensureSaveDir();
+static void tryRemove(const char *path);
 
 static bool loadSettingsFromSD_internal(bool *outLoadedOld = nullptr);
 static void saveSettingsToSD_internal();
@@ -250,7 +251,8 @@ static void saveGameOptionsToSD_internal()
   if (!ensureSaveDir())
     return;
 
-  SD.remove(GAMEOPT_TMP_PATH);
+  tryRemove(GAMEOPT_TMP_PATH);
+
   File f = SD.open(GAMEOPT_TMP_PATH, FILE_WRITE);
   if (!f)
     return;
@@ -261,12 +263,17 @@ static void saveGameOptionsToSD_internal()
 
   if (w != sizeof(g_gameopt))
   {
-    SD.remove(GAMEOPT_TMP_PATH);
+    tryRemove(GAMEOPT_TMP_PATH);
     return;
   }
 
-  SD.remove(GAMEOPT_PATH);
-  SD.rename(GAMEOPT_TMP_PATH, GAMEOPT_PATH);
+  tryRemove(GAMEOPT_PATH);
+  if (!SD.rename(GAMEOPT_TMP_PATH, GAMEOPT_PATH))
+  {
+    DBG_ON("[SAVE] rename failed: %s -> %s\n", GAMEOPT_TMP_PATH, GAMEOPT_PATH);
+    tryRemove(GAMEOPT_TMP_PATH);
+    return;
+  }
 }
 
 // ============================================================
@@ -652,7 +659,8 @@ static void saveSettingsToSD_internal()
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
 
-  SD.remove(SET_TMP_PATH);
+  tryRemove(SET_TMP_PATH);
+
   File f = SD.open(SET_TMP_PATH, FILE_WRITE);
   if (!f)
     return;
@@ -663,12 +671,17 @@ static void saveSettingsToSD_internal()
 
   if (w != sizeof(SettingsData))
   {
-    SD.remove(SET_TMP_PATH);
+    tryRemove(SET_TMP_PATH);
     return;
   }
 
-  SD.remove(SET_PATH);
-  SD.rename(SET_TMP_PATH, SET_PATH);
+  tryRemove(SET_PATH);
+  if (!SD.rename(SET_TMP_PATH, SET_PATH))
+  {
+    DBG_ON("[SAVE] rename failed: %s -> %s\n", SET_TMP_PATH, SET_PATH);
+    tryRemove(SET_TMP_PATH);
+    return;
+  }
 }
 
 static void newPetInternalNoSave(bool resetName)
@@ -757,7 +770,8 @@ static bool saveSaveToSD_internal()
   SavePayload p{};
   pack(p);
 
-  SD.remove(SAVE_TMP_PATH);
+  tryRemove(SAVE_TMP_PATH);
+
   File f = SD.open(SAVE_TMP_PATH, FILE_WRITE);
   if (!f)
     return false;
@@ -768,12 +782,18 @@ static bool saveSaveToSD_internal()
 
   if (w != sizeof(p))
   {
-    SD.remove(SAVE_TMP_PATH);
+    tryRemove(SAVE_TMP_PATH);
     return false;
   }
 
-  SD.remove(SAVE_PATH);
-  SD.rename(SAVE_TMP_PATH, SAVE_PATH);
+  tryRemove(SAVE_PATH);
+  if (!SD.rename(SAVE_TMP_PATH, SAVE_PATH))
+  {
+    DBG_ON("[SAVE] rename failed: %s -> %s\n", SAVE_TMP_PATH, SAVE_PATH);
+    tryRemove(SAVE_TMP_PATH);
+    return false;
+  }
+
   return true;
 }
 

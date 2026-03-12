@@ -5,42 +5,42 @@
 #include "boot_pipeline.h"
 
 #include <Arduino.h>
-#include <SD.h>
 #include <EEPROM.h>
+#include <SD.h>
 #include <cstring>
 
 // Keep includes broad/safe like you’ve been doing
-#include "sdcard.h"
-#include "display.h"
-#include "display_state.h"
-#include "display_dims_state.h"
-#include "ui_runtime.h"
-#include "ui_actions.h"
-#include "ui_level_popup.h"
-#include "input.h"
-#include "save_manager.h"
-#include "time_persist.h"
-#include "wifi_time.h"
-#include "wifi_power.h"
-#include "timezone.h"
-#include "brightness_state.h"
-#include "settings_state.h"
-#include "controls_help_state.h"
-#include "boot_state.h"
-#include "inventory.h"
 #include "app_state.h"
+#include "boot_state.h"
+#include "brightness_state.h"
+#include "controls_help_state.h"
 #include "debug.h"
-#include "time_state.h"
+#include "display.h"
+#include "display_dims_state.h"
+#include "display_state.h"
 #include "eeprom_addrs.h"
-#include "graphics.h"
 #include "flow_boot_wizard.h"
 #include "flow_time_editor.h"
+#include "graphics.h"
+#include "input.h"
+#include "inventory.h"
 #include "new_pet_flow_state.h"
+#include "save_manager.h"
+#include "sdcard.h"
+#include "settings_state.h"
+#include "time_persist.h"
+#include "time_state.h"
+#include "timezone.h"
+#include "ui_actions.h"
+#include "ui_level_popup.h"
+#include "ui_runtime.h"
+#include "wifi_power.h"
+#include "wifi_time.h"
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
 // -----------------------------------------------------------------------------
-static const char* kSdAssetsMarkerPath = "/raising_hell/ASSET_MANIFEST.txt";
+static const char *kSdAssetsMarkerPath = "/raising_hell/ASSET_MANIFEST.txt";
 
 bool g_assetsChecked = false;
 bool g_assetsMissing = false;
@@ -55,8 +55,7 @@ void drawAssetsMissingScreen()
   const bool sdOk = g_sdReady;
 
   spr.setTextColor(TFT_RED, TFT_BLACK);
-  spr.drawString(sdOk ? "ASSETS MISSING" : "SD CARD NOT DETECTED",
-                 SCREEN_W / 2, SCREEN_H / 2 - 36);
+  spr.drawString(sdOk ? "ASSETS MISSING" : "SD CARD NOT DETECTED", SCREEN_W / 2, SCREEN_H / 2 - 36);
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
@@ -77,31 +76,34 @@ void drawAssetsMissingScreen()
 // -----------------------------------------------------------------------------
 // First Run Flag (factory reset helper)
 // -----------------------------------------------------------------------------
-static const char* kFirstRunFlagPath = "/raising_hell/first_run.flag";
+static const char *kFirstRunFlagPath = "/raising_hell/first_run.flag";
 
 static bool consumeFirstRunFlagIfPresent()
 {
-  if (!g_sdReady) return false;
-  if (!SD.exists(kFirstRunFlagPath)) return false;
+  if (!g_sdReady)
+    return false;
+  if (!SD.exists(kFirstRunFlagPath))
+    return false;
 
   SD.remove(kFirstRunFlagPath);
   return true;
 }
 
-static uint32_t g_nextSdTryMs   = 0;
+static uint32_t g_nextSdTryMs = 0;
 static uint32_t g_nextWifiTryMs = 0;
 
 void bootPipelineKick(uint32_t now, bool usbOpen)
 {
   // Nudge retry timers so first attempts are slightly delayed
   // (gives USB serial time to open, avoids spamming init early).
-  g_nextSdTryMs   = now + (usbOpen ? 800 : 200);
+  g_nextSdTryMs = now + (usbOpen ? 800 : 200);
   g_nextWifiTryMs = now + (usbOpen ? 1200 : 500);
 }
 
 bool sdAssetsPresent()
 {
-  if (!g_sdReady) return false;
+  if (!g_sdReady)
+    return false;
   return SD.exists(kSdAssetsMarkerPath);
 }
 
@@ -109,22 +111,21 @@ bool sdAssetsPresent()
 // Deferred init state machine (boot pipeline)
 // -----------------------------------------------------------------------------
 uint32_t g_sdFirstTryMs = 0;
-bool     g_sdGaveUp     = false;
+bool g_sdGaveUp = false;
 
-static bool     g_postBootInitDone = false;
-static bool     g_sdTriedLoad      = false;
-static bool     g_ntpSaved         = false;
-static bool     g_wifiApplied      = false;
-uint8_t         g_sdTryCount       = 0;
+static bool g_postBootInitDone = false;
+static bool g_sdTriedLoad = false;
+static bool g_ntpSaved = false;
+static bool g_wifiApplied = false;
+uint8_t g_sdTryCount = 0;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
-static bool g_tzAppliedEarly     = false;
+static bool g_tzAppliedEarly = false;
 static bool g_anchorAppliedEarly = false;
 
 // Time display gating (loop also checks these)
 bool g_timeAnchorAttempted = false;
-bool g_timeAnchorRestored  = false;
-
+bool g_timeAnchorRestored = false;
 
 // -----------------------------------------------------------------------------
 // See if a save file already exists
@@ -134,8 +135,7 @@ static bool bootSaveFileExists()
   if (!g_sdReady)
     return false;
 
-  return SD.exists("/raising_hell/save/save.bin") ||
-         SD.exists("raising_hell/save/save.bin");
+  return SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin");
 }
 
 // -----------------------------------------------------------------------------
@@ -144,8 +144,10 @@ static bool bootSaveFileExists()
 static inline void enterState(UIState s, Tab t, bool fullRedraw)
 {
   uiActionEnterState(s, t, true);
-  if (fullRedraw) requestFullUIRedraw();
-  else requestUIRedraw();
+  if (fullRedraw)
+    requestFullUIRedraw();
+  else
+    requestUIRedraw();
   clearInputLatch();
 }
 
@@ -174,7 +176,7 @@ void postBootInitTick()
   {
     if (!g_timeAnchorAttempted)
     {
-      g_timeAnchorRestored  = restoreTimeFromAnchor();
+      g_timeAnchorRestored = restoreTimeFromAnchor();
       g_timeAnchorAttempted = true;
     }
     updateTime();
@@ -186,7 +188,8 @@ void postBootInitTick()
   // ---------------------------------------------------------------------------
   if (!g_sdReady && !g_sdGaveUp)
   {
-    if (g_sdFirstTryMs == 0) g_sdFirstTryMs = now;
+    if (g_sdFirstTryMs == 0)
+      g_sdFirstTryMs = now;
 
     if ((uint32_t)(now - g_sdFirstTryMs) > 5000)
     {
@@ -203,7 +206,8 @@ void postBootInitTick()
     {
       g_sdTryCount++;
       uint32_t backoff = 250 + (uint32_t)g_sdTryCount * 250;
-      if (backoff > 1500) backoff = 1500;
+      if (backoff > 1500)
+        backoff = 1500;
       g_nextSdTryMs = now + backoff;
 
       requestUIRedraw();
@@ -237,11 +241,13 @@ void postBootInitTick()
     }
 
     // If SD still not ready (and we haven't timed out), stop here.
-    if (!g_sdReady && !g_sdGaveUp) return;
+    if (!g_sdReady && !g_sdGaveUp)
+      return;
   }
 
   // If SD is up but the asset pack is missing, block further boot work until fixed.
-  if (g_assetsMissing) return;
+  if (g_assetsMissing)
+    return;
 
   // ---------------------------------------------------------------------------
   // Stage 2: One-time SD load pipeline (settings + save + time anchor)
@@ -258,7 +264,8 @@ void postBootInitTick()
     if (g_sdReady)
     {
       settingsLoaded = loadSettingsFromSD();
-      if (!settingsLoaded) saveSettingsToSD();
+      if (!settingsLoaded)
+        saveSettingsToSD();
     }
 
     // FIRST RUN FLAG (from factory reset)
@@ -280,12 +287,13 @@ void postBootInitTick()
     // Try restore time anchor again (safe) after settings/tz is applied
     if (!g_timeAnchorAttempted)
     {
-      g_timeAnchorRestored  = restoreTimeFromAnchor();
+      g_timeAnchorRestored = restoreTimeFromAnchor();
       g_timeAnchorAttempted = true;
     }
 
     bool loadedFromSD = false;
-    if (g_sdReady) loadedFromSD = saveManagerLoad();
+    if (g_sdReady)
+      loadedFromSD = saveManagerLoad();
 
     DBG_ON("[LOAD] saveManagerLoad -> %d\n", (int)loadedFromSD);
 
@@ -295,15 +303,19 @@ void postBootInitTick()
     const bool firstBootWizard = !settingsLoaded;
     const bool saveFileExists = bootSaveFileExists();
     const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
-    
-    Serial.printf(
-      "[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
-      settingsLoaded ? 1 : 0,
-      loadedFromSD ? 1 : 0,
-      timeIsValid() ? 1 : 0,
-      firstBootWizard ? 1 : 0,
-      (int)afterOk
-    );
+
+    Serial.printf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
+                  settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
+                  (int)afterOk);
+
+    if (firstBootWizard)
+      Serial.println("[BOOT] path=FIRST_BOOT_WIZARD");
+    else if (!timeIsValid())
+      Serial.println("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
+    else if (!loadedFromSD)
+      Serial.println("[BOOT] path=NEW_PET_FLOW");
+    else
+      Serial.println("[BOOT] path=NORMAL_BOOT");
 
     if (!loadedFromSD)
     {
@@ -320,9 +332,9 @@ void postBootInitTick()
     if (firstBootWizard)
     {
       extern UIState g_bootWizardAfterOkState;
-      extern Tab     g_bootWizardAfterOkTab;
+      extern Tab g_bootWizardAfterOkTab;
       g_bootWizardAfterOkState = afterOk;
-      g_bootWizardAfterOkTab   = Tab::TAB_PET;
+      g_bootWizardAfterOkTab = Tab::TAB_PET;
 
       if (!g_controlsHelpSeen)
       {
@@ -335,11 +347,18 @@ void postBootInitTick()
     }
 
     // -----------------------------------------------------------------------
-    // NOT first boot: if time is invalid, force manual time path
+    // NOT first boot: if time is invalid, re-enter boot Wi-Fi flow
+    // so the user gets another chance to import/use Wi-Fi before
+    // falling back to manual time entry.
     // -----------------------------------------------------------------------
     if (!timeIsValid())
     {
-      beginForcedSetTimeBootGate(afterOk, Tab::TAB_PET);
+      extern UIState g_bootWizardAfterOkState;
+      extern Tab g_bootWizardAfterOkTab;
+      g_bootWizardAfterOkState = afterOk;
+      g_bootWizardAfterOkTab = Tab::TAB_PET;
+
+      bootWizardBegin(afterOk, Tab::TAB_PET);
       requestFullUIRedraw();
       invalidateBackgroundCache();
       requestUIRedraw();
@@ -347,7 +366,7 @@ void postBootInitTick()
       clearInputLatch();
       return;
     }
-        
+
     // -----------------------------------------------------------------------
     // No save exists -> new pet flow
     // -----------------------------------------------------------------------
@@ -361,7 +380,8 @@ void postBootInitTick()
       // No SD save means we are bootstrapping a brand-new pet.
       // IMPORTANT: do NOT resurrect old inventory from the legacy EEPROM mirror.
       // Use the canonical starter inventory instead.
-      g_app.inventory.resetToDefaults();      ui_setBootSplashActive(false);
+      g_app.inventory.resetToDefaults();
+      ui_setBootSplashActive(false);
 
       // If controls help hasn’t been seen, do: (forced time) -> help -> time -> choose pet.
       if (!g_controlsHelpSeen)
