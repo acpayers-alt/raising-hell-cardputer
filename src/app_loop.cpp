@@ -49,6 +49,7 @@ static uint32_t s_hbNextMs = 0;
 static bool s_bootKeepAwakeInited = false;
 static uint32_t s_bootKeepAwakeUntilMs = 0;
 static bool s_prevSleeping = false;
+static bool s_prevScreenOn = true;
 
 void appServicesTick(uint32_t nowMs)
 {
@@ -146,6 +147,18 @@ void appMainLoopTick()
   (g_app.uiState == UIState::MINI_GAME) ||
   (g_app.uiState == UIState::BURIAL_SCREEN);
 
+  const bool screenOnNow = isScreenOn();
+
+  if (!s_prevScreenOn && screenOnNow)
+  {
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    sleepBgNotifyScreenWake();
+    clearInputLatch();
+  }
+
+  s_prevScreenOn = screenOnNow;
+  
   // ---------------------------------------------------------------------------
   // SCREEN OFF PATH
   // ---------------------------------------------------------------------------
