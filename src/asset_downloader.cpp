@@ -53,6 +53,8 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
   }
 
   const String stagingPath = joinStagingPath(rel);
+  Serial.printf("[OTA] staging path=%s\n", stagingPath.c_str());
+
   if (!assetOtaEnsureParentDir(stagingPath.c_str()))
   {
     if (outErr)
@@ -71,20 +73,59 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
     return false;
   }
 
-  WiFiClientSecure client;
-  client.setInsecure();
+  Serial.printf("[OTA] file url=%s\n", file.url.c_str());
+  Serial.printf("[OTA] file pre-http free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
-  if (!http.begin(client, file.url))
+  http.setReuse(false);
+
+  const String sUrl(file.url);
+  bool began = false;
+
+  if (sUrl.startsWith("https://"))
+  {
+    WiFiClientSecure *client = new WiFiClientSecure();
+    if (!client)
+    {
+      out.close();
+      SD.remove(stagingPath.c_str());
+      if (outErr)
+        *outErr = "Secure client alloc failed";
+      return false;
+    }
+    client->setInsecure();
+    client->setTimeout(15000);
+    client->setHandshakeTimeout(15);
+    began = http.begin(*client, file.url);
+  }
+  else
+  {
+    WiFiClient *client = new WiFiClient();
+    if (!client)
+    {
+      out.close();
+      SD.remove(stagingPath.c_str());
+      if (outErr)
+        *outErr = "Client alloc failed";
+      return false;
+    }
+    began = http.begin(*client, file.url);
+  }
+
+  if (!began)
   {
     out.close();
     SD.remove(stagingPath.c_str());
     if (outErr)
       *outErr = "HTTP begin failed";
+    Serial.println("[OTA] file http.begin failed");
     return false;
   }
 
   const int code = http.GET();
+  Serial.printf("[OTA] file http code=%d\n", code);
   if (code != HTTP_CODE_OK)
   {
     http.end();
@@ -94,9 +135,12 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
       *outErr = String("HTTP ") + code;
     return false;
   }
-
+  
   WiFiClient *stream = http.getStreamPtr();
   const int contentLength = http.getSize();
+  Serial.printf("[OTA] file contentLength=%d expected=%u\n",
+                contentLength,
+                (unsigned)file.size);
 
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
@@ -174,6 +218,8 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
       *outErr = "SHA256 mismatch";
     return false;
   }
+
+  Serial.printf("[OTA] file done total=%u\n", (unsigned)total);
 
   if (outStagingPath)
     *outStagingPath = stagingPath;

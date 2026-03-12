@@ -15,8 +15,11 @@ static const char *kLocalManifestTmpPath = "/raising_hell/assets/manifest_local.
 static const char *kStagingRoot = "/raising_hell/assets_staging";
 static const char *kLegacyMarkerPath = "/raising_hell/ASSET_MANIFEST.txt";
 
-static const char *kPublicManifestUrl = "https://example.com/raising_hell/manifest-public.json";
-static const char *kDevManifestUrl = "https://example.com/raising_hell/manifest-dev.json";
+static const char *kPublicManifestUrl =
+    "http://192.168.1.76:8000/manifest-public.json";
+
+static const char *kDevManifestUrl =
+    "http://192.168.1.76:8000/manifest-dev.json";
 
 const char *assetOtaConfigPath() { return kCfgPath; }
 const char *assetOtaConfigTmpPath() { return kCfgTmpPath; }
@@ -80,20 +83,35 @@ bool assetOtaEnsureParentDir(const char *fullPath)
   if (!g_sdReady || !fullPath || fullPath[0] != '/')
     return false;
 
-  if (!assetOtaEnsureCoreDirs())
+  String path(fullPath);
+  const int lastSlash = path.lastIndexOf('/');
+  if (lastSlash <= 0)
     return false;
 
-  String cur;
-  const size_t len = strlen(fullPath);
-  for (size_t i = 0; i < len; ++i)
+  String dirPath = path.substring(0, lastSlash);
+  if (dirPath.isEmpty() || dirPath[0] != '/')
+    return false;
+
+  if (SD.exists(dirPath.c_str()))
+    return true;
+
+  String cur = "";
+  int start = 0;
+
+  while (start < dirPath.length())
   {
-    const char c = fullPath[i];
-    cur += c;
-    if (c != '/')
+    int slash = dirPath.indexOf('/', start);
+    if (slash < 0)
+      slash = dirPath.length();
+
+    String part = dirPath.substring(start, slash);
+    start = slash + 1;
+
+    if (part.isEmpty())
       continue;
 
-    if (cur.length() <= 1)
-      continue;
+    cur += "/";
+    cur += part;
 
     if (!SD.exists(cur.c_str()))
     {
@@ -102,16 +120,7 @@ bool assetOtaEnsureParentDir(const char *fullPath)
     }
   }
 
-  const int slash = String(fullPath).lastIndexOf('/');
-  if (slash <= 0)
-    return true;
-
-  const String parent = String(fullPath).substring(0, slash);
-  if (parent.isEmpty())
-    return true;
-  if (SD.exists(parent.c_str()))
-    return true;
-  return SD.mkdir(parent.c_str());
+  return SD.exists(dirPath.c_str());
 }
 
 static bool writeAtomic(const char *tmpPath, const char *livePath, const uint8_t *data, size_t len)

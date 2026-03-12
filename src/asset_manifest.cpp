@@ -167,22 +167,61 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   if (!out || !url || !url[0])
     return false;
 
-  WiFiClientSecure client;
-  client.setInsecure();
+  Serial.printf("[OTA] manifest url=%s\n", url);
+  Serial.printf("[OTA] pre-http free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
-  if (!http.begin(client, url))
+  http.setReuse(false);
+
+  const String sUrl(url);
+  bool began = false;
+
+  if (sUrl.startsWith("https://"))
+  {
+    WiFiClientSecure *client = new WiFiClientSecure();
+    if (!client)
+    {
+      Serial.println("[OTA] manifest secure client alloc failed");
+      return false;
+    }
+    client->setInsecure();
+    client->setTimeout(15000);
+    client->setHandshakeTimeout(15);
+    began = http.begin(*client, url);
+  }
+  else
+  {
+    WiFiClient *client = new WiFiClient();
+    if (!client)
+    {
+      Serial.println("[OTA] manifest client alloc failed");
+      return false;
+    }
+    began = http.begin(*client, url);
+  }
+
+  if (!began)
+  {
+    Serial.println("[OTA] manifest http.begin failed");
     return false;
+  }
 
   const int code = http.GET();
+  Serial.printf("[OTA] manifest http code=%d\n", code);
   if (code != HTTP_CODE_OK)
   {
     http.end();
     return false;
   }
 
-  String payload = http.getString();
+  String payload;
+  payload.reserve(2048);
+  payload = http.getString();
   http.end();
+
+  Serial.printf("[OTA] manifest bytes=%u\n", (unsigned)payload.length());
 
   if (payload.isEmpty())
     return false;
