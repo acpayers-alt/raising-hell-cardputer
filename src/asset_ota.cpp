@@ -1,15 +1,16 @@
 #include "asset_ota.h"
 
-#include <Arduino.h>
-#include <SD.h>
-#include <string.h>
-#include "graphics.h"
-#include "display.h"
 #include "asset_downloader.h"
 #include "asset_manifest.h"
 #include "asset_ota_config.h"
+#include "display.h"
+#include "graphics.h"
 #include "sdcard.h"
 #include "wifi_time.h"
+#include <Arduino.h>
+#include <SD.h>
+#include <string.h>
+#include "ui_invalidate.h"
 
 static AssetOtaConfig s_cfg{};
 static AssetOtaState s_state{};
@@ -22,12 +23,18 @@ static const char *statusString(AssetOtaStatus st)
 {
   switch (st)
   {
-  case AssetOtaStatus::IDLE: return "Idle";
-  case AssetOtaStatus::CHECKING: return "Checking";
-  case AssetOtaStatus::DOWNLOADING: return "Downloading";
-  case AssetOtaStatus::INSTALLING: return "Installing";
-  case AssetOtaStatus::SUCCESS: return "Success";
-  case AssetOtaStatus::FAILED: return "Failed";
+  case AssetOtaStatus::IDLE:
+    return "Idle";
+  case AssetOtaStatus::CHECKING:
+    return "Checking";
+  case AssetOtaStatus::DOWNLOADING:
+    return "Downloading";
+  case AssetOtaStatus::INSTALLING:
+    return "Installing";
+  case AssetOtaStatus::SUCCESS:
+    return "Success";
+  case AssetOtaStatus::FAILED:
+    return "Failed";
   }
   return "Unknown";
 }
@@ -36,23 +43,48 @@ static const char *errorString(AssetOtaError err)
 {
   switch (err)
   {
-  case AssetOtaError::NONE: return "None";
-  case AssetOtaError::WIFI_DISABLED: return "WiFi disabled";
-  case AssetOtaError::WIFI_NOT_CONNECTED: return "WiFi not connected";
-  case AssetOtaError::SD_NOT_READY: return "SD not ready";
-  case AssetOtaError::CONFIG_IO: return "Config I/O failed";
-  case AssetOtaError::STATE_IO: return "State I/O failed";
-  case AssetOtaError::HTTP_FAIL: return "HTTP failed";
-  case AssetOtaError::JSON_FAIL: return "Manifest parse failed";
-  case AssetOtaError::HASH_MISMATCH: return "SHA256 mismatch";
-  case AssetOtaError::SIZE_MISMATCH: return "Size mismatch";
-  case AssetOtaError::RENAME_FAIL: return "Install rename failed";
-  case AssetOtaError::BAD_PATH: return "Bad asset path";
-  case AssetOtaError::NO_MANIFEST: return "Manifest missing";
-  case AssetOtaError::STAGING_FAIL: return "Staging failed";
-  case AssetOtaError::WRITE_FAIL: return "Write failed";
+  case AssetOtaError::NONE:
+    return "None";
+  case AssetOtaError::WIFI_DISABLED:
+    return "WiFi disabled";
+  case AssetOtaError::WIFI_NOT_CONNECTED:
+    return "WiFi not connected";
+  case AssetOtaError::SD_NOT_READY:
+    return "SD not ready";
+  case AssetOtaError::CONFIG_IO:
+    return "Config I/O failed";
+  case AssetOtaError::STATE_IO:
+    return "State I/O failed";
+  case AssetOtaError::HTTP_FAIL:
+    return "HTTP failed";
+  case AssetOtaError::JSON_FAIL:
+    return "Manifest parse failed";
+  case AssetOtaError::HASH_MISMATCH:
+    return "SHA256 mismatch";
+  case AssetOtaError::SIZE_MISMATCH:
+    return "Size mismatch";
+  case AssetOtaError::RENAME_FAIL:
+    return "Install rename failed";
+  case AssetOtaError::BAD_PATH:
+    return "Bad asset path";
+  case AssetOtaError::NO_MANIFEST:
+    return "Manifest missing";
+  case AssetOtaError::STAGING_FAIL:
+    return "Staging failed";
+  case AssetOtaError::WRITE_FAIL:
+    return "Write failed";
   }
   return "Unknown";
+}
+
+static void restoreMainUiSprite()
+{
+  spr.deleteSprite();
+  spr.createSprite(SCREEN_W, SCREEN_H);
+  spr.setTextScroll(false);
+  spr.fillScreen(TFT_BLACK);
+  invalidateBackgroundCache();
+  requestUIRedraw();
 }
 
 static void setFailure(AssetOtaError err)
@@ -202,30 +234,15 @@ bool assetOtaSetChannel(AssetOtaChannel ch)
   return assetOtaConfigSave(s_cfg);
 }
 
-const char *assetOtaInstalledVersion()
-{
-  return s_installedVersion.c_str();
-}
+const char *assetOtaInstalledVersion() { return s_installedVersion.c_str(); }
 
-AssetOtaStatus assetOtaStatus()
-{
-  return s_status;
-}
+AssetOtaStatus assetOtaStatus() { return s_status; }
 
-AssetOtaError assetOtaLastError()
-{
-  return s_lastErr;
-}
+AssetOtaError assetOtaLastError() { return s_lastErr; }
 
-const char *assetOtaStatusString()
-{
-  return statusString(s_status);
-}
+const char *assetOtaStatusString() { return statusString(s_status); }
 
-const char *assetOtaLastErrorString()
-{
-  return errorString(s_lastErr);
-}
+const char *assetOtaLastErrorString() { return errorString(s_lastErr); }
 
 bool assetOtaCheckNow(String *outMessage)
 {
@@ -235,43 +252,48 @@ bool assetOtaCheckNow(String *outMessage)
   if (!s_inited)
     assetOtaInit();
 
-  Serial.printf("[OTA] before cleanup free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
-  // --- FREE GRAPHICS MEMORY BEFORE HTTPS ---
   invalidateBackgroundCache();
   spr.deleteSprite();
 
-  Serial.printf("[OTA] after cleanup free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   if (!g_sdReady)
   {
     setFailure(AssetOtaError::SD_NOT_READY);
-    if (outMessage) *outMessage = "SD not ready";
+    if (outMessage)
+      *outMessage = "SD not ready";
+    restoreMainUiSprite();
     return false;
   }
 
   if (!wifiIsEnabled())
   {
     setFailure(AssetOtaError::WIFI_DISABLED);
-    if (outMessage) *outMessage = "Enable WiFi first";
+    if (outMessage)
+      *outMessage = "Enable WiFi first";
+    restoreMainUiSprite();
     return false;
   }
 
   if (!wifiIsConnectedNow())
   {
     setFailure(AssetOtaError::WIFI_NOT_CONNECTED);
-    if (outMessage) *outMessage = "Connect WiFi first";
+    if (outMessage)
+      *outMessage = "Connect WiFi first";
+    restoreMainUiSprite();
     return false;
   }
 
   if (!assetOtaEnsureCoreDirs())
   {
     setFailure(AssetOtaError::CONFIG_IO);
-    if (outMessage) *outMessage = "OTA dirs failed";
+    if (outMessage)
+      *outMessage = "OTA dirs failed";
+    restoreMainUiSprite();
     return false;
   }
 
@@ -292,7 +314,9 @@ bool assetOtaCheckNow(String *outMessage)
   if (!manifestUrl || !manifestUrl[0])
   {
     setFailure(AssetOtaError::NO_MANIFEST);
-    if (outMessage) *outMessage = "Manifest URL missing";
+    if (outMessage)
+      *outMessage = "Manifest URL missing";
+    restoreMainUiSprite();
     return false;
   }
 
@@ -303,7 +327,9 @@ bool assetOtaCheckNow(String *outMessage)
   if (!assetManifestDownloadRemote(manifestUrl, &remoteManifest))
   {
     setFailure(AssetOtaError::JSON_FAIL);
-    if (outMessage) *outMessage = "Remote manifest failed";
+    if (outMessage)
+      *outMessage = "Remote manifest failed";
+    restoreMainUiSprite();
     return false;
   }
 
@@ -321,7 +347,13 @@ bool assetOtaCheckNow(String *outMessage)
     s_status = AssetOtaStatus::SUCCESS;
     assetOtaStateDefaults(s_state);
     assetOtaStateSave(s_state);
-    if (outMessage) *outMessage = "Assets already up to date";
+    if (outMessage)
+    {
+      *outMessage = "Asset OTA ";
+      *outMessage += remoteManifest.packVersion;
+      *outMessage += " already installed";
+    }
+    restoreMainUiSprite();
     return true;
   }
 
@@ -336,7 +368,9 @@ bool assetOtaCheckNow(String *outMessage)
     if (!assetManifestNormalizePath(changed[i].path, &rel))
     {
       setFailure(AssetOtaError::BAD_PATH);
-      if (outMessage) *outMessage = "Bad manifest path";
+      if (outMessage)
+        *outMessage = "Bad manifest path";
+      restoreMainUiSprite();
       return false;
     }
 
@@ -353,6 +387,7 @@ bool assetOtaCheckNow(String *outMessage)
 
       if (outMessage)
         *outMessage = dlErr;
+      restoreMainUiSprite();
       return false;
     }
 
@@ -363,7 +398,9 @@ bool assetOtaCheckNow(String *outMessage)
     if (!installStagedFile(rel, stagingPath))
     {
       setFailure(AssetOtaError::RENAME_FAIL);
-      if (outMessage) *outMessage = "Install failed";
+      if (outMessage)
+        *outMessage = "Install failed";
+      restoreMainUiSprite();
       return false;
     }
   }
@@ -371,7 +408,9 @@ bool assetOtaCheckNow(String *outMessage)
   if (!assetManifestSaveLocal(remoteManifest))
   {
     setFailure(AssetOtaError::WRITE_FAIL);
-    if (outMessage) *outMessage = "Local manifest write failed";
+    if (outMessage)
+      *outMessage = "Local manifest write failed";
+    restoreMainUiSprite();
     return false;
   }
 
@@ -384,12 +423,16 @@ bool assetOtaCheckNow(String *outMessage)
 
   if (outMessage)
   {
-    *outMessage = "Assets updated: ";
+    *outMessage = "Asset OTA ";
+    *outMessage += remoteManifest.packVersion;
+    *outMessage += " installed (";
     *outMessage += (int)changed.size();
     *outMessage += " file";
     if (changed.size() != 1)
       *outMessage += "s";
+    *outMessage += ")";
   }
 
+  restoreMainUiSprite();
   return true;
 }

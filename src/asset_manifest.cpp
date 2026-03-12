@@ -230,28 +230,36 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
 }
 
 void assetManifestBuildDiff(const AssetManifestData &localManifest,
-                            const AssetManifestData &remoteManifest,
-                            std::vector<AssetManifestFile> &outChangedFiles)
+  const AssetManifestData &remoteManifest,
+  std::vector<AssetManifestFile> &outChangedFiles)
 {
-  outChangedFiles.clear();
+outChangedFiles.clear();
 
-  for (const auto &rf : remoteManifest.files)
-  {
-    bool foundSame = false;
+for (const auto &rf : remoteManifest.files)
+{
+bool foundSame = false;
 
-    for (const auto &lf : localManifest.files)
-    {
-      if (lf.path != rf.path)
-        continue;
+for (const auto &lf : localManifest.files)
+{
+if (lf.path != rf.path)
+continue;
 
-      const bool sameSize = (lf.size == rf.size);
-      const bool sameHash = (lf.sha256.equalsIgnoreCase(rf.sha256));
-      if (sameSize && sameHash)
-        foundSame = true;
-      break;
-    }
+const bool sameSize = (lf.size == rf.size);
+const bool sameHash = (lf.sha256.equalsIgnoreCase(rf.sha256));
 
-    if (!foundSame)
-      outChangedFiles.push_back(rf);
-  }
+if (sameSize && sameHash)
+{
+String livePath = "/";
+livePath += rf.path;
+
+if (SD.exists(livePath.c_str()))
+foundSame = true;
+}
+
+break;
+}
+
+if (!foundSame)
+outChangedFiles.push_back(rf);
+}
 }
