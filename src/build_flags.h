@@ -14,5 +14,5 @@
 // Set to 1 for public test builds.
 // Set to 0 for normal development builds.
 #ifndef PUBLIC_BUILD
-#define PUBLIC_BUILD 0
+#define PUBLIC_BUILD 1
 #endif

@@ -61,7 +61,7 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
-
+#include "asset_ota.h"
 bool g_forcePetBgCache = false;
 static void drawBurialScreen();
 
@@ -1963,8 +1963,15 @@ static void drawWifiSettingsMenu()
   char tzLine[36];
   snprintf(tzLine, sizeof(tzLine), "Time Zone: %s", tzName(tzIndex));
 
-  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine};
-  const int totalItems = 4;
+  const char *ver = assetOtaInstalledVersion();
+  char otaLine[40];
+  if (ver && ver[0])
+    snprintf(otaLine, sizeof(otaLine), "Asset OTA: %s", ver);
+  else
+    snprintf(otaLine, sizeof(otaLine), "Check Asset OTA");
+
+  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaLine};
+  const int totalItems = 5;
 
   g_wifi.wifiSettingsIndex = clampi(g_wifi.wifiSettingsIndex, 0, totalItems - 1);
 
@@ -2005,13 +2012,6 @@ static void drawWifiSettingsMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(labels[i], boxX + 10, ty);
   }
-
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("MENU: Back", SCREEN_W / 2, SCREEN_H - 6);
-  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawFactoryResetConfirmOverlay()

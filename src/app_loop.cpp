@@ -37,6 +37,7 @@
 #include "ui_state_console.h"
 #include "ui_tabs.h"
 #include "wifi_time.h"
+#include "asset_ota.h"
 
 #include <Arduino.h>
 #include <cstring>
@@ -151,6 +152,7 @@ void appMainLoopTick()
   if (!isScreenOn())
   {
     wifiTimeTick();
+    assetOtaTick();
     updateTime();
     updateBattery();
     saveManagerTick();
@@ -297,6 +299,7 @@ void appMainLoopTick()
       }
 
       wifiTimeTick();
+      assetOtaTick();
       if (g_timeAnchorAttempted || timeIsSynced())
         updateTime();
       updateBattery();

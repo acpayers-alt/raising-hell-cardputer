@@ -26,6 +26,7 @@
 #include "ui_input_utils.h" // uiDrainKb
 #include "flow_console.h"
 #include "ui_settings_actions.h"
+#include "asset_ota.h"
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -317,6 +318,25 @@ static void actWifi_TzLeft(InputState &) { settingsCycleTimeZone(-1); }
 
 static void actWifi_TzRight(InputState &) { settingsCycleTimeZone(+1); }
 
+static void actWifi_CheckAssetOta(InputState &)
+{
+  String msg;
+  const bool ok = assetOtaCheckNow(&msg);
+
+  if (msg.isEmpty())
+    msg = ok ? "Asset OTA done" : "Asset OTA failed";
+
+  ui_showMessage(msg.c_str());
+  requestUIRedraw();
+
+  if (ok)
+    playBeep();
+  else
+    soundError();
+
+  clearInputLatch();
+}
+
 // ------------------------------------------------------------
 // GAME page actions
 // ------------------------------------------------------------
@@ -403,10 +423,11 @@ static MenuItem kScreenItems[] = {
 };
 
 static MenuItem kWifiItems[] = {
-    {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
-    {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
-    {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
+  {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
+  {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
+  {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
+  {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
+  {"Check Asset OTA", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kGameItems[] = {

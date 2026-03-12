@@ -52,6 +52,7 @@
 #include "power_button.h"
 #include "hatching_flow.h"
 #include "evolution_flow.h"
+#include "asset_ota.h"
 
 void updateBattery();
 
@@ -179,6 +180,8 @@ void appSetup() {
   const uint32_t now = millis();
   const bool usbOpen = (bool)Serial;
   bootPipelineKick(now, usbOpen);
+  
+  assetOtaInit();
 
   bootPrintln("[BOOT] setup complete");
 }
