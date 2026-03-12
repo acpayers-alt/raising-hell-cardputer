@@ -62,6 +62,7 @@
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
 #include "asset_ota.h"
+
 bool g_forcePetBgCache = false;
 static void drawBurialScreen();
 
@@ -1964,14 +1965,29 @@ static void drawWifiSettingsMenu()
   snprintf(tzLine, sizeof(tzLine), "Time Zone: %s", tzName(tzIndex));
 
   const char *ver = assetOtaInstalledVersion();
-  char otaLine[40];
+  char otaCheckLine[40];
   if (ver && ver[0])
-    snprintf(otaLine, sizeof(otaLine), "Asset OTA: %s", ver);
+    snprintf(otaCheckLine, sizeof(otaCheckLine), "Asset OTA: %s", ver);
   else
-    snprintf(otaLine, sizeof(otaLine), "Check Asset OTA");
+    snprintf(otaCheckLine, sizeof(otaCheckLine), "Check Asset OTA");
 
-  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaLine};
-  const int totalItems = 5;
+  char otaAutoLine[32];
+  snprintf(otaAutoLine, sizeof(otaAutoLine), "OTA Auto Check: %s",
+           assetOtaGetConfig().autoCheckEnabled ? "ON" : "OFF");
+
+  char otaChannelLine[32];
+  snprintf(otaChannelLine, sizeof(otaChannelLine), "OTA Channel: %s",
+           ((AssetOtaChannel)assetOtaGetConfig().channel == AssetOtaChannel::DEV) ? "Dev" : "Public");
+
+  const char *labels[] = {
+      wLine,
+      "Set WiFi Network",
+      "Reset WiFi Settings",
+      tzLine,
+      otaCheckLine,
+      otaAutoLine,
+      otaChannelLine};
+  const int totalItems = 7;
 
   g_wifi.wifiSettingsIndex = clampi(g_wifi.wifiSettingsIndex, 0, totalItems - 1);
 

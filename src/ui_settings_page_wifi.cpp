@@ -18,11 +18,12 @@
 #include "graphics.h"
 #include "ui_input_utils.h"
 #include "ui_settings_actions.h"
+#include "asset_ota.h"
 
 namespace UiSettingsPages {
 
 void Handle_WIFI(InputState& input, int move) {
-  const int totalItems = 4;
+  const int totalItems = 7;
 
   if (move != 0) {
     g_wifi.wifiSettingsIndex += move;
@@ -39,6 +40,28 @@ void Handle_WIFI(InputState& input, int move) {
   if (g_wifi.wifiSettingsIndex == 3 && (input.leftOnce || input.rightOnce)) {
     settingsCycleTimeZone(input.leftOnce ? -1 : 1);
     // settingsCycleTimeZone() already redraws + beeps + clears latch
+    return;
+  }
+
+  // Asset OTA auto-check toggle on row 5
+  if (g_wifi.wifiSettingsIndex == 5 && (input.leftOnce || input.rightOnce)) {
+    const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
+    assetOtaSetAutoCheckEnabled(!enabled);
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
+    return;
+  }
+
+  // Asset OTA channel cycle on row 6
+  if (g_wifi.wifiSettingsIndex == 6 && (input.leftOnce || input.rightOnce)) {
+    const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
+    const AssetOtaChannel next =
+        (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
+    assetOtaSetChannel(next);
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
     return;
   }
 
@@ -95,6 +118,36 @@ void Handle_WIFI(InputState& input, int move) {
       case 3: { // Time zone row: cycle forward on select
         settingsCycleTimeZone(+1);
         // settingsCycleTimeZone() already redraws + beeps + clears latch
+        return;
+      }
+
+      case 4: { // Check Asset OTA
+        String msg;
+        const bool ok = assetOtaCheckNow(&msg);
+        ui_showMessage(msg.length() ? msg.c_str() : (ok ? "Asset OTA done" : "Asset OTA failed"));
+        requestUIRedraw();
+        playBeep();
+        clearInputLatch();
+        return;
+      }
+
+      case 5: { // Asset OTA Auto Check
+        const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
+        assetOtaSetAutoCheckEnabled(!enabled);
+        requestUIRedraw();
+        playBeep();
+        clearInputLatch();
+        return;
+      }
+
+      case 6: { // Asset OTA Channel
+        const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
+        const AssetOtaChannel next =
+            (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
+        assetOtaSetChannel(next);
+        requestUIRedraw();
+        playBeep();
+        clearInputLatch();
         return;
       }
 

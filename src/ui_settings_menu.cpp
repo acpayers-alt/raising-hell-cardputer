@@ -422,12 +422,34 @@ static MenuItem kScreenItems[] = {
     {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
 };
 
+static void actWifi_AssetOtaAutoToggle(InputState &)
+{
+  const bool enabled = assetOtaGetConfig().autoCheckEnabled != 0;
+  assetOtaSetAutoCheckEnabled(!enabled);
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actWifi_AssetOtaChannelToggle(InputState &)
+{
+  const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
+  const AssetOtaChannel next =
+      (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
+  assetOtaSetChannel(next);
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 static MenuItem kWifiItems[] = {
-  {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
-  {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
-  {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-  {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
-  {"Check Asset OTA", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
+    {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
+    {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
+    {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
+    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
+    {"Check Asset OTA", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
+    {"OTA Auto Check", actWifi_AssetOtaAutoToggle, actWifi_AssetOtaAutoToggle, actWifi_AssetOtaAutoToggle, nullptr},
+    {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr},
 };
 
 static MenuItem kGameItems[] = {
