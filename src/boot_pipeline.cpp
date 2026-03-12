@@ -241,9 +241,11 @@ void postBootInitTick()
     clearInputLatch();
     inputForceClear();
 
+    bool settingsLoaded = false;
     if (g_sdReady)
     {
-      if (!loadSettingsFromSD()) saveSettingsToSD();
+      settingsLoaded = loadSettingsFromSD();
+      if (!settingsLoaded) saveSettingsToSD();
     }
 
     // FIRST RUN FLAG (from factory reset)
@@ -277,44 +279,53 @@ void postBootInitTick()
     updateTime();
     uiInitLevelPopupTracker();
 
-    // -----------------------------------------------------------------------
-    // FIRST BOOT TIME GATE
-    // -----------------------------------------------------------------------
-    if (!timeIsValid())
+    const bool firstBootWizard = !settingsLoaded;
+    const UIState afterOk = (!loadedFromSD) ? UIState::CHOOSE_PET : UIState::PET_SCREEN;
+
+    Serial.printf(
+      "[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
+      settingsLoaded ? 1 : 0,
+      loadedFromSD ? 1 : 0,
+      timeIsValid() ? 1 : 0,
+      firstBootWizard ? 1 : 0,
+      (int)afterOk
+    );
+    
+    if (!loadedFromSD)
     {
-      const UIState afterOk = (!loadedFromSD) ? UIState::CHOOSE_PET : UIState::PET_SCREEN;
+      g_app.inventory.init();
+    }
 
-      if (!loadedFromSD)
+    ui_setBootSplashActive(false);
+
+    // -----------------------------------------------------------------------
+    // FIRST BOOT WIZARD
+    // Missing settings.bin means onboarding should run, regardless of save.bin
+    // and regardless of whether time currently appears valid.
+    // -----------------------------------------------------------------------
+    if (firstBootWizard)
+    {
+      extern UIState g_bootWizardAfterOkState;
+      extern Tab     g_bootWizardAfterOkTab;
+      g_bootWizardAfterOkState = afterOk;
+      g_bootWizardAfterOkTab   = Tab::TAB_PET;
+
+      if (!g_controlsHelpSeen)
       {
-        g_app.inventory.init();
-      }
-
-      ui_setBootSplashActive(false);
-
-      // FIRST BOOT: Controls Help -> wizard
-      if (!loadedFromSD)
-      {
-        if (!g_controlsHelpSeen)
-        {
-          // Ensure boot wizard knows where to go after WiFi/time steps complete.
-          extern UIState g_bootWizardAfterOkState;
-          extern Tab     g_bootWizardAfterOkTab;
-          g_bootWizardAfterOkState = afterOk;
-          g_bootWizardAfterOkTab   = Tab::TAB_PET;
-        
-          // After Controls Help is dismissed, it should land on the wizard prompt.
-          controlsHelpBegin(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET);
-          return;
-        }
-
-        // Controls help already seen: go straight to the boot wizard prompt.
-        bootWizardBegin(afterOk, Tab::TAB_PET);
+        controlsHelpBegin(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET);
         return;
       }
 
-      // NOT first boot (save exists): forced manual time path
+      bootWizardBegin(afterOk, Tab::TAB_PET);
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // NOT first boot: if time is invalid, force manual time path
+    // -----------------------------------------------------------------------
+    if (!timeIsValid())
+    {
       beginForcedSetTimeBootGate(afterOk, Tab::TAB_PET);
-      // beginForcedSetTimeBootGate() should enter SET_TIME; make sure we’re drawn.
       requestFullUIRedraw();
       invalidateBackgroundCache();
       requestUIRedraw();
@@ -322,7 +333,7 @@ void postBootInitTick()
       clearInputLatch();
       return;
     }
-
+        
     // -----------------------------------------------------------------------
     // No save exists -> new pet flow
     // -----------------------------------------------------------------------

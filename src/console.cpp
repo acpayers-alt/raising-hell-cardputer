@@ -18,6 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <FS.h>
+#include <SD.h>
+#include "sdcard.h"
+#include "settings_state.h"
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -364,7 +368,7 @@ static void execLine(char *line)
     logLine("  wifi off|on           toggle wifi power");
     logLine("  wifi <ssid> <pass>    save + connect");
     logLine("  wifi clear            clear saved creds");
-    logLine("  newpet!             OVERWRITE save + start a new pet");
+    logLine("  reset_settings      delete settings.bin");    logLine("  newpet!             OVERWRITE save + start a new pet");
     logLine("  age                 show birth epoch + age string");
     logLine("  name <pet name>      set pet name");
     logLine("  pet                 show current pet type");
@@ -396,6 +400,35 @@ static void execLine(char *line)
   if (!strcmp(argv[0], "clear"))
   {
     consoleClear();
+    return;
+  }
+
+  if (!strcmp(argv[0], "reset_settings"))
+  {
+    if (!g_sdReady)
+    {
+      logLine("SD not ready");
+      return;
+    }
+
+    const char *path = "/raising_hell/save/settings.bin";
+
+    if (!SD.exists(path))
+    {
+      logLine("settings.bin does not exist");
+      logLine("[OK] reboot to test first boot");
+      return;
+    }
+
+    if (SD.remove(path))
+    {
+      logLine("[OK] settings.bin deleted");
+      logLine("[OK] reboot to test first boot");
+    }
+    else
+    {
+      logLine("failed to delete settings.bin");
+    }
     return;
   }
 

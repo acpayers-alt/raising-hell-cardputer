@@ -39,11 +39,13 @@
 #include "build_flags.h"
 #include "death_state.h"
 #include "factory_reset_state.h"
+#include "flow_boot_wifi.h"
 #include "inventory_state.h"
 #include "mg_pause_menu.h"
 #include "mini_game_pause_menu.h"
 #include "mini_games.h"
 #include "name_entry_state.h"
+#include "new_pet_flow_state.h"
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
 #include "shop_items.h"
@@ -59,7 +61,6 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
-#include "new_pet_flow_state.h"
 
 bool g_forcePetBgCache = false;
 static void drawBurialScreen();
@@ -660,6 +661,30 @@ void drawBootWifiPromptScreen()
   spr.drawString("ESC: Skip", 10, 100);
 
   spr.pushSprite(0, 0);
+}
+
+// -----------------------------------------------------------------------------
+// Import wifi credentials from HLauncher
+// -----------------------------------------------------------------------------
+static void drawBootWifiImportedScreen()
+{
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextDatum(CC_DATUM);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawCentreString("Wi-Fi Settings", screenW / 2, 42, 2);
+  spr.drawCentreString("Imported from Launcher", screenW / 2, 62, 2);
+
+  const char *ssid = bootWifiImportedSsid();
+  if (ssid && ssid[0])
+  {
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    String line = String("SSID: ") + ssid;
+    spr.drawCentreString(line.c_str(), screenW / 2, 92, 2);
+  }
+
+  spr.setTextColor(TFT_GREEN, TFT_BLACK);
+  spr.drawCentreString("Connecting...", screenW / 2, 116, 2);
 }
 
 // -----------------------------------------------------------------------------
@@ -4573,6 +4598,10 @@ static void drawCurrentScreen(bool redrawBg)
 
   case UIState::BOOT_WIFI_WAIT:
     drawBootWifiWaitScreen(wifiIsConnected(), wifiRssi());
+    return;
+
+  case UIState::BOOT_WIFI_IMPORTED:
+    drawBootWifiImportedScreen();
     return;
 
   case UIState::BOOT_TZ_PICK:

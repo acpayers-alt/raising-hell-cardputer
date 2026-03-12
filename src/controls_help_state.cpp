@@ -1,5 +1,6 @@
 #include "controls_help_state.h"
 
+#include "flow_boot_wizard.h"
 #include "app_state.h"        // uiState (extern) or accessors
 #include "ui_menu_state.h"    // currentTab (extern) or accessors
 #include "display_state.h"    // uiNeedsRedraw (extern)
@@ -30,9 +31,18 @@ void controlsHelpDismiss() {
     }
   }
 
+  inputForceClear();
+  clearInputLatch();
+
+  // Special case: on first boot, Controls Help should continue into the
+  // boot wizard entry function, not directly into a wizard state.
+  if (s_controlsHelpReturnState == UIState::BOOT_WIFI_PROMPT) {
+    bootWizardBegin(UIState::CHOOSE_PET, s_controlsHelpReturnTab);
+    requestFullUIRedraw();
+    return;
+  }
+
   g_app.uiState    = s_controlsHelpReturnState;
   g_app.currentTab = s_controlsHelpReturnTab;
   requestFullUIRedraw();
-  inputForceClear();
-  clearInputLatch();
 }
