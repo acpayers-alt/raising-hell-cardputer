@@ -125,6 +125,19 @@ static bool g_anchorAppliedEarly = false;
 bool g_timeAnchorAttempted = false;
 bool g_timeAnchorRestored  = false;
 
+
+// -----------------------------------------------------------------------------
+// See if a save file already exists
+// -----------------------------------------------------------------------------
+static bool bootSaveFileExists()
+{
+  if (!g_sdReady)
+    return false;
+
+  return SD.exists("/raising_hell/save/save.bin") ||
+         SD.exists("raising_hell/save/save.bin");
+}
+
 // -----------------------------------------------------------------------------
 // Small helper: centralized state enter + redraw (keeps transitions consistent)
 // -----------------------------------------------------------------------------
@@ -280,8 +293,9 @@ void postBootInitTick()
     uiInitLevelPopupTracker();
 
     const bool firstBootWizard = !settingsLoaded;
-    const UIState afterOk = (!loadedFromSD) ? UIState::CHOOSE_PET : UIState::PET_SCREEN;
-
+    const bool saveFileExists = bootSaveFileExists();
+    const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+    
     Serial.printf(
       "[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
       settingsLoaded ? 1 : 0,
@@ -290,7 +304,7 @@ void postBootInitTick()
       firstBootWizard ? 1 : 0,
       (int)afterOk
     );
-    
+
     if (!loadedFromSD)
     {
       g_app.inventory.init();

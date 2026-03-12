@@ -6,6 +6,10 @@
 #include "ui_runtime.h"
 #include "ui_input_common.h"   // uiDrainKb()
 
+#include <FS.h>
+#include <SD.h>
+#include "sdcard.h"
+
 #include "wifi_time.h"
 #include "flow_time_editor.h"
 #include "new_pet_flow_state.h"
@@ -140,19 +144,28 @@ void uiBootNtpWaitHandle(InputState& in)
 
   if (timeIsSynced())
   {
-    if (g_bootWizardAfterOkState == UIState::CHOOSE_PET)
+    UIState nextState = g_bootWizardAfterOkState;
+  
+    if (g_sdReady &&
+        (SD.exists("/raising_hell/save/save.bin") ||
+         SD.exists("raising_hell/save/save.bin")))
+    {
+      nextState = UIState::PET_SCREEN;
+    }
+  
+    if (nextState == UIState::CHOOSE_PET)
     {
       g_choosePetBlockHatchUntilRelease = true;
     }
-
+  
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
-
-    uiActionEnterState(g_bootWizardAfterOkState, g_bootWizardAfterOkTab, true);
+  
+    uiActionEnterState(nextState, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
   }
-
+  
   uiActionSwallowAll(in);
 }
