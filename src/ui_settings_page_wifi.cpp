@@ -112,9 +112,7 @@ void Handle_WIFI(InputState& input, int move) {
       }
 
       case 4: { // Check Asset OTA
-        String msg;
-        const bool ok = assetOtaCheckNow(&msg);
-        ui_showMessage(msg.length() ? msg.c_str() : (ok ? "Asset OTA done" : "Asset OTA failed"));
+        assetOtaSetConfirmActive(true);
         requestUIRedraw();
         playBeep();
         clearInputLatch();

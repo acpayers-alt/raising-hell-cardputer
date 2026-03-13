@@ -231,168 +231,6 @@ void appMainLoopTick()
   InputState input = readInput();
 
   // ---------------------------------------------------------------------------
-  // MODAL: Asset OTA confirmation
-  // Warn user that downloading new assets will reboot the system.
-  // ---------------------------------------------------------------------------
-  if (assetOtaConfirmActive())
-  {
-    static bool s_prevSelectHeld_assetOta = false;
-    const bool enterOnce = (input.selectHeld && !s_prevSelectHeld_assetOta);
-    s_prevSelectHeld_assetOta = input.selectHeld;
-
-    if (enterOnce || input.selectOnce || input.encoderPressOnce)
-    {
-      assetOtaSetConfirmActive(false);
-      clearInputLatch();
-      inputForceClear();
-
-      String msg;
-      const bool ok = assetOtaCheckNow(&msg);
-
-      const bool didInstall = (msg.indexOf("installed (") >= 0);
-      const bool alreadyInstalled = (msg.indexOf("already installed") >= 0);
-
-      if (!ok)
-      {
-        if (msg.isEmpty())
-          msg = "Asset OTA failed";
-        ui_showMessage(msg.c_str());
-        soundError();
-        requestUIRedraw();
-        return;
-      }
-
-      if (didInstall)
-      {
-        delay(150);
-        ESP.restart();
-      }
-
-      if (alreadyInstalled)
-      {
-        ui_showMessage(msg.c_str());
-        playBeep();
-        requestUIRedraw();
-        return;
-      }
-
-      ui_showMessage("Asset OTA done");
-      playBeep();
-      requestUIRedraw();
-      return;
-    }
-
-    if (input.menuOnce || input.escOnce)
-    {
-      assetOtaSetConfirmActive(false);
-      clearInputLatch();
-      inputForceClear();
-      requestUIRedraw();
-      playBeep();
-      return;
-    }
-
-    if (consumeUIRedrawRequest())
-    {
-      renderUI();
-    }
-
-    wifiTimeTick();
-    assetOtaTick();
-    if (g_timeAnchorAttempted || timeIsSynced())
-      updateTime();
-    updateBattery();
-    saveManagerTick();
-    maybePeriodicTimeSave();
-
-#if LED_STATUS_ENABLED
-    ledSetScreenOff(false);
-    ledUpdatePetStatus(computeLedMode());
-#endif
-    return;
-  }
-  // ---------------------------------------------------------------------------
-  // MODAL: Asset OTA confirmation
-  // Warn user that downloading new assets will reboot the system.
-  // ---------------------------------------------------------------------------
-  if (assetOtaConfirmActive())
-  {
-    static bool s_prevSelectHeld_assetOta = false;
-    const bool enterOnce = (input.selectHeld && !s_prevSelectHeld_assetOta);
-    s_prevSelectHeld_assetOta = input.selectHeld;
-
-    if (enterOnce || input.selectOnce || input.encoderPressOnce)
-    {
-      assetOtaSetConfirmActive(false);
-      clearInputLatch();
-      inputForceClear();
-
-      String msg;
-      const bool ok = assetOtaCheckNow(&msg);
-
-      const bool didInstall = (msg.indexOf("installed (") >= 0);
-      const bool alreadyInstalled = (msg.indexOf("already installed") >= 0);
-
-      if (!ok)
-      {
-        if (msg.isEmpty())
-          msg = "Asset OTA failed";
-        ui_showMessage(msg.c_str());
-        soundError();
-        requestUIRedraw();
-        return;
-      }
-
-      if (didInstall)
-      {
-        delay(150);
-        ESP.restart();
-      }
-
-      if (alreadyInstalled)
-      {
-        ui_showMessage(msg.c_str());
-        playBeep();
-        requestUIRedraw();
-        return;
-      }
-
-      ui_showMessage("Asset OTA done");
-      playBeep();
-      requestUIRedraw();
-      return;
-    }
-
-    if (input.menuOnce || input.escOnce)
-    {
-      assetOtaSetConfirmActive(false);
-      clearInputLatch();
-      inputForceClear();
-      requestUIRedraw();
-      playBeep();
-      return;
-    }
-
-    if (consumeUIRedrawRequest())
-    {
-      renderUI();
-    }
-
-    wifiTimeTick();
-    assetOtaTick();
-    if (g_timeAnchorAttempted || timeIsSynced())
-      updateTime();
-    updateBattery();
-    saveManagerTick();
-    maybePeriodicTimeSave();
-
-#if LED_STATUS_ENABLED
-    ledSetScreenOff(false);
-    ledUpdatePetStatus(computeLedMode());
-#endif
-    return;
-  }
-  // ---------------------------------------------------------------------------
   // MODAL: SD assets missing screen (all builds)
   // Draw ONCE to prevent flicker; retry check on ENTER.
   // ---------------------------------------------------------------------------
@@ -825,13 +663,12 @@ void appMainLoopTick()
   static bool s_prevDbgRedraw = false;
   static int s_prevDbgUiState = -1;
   
-  if (g_app.uiNeedsRedraw != s_prevDbgRedraw || (int)g_app.uiState != s_prevDbgUiState)
+  if ((int)g_app.uiState != s_prevDbgUiState)
   {
-    Serial.printf("[UI POST MENU] uiState=%d redraw=%d screenOn=%d\n",
+    Serial.printf("[UI STATE] uiState=%d screenOn=%d\n",
                   (int)g_app.uiState,
-                  (int)g_app.uiNeedsRedraw,
                   (int)isScreenOn());
-    s_prevDbgRedraw = g_app.uiNeedsRedraw;
+  
     s_prevDbgUiState = (int)g_app.uiState;
   }
     

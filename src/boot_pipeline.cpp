@@ -11,6 +11,8 @@
 
 // Keep includes broad/safe like you’ve been doing
 #include "app_state.h"
+#include "asset_ota.h"
+#include "asset_provision_request.h"
 #include "boot_state.h"
 #include "brightness_state.h"
 #include "controls_help_state.h"
@@ -36,6 +38,8 @@
 #include "ui_runtime.h"
 #include "wifi_power.h"
 #include "wifi_time.h"
+#include <WiFi.h>
+#include <esp_system.h>
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
@@ -119,6 +123,10 @@ static bool g_sdTriedLoad = false;
 static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
 uint8_t g_sdTryCount = 0;
+static bool g_bootProvisionWifiStarted = false;
+static uint32_t g_bootProvisionWifiStartMs = 0;
+static bool g_bootLandingDeferredForAssetProvision = false;
+static bool g_bootLandingDone = false;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -150,6 +158,164 @@ static inline void enterState(UIState s, Tab t, bool fullRedraw)
   else
     requestUIRedraw();
   clearInputLatch();
+}
+
+static bool bootAssetProvisionRequested() { return assetProvisionBootRequested(); }
+
+static void drawBootAssetProvisionScreen(const char *line1, const char *line2)
+{
+  displayInit();
+
+  spr.fillScreen(TFT_BLACK);
+  spr.setTextDatum(textdatum_t::middle_center);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  spr.setTextColor(TFT_RED, TFT_BLACK);
+  spr.drawString("ASSET PROVISIONING", SCREEN_W / 2, SCREEN_H / 2 - 26);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  if (line1 && line1[0])
+    spr.drawString(line1, SCREEN_W / 2, SCREEN_H / 2 + 2);
+  if (line2 && line2[0])
+    spr.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 22);
+
+  spr.pushSprite(0, 0);
+}
+
+static bool runBootAssetProvision()
+{
+  static bool s_bootAssetProvisionHandled = false;
+
+  if (!bootAssetProvisionRequested())
+    return false;
+
+  if (s_bootAssetProvisionHandled)
+    return true;
+
+  s_bootAssetProvisionHandled = true;
+
+  ui_setBootSplashActive(false);
+  clearInputLatch();
+  inputForceClear();
+
+  drawBootAssetProvisionScreen("Checking asset package.", "Please wait...");
+
+  String msg;
+  const bool ok = assetOtaCheckNow(&msg);
+
+  clearAssetProvisionBootRequest();
+
+  drawBootAssetProvisionScreen("Asset check result", msg.c_str());
+  delay(1500);
+
+  if (ok)
+  {
+    ESP.restart();
+  }
+
+  Serial.printf("[BOOT][ASSET_PROVISION] failed: %s\n", msg.c_str());
+
+  // If assets are still missing, fall back to the normal missing-assets gate.
+  g_assetsChecked = true;
+  g_assetsMissing = !sdAssetsPresent();
+
+  if (!g_assetsMissing)
+  {
+    drawBootSplash();
+    requestUIRedraw();
+    renderUI();
+  }
+
+  return g_assetsMissing;
+}
+
+static bool bootAssetProvisionWifiReady()
+{
+  if (!bootAssetProvisionRequested())
+    return false;
+
+  if (!settingsWifiEnabled())
+    return true;
+
+  if (!g_bootProvisionWifiStarted)
+  {
+    wifiSetEnabled(true);
+    applyWifiPower(true);
+    wifiTimeInit();
+
+    g_bootProvisionWifiStarted = true;
+    g_bootProvisionWifiStartMs = millis();
+
+    drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
+    return false;
+  }
+
+  wifiTimeInit();
+
+  if (WiFi.status() == WL_CONNECTED)
+    return true;
+
+  if ((uint32_t)(millis() - g_bootProvisionWifiStartMs) >= 8000)
+    return true;
+
+  drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
+  return false;
+}
+
+static void finalizeBootLanding()
+{
+  if (g_bootLandingDone)
+    return;
+
+  g_bootLandingDone = true;
+
+  const bool saveFileExists = bootSaveFileExists();
+  const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+
+  bool loadedFromSD = saveFileExists;
+  uint16_t seedMarkNow = 0;
+  EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
+
+  if (!loadedFromSD)
+  {
+    DBG_ON("[BOOT] No SD save -> UIState::CHOOSE_PET\n");
+
+    g_app.inventory.resetToDefaults();
+    ui_setBootSplashActive(false);
+
+    if (!g_controlsHelpSeen)
+    {
+      beginForcedSetTimeBootGate(UIState::CHOOSE_PET, Tab::TAB_PET);
+      controlsHelpBegin(UIState::SET_TIME, Tab::TAB_PET);
+      return;
+    }
+
+    enterState(UIState::CHOOSE_PET, Tab::TAB_PET, false);
+    uiInitLevelPopupTracker();
+
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    renderUI();
+    return;
+  }
+
+  if (seedMarkNow != SEED_MARK)
+  {
+    EEPROM.put(SEED_MARK_ADDR, (uint16_t)SEED_MARK);
+    EEPROM.commit();
+  }
+
+  if (g_app.uiState == UIState::BOOT)
+  {
+    enterState(UIState::PET_SCREEN, Tab::TAB_PET, false);
+  }
+
+  ui_setBootSplashActive(false);
+
+  invalidateBackgroundCache();
+  requestUIRedraw();
+  renderUI();
 }
 
 // -----------------------------------------------------------------------------
@@ -305,11 +471,15 @@ void postBootInitTick()
     const bool saveFileExists = bootSaveFileExists();
     const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
+    const bool deferForAssetProvision = bootAssetProvisionRequested() && !firstBootWizard && timeIsValid();
+
     Serial.printf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
                   settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
                   (int)afterOk);
 
-    if (firstBootWizard)
+    if (deferForAssetProvision)
+      Serial.println("[BOOT] path=ASSET_PROVISION_PENDING");
+    else if (firstBootWizard)
       Serial.println("[BOOT] path=FIRST_BOOT_WIZARD");
     else if (!timeIsValid())
       Serial.println("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
@@ -321,6 +491,16 @@ void postBootInitTick()
     if (!loadedFromSD)
     {
       g_app.inventory.init();
+    }
+
+    if (deferForAssetProvision)
+    {
+      g_bootLandingDeferredForAssetProvision = true;
+      ui_setBootSplashActive(false);
+      drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
+      requestUIRedraw();
+      renderUI();
+      return;
     }
 
     ui_setBootSplashActive(false);
@@ -368,58 +548,11 @@ void postBootInitTick()
       return;
     }
 
-    // -----------------------------------------------------------------------
-    // No save exists -> new pet flow
-    // -----------------------------------------------------------------------
-    uint16_t seedMarkNow = 0;
-    EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
-
-    if (!loadedFromSD)
+    if (!deferForAssetProvision)
     {
-      DBG_ON("[BOOT] No SD save -> UIState::CHOOSE_PET\n");
-
-      // No SD save means we are bootstrapping a brand-new pet.
-      // IMPORTANT: do NOT resurrect old inventory from the legacy EEPROM mirror.
-      // Use the canonical starter inventory instead.
-      g_app.inventory.resetToDefaults();
-      ui_setBootSplashActive(false);
-
-      // If controls help hasn’t been seen, do: (forced time) -> help -> time -> choose pet.
-      if (!g_controlsHelpSeen)
-      {
-        beginForcedSetTimeBootGate(UIState::CHOOSE_PET, Tab::TAB_PET);
-        controlsHelpBegin(UIState::SET_TIME, Tab::TAB_PET);
-        return;
-      }
-
-      // Normal first-time path (time valid + no save): choose pet.
-      enterState(UIState::CHOOSE_PET, Tab::TAB_PET, false);
-      uiInitLevelPopupTracker();
-
-      invalidateBackgroundCache();
-      requestUIRedraw();
-      renderUI();
+      finalizeBootLanding();
       return;
     }
-
-    // Save exists: ensure seed mark is written once.
-    if (seedMarkNow != SEED_MARK)
-    {
-      EEPROM.put(SEED_MARK_ADDR, (uint16_t)SEED_MARK);
-      EEPROM.commit();
-    }
-
-    // If still in BOOT, land on the pet screen.
-    if (g_app.uiState == UIState::BOOT)
-    {
-      enterState(UIState::PET_SCREEN, Tab::TAB_PET, false);
-    }
-
-    ui_setBootSplashActive(false);
-
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    renderUI();
   }
 
   // ---------------------------------------------------------------------------
@@ -440,10 +573,26 @@ void postBootInitTick()
       }
 
       wifiTimeInit();
+
+      if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
+      {
+        finalizeBootLanding();
+        return;
+      }
+
       g_postBootInitDone = true;
       requestUIRedraw();
     }
     return;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stage 3.5: Deferred boot asset provisioning
+  // ---------------------------------------------------------------------------
+  if (bootAssetProvisionRequested())
+  {
+    if (runBootAssetProvision())
+      return;
   }
 
   // ---------------------------------------------------------------------------

@@ -28,6 +28,8 @@
 #include "flow_console.h"
 #include "ui_settings_actions.h"
 #include "asset_ota.h"
+#include "asset_provision_request.h"
+#include <esp_system.h>
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -490,6 +492,30 @@ bool Handle(InputState &input, int move)
   int &cursor = def->cursor();
   const int count = (int)def->itemCount;
 
+  if (assetOtaConfirmActive())
+  {
+    if (input.menuOnce || input.escOnce)
+    {
+      assetOtaSetConfirmActive(false);
+      requestUIRedraw();
+      clearInputLatch();
+      playBeep();
+      return true;
+    }
+
+    if (uiIsSelect(input))
+    {
+      assetOtaSetConfirmActive(false);
+      requestAssetProvisionOnNextBoot();
+      clearInputLatch();
+      delay(80);
+      ESP.restart();
+      return true;
+    }
+
+    return true;
+  }
+  
   // Move
   if (move != 0)
   {
