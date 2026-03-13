@@ -26,10 +26,12 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
   if (root.isNull())
     return false;
 
-  out->packVersion = String((const char *)(root["packVersion"] | ""));
+  const char *packVersion = root["packVersion"] | root["pack_version"] | "";
+
+  out->packVersion = String(packVersion);
   out->channel = String((const char *)(root["channel"] | ""));
   Serial.printf("[OTA] parsed packVersion='%s'\n", out->packVersion.c_str());
-  
+
   JsonArray files = root["files"].as<JsonArray>();
   if (files.isNull())
     return false;
@@ -122,7 +124,7 @@ bool assetManifestSaveLocal(const AssetManifestData &manifest)
     return false;
 
   DynamicJsonDocument doc((size_t)4096 + manifest.files.size() * 256);
-  doc["pack_version"] = manifest.packVersion;
+  doc["packVersion"] = manifest.packVersion;
   doc["channel"] = manifest.channel;
 
   JsonArray files = doc.createNestedArray("files");
