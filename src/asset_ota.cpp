@@ -395,8 +395,23 @@ bool assetOtaCheckNow(String *outMessage)
   AssetManifestData localManifest;
   (void)assetManifestLoadLocal(&localManifest);
 
-  AssetManifestData remoteManifest;
-  if (!assetManifestDownloadRemote(manifestUrl, &remoteManifest))
+  Serial.printf("[OTA] before cleanup free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  graphicsReleasePetLayerForOta();
+  invalidateBackgroundCache();
+  spr.deleteSprite();
+  s_graphicsReleasedForOta = true;
+
+  Serial.printf("[OTA] after cleanup free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  String remotePackVersion;
+  std::vector<AssetManifestFile> changed;
+
+  if (!assetManifestDownloadDiffOnly(manifestUrl, localManifest, &remotePackVersion, changed))
   {
     setFailure(AssetOtaError::JSON_FAIL);
     if (outMessage)
@@ -405,42 +420,27 @@ bool assetOtaCheckNow(String *outMessage)
     return false;
   }
 
-  strncpy(s_state.targetPackVersion, remoteManifest.packVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
+  strncpy(s_state.targetPackVersion, remotePackVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
   assetOtaStateSave(s_state);
 
-  std::vector<AssetManifestFile> changed;
-  assetManifestBuildDiff(localManifest, remoteManifest, changed);
-
   if (changed.empty())
   {
-    Serial.printf("[OTA] no changes; version=%s\n", remoteManifest.packVersion.c_str());
-    (void)assetManifestSaveLocal(remoteManifest);
-    s_installedVersion = remoteManifest.packVersion;
+    Serial.printf("[OTA] no changes; version=%s\n", remotePackVersion.c_str());
+    s_installedVersion = remotePackVersion;
     s_status = AssetOtaStatus::SUCCESS;
     assetOtaStateDefaults(s_state);
     assetOtaStateSave(s_state);
     if (outMessage)
     {
       *outMessage = "Asset OTA ";
-      *outMessage += remoteManifest.packVersion;
+      *outMessage += remotePackVersion;
       *outMessage += " already installed";
     }
     restoreMainUiSprite();
     return true;
   }
 
-  Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-
-  graphicsReleasePetLayerForOta();
-  invalidateBackgroundCache();
-  spr.deleteSprite();
-  s_graphicsReleasedForOta = true;
-
-  Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-              
   for (size_t i = 0; i < changed.size(); ++i)
   {
     s_status = AssetOtaStatus::DOWNLOADING;
@@ -458,6 +458,12 @@ bool assetOtaCheckNow(String *outMessage)
       return false;
     }
 
+    if (rel.equalsIgnoreCase("raising_hell/ASSET_MANIFEST.txt"))
+    {
+      Serial.println("[OTA] skipping legacy marker from remote manifest");
+      continue;
+    }
+
     AssetManifestFile fileToDownload = changed[i];
     fileToDownload.url = assetFileResolvedUrl(fileToDownload);
 
@@ -469,7 +475,36 @@ bool assetOtaCheckNow(String *outMessage)
 
     String stagingPath;
     String dlErr;
-    if (!assetDownloadToStaging(fileToDownload, &stagingPath, &dlErr))
+    bool dlOk = false;
+
+    for (int attempt = 1; attempt <= 3; ++attempt)
+    {
+      stagingPath = "";
+      dlErr = "";
+
+      Serial.printf("[OTA] file attempt %d/3: %s\n",
+                    attempt, fileToDownload.path.c_str());
+
+      if (assetDownloadToStaging(fileToDownload, &stagingPath, &dlErr))
+      {
+        dlOk = true;
+        break;
+      }
+
+      Serial.printf("[OTA] file attempt failed: %s\n", dlErr.c_str());
+
+      // Let WiFi/HTTP stack breathe before retry.
+      delay(500);
+
+      // If the station dropped, wait briefly for it to come back.
+      uint32_t waitStart = millis();
+      while (!wifiIsConnectedNow() && (millis() - waitStart) < 5000)
+      {
+        delay(100);
+      }
+    }
+
+    if (!dlOk)
     {
       if (dlErr.indexOf("SHA256") >= 0)
         setFailure(AssetOtaError::HASH_MISMATCH);
@@ -498,7 +533,19 @@ bool assetOtaCheckNow(String *outMessage)
     }
   }
 
-  if (!assetManifestSaveLocal(remoteManifest))
+  delay(25);
+  
+  AssetManifestData finalRemoteManifest;
+  if (!assetManifestDownloadRemote(manifestUrl, &finalRemoteManifest))
+  {
+    setFailure(AssetOtaError::WRITE_FAIL);
+    if (outMessage)
+      *outMessage = "Final manifest reload failed";
+    restoreMainUiSprite();
+    return false;
+  }
+
+  if (!assetManifestSaveLocal(finalRemoteManifest))
   {
     setFailure(AssetOtaError::WRITE_FAIL);
     if (outMessage)
@@ -507,21 +554,21 @@ bool assetOtaCheckNow(String *outMessage)
     return false;
   }
 
-  (void)writeLegacyMarker(remoteManifest.packVersion.c_str());
+  (void)writeLegacyMarker(remotePackVersion.c_str());
 
-  s_installedVersion = remoteManifest.packVersion;
+  s_installedVersion = remotePackVersion;
   s_status = AssetOtaStatus::SUCCESS;
   assetOtaStateDefaults(s_state);
   assetOtaStateSave(s_state);
 
   Serial.printf("[OTA] install success; version=%s files=%u\n",
-                remoteManifest.packVersion.c_str(),
+                remotePackVersion.c_str(),
                 (unsigned)changed.size());
 
   if (outMessage)
   {
     *outMessage = "Asset OTA ";
-    *outMessage += remoteManifest.packVersion;
+    *outMessage += remotePackVersion;
     *outMessage += " installed (";
     *outMessage += (int)changed.size();
     *outMessage += " file";
@@ -529,7 +576,7 @@ bool assetOtaCheckNow(String *outMessage)
       *outMessage += "s";
     *outMessage += ")";
   }
-
+  
   // Do NOT restore UI here. Caller will reboot after successful install.
   return true;
 }

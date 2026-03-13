@@ -6,14 +6,22 @@
 #include <SD.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <vector>
 
 #include "asset_ota.h"
-#include "asset_ota_config.h"
 #include "graphics.h"
 #include "sdcard.h"
+#include "asset_ota_config.h"
 
-static bool parseManifestJson(const String &json, AssetManifestData *out)
+static String synthesizeAssetUrl(const String &relPath)
 {
+  String base = "https://assets.raisinghellgame.com/assets/";
+  if (!base.endsWith("/"))
+    base += "/";
+  return base + relPath;
+}
+
+static bool parseManifestJson(String &json, AssetManifestData *out){
   if (!out)
     return false;
 
@@ -30,6 +38,8 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
     return false;
   }
 
+  json = "";
+
   JsonObject root = doc.as<JsonObject>();
   if (root.isNull())
   {
@@ -37,7 +47,10 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
     return false;
   }
 
-  const char *packVersion = root["packVersion"] | root["pack_version"] | "";
+  const char *packVersion =
+      root["packVersion"] |
+      root["pack_version"] |
+      "";
 
   if (!packVersion[0])
   {
@@ -45,7 +58,9 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
     return false;
   }
 
-  const char *channel = root["channel"] | "";
+  const char *channel =
+      root["channel"] |
+      "";
 
   JsonVariant filesVar = root["files"];
   if (!filesVar.is<JsonArray>())
@@ -80,15 +95,9 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
 
     const char *urlField = obj["url"] | "";
     if (urlField[0])
-    {
       f.url = urlField;
-    }
     else
-    {
-      // Do not synthesize and store full URLs during manifest parse.
-      // We can derive them later from the base asset URL when downloading.
       f.url = "";
-    }
 
     const char *shaField = obj["sha256"] | "";
     if (shaField[0])
@@ -101,43 +110,21 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
       f.sha256 = "";
     }
 
-    // Empty URL is allowed in minimal manifests; it will be synthesized later.
-
-    if ((fileIndex % 50) == 0 || fileIndex >= 340)
-    {
-      Serial.printf("[OTA] parse progress index=%u/%u path=%s free=%u largest=%u vec=%u\n",
-                    fileIndex,
-                    totalFiles,
-                    f.path.c_str(),
-                    (unsigned)ESP.getFreeHeap(),
-                    (unsigned)ESP.getMaxAllocHeap(),
-                    (unsigned)out->files.size());
-    }
-
     out->files.push_back(f);
 
-    if (fileIndex >= 340)
+    if ((fileIndex % 25) == 0)
     {
-      Serial.printf("[OTA] pushed index=%u/%u vecNow=%u free=%u largest=%u\n",
-                    fileIndex,
-                    totalFiles,
-                    (unsigned)out->files.size(),
+      Serial.printf("[OTA] parse progress index=%u/%u free=%u largest=%u path=%s\n",
+                    fileIndex, totalFiles,
                     (unsigned)ESP.getFreeHeap(),
-                    (unsigned)ESP.getMaxAllocHeap());
+                    (unsigned)ESP.getMaxAllocHeap(),
+                    f.path.c_str());
     }
   }
 
-  Serial.printf("[OTA] parse loop complete total=%u vec=%u free=%u largest=%u\n",
-                totalFiles,
-                (unsigned)out->files.size(),
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-
-  Serial.printf("[OTA] manifest parsed ok: version=%s files=%u free=%u largest=%u\n",
+  Serial.printf("[OTA] manifest parsed ok: version=%s files=%u\n",
                 out->packVersion.c_str(),
-                (unsigned)out->files.size(),
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
+                (unsigned)out->files.size());
 
   return true;
 }
@@ -210,7 +197,8 @@ bool assetManifestSaveLocal(const AssetManifestData &manifest)
   {
     JsonObject o = files.createNestedObject();
     o["path"] = f.path;
-    o["url"] = f.url;
+    if (!f.url.isEmpty())
+      o["url"] = f.url;
     o["sha256"] = f.sha256;
     o["size"] = f.size;
   }
@@ -252,7 +240,9 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   graphicsReleasePetLayerForOta();
 
   Serial.printf("[OTA] manifest url=%s\n", url);
-  Serial.printf("[OTA] pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-http free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
   http.setReuse(false);
@@ -280,7 +270,9 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     began = http.begin(plainClient, url);
   }
 
-  Serial.printf("[OTA] post-begin began=%d free=%u largest=%u\n", began ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] post-begin began=%d free=%u largest=%u\n",
+                began ? 1 : 0,
+                (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   if (!began)
@@ -289,7 +281,9 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  Serial.printf("[OTA] pre-GET free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-GET free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   const int code = http.GET();
   Serial.printf("[OTA] manifest http code=%d\n", code);
@@ -370,7 +364,8 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   return true;
 }
 
-void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetManifestData &remoteManifest,
+void assetManifestBuildDiff(const AssetManifestData &localManifest,
+                            const AssetManifestData &remoteManifest,
                             std::vector<AssetManifestFile> &outChangedFiles)
 {
   outChangedFiles.clear();
@@ -402,4 +397,20 @@ void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetM
     if (!foundSame)
       outChangedFiles.push_back(rf);
   }
+}
+
+bool assetManifestDownloadDiffOnly(const char *url,
+                                   const AssetManifestData &localManifest,
+                                   String *outPackVersion,
+                                   std::vector<AssetManifestFile> &outChangedFiles)
+{
+  AssetManifestData remoteManifest;
+  if (!assetManifestDownloadRemote(url, &remoteManifest))
+    return false;
+
+  if (outPackVersion)
+    *outPackVersion = remoteManifest.packVersion;
+
+  assetManifestBuildDiff(localManifest, remoteManifest, outChangedFiles);
+  return true;
 }

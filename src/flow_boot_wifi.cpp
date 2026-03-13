@@ -121,8 +121,7 @@ void uiBootWifiWaitHandle(InputState& in)
 
     // Mandatory asset provisioning does not need TZ/NTP flow if time is already valid.
     // Return to BOOT so provisioning can resume immediately.
-    if (g_bootAssetProvisionMustComplete && timeIsValid())
-    {
+    if (g_bootAssetProvisionMustComplete && timeIsSynced())    {
       uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
       requestFullUIRedraw();
       requestUIRedraw();

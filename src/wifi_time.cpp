@@ -87,23 +87,25 @@ bool wifiIsEnabled() {
 }
 
 static char s_consoleSsidBuf[33] = {0};
+
 void wifiConsoleBeginConnect(const char* ssid, const char* pass) {
   s_consoleConnectStartMs = millis();
   if (!ssid) ssid = "";
   if (!pass) pass = "";
 
-  // Ensure radio is allowed on (respects your existing power gate approach)
   wifiSetEnabled(true);
-  applyWifiPower(true);
 
   WiFi.mode(WIFI_STA);
+  WiFi.persistent(false);
   WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
 
-  // Start connection attempt
+  WiFi.disconnect(false, false);
+  delay(50);
+
   WiFi.begin(ssid, pass);
   s_consoleConnectStartMs = millis();
 
-  // Cache SSID for console display
   strncpy(s_consoleSsidBuf, ssid, sizeof(s_consoleSsidBuf) - 1);
   s_consoleSsidBuf[sizeof(s_consoleSsidBuf) - 1] = '\0';
 }

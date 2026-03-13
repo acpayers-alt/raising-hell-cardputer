@@ -10,10 +10,7 @@
 #include "asset_ota_config.h"
 #include "sdcard.h"
 
-static String joinStagingPath(const String &relPath)
-{
-  return String(assetOtaStagingRoot()) + "/" + relPath + ".part";
-}
+static String joinStagingPath(const String &relPath) { return String(assetOtaStagingRoot()) + "/" + relPath + ".part"; }
 
 static String toLowerHex(const uint8_t *buf, size_t len)
 {
@@ -28,9 +25,7 @@ static String toLowerHex(const uint8_t *buf, size_t len)
   return out;
 }
 
-bool assetDownloadToStaging(const AssetManifestFile &file,
-                            String *outStagingPath,
-                            String *outErr)
+bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPath, String *outErr)
 {
   if (outStagingPath)
     *outStagingPath = "";
@@ -74,46 +69,35 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
   }
 
   Serial.printf("[OTA] file url=%s\n", file.url.c_str());
-  Serial.printf("[OTA] file pre-http free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] file pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
   http.setReuse(false);
 
+  http.setTimeout(30000);
+  http.addHeader("Accept-Encoding", "identity");
+  http.addHeader("Cache-Control", "no-cache");
+  http.setUserAgent("RaisingHellCardputer/1.0");
+
   const String sUrl(file.url);
   bool began = false;
 
+  WiFiClient plainClient;
+  WiFiClientSecure secureClient;
+
   if (sUrl.startsWith("https://"))
   {
-    WiFiClientSecure *client = new WiFiClientSecure();
-    if (!client)
-    {
-      out.close();
-      SD.remove(stagingPath.c_str());
-      if (outErr)
-        *outErr = "Secure client alloc failed";
-      return false;
-    }
-    client->setInsecure();
-    client->setTimeout(15000);
-    client->setHandshakeTimeout(15);
-    began = http.begin(*client, file.url);
+    secureClient.setInsecure();
+    secureClient.setTimeout(15000);
+    secureClient.setHandshakeTimeout(15);
+    began = http.begin(secureClient, file.url);
   }
   else
   {
-    WiFiClient *client = new WiFiClient();
-    if (!client)
-    {
-      out.close();
-      SD.remove(stagingPath.c_str());
-      if (outErr)
-        *outErr = "Client alloc failed";
-      return false;
-    }
-    began = http.begin(*client, file.url);
+    began = http.begin(plainClient, file.url);
   }
-
+  
   if (!began)
   {
     out.close();
@@ -135,18 +119,24 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
       *outErr = String("HTTP ") + code;
     return false;
   }
-  
+
   WiFiClient *stream = http.getStreamPtr();
   const int contentLength = http.getSize();
-  Serial.printf("[OTA] file contentLength=%d expected=%u\n",
-                contentLength,
-                (unsigned)file.size);
+  Serial.printf("[OTA] file contentLength=%d expected=%u\n", contentLength, (unsigned)file.size);
 
+  String wantHash = file.sha256;
+  wantHash.toLowerCase();
+  wantHash.trim();
+
+  const bool verifyHash = !wantHash.isEmpty();
   mbedtls_sha256_context ctx;
-  mbedtls_sha256_init(&ctx);
-  mbedtls_sha256_starts_ret(&ctx, 0);
-
   uint8_t hash[32];
+
+  if (verifyHash)
+  {
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts_ret(&ctx, 0);
+  }
   uint8_t buf[1024];
   uint32_t total = 0;
   uint32_t idleLoops = 0;
@@ -180,12 +170,16 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
       return false;
     }
 
-    mbedtls_sha256_update_ret(&ctx, buf, (size_t)n);
-    total += (uint32_t)n;
+    if (verifyHash)
+      mbedtls_sha256_update_ret(&ctx, buf, (size_t)n);
+          total += (uint32_t)n;
   }
 
-  mbedtls_sha256_finish_ret(&ctx, hash);
-  mbedtls_sha256_free(&ctx);
+  if (verifyHash)
+  {
+    mbedtls_sha256_finish_ret(&ctx, hash);
+    mbedtls_sha256_free(&ctx);
+  }
 
   out.flush();
   out.close();
@@ -207,20 +201,32 @@ bool assetDownloadToStaging(const AssetManifestFile &file,
     return false;
   }
 
-  String gotHash = toLowerHex(hash, sizeof(hash));
-  String wantHash = file.sha256;
-  wantHash.toLowerCase();
+  Serial.printf("[OTA] file total=%u wantSize=%u\n",
+                (unsigned)total,
+                (unsigned)file.size);
 
-  if (gotHash != wantHash)
+  if (verifyHash)
   {
-    SD.remove(stagingPath.c_str());
-    if (outErr)
-      *outErr = "SHA256 mismatch";
-    return false;
+    String gotHash = toLowerHex(hash, sizeof(hash));
+
+    Serial.printf("[OTA] file gotHash=%s\n", gotHash.c_str());
+    Serial.printf("[OTA] file wantHash=%s\n", wantHash.c_str());
+
+    if (gotHash != wantHash)
+    {
+      SD.remove(stagingPath.c_str());
+      if (outErr)
+        *outErr = "SHA256 mismatch";
+      return false;
+    }
+  }
+  else
+  {
+    Serial.println("[OTA] file hash skipped (no manifest sha256)");
   }
 
   Serial.printf("[OTA] file done total=%u\n", (unsigned)total);
-
+  
   if (outStagingPath)
     *outStagingPath = stagingPath;
 

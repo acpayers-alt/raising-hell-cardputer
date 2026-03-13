@@ -307,7 +307,6 @@ static void finalizeBootLanding()
 
   g_bootLandingDone = true;
   g_bootAssetProvisionMustComplete = false;
-  
   const bool saveFileExists = bootSaveFileExists();
   const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
@@ -603,27 +602,16 @@ void postBootInitTick()
     if (now >= g_nextWifiTryMs)
     {
       g_nextWifiTryMs = now + 1000;
-
-      if (!g_wifiApplied)
-      {
-        const bool pref = settingsWifiEnabled();
-        wifiSetEnabled(pref);
-        applyWifiPower(pref);
-        g_wifiApplied = true;
-      }
-
-      wifiTimeInit();
-
+  
       if (bootAssetProvisionRequired())
       {
-        // Mandatory provisioning must never dead-end on "Enable WiFi first".
-        // Route through the boot WiFi/import flow first, then come back here.
+        // For mandatory provisioning, let the boot WiFi/import flow own WiFi startup.
         if (g_bootAssetProvisionMustComplete && !g_bootProvisionWifiOnboardingStarted)
         {
           g_bootProvisionWifiOnboardingStarted = true;
           g_bootAssetProvisionActive = false;
           ui_setBootSplashActive(false);
-
+  
           bootWizardBegin(UIState::BOOT, Tab::TAB_PET);
           requestFullUIRedraw();
           requestUIRedraw();
@@ -631,24 +619,35 @@ void postBootInitTick()
           clearInputLatch();
           return;
         }
-
-        // While the boot WiFi/import flow owns the screen, pause the boot pipeline.
+  
         if (bootAssetProvisionWifiOnboardingActive())
           return;
-
-        // Once onboarding returns to BOOT, provisioning owns the screen again.
+      }
+  
+      if (!g_wifiApplied)
+      {
+        const bool pref = settingsWifiEnabled();
+        wifiSetEnabled(pref);
+        applyWifiPower(pref);
+        g_wifiApplied = true;
+      }
+  
+      wifiTimeInit();
+  
+      if (bootAssetProvisionRequired())
+      {
         g_bootAssetProvisionActive = true;
-
+  
         if (!bootAssetProvisionWifiReady())
           return;
       }
-
+  
       g_postBootInitDone = true;
       requestUIRedraw();
-        }
+    }
     return;
   }
-
+  
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------
