@@ -127,6 +127,7 @@ static bool g_bootProvisionWifiStarted = false;
 static uint32_t g_bootProvisionWifiStartMs = 0;
 static bool g_bootLandingDeferredForAssetProvision = false;
 static bool g_bootLandingDone = false;
+bool g_bootAssetProvisionActive = false;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -211,11 +212,14 @@ static bool runBootAssetProvision()
 
   if (ok)
   {
+    g_bootAssetProvisionActive = false;
     ESP.restart();
   }
 
-  Serial.printf("[BOOT][ASSET_PROVISION] failed: %s\n", msg.c_str());
+  g_bootAssetProvisionActive = false;
 
+  Serial.printf("[BOOT][ASSET_PROVISION] failed: %s\n", msg.c_str());
+  
   // If assets are still missing, fall back to the normal missing-assets gate.
   g_assetsChecked = true;
   g_assetsMissing = !sdAssetsPresent();
@@ -498,6 +502,7 @@ void postBootInitTick()
       g_bootLandingDeferredForAssetProvision = true;
       ui_setBootSplashActive(false);
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
+      g_bootAssetProvisionActive = true;
       requestUIRedraw();
       renderUI();
       return;
@@ -574,10 +579,10 @@ void postBootInitTick()
 
       wifiTimeInit();
 
-      if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
+      if (bootAssetProvisionRequested())
       {
-        finalizeBootLanding();
-        return;
+        if (!bootAssetProvisionWifiReady())
+          return;
       }
 
       g_postBootInitDone = true;
@@ -593,6 +598,13 @@ void postBootInitTick()
   {
     if (runBootAssetProvision())
       return;
+  }
+
+  if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
+  {
+    g_bootAssetProvisionActive = false;
+    finalizeBootLanding();
+    return;
   }
 
   // ---------------------------------------------------------------------------
