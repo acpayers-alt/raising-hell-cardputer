@@ -174,21 +174,87 @@ static void drawBootAssetProvisionScreen(const char *line1, const char *line2)
 {
   displayInit();
 
+  const uint16_t cur = assetOtaCurrentFileIndex();
+  const uint16_t total = assetOtaTotalFileCount();
+  const AssetOtaStatus st = assetOtaStatus();
+
+  if (assetOtaDidReleaseGraphics())
+  {
+    auto &d = M5Cardputer.Display;
+
+    d.fillScreen(TFT_BLACK);
+    d.setTextDatum(textdatum_t::middle_center);
+    d.setTextFont(2);
+    d.setTextSize(1);
+
+    d.setTextColor(TFT_RED, TFT_BLACK);
+    d.drawString("ASSET PROVISIONING", SCREEN_W / 2, SCREEN_H / 2 - 34);
+
+    d.setTextColor(TFT_WHITE, TFT_BLACK);
+    if (line1 && line1[0])
+      d.drawString(line1, SCREEN_W / 2, SCREEN_H / 2 - 6);
+    if (line2 && line2[0])
+      d.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 14);
+
+    if ((st == AssetOtaStatus::DOWNLOADING || st == AssetOtaStatus::INSTALLING) && total > 0)
+    {
+      char prog[40];
+      snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
+      d.drawString(prog, SCREEN_W / 2, SCREEN_H / 2 + 40);
+
+      const int barW = SCREEN_W - 40;
+      const int barH = 10;
+      const int barX = 20;
+      const int barY = SCREEN_H / 2 + 54;
+
+      d.drawRect(barX, barY, barW, barH, TFT_WHITE);
+
+      int fillW = (int)(((uint32_t)(barW - 2) * cur) / total);
+      if (fillW > 0)
+        d.fillRect(barX + 1, barY + 1, fillW, barH - 2, TFT_WHITE);
+    }
+
+    return;
+  }
+
   spr.fillScreen(TFT_BLACK);
   spr.setTextDatum(textdatum_t::middle_center);
   spr.setTextFont(2);
   spr.setTextSize(1);
 
   spr.setTextColor(TFT_RED, TFT_BLACK);
-  spr.drawString("ASSET PROVISIONING", SCREEN_W / 2, SCREEN_H / 2 - 26);
+  spr.drawString("ASSET PROVISIONING", SCREEN_W / 2, SCREEN_H / 2 - 34);
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   if (line1 && line1[0])
-    spr.drawString(line1, SCREEN_W / 2, SCREEN_H / 2 + 2);
+    spr.drawString(line1, SCREEN_W / 2, SCREEN_H / 2 - 6);
   if (line2 && line2[0])
-    spr.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 22);
+    spr.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 14);
+
+  if ((st == AssetOtaStatus::DOWNLOADING || st == AssetOtaStatus::INSTALLING) && total > 0)
+  {
+    char prog[40];
+    snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
+    spr.drawString(prog, SCREEN_W / 2, SCREEN_H / 2 + 40);
+
+    const int barW = SCREEN_W - 40;
+    const int barH = 10;
+    const int barX = 20;
+    const int barY = SCREEN_H / 2 + 54;
+
+    spr.drawRect(barX, barY, barW, barH, TFT_WHITE);
+
+    int fillW = (int)(((uint32_t)(barW - 2) * cur) / total);
+    if (fillW > 0)
+      spr.fillRect(barX + 1, barY + 1, fillW, barH - 2, TFT_WHITE);
+  }
 
   spr.pushSprite(0, 0);
+}
+
+void bootAssetProvisionRedraw(const char *line1, const char *line2)
+{
+  drawBootAssetProvisionScreen(line1, line2);
 }
 
 static bool bootAssetProvisionWifiOnboardingActive()

@@ -49,6 +49,7 @@ void assetOtaStateDefaults(AssetOtaState &st)
   st.status = (uint8_t)AssetOtaStatus::IDLE;
   st.lastError = (uint8_t)AssetOtaError::NONE;
   st.currentFileIndex = 0;
+  st.totalFileCount = 0;
   st.targetPackVersion[0] = '\0';
 }
 

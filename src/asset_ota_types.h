@@ -69,6 +69,7 @@ struct AssetOtaState {
   uint8_t inProgress = 0;
   uint8_t status = (uint8_t)AssetOtaStatus::IDLE;
   uint16_t currentFileIndex = 0;
+  uint16_t totalFileCount = 0;
   uint8_t lastError = (uint8_t)AssetOtaError::NONE;
   char targetPackVersion[24] = {0};
 };

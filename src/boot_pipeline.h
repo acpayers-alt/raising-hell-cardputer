@@ -30,3 +30,5 @@ extern bool g_bootAssetProvisionMustComplete;
 
 extern bool g_bootAssetProvisionActive;
 extern bool g_bootAssetProvisionMustComplete;
+
+void bootAssetProvisionRedraw(const char *line1, const char *line2);

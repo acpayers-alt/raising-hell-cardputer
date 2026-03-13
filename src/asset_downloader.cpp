@@ -97,7 +97,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
   {
     began = http.begin(plainClient, file.url);
   }
-  
+
   if (!began)
   {
     out.close();
@@ -172,7 +172,8 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
 
     if (verifyHash)
       mbedtls_sha256_update_ret(&ctx, buf, (size_t)n);
-          total += (uint32_t)n;
+
+    total += (uint32_t)n;
   }
 
   if (verifyHash)
@@ -201,9 +202,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     return false;
   }
 
-  Serial.printf("[OTA] file total=%u wantSize=%u\n",
-                (unsigned)total,
-                (unsigned)file.size);
+  Serial.printf("[OTA] file total=%u wantSize=%u\n", (unsigned)total, (unsigned)file.size);
 
   if (verifyHash)
   {
@@ -226,7 +225,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
   }
 
   Serial.printf("[OTA] file done total=%u\n", (unsigned)total);
-  
+
   if (outStagingPath)
     *outStagingPath = stagingPath;
 

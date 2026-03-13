@@ -17,6 +17,9 @@ AssetOtaError assetOtaLastError();
 const char *assetOtaStatusString();
 const char *assetOtaLastErrorString();
 
+uint16_t assetOtaCurrentFileIndex();
+uint16_t assetOtaTotalFileCount();
+
 bool assetOtaDidReleaseGraphics();
 
 bool assetOtaConfirmActive();

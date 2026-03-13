@@ -6,12 +6,13 @@
 #include "display.h"
 #include "graphics.h"
 #include "sdcard.h"
+#include "ui_invalidate.h"
+#include "ui_runtime.h"
 #include "wifi_time.h"
 #include <Arduino.h>
 #include <SD.h>
 #include <string.h>
-#include "ui_invalidate.h"
-#include "ui_runtime.h"
+#include "boot_pipeline.h"
 
 static String assetFileResolvedUrl(const AssetManifestFile &f)
 {
@@ -34,20 +35,11 @@ static bool s_loadedFromSd = false;
 static bool s_graphicsReleasedForOta = false;
 static bool s_assetOtaConfirmActive = false;
 
-bool assetOtaConfirmActive()
-{
-  return s_assetOtaConfirmActive;
-}
+bool assetOtaConfirmActive() { return s_assetOtaConfirmActive; }
 
-void assetOtaSetConfirmActive(bool v)
-{
-  s_assetOtaConfirmActive = v;
-}
+void assetOtaSetConfirmActive(bool v) { s_assetOtaConfirmActive = v; }
 
-bool assetOtaDidReleaseGraphics()
-{
-  return s_graphicsReleasedForOta;
-}
+bool assetOtaDidReleaseGraphics() { return s_graphicsReleasedForOta; }
 
 static const char *statusString(AssetOtaStatus st)
 {
@@ -121,9 +113,7 @@ static void restoreMainUiSprite()
   }
 
   const bool ok = spr.createSprite(SCREEN_W, SCREEN_H);
-  Serial.printf("[OTA/UI] recreate main sprite ok=%d free=%u largest=%u\n",
-                (int)ok,
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA/UI] recreate main sprite ok=%d free=%u largest=%u\n", (int)ok, (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   if (!ok)
@@ -147,6 +137,7 @@ static void setFailure(AssetOtaError err)
   s_status = AssetOtaStatus::FAILED;
   s_state.status = (uint8_t)s_status;
   s_state.lastError = (uint8_t)err;
+  s_state.totalFileCount = 0;
   assetOtaStateSave(s_state);
 }
 
@@ -319,6 +310,9 @@ AssetOtaStatus assetOtaStatus() { return s_status; }
 
 AssetOtaError assetOtaLastError() { return s_lastErr; }
 
+uint16_t assetOtaCurrentFileIndex() { return s_state.currentFileIndex; }
+uint16_t assetOtaTotalFileCount() { return s_state.totalFileCount; }
+
 const char *assetOtaStatusString() { return statusString(s_status); }
 
 const char *assetOtaLastErrorString() { return errorString(s_lastErr); }
@@ -395,8 +389,7 @@ bool assetOtaCheckNow(String *outMessage)
   AssetManifestData localManifest;
   (void)assetManifestLoadLocal(&localManifest);
 
-  Serial.printf("[OTA] before cleanup free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   graphicsReleasePetLayerForOta();
@@ -404,8 +397,7 @@ bool assetOtaCheckNow(String *outMessage)
   spr.deleteSprite();
   s_graphicsReleasedForOta = true;
 
-  Serial.printf("[OTA] after cleanup free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   String remotePackVersion;
@@ -422,6 +414,7 @@ bool assetOtaCheckNow(String *outMessage)
 
   strncpy(s_state.targetPackVersion, remotePackVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
+  s_state.totalFileCount = (uint16_t)changed.size();
   assetOtaStateSave(s_state);
 
   if (changed.empty())
@@ -445,8 +438,10 @@ bool assetOtaCheckNow(String *outMessage)
   {
     s_status = AssetOtaStatus::DOWNLOADING;
     s_state.status = (uint8_t)s_status;
-    s_state.currentFileIndex = (uint16_t)i;
+    s_state.currentFileIndex = (uint16_t)(i + 1);
     assetOtaStateSave(s_state);
+
+    bootAssetProvisionRedraw("Downloading assets.", "Please wait...");
 
     String rel;
     if (!assetManifestNormalizePath(changed[i].path, &rel))
@@ -467,9 +462,7 @@ bool assetOtaCheckNow(String *outMessage)
     AssetManifestFile fileToDownload = changed[i];
     fileToDownload.url = assetFileResolvedUrl(fileToDownload);
 
-    Serial.printf("[OTA] download index=%u/%u path=%s\n",
-                  (unsigned)(i + 1),
-                  (unsigned)changed.size(),
+    Serial.printf("[OTA] download index=%u/%u path=%s\n", (unsigned)(i + 1), (unsigned)changed.size(),
                   fileToDownload.path.c_str());
     Serial.printf("[OTA] resolved url=%s\n", fileToDownload.url.c_str());
 
@@ -482,8 +475,7 @@ bool assetOtaCheckNow(String *outMessage)
       stagingPath = "";
       dlErr = "";
 
-      Serial.printf("[OTA] file attempt %d/3: %s\n",
-                    attempt, fileToDownload.path.c_str());
+      Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, fileToDownload.path.c_str());
 
       if (assetDownloadToStaging(fileToDownload, &stagingPath, &dlErr))
       {
@@ -523,6 +515,8 @@ bool assetOtaCheckNow(String *outMessage)
     s_state.status = (uint8_t)s_status;
     assetOtaStateSave(s_state);
 
+    bootAssetProvisionRedraw("Installing assets.", "Please wait...");
+
     if (!installStagedFile(rel, stagingPath))
     {
       setFailure(AssetOtaError::RENAME_FAIL);
@@ -531,10 +525,10 @@ bool assetOtaCheckNow(String *outMessage)
       restoreMainUiSprite();
       return false;
     }
+
+    delay(25);
   }
 
-  delay(25);
-  
   AssetManifestData finalRemoteManifest;
   if (!assetManifestDownloadRemote(manifestUrl, &finalRemoteManifest))
   {
@@ -561,9 +555,7 @@ bool assetOtaCheckNow(String *outMessage)
   assetOtaStateDefaults(s_state);
   assetOtaStateSave(s_state);
 
-  Serial.printf("[OTA] install success; version=%s files=%u\n",
-                remotePackVersion.c_str(),
-                (unsigned)changed.size());
+  Serial.printf("[OTA] install success; version=%s files=%u\n", remotePackVersion.c_str(), (unsigned)changed.size());
 
   if (outMessage)
   {
@@ -576,7 +568,7 @@ bool assetOtaCheckNow(String *outMessage)
       *outMessage += "s";
     *outMessage += ")";
   }
-  
+
   // Do NOT restore UI here. Caller will reboot after successful install.
   return true;
 }
