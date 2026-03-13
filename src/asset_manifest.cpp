@@ -61,6 +61,8 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
   out->files.reserve(files.size());
 
   unsigned fileIndex = 0;
+  const unsigned totalFiles = files.size();
+
   for (JsonObject obj : files)
   {
     ++fileIndex;
@@ -83,11 +85,9 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
     }
     else
     {
-      // Minimal manifest support: synthesize URL from public assets root.
-      String base = "https://assets.raisinghellgame.com/assets/";
-      if (!base.endsWith("/"))
-        base += "/";
-      f.url = base + f.path;
+      // Do not synthesize and store full URLs during manifest parse.
+      // We can derive them later from the base asset URL when downloading.
+      f.url = "";
     }
 
     const char *shaField = obj["sha256"] | "";
@@ -101,24 +101,43 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
       f.sha256 = "";
     }
 
-    if (f.url.isEmpty())
+    // Empty URL is allowed in minimal manifests; it will be synthesized later.
+
+    if ((fileIndex % 50) == 0 || fileIndex >= 340)
     {
-      Serial.printf("[OTA] manifest file entry has empty url at index=%u path=%s\n",
+      Serial.printf("[OTA] parse progress index=%u/%u path=%s free=%u largest=%u vec=%u\n",
                     fileIndex,
-                    f.path.c_str());
-      return false;
+                    totalFiles,
+                    f.path.c_str(),
+                    (unsigned)ESP.getFreeHeap(),
+                    (unsigned)ESP.getMaxAllocHeap(),
+                    (unsigned)out->files.size());
     }
-    if ((fileIndex % 50) == 0)
-    {
-      Serial.printf("[OTA] parse progress index=%u path=%s\n",
-                    fileIndex,
-                    f.path.c_str());
-    }
+
     out->files.push_back(f);
+
+    if (fileIndex >= 340)
+    {
+      Serial.printf("[OTA] pushed index=%u/%u vecNow=%u free=%u largest=%u\n",
+                    fileIndex,
+                    totalFiles,
+                    (unsigned)out->files.size(),
+                    (unsigned)ESP.getFreeHeap(),
+                    (unsigned)ESP.getMaxAllocHeap());
+    }
   }
 
-  Serial.printf("[OTA] manifest parsed ok: version=%s files=%u\n", out->packVersion.c_str(),
-                (unsigned)out->files.size());
+  Serial.printf("[OTA] parse loop complete total=%u vec=%u free=%u largest=%u\n",
+                totalFiles,
+                (unsigned)out->files.size(),
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  Serial.printf("[OTA] manifest parsed ok: version=%s files=%u free=%u largest=%u\n",
+                out->packVersion.c_str(),
+                (unsigned)out->files.size(),
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
   return true;
 }

@@ -13,6 +13,17 @@
 #include "ui_invalidate.h"
 #include "ui_runtime.h"
 
+static String assetFileResolvedUrl(const AssetManifestFile &f)
+{
+  if (!f.url.isEmpty())
+    return f.url;
+
+  String url = "https://assets.raisinghellgame.com/assets/";
+  if (!url.endsWith("/"))
+    url += "/";
+  url += f.path;
+  return url;
+}
 static AssetOtaConfig s_cfg{};
 static AssetOtaState s_state{};
 static AssetOtaStatus s_status = AssetOtaStatus::IDLE;
@@ -447,9 +458,18 @@ bool assetOtaCheckNow(String *outMessage)
       return false;
     }
 
+    AssetManifestFile fileToDownload = changed[i];
+    fileToDownload.url = assetFileResolvedUrl(fileToDownload);
+
+    Serial.printf("[OTA] download index=%u/%u path=%s\n",
+                  (unsigned)(i + 1),
+                  (unsigned)changed.size(),
+                  fileToDownload.path.c_str());
+    Serial.printf("[OTA] resolved url=%s\n", fileToDownload.url.c_str());
+
     String stagingPath;
     String dlErr;
-    if (!assetDownloadToStaging(changed[i], &stagingPath, &dlErr))
+    if (!assetDownloadToStaging(fileToDownload, &stagingPath, &dlErr))
     {
       if (dlErr.indexOf("SHA256") >= 0)
         setFailure(AssetOtaError::HASH_MISMATCH);
