@@ -117,17 +117,20 @@ bool sdAssetsPresent()
 // -----------------------------------------------------------------------------
 uint32_t g_sdFirstTryMs = 0;
 bool g_sdGaveUp = false;
+uint8_t g_sdTryCount = 0;
+static uint32_t g_bootProvisionWifiStartMs = 0;
+bool g_bootAssetProvisionActive = false;
+extern bool g_bootAssetProvisionMustComplete;
+bool g_bootAssetProvisionMustComplete = false;
 
+static bool g_bootProvisionWifiOnboardingStarted = false;
+static bool g_bootLandingDeferredForAssetProvision = false;
+static bool g_bootLandingDone = false;
 static bool g_postBootInitDone = false;
 static bool g_sdTriedLoad = false;
 static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
-uint8_t g_sdTryCount = 0;
 static bool g_bootProvisionWifiStarted = false;
-static uint32_t g_bootProvisionWifiStartMs = 0;
-static bool g_bootLandingDeferredForAssetProvision = false;
-static bool g_bootLandingDone = false;
-bool g_bootAssetProvisionActive = false;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -186,6 +189,22 @@ static void drawBootAssetProvisionScreen(const char *line1, const char *line2)
     spr.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 22);
 
   spr.pushSprite(0, 0);
+}
+
+static bool bootAssetProvisionWifiOnboardingActive()
+{
+  switch (g_app.uiState)
+  {
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_WIFI_IMPORTED:
+  case UIState::BOOT_WIFI_WAIT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+  case UIState::WIFI_SETUP:
+    return true;
+  default:
+    return false;
+  }
 }
 
 static bool runBootAssetProvision()
@@ -250,13 +269,16 @@ static bool bootAssetProvisionWifiReady()
   if (!bootAssetProvisionRequired())
     return false;
 
-  if (!settingsWifiEnabled())
+  // Optional OTA request: if WiFi is disabled in settings, let OTA report it and continue boot.
+  if (!g_bootAssetProvisionMustComplete && !settingsWifiEnabled())
     return true;
 
   if (!g_bootProvisionWifiStarted)
   {
-    wifiSetEnabled(true);
-    applyWifiPower(true);
+    const bool shouldEnableWifi = g_bootAssetProvisionMustComplete ? true : settingsWifiEnabled();
+
+    wifiSetEnabled(shouldEnableWifi);
+    applyWifiPower(shouldEnableWifi);
     wifiTimeInit();
 
     g_bootProvisionWifiStarted = true;
@@ -284,7 +306,8 @@ static void finalizeBootLanding()
     return;
 
   g_bootLandingDone = true;
-
+  g_bootAssetProvisionMustComplete = false;
+  
   const bool saveFileExists = bootSaveFileExists();
   const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
@@ -510,6 +533,8 @@ void postBootInitTick()
     if (deferForAssetProvision)
     {
       g_bootLandingDeferredForAssetProvision = true;
+      g_bootAssetProvisionMustComplete = bootAssetProvisionMandatory();
+
       ui_setBootSplashActive(false);
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
       g_bootAssetProvisionActive = true;
@@ -591,13 +616,36 @@ void postBootInitTick()
 
       if (bootAssetProvisionRequired())
       {
+        // Mandatory provisioning must never dead-end on "Enable WiFi first".
+        // Route through the boot WiFi/import flow first, then come back here.
+        if (g_bootAssetProvisionMustComplete && !g_bootProvisionWifiOnboardingStarted)
+        {
+          g_bootProvisionWifiOnboardingStarted = true;
+          g_bootAssetProvisionActive = false;
+          ui_setBootSplashActive(false);
+
+          bootWizardBegin(UIState::BOOT, Tab::TAB_PET);
+          requestFullUIRedraw();
+          requestUIRedraw();
+          renderUI();
+          clearInputLatch();
+          return;
+        }
+
+        // While the boot WiFi/import flow owns the screen, pause the boot pipeline.
+        if (bootAssetProvisionWifiOnboardingActive())
+          return;
+
+        // Once onboarding returns to BOOT, provisioning owns the screen again.
+        g_bootAssetProvisionActive = true;
+
         if (!bootAssetProvisionWifiReady())
           return;
       }
 
       g_postBootInitDone = true;
       requestUIRedraw();
-    }
+        }
     return;
   }
 
@@ -609,7 +657,7 @@ void postBootInitTick()
     if (runBootAssetProvision())
       return;
   }
-  
+
   if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
   {
     g_bootAssetProvisionActive = false;

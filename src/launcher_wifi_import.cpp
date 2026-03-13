@@ -96,27 +96,48 @@ bool launcherImportWifiCreds(String &outSsid, String &outPwd)
     if (ap.isNull())
       continue;
 
-      const char *ssid = ap["ssid"] | "";
-      const char *pwd  = ap["pwd"]  | "";
-  
+      const char *ssid =
+          ap["ssid"] |
+          ap["SSID"] |
+          "";
+
+      const char *pwd =
+          ap["pwd"] |
+          ap["password"] |
+          ap["pass"] |
+          ap["psk"] |
+          "";
+
+      Serial.printf("[WIFI] launcher entry ssid='%s' pwd_len=%u\n",
+                    ssid,
+                    (unsigned)strlen(pwd));
+
       if (!ssid[0] || !pwd[0])
+      {
+        Serial.println("[WIFI] skipping launcher wifi entry with missing ssid/pwd");
         continue;
-  
-      const bool isPlaceholder =
+      }
+
+      const bool ssidPlaceholder =
           (strcmp(ssid, "myNetSSID") == 0) ||
-          (strcmp(pwd, "myNetPassword") == 0);
-  
-      if (isPlaceholder)
+          (strcmp(ssid, "YOUR_WIFI_SSID") == 0);
+
+      const bool pwdPlaceholder =
+          (strcmp(pwd, "myNetPassword") == 0) ||
+          (strcmp(pwd, "YOUR_WIFI_PASSWORD") == 0);
+
+      if (ssidPlaceholder || pwdPlaceholder)
       {
         Serial.println("[WIFI] skipping launcher placeholder wifi entry");
         continue;
       }
-  
+
       outSsid = ssid;
       outPwd = pwd;
       Serial.printf("[WIFI] launcher creds found for SSID: %s\n", ssid);
       return true;
       }
+      
   Serial.println("[WIFI] launcher wifi array had no valid ssid/pwd entries");
   return false;
 }

@@ -4,8 +4,10 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <SD.h>
+#include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
+#include "asset_ota.h"
 #include "asset_ota_config.h"
 #include "graphics.h"
 #include "sdcard.h"
@@ -17,49 +19,106 @@ static bool parseManifestJson(const String &json, AssetManifestData *out)
 
   out->clear();
 
-  DynamicJsonDocument doc((size_t)4096 + json.length() * 2);
+  JsonDocument doc;
+
+  Serial.printf("[OTA] parse start: jsonLen=%u\n", (unsigned)json.length());
+
   DeserializationError err = deserializeJson(doc, json);
   if (err)
+  {
+    Serial.printf("[OTA] manifest deserialize failed: %s\n", err.c_str());
     return false;
+  }
 
   JsonObject root = doc.as<JsonObject>();
   if (root.isNull())
+  {
+    Serial.println("[OTA] manifest root is null");
     return false;
+  }
 
   const char *packVersion = root["packVersion"] | root["pack_version"] | "";
 
-  out->packVersion = String(packVersion);
-  out->channel = String((const char *)(root["channel"] | ""));
-  Serial.printf("[OTA] parsed packVersion='%s'\n", out->packVersion.c_str());
-
-  JsonArray files = root["files"].as<JsonArray>();
-  if (files.isNull())
+  if (!packVersion[0])
+  {
+    Serial.println("[OTA] manifest missing packVersion");
     return false;
+  }
 
+  const char *channel = root["channel"] | "";
+
+  JsonVariant filesVar = root["files"];
+  if (!filesVar.is<JsonArray>())
+  {
+    Serial.println("[OTA] manifest missing files array");
+    return false;
+  }
+
+  out->packVersion = packVersion;
+  out->channel = channel;
+
+  JsonArray files = filesVar.as<JsonArray>();
   out->files.reserve(files.size());
 
-  for (JsonVariant v : files)
+  unsigned fileIndex = 0;
+  for (JsonObject obj : files)
   {
-    JsonObject obj = v.as<JsonObject>();
-    if (obj.isNull())
-      continue;
+    ++fileIndex;
 
-    String rel;
-    if (!assetManifestNormalizePath(String((const char *)(obj["path"] | "")), &rel))
+    const char *rel = obj["path"] | "";
+    if (!rel[0])
+    {
+      Serial.printf("[OTA] manifest file entry missing path at index=%u\n", fileIndex);
       return false;
+    }
 
     AssetManifestFile f;
     f.path = rel;
-    f.url = String((const char *)(obj["url"] | ""));
-    f.sha256 = String((const char *)(obj["sha256"] | ""));
-    f.sha256.toLowerCase();
     f.size = (uint32_t)(obj["size"] | 0UL);
 
-    if (f.path.isEmpty() || f.url.isEmpty() || f.sha256.isEmpty() || f.size == 0)
-      return false;
+    const char *urlField = obj["url"] | "";
+    if (urlField[0])
+    {
+      f.url = urlField;
+    }
+    else
+    {
+      // Minimal manifest support: synthesize URL from public assets root.
+      String base = "https://assets.raisinghellgame.com/assets/";
+      if (!base.endsWith("/"))
+        base += "/";
+      f.url = base + f.path;
+    }
 
+    const char *shaField = obj["sha256"] | "";
+    if (shaField[0])
+    {
+      f.sha256 = shaField;
+      f.sha256.toLowerCase();
+    }
+    else
+    {
+      f.sha256 = "";
+    }
+
+    if (f.url.isEmpty())
+    {
+      Serial.printf("[OTA] manifest file entry has empty url at index=%u path=%s\n",
+                    fileIndex,
+                    f.path.c_str());
+      return false;
+    }
+    if ((fileIndex % 50) == 0)
+    {
+      Serial.printf("[OTA] parse progress index=%u path=%s\n",
+                    fileIndex,
+                    f.path.c_str());
+    }
     out->files.push_back(f);
   }
+
+  Serial.printf("[OTA] manifest parsed ok: version=%s files=%u\n", out->packVersion.c_str(),
+                (unsigned)out->files.size());
 
   return true;
 }
@@ -180,6 +239,8 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   http.setReuse(false);
   http.setTimeout(15000);
   http.addHeader("Accept", "application/json");
+  http.addHeader("Accept-Encoding", "identity");
+  http.addHeader("Cache-Control", "no-cache");
   http.setUserAgent("RaisingHellCardputer/1.0");
 
   const String sUrl(url);
@@ -222,9 +283,53 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
+  const int contentLen = http.getSize();
+  Serial.printf("[OTA] manifest contentLen=%d\n", contentLen);
+
+  WiFiClient *stream = http.getStreamPtr();
+  if (!stream)
+  {
+    Serial.println("[OTA] manifest stream unavailable");
+    http.end();
+    return false;
+  }
+
   String payload;
-  payload.reserve(2048);
-  payload = http.getString();
+  if (contentLen > 0)
+    payload.reserve((size_t)contentLen + 1);
+  else
+    payload.reserve(8192);
+
+  uint8_t buf[1024];
+  uint32_t started = millis();
+
+  while (http.connected() && (contentLen < 0 || payload.length() < (size_t)contentLen))
+  {
+    const size_t avail = stream->available();
+    if (avail == 0)
+    {
+      if (!http.connected())
+        break;
+
+      if ((millis() - started) > 15000)
+      {
+        Serial.println("[OTA] manifest read timeout");
+        break;
+      }
+
+      delay(1);
+      continue;
+    }
+
+    const size_t toRead = (avail > sizeof(buf)) ? sizeof(buf) : avail;
+    const int n = stream->readBytes((char *)buf, toRead);
+    if (n <= 0)
+      break;
+
+    payload.concat((const char *)buf, (size_t)n);
+    started = millis();
+  }
+
   http.end();
 
   Serial.printf("[OTA] manifest bytes=%u\n", (unsigned)payload.length());
@@ -240,7 +345,6 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   if (!parsed)
   {
     Serial.println("[OTA] manifest parse failed");
-    Serial.println(payload);
     return false;
   }
 

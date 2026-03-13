@@ -15,6 +15,9 @@
 #include "new_pet_flow_state.h"
 
 #include "ui_boot_wizard_menu.h"
+#include "boot_pipeline.h"
+#include "time_state.h"
+#include "time_persist.h"
 
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
@@ -56,7 +59,6 @@ const char *bootWifiImportedSsid()
 
 void uiBootWifiImportedHandle(InputState &in)
 {
-  Serial.println("[BOOTWIFI] uiBootWifiImportedHandle");
   const uint32_t kImportedShowMs = 1200;
 
   const bool continueNow =
@@ -83,7 +85,6 @@ void uiBootWifiImportedHandle(InputState &in)
 // -----------------------------------------------------------------------------
 void uiBootWifiPromptHandle(InputState& in)
 {
-  Serial.println("[BOOTWIFI] uiBootWifiPromptHandle");
   (void)UiBootWizardMenu::HandleWifiPrompt(in);
 }
 
@@ -94,7 +95,7 @@ void uiBootWifiPromptHandle(InputState& in)
 // -----------------------------------------------------------------------------
 void uiBootWifiWaitHandle(InputState& in)
 {
-  Serial.println("[BOOTWIFI] uiBootWifiWaitHandle");  if (in.escOnce || in.menuOnce)
+  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
@@ -104,14 +105,33 @@ void uiBootWifiWaitHandle(InputState& in)
     return;
   }
 
-  if (wifiIsConnected())
+  if (g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
-    // Advance to TZ pick after connection is established
-    uiActionEnterState(UIState::BOOT_TZ_PICK, g_bootWizardAfterOkTab, true);
-    requestUIRedraw();
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
+    return;
+  }
+
+  if (wifiIsConnected())
+  {
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+
+    // Mandatory asset provisioning does not need TZ/NTP flow if time is already valid.
+    // Return to BOOT so provisioning can resume immediately.
+    if (g_bootAssetProvisionMustComplete && timeIsValid())
+    {
+      uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
+      return;
+    }
+
+    // Normal boot wizard behavior
+    uiActionEnterState(UIState::BOOT_TZ_PICK, g_bootWizardAfterOkTab, true);
+    requestUIRedraw();
     return;
   }
 
@@ -132,13 +152,21 @@ void uiBootTzPickHandle(InputState& in)
 // -----------------------------------------------------------------------------
 void uiBootNtpWaitHandle(InputState& in)
 {
-  if (in.escOnce || in.menuOnce)
+  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
     beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
     requestUIRedraw();
+    return;
+  }
+
+  if (g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
+  {
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
     return;
   }
 

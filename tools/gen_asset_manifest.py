@@ -36,7 +36,6 @@ def build_manifest(asset_root: Path, version: str, channel: str):
             {
                 "path": rel,
                 "size": f.stat().st_size,
-                "sha256": sha256_file(f),
             }
         )
 

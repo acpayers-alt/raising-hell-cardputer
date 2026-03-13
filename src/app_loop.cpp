@@ -234,7 +234,7 @@ void appMainLoopTick()
   // MODAL: SD assets missing screen (all builds)
   // Draw ONCE to prevent flicker; retry check on ENTER.
   // ---------------------------------------------------------------------------
-  if (g_assetsMissing)
+  if (g_assetsMissing && !g_bootAssetProvisionMustComplete)
   {
     static bool s_prevSelectHeld_assets = false;
     const bool enterOnce = (input.selectHeld && !s_prevSelectHeld_assets);
@@ -673,7 +673,7 @@ void appMainLoopTick()
   
     s_prevDbgUiState = (int)g_app.uiState;
   }
-      
+
   const bool sleepingNow2 = isPetSleepingNow();
 
   if (!s_prevSleeping && sleepingNow2)

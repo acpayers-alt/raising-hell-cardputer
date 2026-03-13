@@ -5,7 +5,7 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 #include "ui_input_common.h"   // uiDrainKb()
-
+#include "boot_pipeline.h"
 #include "timezone.h"
 #include "wifi_time.h"
 #include "flow_time_editor.h"
@@ -79,8 +79,8 @@ static void tzCommit()
 // -----------------------------------------------------------------------------
 bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
 {
-  // ESC skips WiFi and goes straight to manual time setup.
-  if (in.escOnce)
+  // For mandatory asset provisioning, do not allow skipping WiFi.
+  if (!g_bootAssetProvisionMustComplete && in.escOnce)
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
@@ -89,7 +89,7 @@ bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
     return true;
   }
 
-  // MENU inactive here (don’t open Settings during boot wizard)
+  // MENU inactive here
   if (in.menuOnce)
   {
     uiActionSwallowAll(in);
@@ -98,8 +98,8 @@ bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
     return true;
   }
 
-  // Up/Down toggles choice (even if render doesn't highlight yet)
-  if (in.upOnce || in.downOnce)
+  // For mandatory asset provisioning, force the WiFi path.
+  if (!g_bootAssetProvisionMustComplete && (in.upOnce || in.downOnce))
   {
     s_wifiPromptChoice = (s_wifiPromptChoice == 0) ? 1 : 0;
     requestUIRedraw();
@@ -107,10 +107,9 @@ bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
     return true;
   }
 
-  // Enter confirms
   if (in.selectOnce)
   {
-    if (s_wifiPromptChoice == 0)
+    if (g_bootAssetProvisionMustComplete || s_wifiPromptChoice == 0)
       bootWizardEnterWifiSetup();
     else
       bootWizardSkipToManualTime();
@@ -130,7 +129,7 @@ bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
 // -----------------------------------------------------------------------------
 bool UiBootWizardMenu::HandleTimezonePick(InputState& in)
 {
-  if (in.escOnce || in.menuOnce)
+  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
@@ -139,6 +138,14 @@ bool UiBootWizardMenu::HandleTimezonePick(InputState& in)
     return true;
   }
 
+  if (g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
+  {
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+    return true;
+  }
+  
   if (in.upOnce)
   {
     tzPrev();

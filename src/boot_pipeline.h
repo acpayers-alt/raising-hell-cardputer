@@ -25,3 +25,8 @@ void postBootInitTick();
 void bootPipelineKick(uint32_t now, bool usbOpen);
 
 void drawAssetsMissingScreen();
+
+extern bool g_bootAssetProvisionMustComplete;
+
+extern bool g_bootAssetProvisionActive;
+extern bool g_bootAssetProvisionMustComplete;
