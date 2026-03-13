@@ -132,9 +132,6 @@ void appSetup() {
     bootPrintf("[BOOT] reset=%s (%d)\n", resetReasonStr(rr), (int)rr);
   }
 
-  // Silence esp-idf logging
-  esp_log_level_set("*", ESP_LOG_NONE);
-
   auto cfg = M5.config();
   M5Cardputer.begin(cfg, true);
 

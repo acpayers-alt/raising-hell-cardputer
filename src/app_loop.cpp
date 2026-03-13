@@ -663,7 +663,9 @@ void appMainLoopTick()
   static bool s_prevDbgRedraw = false;
   static int s_prevDbgUiState = -1;
   
-  if ((int)g_app.uiState != s_prevDbgUiState)
+  static constexpr bool kLogUiStateTransitions = false;
+
+  if (kLogUiStateTransitions && (int)g_app.uiState != s_prevDbgUiState)
   {
     Serial.printf("[UI STATE] uiState=%d screenOn=%d\n",
                   (int)g_app.uiState,
@@ -671,7 +673,7 @@ void appMainLoopTick()
   
     s_prevDbgUiState = (int)g_app.uiState;
   }
-    
+      
   const bool sleepingNow2 = isPetSleepingNow();
 
   if (!s_prevSleeping && sleepingNow2)

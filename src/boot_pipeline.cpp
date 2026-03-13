@@ -163,6 +163,10 @@ static inline void enterState(UIState s, Tab t, bool fullRedraw)
 
 static bool bootAssetProvisionRequested() { return assetProvisionBootRequested(); }
 
+static bool bootAssetProvisionMandatory() { return g_sdReady && !sdAssetsPresent(); }
+
+static bool bootAssetProvisionRequired() { return bootAssetProvisionRequested() || bootAssetProvisionMandatory(); }
+
 static void drawBootAssetProvisionScreen(const char *line1, const char *line2)
 {
   displayInit();
@@ -188,7 +192,7 @@ static bool runBootAssetProvision()
 {
   static bool s_bootAssetProvisionHandled = false;
 
-  if (!bootAssetProvisionRequested())
+  if (!bootAssetProvisionRequired())
     return false;
 
   if (s_bootAssetProvisionHandled)
@@ -207,36 +211,43 @@ static bool runBootAssetProvision()
 
   clearAssetProvisionBootRequest();
 
+  // Re-check asset presence after OTA work completes.
+  g_assetsChecked = true;
+  g_assetsMissing = !sdAssetsPresent();
+
   drawBootAssetProvisionScreen("Asset check result", msg.c_str());
   delay(1500);
 
-  if (ok)
+  // Success only counts if assets are actually present afterward.
+  if (ok && !g_assetsMissing)
   {
     g_bootAssetProvisionActive = false;
     ESP.restart();
   }
 
-  g_bootAssetProvisionActive = false;
-
   Serial.printf("[BOOT][ASSET_PROVISION] failed: %s\n", msg.c_str());
-  
-  // If assets are still missing, fall back to the normal missing-assets gate.
-  g_assetsChecked = true;
-  g_assetsMissing = !sdAssetsPresent();
 
-  if (!g_assetsMissing)
+  // If assets are still missing, this is a mandatory provisioning failure.
+  // Stay blocked on the provisioning/error screen.
+  if (g_assetsMissing)
   {
-    drawBootSplash();
-    requestUIRedraw();
-    renderUI();
+    return true;
   }
 
-  return g_assetsMissing;
+  // Optional OTA request failed or had no effect, but assets already exist.
+  // Allow normal boot to continue.
+  g_bootAssetProvisionActive = false;
+
+  drawBootSplash();
+  requestUIRedraw();
+  renderUI();
+
+  return false;
 }
 
 static bool bootAssetProvisionWifiReady()
 {
-  if (!bootAssetProvisionRequested())
+  if (!bootAssetProvisionRequired())
     return false;
 
   if (!settingsWifiEnabled())
@@ -403,9 +414,7 @@ void postBootInitTick()
 
           if (g_assetsMissing)
           {
-            ui_setBootSplashActive(false);
             requestUIRedraw();
-            return; // stop boot pipeline until assets are installed
           }
         }
       }
@@ -416,8 +425,9 @@ void postBootInitTick()
       return;
   }
 
-  // If SD is up but the asset pack is missing, block further boot work until fixed.
-  if (g_assetsMissing)
+  // Hard block only when SD itself is not ready/present.
+  // If SD is ready but assets are missing, continue into provisioning flow.
+  if (g_assetsMissing && !g_sdReady)
     return;
 
   // ---------------------------------------------------------------------------
@@ -475,7 +485,7 @@ void postBootInitTick()
     const bool saveFileExists = bootSaveFileExists();
     const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
-    const bool deferForAssetProvision = bootAssetProvisionRequested() && !firstBootWizard && timeIsValid();
+    const bool deferForAssetProvision = bootAssetProvisionRequired();
 
     Serial.printf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
                   settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
@@ -579,7 +589,7 @@ void postBootInitTick()
 
       wifiTimeInit();
 
-      if (bootAssetProvisionRequested())
+      if (bootAssetProvisionRequired())
       {
         if (!bootAssetProvisionWifiReady())
           return;
@@ -594,12 +604,12 @@ void postBootInitTick()
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------
-  if (bootAssetProvisionRequested())
+  if (bootAssetProvisionRequired())
   {
     if (runBootAssetProvision())
       return;
   }
-
+  
   if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
   {
     g_bootAssetProvisionActive = false;
