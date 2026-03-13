@@ -417,9 +417,27 @@ bool assetOtaCheckNow(String *outMessage)
   s_state.totalFileCount = (uint16_t)changed.size();
   assetOtaStateSave(s_state);
 
+  if (remotePackVersion == s_installedVersion && changed.empty())
+  {
+    Serial.printf("[OTA] already current; installed=%s remote=%s\n",
+                  s_installedVersion.c_str(),
+                  remotePackVersion.c_str());
+    s_status = AssetOtaStatus::SUCCESS;
+    assetOtaStateDefaults(s_state);
+    assetOtaStateSave(s_state);
+    if (outMessage)
+    {
+      *outMessage = "Assets already up to date (";
+      *outMessage += remotePackVersion;
+      *outMessage += ")";
+    }
+    restoreMainUiSprite();
+    return true;
+  }
+
   if (changed.empty())
   {
-    Serial.printf("[OTA] no changes; version=%s\n", remotePackVersion.c_str());
+    Serial.printf("[OTA] no file changes; adopting version=%s\n", remotePackVersion.c_str());
     s_installedVersion = remotePackVersion;
     s_status = AssetOtaStatus::SUCCESS;
     assetOtaStateDefaults(s_state);

@@ -31,11 +31,13 @@ def build_manifest(asset_root: Path, version: str, channel: str):
             continue
 
         rel = f.relative_to(asset_root.parent).as_posix()
+        print("Hashing:", rel)
 
         files.append(
             {
                 "path": rel,
                 "size": f.stat().st_size,
+                "sha256": sha256_file(f),
             }
         )
 

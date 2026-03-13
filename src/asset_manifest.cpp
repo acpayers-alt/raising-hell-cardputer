@@ -21,7 +21,8 @@ static String synthesizeAssetUrl(const String &relPath)
   return base + relPath;
 }
 
-static bool parseManifestJson(String &json, AssetManifestData *out){
+static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestData *out)
+{
   if (!out)
     return false;
 
@@ -29,16 +30,14 @@ static bool parseManifestJson(String &json, AssetManifestData *out){
 
   JsonDocument doc;
 
-  Serial.printf("[OTA] parse start: jsonLen=%u\n", (unsigned)json.length());
+  Serial.printf("[OTA] parse start: contentLen=%u\n", (unsigned)contentLen);
 
-  DeserializationError err = deserializeJson(doc, json);
+  DeserializationError err = deserializeJson(doc, input);
   if (err)
   {
     Serial.printf("[OTA] manifest deserialize failed: %s\n", err.c_str());
     return false;
   }
-
-  json = "";
 
   JsonObject root = doc.as<JsonObject>();
   if (root.isNull())
@@ -170,13 +169,10 @@ bool assetManifestLoadLocal(AssetManifestData *out)
   if (!f)
     return false;
 
-  String json;
-  json.reserve((size_t)f.size() + 8);
-  while (f.available())
-    json += (char)f.read();
-  f.close();
-
-  return parseManifestJson(json, out);
+    const size_t len = (size_t)f.size();
+    const bool ok = parseManifestJson(f, len, out);
+    f.close();
+    return ok;
 }
 
 bool assetManifestSaveLocal(const AssetManifestData &manifest)
@@ -307,53 +303,16 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  String payload;
-  if (contentLen > 0)
-    payload.reserve((size_t)contentLen + 1);
-  else
-    payload.reserve(8192);
-
-  uint8_t buf[1024];
-  uint32_t started = millis();
-
-  while (http.connected() && (contentLen < 0 || payload.length() < (size_t)contentLen))
+  if (!stream)
   {
-    const size_t avail = stream->available();
-    if (avail == 0)
-    {
-      if (!http.connected())
-        break;
-
-      if ((millis() - started) > 15000)
-      {
-        Serial.println("[OTA] manifest read timeout");
-        break;
-      }
-
-      delay(1);
-      continue;
-    }
-
-    const size_t toRead = (avail > sizeof(buf)) ? sizeof(buf) : avail;
-    const int n = stream->readBytes((char *)buf, toRead);
-    if (n <= 0)
-      break;
-
-    payload.concat((const char *)buf, (size_t)n);
-    started = millis();
-  }
-
-  http.end();
-
-  Serial.printf("[OTA] manifest bytes=%u\n", (unsigned)payload.length());
-
-  if (payload.isEmpty())
-  {
-    Serial.println("[OTA] manifest payload empty");
+    Serial.println("[OTA] manifest stream unavailable");
+    http.end();
     return false;
   }
 
-  const bool parsed = parseManifestJson(payload, out);
+  const bool parsed = parseManifestJson(*stream, (size_t)((contentLen > 0) ? contentLen : 0), out);
+  http.end();
+
   Serial.printf("[OTA] manifest parsed=%d\n", parsed ? 1 : 0);
   if (!parsed)
   {
@@ -361,8 +320,7 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  return true;
-}
+  return true;}
 
 void assetManifestBuildDiff(const AssetManifestData &localManifest,
                             const AssetManifestData &remoteManifest,
