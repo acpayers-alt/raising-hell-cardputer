@@ -28,8 +28,8 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
 
   out->clear();
 
-  JsonDocument doc;
-
+  DynamicJsonDocument doc(131072);
+  
   Serial.printf("[OTA] parse start: contentLen=%u\n", (unsigned)contentLen);
 
   DeserializationError err = deserializeJson(doc, input);

@@ -104,6 +104,9 @@ static const char *errorString(AssetOtaError err)
 // does not remain blank while the app continues running.
 static void restoreMainUiSprite()
 {
+  if (g_bootAssetProvisionActive)
+  return;
+  
   if (!s_graphicsReleasedForOta)
   {
     invalidateBackgroundCache();

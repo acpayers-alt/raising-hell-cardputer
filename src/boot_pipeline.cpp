@@ -109,7 +109,14 @@ bool sdAssetsPresent()
 {
   if (!g_sdReady)
     return false;
-  return SD.exists(kSdAssetsMarkerPath) || SD.exists(kSdAssetsLocalManifestPath);
+
+  if (SD.exists(kSdAssetsLocalManifestPath))
+    return true;
+
+  if (SD.exists("/raising_hell/graphics/background/rh_splash.jpg"))
+    return true;
+
+  return false;
 }
 
 // -----------------------------------------------------------------------------
@@ -164,13 +171,36 @@ static inline void enterState(UIState s, Tab t, bool fullRedraw)
   clearInputLatch();
 }
 
+static bool bootVisualsLockedForProvisioning()
+{
+  return g_bootAssetProvisionActive || g_bootLandingDeferredForAssetProvision;
+}
+
 static bool bootAssetProvisionRequested() { return assetProvisionBootRequested(); }
 
 static bool bootAssetProvisionMandatory() { return g_sdReady && !sdAssetsPresent(); }
 
-static bool bootAssetProvisionRequired() { return bootAssetProvisionRequested() || bootAssetProvisionMandatory(); }
+bool g_bootUiBlockedForAssetProvision = false;
 
-static void drawBootAssetProvisionScreen(const char *line1, const char *line2)
+static bool bootAssetProvisionRequired()
+{
+  const bool requested = bootAssetProvisionRequested();
+  const bool mandatory = bootAssetProvisionMandatory();
+  const bool assetsPresent = sdAssetsPresent();
+
+  // If a stale boot-request flag survived, but assets are already present,
+  // clear it and allow normal boot.
+  if (requested && !mandatory && assetsPresent)
+  {
+    Serial.println("[BOOT] clearing stale asset provision request");
+    clearAssetProvisionBootRequest();
+    return false;
+  }
+
+  return requested || mandatory;
+}
+
+void drawBootAssetProvisionScreen(const char *line1, const char *line2)
 {
   displayInit();
 
@@ -307,6 +337,7 @@ static bool runBootAssetProvision()
   if (ok && !g_assetsMissing)
   {
     g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
     ESP.restart();
   }
 
@@ -322,6 +353,7 @@ static bool runBootAssetProvision()
   // Optional OTA request failed or had no effect, but assets already exist.
   // Allow normal boot to continue.
   g_bootAssetProvisionActive = false;
+  g_bootUiBlockedForAssetProvision = false;
 
   drawBootSplash();
   requestUIRedraw();
@@ -489,10 +521,13 @@ void postBootInitTick()
       {
         g_sdTryCount = 0;
 
-        drawBootSplash();
-        invalidateBackgroundCache();
-        requestUIRedraw();
-        renderUI();
+        if (!bootVisualsLockedForProvisioning())
+        {
+          drawBootSplash();
+          invalidateBackgroundCache();
+          requestUIRedraw();
+          renderUI();
+        }
 
         // Asset pack check — ONLY after SD is ready
         if (!g_assetsChecked)
@@ -502,6 +537,7 @@ void postBootInitTick()
 
           if (g_assetsMissing)
           {
+            g_bootUiBlockedForAssetProvision = true;
             requestUIRedraw();
           }
         }
@@ -572,6 +608,15 @@ void postBootInitTick()
     const bool firstBootWizard = !settingsLoaded;
     const bool saveFileExists = bootSaveFileExists();
     const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+    
+    const bool provisionRequested = bootAssetProvisionRequested();
+    const bool provisionMandatory = bootAssetProvisionMandatory();
+    const bool assetsPresentNow = sdAssetsPresent();
+
+    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n",
+                  provisionRequested ? 1 : 0,
+                  provisionMandatory ? 1 : 0,
+                  assetsPresentNow ? 1 : 0);
 
     const bool deferForAssetProvision = bootAssetProvisionRequired();
 
@@ -599,6 +644,7 @@ void postBootInitTick()
     {
       g_bootLandingDeferredForAssetProvision = true;
       g_bootAssetProvisionMustComplete = bootAssetProvisionMandatory();
+      g_bootUiBlockedForAssetProvision = true;
 
       ui_setBootSplashActive(false);
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
@@ -681,7 +727,6 @@ void postBootInitTick()
           bootWizardBegin(UIState::BOOT, Tab::TAB_PET);
           requestFullUIRedraw();
           requestUIRedraw();
-          renderUI();
           clearInputLatch();
           return;
         }
@@ -726,6 +771,7 @@ void postBootInitTick()
   if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
   {
     g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
     finalizeBootLanding();
     return;
   }

@@ -32,3 +32,8 @@ extern bool g_bootAssetProvisionActive;
 extern bool g_bootAssetProvisionMustComplete;
 
 void bootAssetProvisionRedraw(const char *line1, const char *line2);
+
+extern bool g_bootAssetProvisionActive;
+void drawBootAssetProvisionScreen(const char *line1, const char *line2);
+
+extern bool g_bootUiBlockedForAssetProvision;

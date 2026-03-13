@@ -9,6 +9,7 @@
 #include <SD.h>
 #include <cstring>
 #include <time.h>
+#include "boot_pipeline.h"
 
 #include "console.h"
 #include "death_state.h"
@@ -4561,6 +4562,22 @@ void forceRenderUIOnce()
   renderUI();
 }
 
+static bool uiIsBootWifiOnboardingState(UIState s)
+{
+  switch (s)
+  {
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_WIFI_IMPORTED:
+  case UIState::BOOT_WIFI_WAIT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+  case UIState::WIFI_SETUP:
+    return true;
+  default:
+    return false;
+  }
+}
+
 static bool uiStateBlocksOverlays(UIState s)
 {
   switch (s)
@@ -4752,6 +4769,14 @@ void renderUI()
   if (g_bootSplashActive)
   {
     drawSplashScreen(true);
+    spr.pushSprite(0, 0);
+    return;
+  }
+
+  if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) &&
+      !uiIsBootWifiOnboardingState(g_app.uiState))
+  {
+    drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
     spr.pushSprite(0, 0);
     return;
   }
