@@ -18,3 +18,6 @@ const char *assetOtaStatusString();
 const char *assetOtaLastErrorString();
 
 bool assetOtaDidReleaseGraphics();
+
+bool assetOtaConfirmActive();
+void assetOtaSetConfirmActive(bool v);

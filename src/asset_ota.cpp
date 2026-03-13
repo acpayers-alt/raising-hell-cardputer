@@ -21,6 +21,17 @@ static String s_installedVersion;
 static bool s_inited = false;
 static bool s_loadedFromSd = false;
 static bool s_graphicsReleasedForOta = false;
+static bool s_assetOtaConfirmActive = false;
+
+bool assetOtaConfirmActive()
+{
+  return s_assetOtaConfirmActive;
+}
+
+void assetOtaSetConfirmActive(bool v)
+{
+  s_assetOtaConfirmActive = v;
+}
 
 bool assetOtaDidReleaseGraphics()
 {
@@ -90,9 +101,33 @@ static const char *errorString(AssetOtaError err)
 // does not remain blank while the app continues running.
 static void restoreMainUiSprite()
 {
-  // Intentionally do nothing here.
-  // Rebuild the UI sprite only after assetOtaCheckNow() returns,
-  // when manifest/download locals have gone out of scope.
+  if (!s_graphicsReleasedForOta)
+  {
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    renderUI();
+    return;
+  }
+
+  const bool ok = spr.createSprite(SCREEN_W, SCREEN_H);
+  Serial.printf("[OTA/UI] recreate main sprite ok=%d free=%u largest=%u\n",
+                (int)ok,
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  if (!ok)
+  {
+    return;
+  }
+
+  spr.setTextScroll(false);
+  spr.fillScreen(TFT_BLACK);
+
+  s_graphicsReleasedForOta = false;
+
+  invalidateBackgroundCache();
+  requestUIRedraw();
+  renderUI();
 }
 
 static void setFailure(AssetOtaError err)
@@ -215,8 +250,16 @@ void assetOtaInit()
   assetOtaConfigDefaults(s_cfg);
   assetOtaStateDefaults(s_state);
 
+  s_installedVersion = "";
+
   if (g_sdReady)
+  {
     loadAssetOtaFromSdIfAvailable();
+
+    AssetManifestData localManifest;
+    if (assetManifestLoadLocal(&localManifest) && localManifest.packVersion.length() > 0)
+      s_installedVersion = localManifest.packVersion;
+  }
 
   s_status = AssetOtaStatus::IDLE;
   s_lastErr = AssetOtaError::NONE;
@@ -350,7 +393,7 @@ bool assetOtaCheckNow(String *outMessage)
     restoreMainUiSprite();
     return false;
   }
-  
+
   strncpy(s_state.targetPackVersion, remoteManifest.packVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
   assetOtaStateSave(s_state);
@@ -379,13 +422,14 @@ bool assetOtaCheckNow(String *outMessage)
   Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
+  graphicsReleasePetLayerForOta();
   invalidateBackgroundCache();
   spr.deleteSprite();
   s_graphicsReleasedForOta = true;
 
   Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
-
+              
   for (size_t i = 0; i < changed.size(); ++i)
   {
     s_status = AssetOtaStatus::DOWNLOADING;
@@ -466,6 +510,6 @@ bool assetOtaCheckNow(String *outMessage)
     *outMessage += ")";
   }
 
-  restoreMainUiSprite();
+  // Do NOT restore UI here. Caller will reboot after successful install.
   return true;
 }

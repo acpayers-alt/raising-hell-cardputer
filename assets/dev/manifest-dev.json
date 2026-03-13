@@ -1,0 +1,12 @@
+{
+  "packVersion": "0.0.3",
+  "channel": "dev",
+  "files": [
+    {
+      "path": "/raising_hell/graphics/pet/bio/dev/bb/dev_bb_hpy_bio.png",
+      "url": "https://assets.raisinghellgame.com/assets/raising_hell/graphics/pet/bio/dev/bb/dev_bb_hpy_bio.png",
+      "size": 6020,
+      "sha256": "a546fea9d8651a21de63c873adfa9da562ca8812365cd66439f912d7275b9148"
+    }
+  ]
+}

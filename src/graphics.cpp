@@ -62,6 +62,7 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
+#include "asset_ota.h"
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -2186,6 +2187,36 @@ static void drawPlaceholderMenu(const char *title)
   spr.setTextDatum(TL_DATUM);
 }
 
+static void drawAssetOtaConfirmOverlay()
+{
+  const uint16_t modalOutline = uiModalOutline(pet.type);
+
+  const int pad = 10;
+  const int boxW = screenW - (pad * 2);
+  const int boxH = 74;
+  const int x = pad;
+  const int y = (screenH - boxH) / 2;
+
+  spr.fillRoundRect(x, y, boxW, boxH, 8, TFT_BLACK);
+  spr.drawRoundRect(x, y, boxW, boxH, 8, modalOutline);
+
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("Asset OTA", screenW / 2, y + 8);
+
+  spr.setTextFont(1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.drawString("If new assets are downloaded,", screenW / 2, y + 28);
+  spr.drawString("the system will reboot.", screenW / 2, y + 40);
+
+  spr.setTextDatum(BC_DATUM);
+  spr.drawString("ENTER: Continue   MENU: Cancel", screenW / 2, y + boxH - 6);
+
+  spr.setTextDatum(TL_DATUM);
+}
+
 static void drawCreditsScreen()
 {
   if (!isScreenOn())
@@ -2197,34 +2228,34 @@ static void drawCreditsScreen()
   if (!ok)
     spr.fillRect(0, 0, SCREEN_W, SCREEN_H, TFT_BLACK);
 
-  spr.setTextDatum(BC_DATUM);
   spr.setTextFont(2);
   spr.setTextSize(1);
+  spr.setTextDatum(TC_DATUM);
 
-  // ---- Layout ----
-  const int TEXT_NUDGE_Y = 21;
-
-  // Font 2 @ size 1 is ~16px tall; use a slightly larger step for breathing room.
   const int LINE_H = 18;
+  const int TIGHT_H = 14;
 
-  // Anchor the bottom of the whole text block safely ABOVE the bottom edge.
-  // (This is the only value you should need to tweak.)
-  const int blockBottomY = (SCREEN_H - 28) + TEXT_NUDGE_Y;
+  const int blockTopY = (SCREEN_H / 2);
 
-  const int yVersion = blockBottomY;
-  const int yBlank = yVersion - LINE_H;
-  const int yAaron = yBlank - LINE_H;
-  const int yCreated = yAaron - LINE_H;
+  const int yCreated = blockTopY;
+  const int yAaron = yCreated + LINE_H;
+  const int yVersion = yAaron + LINE_H;
+  const int yAssets = yVersion + TIGHT_H;
 
-  // ---- Draw ----
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString("Created By:", SCREEN_W / 2, yCreated);
   spr.drawString("Aaron & Finley Ayers", SCREEN_W / 2, yAaron);
 
   spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+
   char verLine[48];
   snprintf(verLine, sizeof(verLine), "Version %s", RH_VERSION_STRING);
   spr.drawString(verLine, SCREEN_W / 2, yVersion);
+
+  const char *assetVer = assetOtaInstalledVersion();
+  char assetLine[48];
+  snprintf(assetLine, sizeof(assetLine), "Assets %s", (assetVer && assetVer[0]) ? assetVer : "none");
+  spr.drawString(assetLine, SCREEN_W / 2, yAssets);
 
   spr.setTextDatum(TL_DATUM);
 }
@@ -3032,20 +3063,8 @@ void graphicsRecoverAfterOta()
   petLayer.deleteSprite();
   petLayerReady = false;
 
-  spr.deleteSprite();
-  Serial.printf("[OTA/UI] before recreate free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-
-  if (!spr.createSprite(screenW, screenH))
-  {
-    Serial.printf("[OTA/UI] main sprite recreate failed free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                  (unsigned)ESP.getMaxAllocHeap());
-    return;
-  }
-
-  spr.setTextScroll(false);
-  spr.fillScreen(TFT_BLACK);
-
+  // Do NOT delete/recreate the main sprite here.
+  // We already have a valid sprite; just force cached content to rebuild.
   g_petBgCachedPath = nullptr;
   g_petBgCachedType = (PetType)255;
   g_petBgCachedStage = 255;
@@ -4796,6 +4815,12 @@ void renderUI()
   }
 
   uiDrawToastOverlay();
+
+  // draw overlays
+  if (assetOtaConfirmActive())
+  {
+    drawAssetOtaConfirmOverlay();
+  }
 
   spr.pushSprite(0, 0);
 

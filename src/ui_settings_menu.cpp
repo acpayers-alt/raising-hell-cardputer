@@ -321,33 +321,10 @@ static void actWifi_TzRight(InputState &) { settingsCycleTimeZone(+1); }
 
 static void actWifi_CheckAssetOta(InputState &)
 {
-  String msg;
-  const bool ok = assetOtaCheckNow(&msg);
-
-  // OTA tears down and rebuilds the main sprite. Force a clean UI refresh.
-  invalidateBackgroundCache();
+  assetOtaSetConfirmActive(true);
   requestUIRedraw();
-  renderUI();
-  inputForceClear();
+  playBeep();
   clearInputLatch();
-
-  const bool alreadyInstalled = (msg.indexOf("already installed") >= 0);
-  const bool didInstall = (msg.indexOf("installed (") >= 0);
-
-  // Only show a blocking popup for failures or real installs.
-  if (!ok || didInstall)
-  {
-    if (msg.isEmpty())
-      msg = ok ? "Asset OTA done" : "Asset OTA failed";
-
-    ui_showMessage(msg.c_str());
-    requestUIRedraw();
-  }
-
-  if (ok)
-    playBeep();
-  else
-    soundError();
 }
 
 // ------------------------------------------------------------
