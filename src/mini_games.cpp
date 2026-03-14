@@ -200,6 +200,21 @@ static const char *flappyImpWave2PathForPet()
   }
 }
 
+static M5Canvas *s_flappyFireball1Spr = nullptr;
+static M5Canvas *s_flappyFireball2Spr = nullptr;
+static M5Canvas *s_flappyFireball3Spr = nullptr;
+
+static M5Canvas *s_flappyPipeUpSpr = nullptr;
+static M5Canvas *s_flappyPipeDownSpr = nullptr;
+
+static M5Canvas *s_impWave1Spr = nullptr;
+static M5Canvas *s_impWave2Spr = nullptr;
+static M5Canvas *s_impBurn1Spr = nullptr;
+static M5Canvas *s_impBurn2Spr = nullptr;
+static M5Canvas *s_impBurn3Spr = nullptr;
+static M5Canvas *s_impBurn4Spr = nullptr;
+static M5Canvas *s_impBurn5Spr = nullptr;
+
 // SPIKES
 static const uint16_t kFireKey = kSpriteKey;
 
@@ -226,6 +241,7 @@ static int s_flappyBgScrollX = 0;
 // Flappy pipe sprites (8bpp, cached)
 static int s_flappyPipeW = 0;
 static int s_flappyPipeH = 0;
+static bool s_flappyPipeLoadFailed = false;
 
 // Fireball Run background Cache
 void freeDodgerBgCache();
@@ -244,23 +260,36 @@ struct FlappyPipe
 
 void freeImpWaveSprites()
 {
-  for (int i = 0; i < 2; ++i)
-    mgAssetsReleaseSprite(s_impWaveSpr[i], "flappy-imp-release");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave1");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave2");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn1");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn2");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn3");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn4");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn5");
+
+  s_impWave1Spr = nullptr;
+  s_impWave2Spr = nullptr;
+  s_impBurn1Spr = nullptr;
+  s_impBurn2Spr = nullptr;
+  s_impBurn3Spr = nullptr;
+  s_impBurn4Spr = nullptr;
+  s_impBurn5Spr = nullptr;
 
   s_impWaveSprReady = false;
 }
 
-// -----------------------------------------------------------------------------
-// Flappy fireball sprite (3-frame PNG animation) - cached per flappy folder
-// -----------------------------------------------------------------------------
-void freeFlappyFireballSprites()
+void freeFlappyPipeSprites()
 {
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "fireball1");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "fireball2");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "fireball3");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down");
 
-  s_flappyFireballW = 0;
-  s_flappyFireballH = 0;
+  s_flappyPipeUpSpr = nullptr;
+  s_flappyPipeDownSpr = nullptr;
+
+  s_flappyPipeW = 0;
+  s_flappyPipeH = 0;
+  s_flappyPipeLoadFailed = false;
 }
 
 // -----------------------------------------------------------------------------
@@ -269,7 +298,6 @@ void freeFlappyFireballSprites()
 // We keep this simple: read PNG dimensions once, then draw the PNGs directly.
 // (This preserves transparency and avoids maintaining a separate alpha-capable cache.)
 static FlappyPipe s_pipes[3];
-static bool s_flappyPipeLoadFailed = false;
 
 static int flappyRandGapY(int h)
 {
@@ -368,17 +396,58 @@ static bool sdExistsTrySlash(const char *path, const char **outUsePath)
   return false;
 }
 
-void freeFlappyPipeSprites()
+void freeFlappyFireballSprites()
 {
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "fireball1");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "fireball2");
+  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "fireball3");
 
-  s_flappyPipeW = 0;
-  s_flappyPipeH = 0;
-  s_flappyPipeLoadFailed = false;
+  s_flappyFireball1Spr = nullptr;
+  s_flappyFireball2Spr = nullptr;
+  s_flappyFireball3Spr = nullptr;
+
+  s_flappyFireballW = 0;
+  s_flappyFireballH = 0;
 }
 
-static bool ensureImpWaveSprites() { return true; }
+static bool ensureImpWaveSprites()
+{
+  s_impWave1Spr = nullptr;
+  s_impWave2Spr = nullptr;
+  s_impBurn1Spr = nullptr;
+  s_impBurn2Spr = nullptr;
+  s_impBurn3Spr = nullptr;
+  s_impBurn4Spr = nullptr;
+  s_impBurn5Spr = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave1", flappyImpWave1PathForPet(), 8, kSpriteKey,
+                           s_impWave1Spr))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave2", flappyImpWave2PathForPet(), 8, kSpriteKey,
+                           s_impWave2Spr))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn1", kImpBurnFrames[0], 8, kSpriteKey, s_impBurn1Spr))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn2", kImpBurnFrames[1], 8, kSpriteKey, s_impBurn2Spr))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn3", kImpBurnFrames[2], 8, kSpriteKey, s_impBurn3Spr))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn4", kImpBurnFrames[3], 8, kSpriteKey, s_impBurn4Spr))
+    return false;
+
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn5", kImpBurnFrames[4], 8, kSpriteKey, s_impBurn5Spr))
+    return false;
+
+  s_impWaveSprReady = s_impWave1Spr && s_impWave2Spr && s_impBurn1Spr && s_impBurn2Spr && s_impBurn3Spr &&
+                      s_impBurn4Spr && s_impBurn5Spr;
+
+  return s_impWaveSprReady;
+}
 
 static bool ensureFlappyFireballSprites(const char *bgPath)
 {
@@ -397,24 +466,24 @@ static bool ensureFlappyFireballSprites(const char *bgPath)
   snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
   snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
 
-  M5Canvas *fb1 = nullptr;
-  M5Canvas *fb2 = nullptr;
-  M5Canvas *fb3 = nullptr;
+  s_flappyFireball1Spr = nullptr;
+  s_flappyFireball2Spr = nullptr;
+  s_flappyFireball3Spr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball1", path1, 8, kFireKey, fb1))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball1", path1, 8, kFireKey, s_flappyFireball1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball2", path2, 8, kFireKey, fb2))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball2", path2, 8, kFireKey, s_flappyFireball2Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball3", path3, 8, kFireKey, fb3))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball3", path3, 8, kFireKey, s_flappyFireball3Spr))
     return false;
 
-  if (!fb1 || fb1->width() <= 0 || fb1->height() <= 0)
+  if (!s_flappyFireball1Spr || s_flappyFireball1Spr->width() <= 0 || s_flappyFireball1Spr->height() <= 0)
     return false;
 
-  s_flappyFireballW = (int)fb1->width();
-  s_flappyFireballH = (int)fb1->height();
+  s_flappyFireballW = (int)s_flappyFireball1Spr->width();
+  s_flappyFireballH = (int)s_flappyFireball1Spr->height();
   return true;
 }
 
@@ -422,9 +491,6 @@ static const uint16_t kPipeKey = kSpriteKey;
 
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
-  if (s_flappyPipeLoadFailed)
-    return false;
-
   if (!bgPath || !bgPath[0] || !g_sdReady)
     return false;
 
@@ -438,29 +504,35 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
   snprintf(upPath, sizeof(upPath), "%srock_spike_up.png", dir);
   snprintf(downPath, sizeof(downPath), "%srock_spike_down.png", dir);
 
-  M5Canvas *pipeUp = nullptr;
-  M5Canvas *pipeDown = nullptr;
+  s_flappyPipeUpSpr = nullptr;
+  s_flappyPipeDownSpr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up", upPath, 8, kPipeKey, pipeUp))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up", upPath, 8, kPipeKey, s_flappyPipeUpSpr))
   {
     s_flappyPipeLoadFailed = true;
+    s_flappyPipeW = 0;
+    s_flappyPipeH = 0;
     return false;
   }
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down", downPath, 8, kPipeKey, pipeDown))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down", downPath, 8, kPipeKey, s_flappyPipeDownSpr))
   {
     s_flappyPipeLoadFailed = true;
+    s_flappyPipeW = 0;
+    s_flappyPipeH = 0;
     return false;
   }
 
-  if (!pipeUp || pipeUp->width() <= 0 || pipeUp->height() <= 0)
+  if (!s_flappyPipeUpSpr || s_flappyPipeUpSpr->width() <= 0 || s_flappyPipeUpSpr->height() <= 0)
   {
     s_flappyPipeLoadFailed = true;
+    s_flappyPipeW = 0;
+    s_flappyPipeH = 0;
     return false;
   }
 
-  s_flappyPipeW = (int)pipeUp->width();
-  s_flappyPipeH = (int)pipeUp->height();
+  s_flappyPipeW = (int)s_flappyPipeUpSpr->width();
+  s_flappyPipeH = (int)s_flappyPipeUpSpr->height();
   s_flappyPipeLoadFailed = false;
   return true;
 }
@@ -518,6 +590,7 @@ void startFlappyFireball()
 
   freeFlappyPipeSprites();
   freeFlappyFireballSprites();
+  freeImpWaveSprites();
   mgmem::logUsage("flappy-after-sprite-free");
 
   const bool pipeOk = ensureFlappyPipeSprites(bgPath);
@@ -754,7 +827,7 @@ void updateFlappyFireball(const InputState &input)
     if (input.mgQuitOnce && !mgInputLockedOut())
     {
       miniGameCancelFromIntro();
-            return;
+      return;
     }
 
     const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
@@ -946,7 +1019,7 @@ static bool ensureFlappyBgCache(const char *path)
   if (!path || !path[0] || !g_sdReady)
     return false;
 
-  if (s_flappyBgReady && strcmp(s_flappyBgPath, path) == 0)
+  if (s_flappyBgReady && strcmp(s_flappyBgPath, path) == 0 && mgAssetsSharedBg() != nullptr)
     return true;
 
   if (s_flappyBgLoadFailed && strcmp(s_flappyBgPath, path) == 0)
@@ -1014,13 +1087,9 @@ void drawFlappyFireball()
     const int impX = (gW - 48) / 2;
     const int impY = 40;
 
-    if (ensureImpWaveSprites())
-    {
-      const char *impSprite = (s_impFrame == 0) ? flappyImpWave1PathForPet() : flappyImpWave2PathForPet();
-
-      if (impSprite)
-        sprDrawPngFromSD(impSprite, impX, impY);
-    }
+    M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+    if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
+      impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
 
     const int cbY = 100;
     const int cbSize = 10;
@@ -1046,51 +1115,23 @@ void drawFlappyFireball()
     return;
   }
 
-  const char *bgPath = flappyBgPathForPet();
-  const bool haveFireball = ensureFlappyFireballSprites(bgPath);
-  const bool havePipes = ensureFlappyPipeSprites(bgPath);
+  const bool haveFireball =
+      s_flappyFireball1Spr && s_flappyFireball2Spr && s_flappyFireball3Spr;
 
-  M5Canvas *pipeUp = nullptr;
-  M5Canvas *pipeDown = nullptr;
-  M5Canvas *fbFrame0 = nullptr;
-  M5Canvas *fbFrame1 = nullptr;
-  M5Canvas *fbFrame2 = nullptr;
-
-  if (havePipes)
-  {
-    char dir[128];
-    flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-
-    char upPath[192];
-    char downPath[192];
-    snprintf(upPath, sizeof(upPath), "%srock_spike_up.png", dir);
-    snprintf(downPath, sizeof(downPath), "%srock_spike_down.png", dir);
-
-    mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up", upPath, 8, kPipeKey, pipeUp);
-    mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down", downPath, 8, kPipeKey, pipeDown);
-  }
-
-  if (haveFireball)
-  {
-    char dir[128];
-    flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-
-    char path1[192];
-    char path2[192];
-    char path3[192];
-    snprintf(path1, sizeof(path1), "%sfireball1.png", dir);
-    snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
-    snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
-
-    mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball1", path1, 8, kFireKey, fbFrame0);
-    mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball2", path2, 8, kFireKey, fbFrame1);
-    mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball3", path3, 8, kFireKey, fbFrame2);
-  }
+  const bool havePipes =
+      s_flappyPipeUpSpr && s_flappyPipeDownSpr;
 
   M5Canvas *bg = nullptr;
   int bw = 0;
   int bh = 0;
-  const bool haveBg = mgmem::ensureSharedBg(flappyBgPathForPet(), bg, bw, bh);
+  const bool haveBg = s_flappyBgReady && (mgAssetsSharedBg() != nullptr);
+
+  if (haveBg)
+  {
+    bg = mgAssetsSharedBg();
+    bw = s_flappyBgW;
+    bh = s_flappyBgH;
+  }
 
   bool drewBg = false;
 
@@ -1100,8 +1141,12 @@ void drawFlappyFireball()
     if (x > 0)
       x -= bw;
 
-    bg->pushSprite(&spr, x, 0);
-    bg->pushSprite(&spr, x + bw, 0);
+    while (x > -bw)
+      x -= bw;
+
+    for (int drawX = x; drawX < gW; drawX += bw)
+      bg->pushSprite(&spr, drawX, 0);
+
     drewBg = true;
   }
 
@@ -1117,16 +1162,15 @@ void drawFlappyFireball()
     const int gapTop = s_pipes[i].gapY - gapH / 2;
     const int gapBot = s_pipes[i].gapY + gapH / 2;
 
-    if (havePipes && pipeUp && pipeDown)
+    if (havePipes)
     {
       const int drawX = x + (pipeW - s_flappyPipeW) / 2;
 
-      pipeDown->pushSprite(&spr, drawX, gapTop - s_flappyPipeH, kPipeKey);
-      pipeUp->pushSprite(&spr, drawX, gapBot, kPipeKey);
+      s_flappyPipeDownSpr->pushSprite(&spr, drawX, gapTop - s_flappyPipeH, kPipeKey);
+      s_flappyPipeUpSpr->pushSprite(&spr, drawX, gapBot, kPipeKey);
     }
     else
     {
-      // fallback pipes
       spr.fillRect(x, 0, pipeW, gapTop, TFT_DARKGREY);
       spr.fillRect(x, gapBot, pipeW, gH - gapBot, TFT_DARKGREY);
     }
@@ -1134,37 +1178,45 @@ void drawFlappyFireball()
 
   if (s_flappyGoalActive && !s_impBurnDone)
   {
-    const int islandW = 48;
-    const int islandH = 8;
     const int impH = 48;
-
-    const int islandX = s_flappyGoalX - 4;
-    const int islandY = s_flappyGoalY;
-
     const int impX = s_flappyGoalX;
     const int impY = s_flappyGoalY - impH;
 
+    M5Canvas *impSpr = nullptr;
+
     if (!s_impHit)
     {
-      if (ensureImpWaveSprites())
-      {
-        const char *impSprite = (s_impFrame == 0) ? flappyImpWave1PathForPet() : flappyImpWave2PathForPet();
-
-        if (impSprite)
-          sprDrawPngFromSD(impSprite, impX, impY);
-      }
+      impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
     }
     else
     {
-      const char *impSprite = kImpBurnFrames[s_impFrame];
-      if (impSprite)
-        sprDrawPngFromSD(impSprite, impX, impY);
+      switch (s_impFrame)
+      {
+      case 0:
+        impSpr = s_impBurn1Spr;
+        break;
+      case 1:
+        impSpr = s_impBurn2Spr;
+        break;
+      case 2:
+        impSpr = s_impBurn3Spr;
+        break;
+      case 3:
+        impSpr = s_impBurn4Spr;
+        break;
+      default:
+        impSpr = s_impBurn5Spr;
+        break;
+      }
     }
+
+    if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
+      impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
   }
 
   if (!s_impHit)
   {
-    M5Canvas *fbFrames[3] = {fbFrame0, fbFrame1, fbFrame2};
+    M5Canvas *fbFrames[3] = {s_flappyFireball1Spr, s_flappyFireball2Spr, s_flappyFireball3Spr};
 
     if (haveFireball && fbFrames[0] && fbFrames[1] && fbFrames[2])
     {
@@ -1177,7 +1229,6 @@ void drawFlappyFireball()
       const int drawX = s_fbX - w / 2;
       const int drawY = s_fbY - h / 2;
 
-      spr.fillCircle(s_fbX, s_fbY, 6, TFT_RED);
       fb->pushSprite(&spr, drawX, drawY, kFireKey);
     }
     else
@@ -1223,6 +1274,21 @@ static int s_rrSnakeJumpH = 0;
 static int s_rrSkyW = 0;
 static int s_rrSkyH = 0;
 
+static M5Canvas *s_rrSnakeRun1Spr = nullptr;
+static M5Canvas *s_rrSnakeRun2Spr = nullptr;
+static M5Canvas *s_rrSnakeCrouchSpr = nullptr;
+static M5Canvas *s_rrSnakeJumpSpr = nullptr;
+static M5Canvas *s_rrSnakeWin1Spr = nullptr;
+static M5Canvas *s_rrSnakeWin2Spr = nullptr;
+
+static M5Canvas *s_rrGroundSpr = nullptr;
+static M5Canvas *s_rrSkySpr = nullptr;
+static M5Canvas *s_rrHand1Spr = nullptr;
+static M5Canvas *s_rrHand2Spr = nullptr;
+static M5Canvas *s_rrLadybugGroundSpr = nullptr;
+static M5Canvas *s_rrLadybugFly1Spr = nullptr;
+static M5Canvas *s_rrLadybugFly2Spr = nullptr;
+
 static void rrResetObstacles();
 
 static const char *resRunSkyTilePathForPet()
@@ -1264,16 +1330,16 @@ static constexpr uint32_t kRrWinHoldMs = 500;
 
 static bool ensureResRunSkySprite()
 {
-  M5Canvas *sky = nullptr;
+  s_rrSkySpr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile", resRunSkyTilePathForPet(), 8, kSpriteKey, sky))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile", resRunSkyTilePathForPet(), 8, kSpriteKey, s_rrSkySpr))
     return false;
 
-  if (!sky || sky->width() <= 0 || sky->height() <= 0)
+  if (!s_rrSkySpr || s_rrSkySpr->width() <= 0 || s_rrSkySpr->height() <= 0)
     return false;
 
-  s_rrSkyW = (int)sky->width();
-  s_rrSkyH = (int)sky->height();
+  s_rrSkyW = (int)s_rrSkySpr->width();
+  s_rrSkyH = (int)s_rrSkySpr->height();
   return true;
 }
 
@@ -1506,91 +1572,98 @@ static const char *resRunBranchGroundPathForPet()
 
 static bool ensureResRunHandSprites()
 {
-  M5Canvas *hand1 = nullptr;
-  M5Canvas *hand2 = nullptr;
+  s_rrHand1Spr = nullptr;
+  s_rrHand2Spr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_1", resRunHand1PathForPet(), 8, kResRunKey, hand1))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_1", resRunHand1PathForPet(), 8, kResRunKey, s_rrHand1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_2", resRunHand2PathForPet(), 8, kResRunKey, hand2))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "hand_2", resRunHand2PathForPet(), 8, kResRunKey, s_rrHand2Spr))
     return false;
 
-  if (!hand1 || hand1->width() <= 0 || hand1->height() <= 0)
+  if (!s_rrHand1Spr || s_rrHand1Spr->width() <= 0 || s_rrHand1Spr->height() <= 0)
     return false;
 
-  s_rrHandW = (int)hand1->width();
-  s_rrHandH = (int)hand1->height();
+  s_rrHandW = (int)s_rrHand1Spr->width();
+  s_rrHandH = (int)s_rrHand1Spr->height();
   return true;
 }
 
 static bool ensureResRunLadybugSprites()
 {
-  M5Canvas *groundBug = nullptr;
-  M5Canvas *fly1 = nullptr;
-  M5Canvas *fly2 = nullptr;
+  s_rrLadybugGroundSpr = nullptr;
+  s_rrLadybugFly1Spr = nullptr;
+  s_rrLadybugFly2Spr = nullptr;
 
   if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_ground", resRunLadybugGroundPathForPet(), 8, kResRunKey,
-                           groundBug))
+                           s_rrLadybugGroundSpr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly1", resRunLadybugFly1PathForPet(), 8, kResRunKey, fly1))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly1", resRunLadybugFly1PathForPet(), 8, kResRunKey,
+                           s_rrLadybugFly1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly2", resRunLadybugFly2PathForPet(), 8, kResRunKey, fly2))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "ladybug_fly2", resRunLadybugFly2PathForPet(), 8, kResRunKey,
+                           s_rrLadybugFly2Spr))
     return false;
 
-  if (!groundBug || groundBug->width() <= 0 || groundBug->height() <= 0)
+  if (!s_rrLadybugGroundSpr || s_rrLadybugGroundSpr->width() <= 0 || s_rrLadybugGroundSpr->height() <= 0)
     return false;
 
-  s_rrLadybugW = (int)groundBug->width();
-  s_rrLadybugH = (int)groundBug->height();
+  s_rrLadybugW = (int)s_rrLadybugGroundSpr->width();
+  s_rrLadybugH = (int)s_rrLadybugGroundSpr->height();
   return true;
 }
 
 static bool ensureResRunSnakeSprites()
 {
-  M5Canvas *run1 = nullptr;
-  M5Canvas *run2 = nullptr;
-  M5Canvas *crouch = nullptr;
-  M5Canvas *jump = nullptr;
-  M5Canvas *win1 = nullptr;
-  M5Canvas *win2 = nullptr;
+  s_rrSnakeRun1Spr = nullptr;
+  s_rrSnakeRun2Spr = nullptr;
+  s_rrSnakeCrouchSpr = nullptr;
+  s_rrSnakeJumpSpr = nullptr;
+  s_rrSnakeWin1Spr = nullptr;
+  s_rrSnakeWin2Spr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey, run1))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey,
+                           s_rrSnakeRun1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2", resRunSnakeRun2PathForPet(), 8, kResRunKey, run2))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2", resRunSnakeRun2PathForPet(), 8, kResRunKey,
+                           s_rrSnakeRun2Spr))
     return false;
 
   if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_crouch", resRunSnakeCrouchPathForPet(), 8, kResRunKey,
-                           crouch))
+                           s_rrSnakeCrouchSpr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump", resRunSnakeJumpPathForPet(), 8, kResRunKey, jump))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_jump", resRunSnakeJumpPathForPet(), 8, kResRunKey,
+                           s_rrSnakeJumpSpr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win1", resRunSnakeWin1PathForPet(), 8, kResRunKey, win1))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win1", resRunSnakeWin1PathForPet(), 8, kResRunKey,
+                           s_rrSnakeWin1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win2", resRunSnakeWin2PathForPet(), 8, kResRunKey, win2))
+  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_win2", resRunSnakeWin2PathForPet(), 8, kResRunKey,
+                           s_rrSnakeWin2Spr))
     return false;
 
-  if (!run1 || run1->width() <= 0 || run1->height() <= 0)
+  if (!s_rrSnakeRun1Spr || s_rrSnakeRun1Spr->width() <= 0 || s_rrSnakeRun1Spr->height() <= 0)
     return false;
 
-  s_rrSnakeW = (int)run1->width();
-  s_rrSnakeH = (int)run1->height();
+  s_rrSnakeW = (int)s_rrSnakeRun1Spr->width();
+  s_rrSnakeH = (int)s_rrSnakeRun1Spr->height();
 
-  if (crouch && crouch->width() > 0 && crouch->height() > 0)
+  if (s_rrSnakeCrouchSpr && s_rrSnakeCrouchSpr->width() > 0 && s_rrSnakeCrouchSpr->height() > 0)
   {
-    s_rrSnakeCrouchW = (int)crouch->width();
-    s_rrSnakeCrouchH = (int)crouch->height();
+    s_rrSnakeCrouchW = (int)s_rrSnakeCrouchSpr->width();
+    s_rrSnakeCrouchH = (int)s_rrSnakeCrouchSpr->height();
   }
 
-  if (jump && jump->width() > 0 && jump->height() > 0)
+  if (s_rrSnakeJumpSpr && s_rrSnakeJumpSpr->width() > 0 && s_rrSnakeJumpSpr->height() > 0)
   {
-    s_rrSnakeJumpW = (int)jump->width();
-    s_rrSnakeJumpH = (int)jump->height();
+    s_rrSnakeJumpW = (int)s_rrSnakeJumpSpr->width();
+    s_rrSnakeJumpH = (int)s_rrSnakeJumpSpr->height();
   }
 
   return true;
@@ -1598,17 +1671,17 @@ static bool ensureResRunSnakeSprites()
 
 static bool ensureResRunGroundSprite()
 {
-  M5Canvas *ground = nullptr;
+  s_rrGroundSpr = nullptr;
 
   if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "branch_ground", resRunBranchGroundPathForPet(), 8, kResRunKey,
-                           ground))
+                           s_rrGroundSpr))
     return false;
 
-  if (!ground || ground->width() <= 0 || ground->height() <= 0)
+  if (!s_rrGroundSpr || s_rrGroundSpr->width() <= 0 || s_rrGroundSpr->height() <= 0)
     return false;
 
-  s_rrGroundW = (int)ground->width();
-  s_rrGroundH = (int)ground->height();
+  s_rrGroundW = (int)s_rrGroundSpr->width();
+  s_rrGroundH = (int)s_rrGroundSpr->height();
   return true;
 }
 
@@ -1627,6 +1700,20 @@ void freeResRunSprites()
   mgmem::releaseSprite(MiniGame::RESURRECTION, "ladybug_fly2");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_win1");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_win2");
+
+  s_rrSnakeRun1Spr = nullptr;
+  s_rrSnakeRun2Spr = nullptr;
+  s_rrSnakeCrouchSpr = nullptr;
+  s_rrSnakeJumpSpr = nullptr;
+  s_rrSnakeWin1Spr = nullptr;
+  s_rrSnakeWin2Spr = nullptr;
+  s_rrGroundSpr = nullptr;
+  s_rrSkySpr = nullptr;
+  s_rrHand1Spr = nullptr;
+  s_rrHand2Spr = nullptr;
+  s_rrLadybugGroundSpr = nullptr;
+  s_rrLadybugFly1Spr = nullptr;
+  s_rrLadybugFly2Spr = nullptr;
 
   s_rrSnakeW = 0;
   s_rrSnakeH = 0;
@@ -1756,7 +1843,7 @@ void startResurrectionRun()
   freeResRunSprites();
 
   miniGameSetReturnUi(UIState::DEATH);
-  
+
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   const bool snakeOk = ensureResRunSnakeSprites();
@@ -1868,13 +1955,13 @@ void updateResurrectionRun(const InputState &input)
   if (rr_gameOver)
     return;
 
-    if (s_rrShowIntro)
-    {
-      if (input.mgSpaceOnce)
-        s_rrDontShowAgain = !s_rrDontShowAgain;
-  
-      const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
-      
+  if (s_rrShowIntro)
+  {
+    if (input.mgSpaceOnce)
+      s_rrDontShowAgain = !s_rrDontShowAgain;
+
+    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+
     if (startPressed && !mgInputLockedOut())
     {
       s_rrShowIntro = false;
@@ -2126,25 +2213,27 @@ void drawResurrectionRun()
 
   const int groundY = gH - kRrGroundH;
 
-  const bool haveSnake = ensureResRunSnakeSprites();
-  const bool haveGround = ensureResRunGroundSprite();
-  const bool haveSky = ensureResRunSkySprite();
-  const bool haveHand = ensureResRunHandSprites();
-  const bool haveLadybug = ensureResRunLadybugSprites();
+  const bool haveSnake = s_rrSnakeRun1Spr && s_rrSnakeRun2Spr && s_rrSnakeCrouchSpr && s_rrSnakeJumpSpr &&
+                         s_rrSnakeWin1Spr && s_rrSnakeWin2Spr;
 
-  M5Canvas *snake1 = nullptr;
-  M5Canvas *snake2 = nullptr;
-  M5Canvas *snakeCrouch = nullptr;
-  M5Canvas *snakeJump = nullptr;
-  M5Canvas *snakeWin1 = nullptr;
-  M5Canvas *snakeWin2 = nullptr;
-  M5Canvas *groundSpr = nullptr;
-  M5Canvas *skySpr = nullptr;
-  M5Canvas *hand1 = nullptr;
-  M5Canvas *hand2 = nullptr;
-  M5Canvas *ladybugGround = nullptr;
-  M5Canvas *ladybugFly1 = nullptr;
-  M5Canvas *ladybugFly2 = nullptr;
+  const bool haveGround = (s_rrGroundSpr != nullptr);
+  const bool haveSky = (s_rrSkySpr != nullptr);
+  const bool haveHand = (s_rrHand1Spr != nullptr && s_rrHand2Spr != nullptr);
+  const bool haveLadybug = s_rrLadybugGroundSpr && s_rrLadybugFly1Spr && s_rrLadybugFly2Spr;
+
+  M5Canvas *snake1 = s_rrSnakeRun1Spr;
+  M5Canvas *snake2 = s_rrSnakeRun2Spr;
+  M5Canvas *snakeCrouch = s_rrSnakeCrouchSpr;
+  M5Canvas *snakeJump = s_rrSnakeJumpSpr;
+  M5Canvas *snakeWin1 = s_rrSnakeWin1Spr;
+  M5Canvas *snakeWin2 = s_rrSnakeWin2Spr;
+  M5Canvas *groundSpr = s_rrGroundSpr;
+  M5Canvas *skySpr = s_rrSkySpr;
+  M5Canvas *hand1 = s_rrHand1Spr;
+  M5Canvas *hand2 = s_rrHand2Spr;
+  M5Canvas *ladybugGround = s_rrLadybugGroundSpr;
+  M5Canvas *ladybugFly1 = s_rrLadybugFly1Spr;
+  M5Canvas *ladybugFly2 = s_rrLadybugFly2Spr;
 
   if (haveSnake)
   {
@@ -2193,18 +2282,12 @@ void drawResurrectionRun()
     spr.drawCentreString("Up/Down to Jump/Duck G to boost", gW / 2, 8, 2);
     spr.drawCentreString("Deliver the apple to our ally", gW / 2, 26, 2);
 
-    M5Canvas *introSnake1 = nullptr;
-    M5Canvas *introSnake2 = nullptr;
+    M5Canvas *introSnake1 = s_rrSnakeRun1Spr;
+    M5Canvas *introSnake2 = s_rrSnakeRun2Spr;
+    M5Canvas *introSnake = nullptr;
 
     if (haveSnake)
-    {
-      mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run1", resRunSnakeRun1PathForPet(), 8, kResRunKey,
-                          introSnake1);
-      mgmem::ensureSprite(MiniGame::RESURRECTION, "snake_run2", resRunSnakeRun2PathForPet(), 8, kResRunKey,
-                          introSnake2);
-    }
-
-    M5Canvas *introSnake = (s_rrAnimFrame == 0) ? introSnake1 : introSnake2;
+      introSnake = (s_rrAnimFrame == 0) ? introSnake1 : introSnake2;
 
     if (introSnake && introSnake->width() > 0 && introSnake->height() > 0)
     {
@@ -3091,11 +3174,11 @@ void updateCrossyRoad(const InputState &input)
     if (input.mgSpaceOnce)
       s_crossyDontShowAgain = !s_crossyDontShowAgain;
 
-      if (input.mgQuitOnce && !mgInputLockedOut())
-      {
-        miniGameCancelFromIntro();
-                return;
-      }
+    if (input.mgQuitOnce && !mgInputLockedOut())
+    {
+      miniGameCancelFromIntro();
+      return;
+    }
 
     const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
 
@@ -3486,13 +3569,11 @@ static int16_t s_dodgerGoalX = 0;
 static int16_t s_dodgerGoalY = 0;
 static int s_dodgerGoalSpawnScrollY = 0;
 
-static LGFX_Sprite s_dodgerGoalSpr[2];
 static bool s_dodgerGoalFrameReady[2] = {false, false};
 static char s_dodgerGoalFramePath[2][160] = {{0}, {0}};
 static int s_dodgerGoalW = 0;
 static int s_dodgerGoalH = 0;
 
-static LGFX_Sprite s_dodgerGoreSpr;
 static bool s_dodgerGoreReady = false;
 static char s_dodgerGorePath[160] = {0};
 
@@ -3537,15 +3618,21 @@ static int s_dodgerFireballH = 0;
 static int s_dodgerCarW = 0;
 static int s_dodgerCarH = 0;
 
+static M5Canvas *s_dodgerFireball1Spr = nullptr;
+static M5Canvas *s_dodgerFireball2Spr = nullptr;
+static M5Canvas *s_dodgerFireball3Spr = nullptr;
+static M5Canvas *s_dodgerCarSpr = nullptr;
+static M5Canvas *s_dodgerGoalFrame1Spr = nullptr;
+static M5Canvas *s_dodgerGoalFrame2Spr = nullptr;
+static M5Canvas *s_dodgerGoreSpr = nullptr;
+
 void freeDodgerGoalFrames()
 {
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1");
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_frame_2");
 
-  s_dodgerGoalFrameReady[0] = false;
-  s_dodgerGoalFrameReady[1] = false;
-  s_dodgerGoalFramePath[0][0] = 0;
-  s_dodgerGoalFramePath[1][0] = 0;
+  s_dodgerGoalFrame1Spr = nullptr;
+  s_dodgerGoalFrame2Spr = nullptr;
   s_dodgerGoalW = 0;
   s_dodgerGoalH = 0;
 }
@@ -3553,9 +3640,7 @@ void freeDodgerGoalFrames()
 void freeDodgerGoreSprite()
 {
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_gore");
-
-  s_dodgerGoreReady = false;
-  s_dodgerGorePath[0] = 0;
+  s_dodgerGoreSpr = nullptr;
 }
 
 static const char *dodgerGoalFrame1PathForPet()
@@ -3638,13 +3723,24 @@ static const char *dodgerGoalGoreResolvedPath()
 {
   const char *usePath = nullptr;
   const char *petPath = dodgerGoalGorePathForPet();
+
+  Serial.printf("DODGER gore petPath=%s\n", petPath ? petPath : "(null)");
+
   if (sdExistsTrySlash(petPath, &usePath))
+  {
+    Serial.printf("DODGER gore found pet path: %s\n", usePath ? usePath : petPath);
     return usePath ? usePath : petPath;
+  }
 
   const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
-  if (sdExistsTrySlash(fallback, &usePath))
-    return usePath ? usePath : fallback;
 
+  if (sdExistsTrySlash(fallback, &usePath))
+  {
+    Serial.printf("DODGER gore found fallback path: %s\n", usePath ? usePath : fallback);
+    return usePath ? usePath : fallback;
+  }
+
+  Serial.println("DODGER gore path resolve FAILED");
   return nullptr;
 }
 
@@ -3694,43 +3790,41 @@ static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
   if (!path0 || !path1 || !path0[0] || !path1[0] || !g_sdReady)
     return false;
 
-  M5Canvas *goal1 = nullptr;
-  M5Canvas *goal2 = nullptr;
+  s_dodgerGoalFrame1Spr = nullptr;
+  s_dodgerGoalFrame2Spr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1", path0, 8, kDodgerKey, goal1))
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1", path0, 8, kDodgerKey, s_dodgerGoalFrame1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_2", path1, 8, kDodgerKey, goal2))
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_2", path1, 8, kDodgerKey, s_dodgerGoalFrame2Spr))
     return false;
 
-  if (!goal1 || !goal2 || goal1->width() <= 0 || goal1->height() <= 0)
+  if (!s_dodgerGoalFrame1Spr || s_dodgerGoalFrame1Spr->width() <= 0 || s_dodgerGoalFrame1Spr->height() <= 0)
     return false;
 
-  s_dodgerGoalFrameReady[0] = true;
-  s_dodgerGoalFrameReady[1] = true;
-  strlcpy(s_dodgerGoalFramePath[0], path0, sizeof(s_dodgerGoalFramePath[0]));
-  strlcpy(s_dodgerGoalFramePath[1], path1, sizeof(s_dodgerGoalFramePath[1]));
-  s_dodgerGoalW = (int)goal1->width();
-  s_dodgerGoalH = (int)goal1->height();
+  s_dodgerGoalW = (int)s_dodgerGoalFrame1Spr->width();
+  s_dodgerGoalH = (int)s_dodgerGoalFrame1Spr->height();
   return true;
 }
 
 static bool ensureDodgerGoreSprite(const char *path)
 {
   if (!path || !path[0] || !g_sdReady)
+  {
+    Serial.printf("DODGER gore load skipped path=%s g_sdReady=%d\n", path ? path : "(null)", g_sdReady ? 1 : 0);
     return false;
+  }
 
-  M5Canvas *gore = nullptr;
-  const bool ok =
-      mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_gore", path, 8, kDodgerKey, gore) &&
-      gore && gore->width() > 0 && gore->height() > 0;
+  Serial.printf("DODGER gore load try: %s\n", path);
 
-  s_dodgerGoreReady = ok;
+  s_dodgerGoreSpr = nullptr;
 
-  if (ok)
-    strlcpy(s_dodgerGorePath, path, sizeof(s_dodgerGorePath));
-  else
-    s_dodgerGorePath[0] = 0;
+  const bool ok = mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_gore", path, 8, kDodgerKey, s_dodgerGoreSpr) &&
+                  s_dodgerGoreSpr && s_dodgerGoreSpr->width() > 0 && s_dodgerGoreSpr->height() > 0;
+
+  Serial.printf("DODGER gore load result ok=%d spr=%p w=%d h=%d\n", ok ? 1 : 0, (void *)s_dodgerGoreSpr,
+                s_dodgerGoreSpr ? (int)s_dodgerGoreSpr->width() : 0,
+                s_dodgerGoreSpr ? (int)s_dodgerGoreSpr->height() : 0);
 
   return ok;
 }
@@ -3747,6 +3841,9 @@ void freeDodgerFireballSprites()
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "fireball2");
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "fireball3");
 
+  s_dodgerFireball1Spr = nullptr;
+  s_dodgerFireball2Spr = nullptr;
+  s_dodgerFireball3Spr = nullptr;
   s_dodgerFireballW = 0;
   s_dodgerFireballH = 0;
 }
@@ -3755,6 +3852,7 @@ void freeDodgerCarSprite()
 {
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "car");
 
+  s_dodgerCarSpr = nullptr;
   s_dodgerCarW = 0;
   s_dodgerCarH = 0;
 }
@@ -3778,24 +3876,24 @@ static bool ensureDodgerFireballSprites(const char *bgPath)
   snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
   snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
 
-  M5Canvas *fb1 = nullptr;
-  M5Canvas *fb2 = nullptr;
-  M5Canvas *fb3 = nullptr;
+  s_dodgerFireball1Spr = nullptr;
+  s_dodgerFireball2Spr = nullptr;
+  s_dodgerFireball3Spr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball1", path1, 8, kDodgerKey, fb1))
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball1", path1, 8, kDodgerKey, s_dodgerFireball1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball2", path2, 8, kDodgerKey, fb2))
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball2", path2, 8, kDodgerKey, s_dodgerFireball2Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball3", path3, 8, kDodgerKey, fb3))
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball3", path3, 8, kDodgerKey, s_dodgerFireball3Spr))
     return false;
 
-  if (!fb1 || fb1->width() <= 0 || fb1->height() <= 0)
+  if (!s_dodgerFireball1Spr || s_dodgerFireball1Spr->width() <= 0 || s_dodgerFireball1Spr->height() <= 0)
     return false;
 
-  s_dodgerFireballW = (int)fb1->width();
-  s_dodgerFireballH = (int)fb1->height();
+  s_dodgerFireballW = (int)s_dodgerFireball1Spr->width();
+  s_dodgerFireballH = (int)s_dodgerFireball1Spr->height();
   return true;
 }
 
@@ -3804,15 +3902,16 @@ static bool ensureDodgerCarSprite(const char *path)
   if (!path || !path[0] || !g_sdReady)
     return false;
 
-  M5Canvas *car = nullptr;
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "car", path, 8, kDodgerKey, car))
+  s_dodgerCarSpr = nullptr;
+
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "car", path, 8, kDodgerKey, s_dodgerCarSpr))
     return false;
 
-  if (!car || car->width() <= 0 || car->height() <= 0)
+  if (!s_dodgerCarSpr || s_dodgerCarSpr->width() <= 0 || s_dodgerCarSpr->height() <= 0)
     return false;
 
-  s_dodgerCarW = (int)car->width();
-  s_dodgerCarH = (int)car->height();
+  s_dodgerCarW = (int)s_dodgerCarSpr->width();
+  s_dodgerCarH = (int)s_dodgerCarSpr->height();
   return true;
 }
 
@@ -3917,7 +4016,7 @@ static inline uint32_t dodgerAliveMsNow(uint32_t now)
   return elapsed;
 }
 
-//SHARED MINI GAME INTRO INTERRUPT
+// SHARED MINI GAME INTRO INTERRUPT
 bool miniGameIsShowingIntro()
 {
   switch (currentMiniGame)
@@ -4023,26 +4122,27 @@ void startInfernalDodger()
   const bool carOk = ensureDodgerCarSprite(fireballRunCarPathForPet());
   mgmem::logUsage("dodger-after-car-ensure");
 
+  s_dodgerGoreSpr = nullptr;
   const char *goalFrame1Path = dodgerGoalFrame1ResolvedPath();
   const char *goalFrame2Path = dodgerGoalFrame2ResolvedPath();
   const char *goalGorePath = dodgerGoalGoreResolvedPath();
 
-  const bool goalOk =
-  (goalFrame1Path && goalFrame2Path) &&
-  ensureDodgerGoalFrames(goalFrame1Path, goalFrame2Path);
-  
-  const bool goreOk = ensureDodgerGoreSprite(goalGorePath);
+  Serial.printf("DODGER paths: frame1=%s frame2=%s gore=%s\n", goalFrame1Path ? goalFrame1Path : "(null)",
+                goalFrame2Path ? goalFrame2Path : "(null)", goalGorePath ? goalGorePath : "(null)");
+
+  const bool goalOk = (goalFrame1Path && goalFrame2Path) && ensureDodgerGoalFrames(goalFrame1Path, goalFrame2Path);
+
+  const bool goreOk = goalGorePath && ensureDodgerGoreSprite(goalGorePath);
 
   mgmem::logUsage("dodger-after-goal-ensure");
-mgmem::logUsage("dodger-after-gore-ensure");
+  mgmem::logUsage("dodger-after-gore-ensure");
 
   s_dodgerInited = true;
   dodgerReset();
 
-  Serial.printf("DODGER preload: bg=%d fireballs=%d car=%d goal=%d gore=%d free=%u largest=%u\n",
-    bgOk ? 1 : 0, fireballOk ? 1 : 0, carOk ? 1 : 0, goalOk ? 1 : 0, goreOk ? 1 : 0,
-    (unsigned)ESP.getFreeHeap(),
-    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  Serial.printf("DODGER preload: bg=%d fireballs=%d car=%d goal=%d gore=%d free=%u largest=%u\n", bgOk ? 1 : 0,
+                fireballOk ? 1 : 0, carOk ? 1 : 0, goalOk ? 1 : 0, goreOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   invalidateBackgroundCache();
   s_dodgerShowIntro = true;
@@ -4102,11 +4202,11 @@ void updateInfernalDodger(const InputState &input)
     if (input.mgSpaceOnce)
       s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
 
-      if (input.mgQuitOnce && !mgInputLockedOut())
-      {
-        miniGameCancelFromIntro();
-                return;
-      }
+    if (input.mgQuitOnce && !mgInputLockedOut())
+    {
+      miniGameCancelFromIntro();
+      return;
+    }
 
     const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
 
@@ -4132,14 +4232,14 @@ void updateInfernalDodger(const InputState &input)
     s_dodgerPhase = DODGER_PHASE_COAST;
     s_dodgerPhaseStartMs = now;
     s_dodgerMoveDir = 0;
-  
+
     for (auto &b : s_dodgerBalls)
       b.active = false;
-  
+
     freeDodgerFireballSprites();
     mgmem::logUsage("dodger-after-fireball-unload");
   }
-  
+
   if (s_dodgerPhase == DODGER_PHASE_COAST)
   {
     const uint32_t coastElapsed = now - s_dodgerPhaseStartMs;
@@ -4425,7 +4525,14 @@ void drawInfernalDodger()
   M5Canvas *bg = nullptr;
   int bw = 0;
   int bh = 0;
-  const bool haveBg = mgAssetsEnsureSharedBg(MiniGame::INFERNAL_DODGER, bgPath);
+  const bool haveBg = s_flappyBgReady && mgAssetsSharedBg() != nullptr;
+
+  if (haveBg)
+  {
+    bg = mgAssetsSharedBg();
+    bw = s_flappyBgW;
+    bh = s_flappyBgH;
+  }
 
   if (haveBg)
   {
@@ -4435,52 +4542,28 @@ void drawInfernalDodger()
   }
 
   const bool needFireballs = (s_dodgerPhase == DODGER_PHASE_FIREBALLS);
-  const bool haveFireballs = needFireballs && ensureDodgerFireballSprites(bgPath);
-  const bool haveCar = ensureDodgerCarSprite(fireballRunCarPathForPet());
+  const bool haveFireballs = needFireballs && s_dodgerFireball1Spr && s_dodgerFireball2Spr && s_dodgerFireball3Spr;
+  const bool haveCar = (s_dodgerCarSpr != nullptr);
 
-  M5Canvas *fbFrame0 = nullptr;
-  M5Canvas *fbFrame1 = nullptr;
-  M5Canvas *fbFrame2 = nullptr;
-  M5Canvas *carSpr = nullptr;
+  M5Canvas *fbFrame0 = s_dodgerFireball1Spr;
+  M5Canvas *fbFrame1 = s_dodgerFireball2Spr;
+  M5Canvas *fbFrame2 = s_dodgerFireball3Spr;
+  M5Canvas *carSpr = s_dodgerCarSpr;
 
-  if (needFireballs && haveFireballs)
-  {
-    char dir[128];
-    flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-  
-    char path1[192];
-    char path2[192];
-    char path3[192];
-    snprintf(path1, sizeof(path1), "%sfireball1.png", dir);
-    snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
-    snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
-  
-    mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball1", path1, 8, kDodgerKey, fbFrame0);
-    mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball2", path2, 8, kDodgerKey, fbFrame1);
-    mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "fireball3", path3, 8, kDodgerKey, fbFrame2);
-  }
-
-  if (haveCar)
-  {
-    mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "car", fireballRunCarPathForPet(), 8, kDodgerKey, carSpr);
-  }
-
+  spr.fillSprite(TFT_BLACK);
   bool drewBg = false;
 
   if (haveBg && bg && bw > 0 && bh > 0)
   {
-    int y = -(s_dodgerBgScrollY % bh);
-    if (y > 0)
-      y -= bh;
+    int x = -(s_flappyBgScrollX % bw);
+    if (x > 0)
+      x -= bw;
 
-    for (int drawY = y; drawY < gH; drawY += bh)
-      bg->pushSprite(&spr, 0, drawY);
+    for (int drawX = x - bw; drawX < gW + bw; drawX += bw)
+      bg->pushSprite(&spr, drawX, 0);
 
     drewBg = true;
   }
-
-  if (!drewBg)
-    spr.fillSprite(TFT_BLACK);
 
   if (mgRewardShowing())
   {
@@ -4512,60 +4595,60 @@ void drawInfernalDodger()
     const int impY = 44;
 
     const char *introImp =
-    (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1ResolvedPath() : dodgerGoalFrame2ResolvedPath();
+        (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1ResolvedPath() : dodgerGoalFrame2ResolvedPath();
 
     if (introImp && introImp[0])
-    sprDrawPngFromSD(introImp, impX, impY);
-  else
-    spr.fillRect(impX, impY, 48, 48, TFT_RED);
-  
-  const int cbY = 102;
-  const int cbSize = 10;
-  const int textOffset = 16;
-  const int lineWidth = 150;
-  const int cbX = (gW - lineWidth) / 2;
-  
-  spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-  
-  if (s_dodgerDontShowAgain)
-  {
-    spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-    spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+      sprDrawPngFromSD(introImp, impX, impY);
+    else
+      spr.fillRect(impX, impY, 48, 48, TFT_RED);
+
+    const int cbY = 102;
+    const int cbSize = 10;
+    const int textOffset = 16;
+    const int lineWidth = 150;
+    const int cbX = (gW - lineWidth) / 2;
+
+    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+    if (s_dodgerDontShowAgain)
+    {
+      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+    }
+
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
+    return;
   }
-  
-  spr.setTextDatum(ML_DATUM);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
-  
-  spr.setTextDatum(CC_DATUM);
-  spr.setTextColor(TFT_GREEN, TFT_BLACK);
-  spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
-  return;
-  }
-  
+
   if (s_dodgerPhase == DODGER_PHASE_FIREBALLS || s_dodgerPhase == DODGER_PHASE_COAST)
   {
     for (auto &b : s_dodgerBalls)
     {
       if (!b.active)
         continue;
-  
+
       const int bx = (int)b.x;
       const int by = (int)b.y;
-  
+
       M5Canvas *fbFrames[3] = {fbFrame0, fbFrame1, fbFrame2};
-  
+
       if (haveFireballs && fbFrames[0] && fbFrames[1] && fbFrames[2])
       {
         const int frame = (millis() / 80) % 3;
         M5Canvas *fb = fbFrames[frame];
-  
+
         const int w = fb->width();
         const int h = fb->height();
-  
+
         const int drawX = bx - w / 2;
         const int drawY = by - h / 2;
-  
+
         fb->pushSprite(&spr, drawX, drawY, kDodgerKey);
       }
       else
@@ -4575,26 +4658,18 @@ void drawInfernalDodger()
       }
     }
   }
-  
+
   if (s_dodgerGoalActive)
   {
-    const bool gorePhase =
-        (s_dodgerPhase == DODGER_PHASE_CAR_EXIT) ||
-        (s_dodgerPhase == DODGER_PHASE_HOLD);
-  
+    const bool gorePhase = (s_dodgerPhase == DODGER_PHASE_CAR_EXIT) || (s_dodgerPhase == DODGER_PHASE_HOLD);
+
     if (gorePhase)
     {
-      M5Canvas *goreSpr = nullptr;
-      const char *gorePath = dodgerGoalGoreResolvedPath();
-  
-      if (gorePath &&
-          ensureDodgerGoreSprite(gorePath) &&
-          mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_gore", gorePath, 8, kDodgerKey, goreSpr) &&
-          goreSpr && goreSpr->width() > 0 && goreSpr->height() > 0)
+      if (s_dodgerGoreSpr && s_dodgerGoreSpr->width() > 0 && s_dodgerGoreSpr->height() > 0)
       {
-        const int drawX = s_dodgerGoalX - ((int)goreSpr->width() / 2);
-        const int drawY = s_dodgerGoalY - ((int)goreSpr->height() / 2);
-        goreSpr->pushSprite(&spr, drawX, drawY, kDodgerKey);
+        const int drawX = s_dodgerGoalX - ((int)s_dodgerGoreSpr->width() / 2);
+        const int drawY = s_dodgerGoalY - ((int)s_dodgerGoreSpr->height() / 2);
+        s_dodgerGoreSpr->pushSprite(&spr, drawX, drawY, kDodgerKey);
       }
       else
       {
@@ -4603,19 +4678,13 @@ void drawInfernalDodger()
     }
     else
     {
-      M5Canvas *goal1 = nullptr;
-      M5Canvas *goal2 = nullptr;
-  
-      const char *goalPath1 = dodgerGoalFrame1ResolvedPath();
-      const char *goalPath2 = dodgerGoalFrame2ResolvedPath();
-  
-      if (goalPath1 && goalPath2 &&
-          ensureDodgerGoalFrames(goalPath1, goalPath2) &&
-          mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1", goalPath1, 8, kDodgerKey, goal1) &&
-          mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "goal_frame_2", goalPath2, 8, kDodgerKey, goal2))
+      M5Canvas *goal1 = s_dodgerGoalFrame1Spr;
+      M5Canvas *goal2 = s_dodgerGoalFrame2Spr;
+
+      if (goal1 && goal2)
       {
         M5Canvas *goalSpr = (s_dodgerGoalAnimFrame & 1) ? goal2 : goal1;
-  
+
         if (goalSpr && goalSpr->width() > 0 && goalSpr->height() > 0)
         {
           const int drawX = s_dodgerGoalX - ((int)goalSpr->width() / 2);

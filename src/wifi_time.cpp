@@ -13,6 +13,7 @@
 
 static bool s_waitSntpBeforeSync = true;
 static uint32_t s_consoleConnectStartMs = 0;
+static bool s_wifiEventHooked = false;
 
 void wifiTimeInit();
 void wifiTimeTick();
@@ -242,8 +243,12 @@ void wifiTimeInit() {
   WiFi.persistent(false);
   WiFi.setSleep(false); // responsiveness
 
-  WiFi.onEvent(onWiFiEvent);
-
+  if (!s_wifiEventHooked)
+  {
+    WiFi.onEvent(onWiFiEvent);
+    s_wifiEventHooked = true;
+  }
+  
   s_lastWifiAttemptMs = 0;
   s_lastRssiMs = 0;
   s_lastTimeCheckMs = 0;

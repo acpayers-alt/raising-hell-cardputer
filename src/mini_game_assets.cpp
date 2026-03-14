@@ -33,7 +33,7 @@ namespace
     M5Canvas canvas = M5Canvas(&M5.Display);
   };
 
-  static constexpr int kMgSpriteSlotCount = 16;
+  static constexpr int kMgSpriteSlotCount = 24;
   static MgSpriteSlot s_spriteSlots[kMgSpriteSlotCount];
 
   static MgSpriteSlot *findSpriteSlot(MiniGame owner, const char *assetId)
