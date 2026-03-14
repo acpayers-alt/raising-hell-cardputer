@@ -10,7 +10,19 @@
 #include "asset_ota_config.h"
 #include "sdcard.h"
 
-static String joinStagingPath(const String &relPath) { return String(assetOtaStagingRoot()) + "/" + relPath + ".part"; }
+static String joinStagingPath(const String &relPath)
+{
+  return String(assetOtaStagingRoot()) + "/" + relPath + ".part";
+}
+
+static String synthesizeAssetUrl(const char *relPath)
+{
+  String url = "https://assets.raisinghellgame.com/assets/";
+  if (!url.endsWith("/"))
+    url += "/";
+  url += relPath ? relPath : "";
+  return url;
+}
 
 static String toLowerHex(const uint8_t *buf, size_t len)
 {
@@ -39,8 +51,15 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     return false;
   }
 
+  if (file.path[0] == '\0')
+  {
+    if (outErr)
+      *outErr = "Bad manifest path";
+    return false;
+  }
+
   String rel;
-  if (!assetManifestNormalizePath(file.path, &rel))
+  if (!assetManifestNormalizePath(String(file.path), &rel))
   {
     if (outErr)
       *outErr = "Bad manifest path";
@@ -68,20 +87,21 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     return false;
   }
 
-  Serial.printf("[OTA] file url=%s\n", file.url.c_str());
-  Serial.printf("[OTA] file pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+  String fileUrl = synthesizeAssetUrl(file.path);
+  Serial.printf("[OTA] file url=%s\n", fileUrl.c_str());
+    Serial.printf("[OTA] file pre-http free=%u largest=%u\n",
+                (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
   http.setReuse(false);
-
   http.setTimeout(30000);
   http.addHeader("Accept-Encoding", "identity");
   http.addHeader("Cache-Control", "no-cache");
   http.setUserAgent("RaisingHellCardputer/1.0");
 
-  const String sUrl(file.url);
-  bool began = false;
+  const String sUrl = fileUrl;
+    bool began = false;
 
   WiFiClient plainClient;
   WiFiClientSecure secureClient;
@@ -91,12 +111,10 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     secureClient.setInsecure();
     secureClient.setTimeout(15000);
     secureClient.setHandshakeTimeout(15);
-    began = http.begin(secureClient, file.url);
-  }
+    began = http.begin(secureClient, fileUrl);  }
   else
   {
-    began = http.begin(plainClient, file.url);
-  }
+    began = http.begin(plainClient, fileUrl);  }
 
   if (!began)
   {
@@ -122,9 +140,11 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
 
   WiFiClient *stream = http.getStreamPtr();
   const int contentLength = http.getSize();
-  Serial.printf("[OTA] file contentLength=%d expected=%u\n", contentLength, (unsigned)file.size);
+  Serial.printf("[OTA] file contentLength=%d expected=%u\n",
+                contentLength,
+                (unsigned)file.size);
 
-  String wantHash = file.sha256;
+  String wantHash(file.sha256);
   wantHash.toLowerCase();
   wantHash.trim();
 
@@ -137,6 +157,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     mbedtls_sha256_init(&ctx);
     mbedtls_sha256_starts_ret(&ctx, 0);
   }
+
   uint8_t buf[1024];
   uint32_t total = 0;
   uint32_t idleLoops = 0;
@@ -202,7 +223,9 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     return false;
   }
 
-  Serial.printf("[OTA] file total=%u wantSize=%u\n", (unsigned)total, (unsigned)file.size);
+  Serial.printf("[OTA] file total=%u wantSize=%u\n",
+                (unsigned)total,
+                (unsigned)file.size);
 
   if (verifyHash)
   {

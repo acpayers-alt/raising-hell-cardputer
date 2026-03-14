@@ -36,11 +36,11 @@ enum class AssetOtaError : uint8_t {
   WRITE_FAIL
 };
 
-struct AssetManifestFile {
-  String path;
-  String url;
-  String sha256;
-  uint32_t size = 0;
+struct AssetManifestFile
+{
+  char path[128];
+  char sha256[65];
+  uint32_t size;
 };
 
 struct AssetManifestData {

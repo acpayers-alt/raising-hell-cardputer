@@ -1,6 +1,6 @@
 #pragma once
-#include <vector>
 #include "asset_ota_types.h"
+#include <vector>
 
 bool assetManifestNormalizePath(const String &inPath, String *outRelPath);
 

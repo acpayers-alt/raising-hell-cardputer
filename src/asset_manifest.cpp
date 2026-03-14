@@ -6,12 +6,14 @@
 #include <SD.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <ctype.h>
+#include <string.h>
 #include <vector>
 
 #include "asset_ota.h"
+#include "asset_ota_config.h"
 #include "graphics.h"
 #include "sdcard.h"
-#include "asset_ota_config.h"
 
 static String synthesizeAssetUrl(const String &relPath)
 {
@@ -19,6 +21,48 @@ static String synthesizeAssetUrl(const String &relPath)
   if (!base.endsWith("/"))
     base += "/";
   return base + relPath;
+}
+static bool saveStreamToFile(Stream &input, const char *path, size_t contentLen)
+{
+  File f = SD.open(path, FILE_WRITE);
+  if (!f)
+  {
+    Serial.printf("[OTA] failed to open temp manifest file: %s\n", path);
+    return false;
+  }
+
+  const size_t kBufSize = 1024;
+  uint8_t buf[kBufSize];
+  size_t total = 0;
+
+  while (true)
+  {
+    size_t n = input.readBytes((char *)buf, sizeof(buf));
+    if (n == 0)
+      break;
+
+    size_t wrote = f.write(buf, n);
+    if (wrote != n)
+    {
+      Serial.printf("[OTA] failed writing temp manifest file at total=%u\n", (unsigned)total);
+      f.close();
+      SD.remove(path);
+      return false;
+    }
+
+    total += n;
+
+    if ((total % 8192) == 0)
+    {
+      Serial.printf("[OTA] manifest download progress=%u/%u\n", (unsigned)total, (unsigned)contentLen);
+    }
+  }
+
+  f.flush();
+  f.close();
+
+  Serial.printf("[OTA] manifest temp file saved bytes=%u\n", (unsigned)total);
+  return total > 0;
 }
 
 static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestData *out)
@@ -28,11 +72,25 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
 
   out->clear();
 
-  DynamicJsonDocument doc(131072);
-  
-  Serial.printf("[OTA] parse start: contentLen=%u\n", (unsigned)contentLen);
+  StaticJsonDocument<512> filter;
+  filter["packVersion"] = true;
+  filter["pack_version"] = true;
+  filter["channel"] = true;
+  filter["files"][0]["path"] = true;
+  filter["files"][0]["size"] = true;
+  filter["files"][0]["url"] = true;
+  filter["files"][0]["sha256"] = true;
 
-  DeserializationError err = deserializeJson(doc, input);
+  DynamicJsonDocument doc(65536);
+
+  Serial.printf("[OTA] parse start: contentLen=%u free=%u largest=%u cap=%u\n", (unsigned)contentLen,
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)doc.capacity());
+
+  DeserializationError err = deserializeJson(doc, input, DeserializationOption::Filter(filter));
+
+  Serial.printf("[OTA] deserialize returned: %s free=%u largest=%u overflowed=%d\n", err ? err.c_str() : "Ok",
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), doc.overflowed() ? 1 : 0);
+
   if (err)
   {
     Serial.printf("[OTA] manifest deserialize failed: %s\n", err.c_str());
@@ -46,20 +104,14 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
     return false;
   }
 
-  const char *packVersion =
-      root["packVersion"] |
-      root["pack_version"] |
-      "";
-
+  const char *packVersion = root["packVersion"] | root["pack_version"] | "";
   if (!packVersion[0])
   {
     Serial.println("[OTA] manifest missing packVersion");
     return false;
   }
 
-  const char *channel =
-      root["channel"] |
-      "";
+  const char *channel = root["channel"] | "";
 
   JsonVariant filesVar = root["files"];
   if (!filesVar.is<JsonArray>())
@@ -72,7 +124,10 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
   out->channel = channel;
 
   JsonArray files = filesVar.as<JsonArray>();
-  out->files.reserve(files.size());
+  Serial.printf("[OTA] files array count=%u free=%u largest=%u\n", (unsigned)files.size(), (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+                out->files.reserve(files.size());
 
   unsigned fileIndex = 0;
   const unsigned totalFiles = files.size();
@@ -82,48 +137,59 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
     ++fileIndex;
 
     const char *rel = obj["path"] | "";
-    if (!rel[0])
+    if (!rel || !rel[0])
     {
-      Serial.printf("[OTA] manifest file entry missing path at index=%u\n", fileIndex);
-      return false;
+      Serial.printf("[OTA] skipping manifest entry with empty path at index=%u\n", fileIndex);
+      continue;
     }
 
-    AssetManifestFile f;
-    f.path = rel;
+    String normPath;
+    if (!assetManifestNormalizePath(rel, &normPath))
+    {
+      Serial.printf("[OTA] manifest file entry invalid path at index=%u raw='%s'\n", fileIndex, rel);
+      continue;
+    }
+
+    AssetManifestFile f{};
+    strlcpy(f.path, normPath.c_str(), sizeof(f.path));
     f.size = (uint32_t)(obj["size"] | 0UL);
 
-    const char *urlField = obj["url"] | "";
-    if (urlField[0])
-      f.url = urlField;
-    else
-      f.url = "";
-
     const char *shaField = obj["sha256"] | "";
-    if (shaField[0])
+    if (shaField && shaField[0])
     {
-      f.sha256 = shaField;
-      f.sha256.toLowerCase();
+      strlcpy(f.sha256, shaField, sizeof(f.sha256));
+
+      for (size_t j = 0; f.sha256[j]; ++j)
+        f.sha256[j] = (char)tolower((unsigned char)f.sha256[j]);
+
+      if (strlen(f.sha256) != 64)
+      {
+        Serial.printf("[OTA] manifest file entry bad sha len=%u at index=%u path=%s\n", (unsigned)strlen(f.sha256),
+                      fileIndex, f.path);
+        continue;
+      }
     }
     else
     {
-      f.sha256 = "";
+      f.sha256[0] = '\0';
     }
 
+    if ((fileIndex % 10) == 1)
+    {
+      Serial.printf("[OTA] pre-push index=%u/%u free=%u largest=%u path=%s\n", fileIndex, totalFiles,
+                    (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), f.path);
+    }
     out->files.push_back(f);
 
-    if ((fileIndex % 25) == 0)
+    if ((fileIndex % 10) == 1)
     {
-      Serial.printf("[OTA] parse progress index=%u/%u free=%u largest=%u path=%s\n",
-                    fileIndex, totalFiles,
-                    (unsigned)ESP.getFreeHeap(),
-                    (unsigned)ESP.getMaxAllocHeap(),
-                    f.path.c_str());
+      Serial.printf("[OTA] post-push index=%u/%u free=%u largest=%u\n", fileIndex, totalFiles,
+                    (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
     }
   }
 
-  Serial.printf("[OTA] manifest parsed ok: version=%s files=%u\n",
-                out->packVersion.c_str(),
-                (unsigned)out->files.size());
+  Serial.printf("[OTA] parse complete files=%u free=%u largest=%u\n", (unsigned)out->files.size(),
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
   return true;
 }
@@ -169,10 +235,10 @@ bool assetManifestLoadLocal(AssetManifestData *out)
   if (!f)
     return false;
 
-    const size_t len = (size_t)f.size();
-    const bool ok = parseManifestJson(f, len, out);
-    f.close();
-    return ok;
+  const size_t len = (size_t)f.size();
+  const bool ok = parseManifestJson(f, len, out);
+  f.close();
+  return ok;
 }
 
 bool assetManifestSaveLocal(const AssetManifestData &manifest)
@@ -193,9 +259,10 @@ bool assetManifestSaveLocal(const AssetManifestData &manifest)
   {
     JsonObject o = files.createNestedObject();
     o["path"] = f.path;
-    if (!f.url.isEmpty())
-      o["url"] = f.url;
-    o["sha256"] = f.sha256;
+    if (f.sha256[0])
+      o["sha256"] = f.sha256;
+    else
+      o["sha256"] = "";
     o["size"] = f.size;
   }
 
@@ -236,9 +303,7 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   graphicsReleasePetLayerForOta();
 
   Serial.printf("[OTA] manifest url=%s\n", url);
-  Serial.printf("[OTA] pre-http free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
   http.setReuse(false);
@@ -266,9 +331,7 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     began = http.begin(plainClient, url);
   }
 
-  Serial.printf("[OTA] post-begin began=%d free=%u largest=%u\n",
-                began ? 1 : 0,
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] post-begin began=%d free=%u largest=%u\n", began ? 1 : 0, (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   if (!began)
@@ -277,9 +340,7 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  Serial.printf("[OTA] pre-GET free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-GET free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
   const int code = http.GET();
   Serial.printf("[OTA] manifest http code=%d\n", code);
@@ -303,15 +364,37 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  if (!stream)
+  const char *tmpManifestPath = "/manifest.remote.tmp";
+
+  if (SD.exists(tmpManifestPath))
+    SD.remove(tmpManifestPath);
+
+  const bool saved = saveStreamToFile(*stream, tmpManifestPath, (size_t)((contentLen > 0) ? contentLen : 0));
+
+  http.end();
+
+  Serial.printf("[OTA] manifest temp saved=%d free=%u largest=%u\n", saved ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+
+  if (!saved)
   {
-    Serial.println("[OTA] manifest stream unavailable");
-    http.end();
+    Serial.println("[OTA] manifest temp save failed");
+    SD.remove(tmpManifestPath);
     return false;
   }
 
-  const bool parsed = parseManifestJson(*stream, (size_t)((contentLen > 0) ? contentLen : 0), out);
-  http.end();
+  File mf = SD.open(tmpManifestPath, FILE_READ);
+  if (!mf)
+  {
+    Serial.println("[OTA] failed to reopen temp manifest file");
+    SD.remove(tmpManifestPath);
+    return false;
+  }
+
+  const size_t mfLen = mf.size();
+  const bool parsed = parseManifestJson(mf, mfLen, out);
+  mf.close();
+  SD.remove(tmpManifestPath);
 
   Serial.printf("[OTA] manifest parsed=%d\n", parsed ? 1 : 0);
   if (!parsed)
@@ -320,30 +403,37 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  return true;}
+  return true;
+}
 
-void assetManifestBuildDiff(const AssetManifestData &localManifest,
-                            const AssetManifestData &remoteManifest,
+void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetManifestData &remoteManifest,
                             std::vector<AssetManifestFile> &outChangedFiles)
 {
   outChangedFiles.clear();
 
   for (const auto &rf : remoteManifest.files)
   {
+    String normPath;
+    if (!assetManifestNormalizePath(String(rf.path), &normPath))
+    {
+      Serial.printf("[OTA] skipping remote manifest entry with invalid path '%s'\n", rf.path);
+      continue;
+    }
+
     bool foundSame = false;
 
     for (const auto &lf : localManifest.files)
     {
-      if (lf.path != rf.path)
+      if (String(lf.path) != normPath)
         continue;
 
       const bool sameSize = (lf.size == rf.size);
-      const bool sameHash = (lf.sha256.equalsIgnoreCase(rf.sha256));
+      const bool sameHash = String(lf.sha256).equalsIgnoreCase(String(rf.sha256));
 
       if (sameSize && sameHash)
       {
         String livePath = "/";
-        livePath += rf.path;
+        livePath += normPath;
 
         if (SD.exists(livePath.c_str()))
           foundSame = true;
@@ -353,22 +443,54 @@ void assetManifestBuildDiff(const AssetManifestData &localManifest,
     }
 
     if (!foundSame)
-      outChangedFiles.push_back(rf);
+    {
+      AssetManifestFile clean{};
+      strlcpy(clean.path, normPath.c_str(), sizeof(clean.path));
+      strlcpy(clean.sha256, rf.sha256, sizeof(clean.sha256));
+      clean.size = rf.size;
+      outChangedFiles.push_back(clean);
+    }
   }
 }
 
-bool assetManifestDownloadDiffOnly(const char *url,
-                                   const AssetManifestData &localManifest,
-                                   String *outPackVersion,
+bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &localManifest, String *outPackVersion,
                                    std::vector<AssetManifestFile> &outChangedFiles)
 {
   AssetManifestData remoteManifest;
   if (!assetManifestDownloadRemote(url, &remoteManifest))
     return false;
-
+  
+  Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n",
+                (unsigned)remoteManifest.files.size(),
+                (unsigned)localManifest.files.size(),
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+  
   if (outPackVersion)
     *outPackVersion = remoteManifest.packVersion;
-
+  
+  if (localManifest.files.empty())
+  {
+    Serial.printf("[OTA] local manifest empty; moving all %u remote files into changed list\n",
+                  (unsigned)remoteManifest.files.size());
+  
+    outChangedFiles.clear();
+    outChangedFiles.swap(remoteManifest.files);
+  
+    Serial.printf("[OTA] moved changed.size=%u free=%u largest=%u\n",
+                  (unsigned)outChangedFiles.size(),
+                  (unsigned)ESP.getFreeHeap(),
+                  (unsigned)ESP.getMaxAllocHeap());
+  
+    return true;
+  }
+  
   assetManifestBuildDiff(localManifest, remoteManifest, outChangedFiles);
+  
+  Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n",
+                (unsigned)outChangedFiles.size(),
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
+  
   return true;
-}
+  }
