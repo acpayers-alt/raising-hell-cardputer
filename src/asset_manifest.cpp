@@ -304,30 +304,50 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
   Serial.printf("[OTA] manifest url=%s\n", url);
   Serial.printf("[OTA] pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-  HTTPClient http;
-  http.setReuse(false);
-  http.setTimeout(15000);
-  http.addHeader("Accept", "application/json");
-  http.addHeader("Accept-Encoding", "identity");
-  http.addHeader("Cache-Control", "no-cache");
-  http.setUserAgent("RaisingHellCardputer/1.0");
+  std::unique_ptr<HTTPClient> http(new HTTPClient());
+  if (!http)
+  {
+    Serial.println("[OTA] failed to allocate HTTPClient");
+    return false;
+  }
 
-  const String sUrl(url);
+  http->setReuse(false);
+  http->setTimeout(15000);
+  http->addHeader("Accept", "application/json");
+  http->addHeader("Accept-Encoding", "identity");
+  http->addHeader("Cache-Control", "no-cache");
+  http->setUserAgent("RaisingHellCardputer/1.0");
+
+  const bool isHttps = (strncmp(url, "https://", 8) == 0);
   bool began = false;
 
-  WiFiClient plainClient;
-  WiFiClientSecure secureClient;
+  std::unique_ptr<WiFiClient> plainClient;
+  std::unique_ptr<WiFiClientSecure> secureClient;
 
-  if (sUrl.startsWith("https://"))
+  if (isHttps)
   {
-    secureClient.setInsecure();
-    secureClient.setTimeout(15000);
-    secureClient.setHandshakeTimeout(15);
-    began = http.begin(secureClient, url);
+    secureClient.reset(new WiFiClientSecure());
+    if (!secureClient)
+    {
+      Serial.println("[OTA] failed to allocate WiFiClientSecure");
+      return false;
+    }
+
+    secureClient->setInsecure();
+    secureClient->setTimeout(15000);
+    secureClient->setHandshakeTimeout(15);
+    began = http->begin(*secureClient, url);
   }
   else
   {
-    began = http.begin(plainClient, url);
+    plainClient.reset(new WiFiClient());
+    if (!plainClient)
+    {
+      Serial.println("[OTA] failed to allocate WiFiClient");
+      return false;
+    }
+
+    began = http->begin(*plainClient, url);
   }
 
   Serial.printf("[OTA] post-begin began=%d free=%u largest=%u\n", began ? 1 : 0, (unsigned)ESP.getFreeHeap(),
@@ -341,25 +361,25 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
 
   Serial.printf("[OTA] pre-GET free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-  const int code = http.GET();
+  const int code = http->GET();
   Serial.printf("[OTA] manifest http code=%d\n", code);
 
   if (code != HTTP_CODE_OK)
   {
-    String errBody = http.getString();
+    String errBody = http->getString();
     Serial.printf("[OTA] manifest error body: %s\n", errBody.c_str());
-    http.end();
+    http->end();
     return false;
   }
 
-  const int contentLen = http.getSize();
+  const int contentLen = http->getSize();
   Serial.printf("[OTA] manifest contentLen=%d\n", contentLen);
 
-  WiFiClient *stream = http.getStreamPtr();
+  WiFiClient *stream = http->getStreamPtr();
   if (!stream)
   {
     Serial.println("[OTA] manifest stream unavailable");
-    http.end();
+    http->end();
     return false;
   }
 
@@ -370,7 +390,7 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
 
   const bool saved = saveStreamToFile(*stream, tmpManifestPath, (size_t)((contentLen > 0) ? contentLen : 0));
 
-  http.end();
+  http->end();
 
   Serial.printf("[OTA] manifest temp saved=%d free=%u largest=%u\n", saved ? 1 : 0, (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
@@ -406,14 +426,14 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
 }
 
 void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetManifestData &remoteManifest,
-  std::vector<AssetManifestFile> &outChangedFiles)
+                            std::vector<AssetManifestFile> &outChangedFiles)
 {
-outChangedFiles.clear();
-outChangedFiles.reserve(remoteManifest.files.size());
+  outChangedFiles.clear();
+  outChangedFiles.reserve(remoteManifest.files.size());
 
-for (const auto &rf : remoteManifest.files)
-{
-      String normPath;
+  for (const auto &rf : remoteManifest.files)
+  {
+    String normPath;
     if (!assetManifestNormalizePath(String(rf.path), &normPath))
     {
       Serial.printf("[OTA] skipping remote manifest entry with invalid path '%s'\n", rf.path);
@@ -453,46 +473,37 @@ for (const auto &rf : remoteManifest.files)
   }
 }
 
-bool assetManifestDownloadDiffOnly(const char *url,
-  const AssetManifestData &localManifest,
-  String *outPackVersion,
-  std::vector<AssetManifestFile> &outChangedFiles)
+bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &localManifest, String *outPackVersion,
+                                   std::vector<AssetManifestFile> &outChangedFiles)
 {
-AssetManifestData remoteManifest;
-if (!assetManifestDownloadRemote(url, &remoteManifest))
-return false;
+  AssetManifestData remoteManifest;
+  if (!assetManifestDownloadRemote(url, &remoteManifest))
+    return false;
 
-if (outPackVersion)
-*outPackVersion = remoteManifest.packVersion;
+  if (outPackVersion)
+    *outPackVersion = remoteManifest.packVersion;
 
-Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n",
-(unsigned)remoteManifest.files.size(),
-(unsigned)localManifest.files.size(),
-(unsigned)ESP.getFreeHeap(),
-(unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n", (unsigned)remoteManifest.files.size(),
+                (unsigned)localManifest.files.size(), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-if (localManifest.files.empty())
-{
-Serial.printf("[OTA] local manifest empty; swapping in all %u remote files\n",
-(unsigned)remoteManifest.files.size());
+  if (localManifest.files.empty())
+  {
+    Serial.printf("[OTA] local manifest empty; swapping in all %u remote files\n",
+                  (unsigned)remoteManifest.files.size());
 
-outChangedFiles.clear();
-outChangedFiles.swap(remoteManifest.files);
+    outChangedFiles.clear();
+    outChangedFiles.swap(remoteManifest.files);
 
-Serial.printf("[OTA] swap complete changed.size=%u free=%u largest=%u\n",
-(unsigned)outChangedFiles.size(),
-(unsigned)ESP.getFreeHeap(),
-(unsigned)ESP.getMaxAllocHeap());
+    Serial.printf("[OTA] swap complete changed.size=%u free=%u largest=%u\n", (unsigned)outChangedFiles.size(),
+                  (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-return true;
-}
+    return true;
+  }
 
-assetManifestBuildDiff(localManifest, remoteManifest, outChangedFiles);
+  assetManifestBuildDiff(localManifest, remoteManifest, outChangedFiles);
 
-Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n",
-(unsigned)outChangedFiles.size(),
-(unsigned)ESP.getFreeHeap(),
-(unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n", (unsigned)outChangedFiles.size(),
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-return true;
+  return true;
 }

@@ -141,17 +141,7 @@ bool sdAssetsPresent()
   if (!g_sdReady)
     return false;
 
-  AssetOtaState st;
-  if (assetOtaStateLoad(&st))
-  {
-    if (st.inProgress)
-      return false;
-  }
-
-  if (SD.exists(kSdAssetsLocalManifestPath))
-    return true;
-
-  return false;
+  return SD.exists("/raising_hell/assets/manifest_local.json");
 }
 
 // -----------------------------------------------------------------------------
@@ -223,17 +213,6 @@ static bool bootAssetProvisionRequired()
 {
   const bool requested = bootAssetProvisionRequested();
   const bool mandatory = bootAssetProvisionMandatory();
-  const bool assetsPresent = sdAssetsPresent();
-
-  // If a stale boot-request flag survived, but assets are already present,
-  // clear it and allow normal boot.
-  if (requested && !mandatory && assetsPresent)
-  {
-    Serial.println("[BOOT] clearing stale asset provision request");
-    clearAssetProvisionBootRequest();
-    return false;
-  }
-
   return requested || mandatory;
 }
 
@@ -345,10 +324,10 @@ static bool runBootAssetProvision()
 
   drawBootAssetProvisionScreen("Checking asset package.", "Please wait...");
 
-  String msg;
-  const bool ok = assetOtaCheckNow(&msg);
-
   clearAssetProvisionBootRequest();
+
+  String msg;
+  const bool ok = assetOtaRunInWorkerTask(&msg);
 
   // Re-check asset presence after OTA work completes.
   g_assetsChecked = true;
@@ -667,9 +646,11 @@ void postBootInitTick()
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool assetsPresentNow = sdAssetsPresent();
-
-    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n", provisionRequested ? 1 : 0,
-                  provisionMandatory ? 1 : 0, assetsPresentNow ? 1 : 0);
+    
+    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n",
+                  provisionRequested ? 1 : 0,
+                  provisionMandatory ? 1 : 0,
+                  assetsPresentNow ? 1 : 0);
 
     const bool deferForAssetProvision = bootAssetProvisionRequired();
 

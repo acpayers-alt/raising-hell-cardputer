@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <SD.h>
+#include <mbedtls/sha256.h>
 #include <string.h>
 #include <vector>
 
@@ -40,6 +41,126 @@ bool assetOtaConfirmActive() { return s_assetOtaConfirmActive; }
 void assetOtaSetConfirmActive(bool v) { s_assetOtaConfirmActive = v; }
 
 bool assetOtaDidReleaseGraphics() { return s_graphicsReleasedForOta; }
+
+struct AssetOtaTaskResult
+{
+  bool done = false;
+  bool ok = false;
+  String message;
+};
+
+static AssetOtaTaskResult g_otaTaskResult;
+static TaskHandle_t g_otaTaskHandle = nullptr;
+
+static void assetOtaWorkerTask(void *param)
+{
+  String *msg = static_cast<String *>(param);
+
+  String localMsg;
+  bool ok = assetOtaCheckNow(&localMsg);
+
+  g_otaTaskResult.ok = ok;
+  g_otaTaskResult.message = localMsg;
+  g_otaTaskResult.done = true;
+
+  if (msg)
+    delete msg;
+
+  g_otaTaskHandle = nullptr;
+  vTaskDelete(nullptr);
+}
+
+bool assetOtaRunInWorkerTask(String *outMessage)
+{
+  g_otaTaskResult = AssetOtaTaskResult{};
+
+  String *heapMsg = new String();
+  if (!heapMsg)
+  {
+    if (outMessage)
+      *outMessage = "No memory for OTA worker";
+    return false;
+  }
+
+  BaseType_t rc = xTaskCreatePinnedToCore(
+      assetOtaWorkerTask,
+      "asset_ota_worker",
+      16384,          // start here; can raise to 20480 if needed
+      heapMsg,
+      1,
+      &g_otaTaskHandle,
+      1);
+
+  if (rc != pdPASS)
+  {
+    delete heapMsg;
+    if (outMessage)
+      *outMessage = "Failed to start OTA worker";
+    return false;
+  }
+
+  while (!g_otaTaskResult.done)
+  {
+    delay(10);
+  }
+
+  if (outMessage)
+    *outMessage = g_otaTaskResult.message;
+
+  return g_otaTaskResult.ok;
+}
+
+static bool localAssetMatches(const AssetManifestFile &f)
+{
+  String livePath = "/";
+  livePath += f.path;
+
+  if (!SD.exists(livePath.c_str()))
+    return false;
+
+  File lf = SD.open(livePath.c_str(), FILE_READ);
+  if (!lf)
+    return false;
+
+  if ((uint32_t)lf.size() != f.size)
+  {
+    lf.close();
+    return false;
+  }
+
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0);
+
+  uint8_t buf[4096];
+
+  while (true)
+  {
+    int r = lf.read(buf, sizeof(buf));
+    if (r <= 0)
+      break;
+
+    mbedtls_sha256_update(&ctx, buf, (size_t)r);
+  }
+
+  lf.close();
+
+  uint8_t hash[32];
+  mbedtls_sha256_finish(&ctx, hash);
+  mbedtls_sha256_free(&ctx);
+
+  String hex;
+  hex.reserve(64);
+
+  static const char *digits = "0123456789abcdef";
+  for (int i = 0; i < 32; ++i)
+  {
+    hex += digits[(hash[i] >> 4) & 0x0F];
+    hex += digits[hash[i] & 0x0F];
+  }
+
+  return hex.equalsIgnoreCase(f.sha256);
+}
 
 static const char *statusString(AssetOtaStatus st)
 {
@@ -409,11 +530,8 @@ bool assetOtaCheckNow(String *outMessage)
   String remotePackVersion = remoteManifest.packVersion;
   std::vector<AssetManifestFile> changed;
 
-  Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n",
-                (unsigned)remoteManifest.files.size(),
-                (unsigned)localManifest.files.size(),
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n", (unsigned)remoteManifest.files.size(),
+                (unsigned)localManifest.files.size(), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
   if (localManifest.files.empty())
   {
@@ -422,19 +540,15 @@ bool assetOtaCheckNow(String *outMessage)
 
     changed.swap(remoteManifest.files);
 
-    Serial.printf("[OTA] swap complete changed.size=%u free=%u largest=%u\n",
-                  (unsigned)changed.size(),
-                  (unsigned)ESP.getFreeHeap(),
-                  (unsigned)ESP.getMaxAllocHeap());
+    Serial.printf("[OTA] swap complete changed.size=%u free=%u largest=%u\n", (unsigned)changed.size(),
+                  (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
   }
   else
   {
     assetManifestBuildDiff(localManifest, remoteManifest, changed);
 
-    Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n",
-                  (unsigned)changed.size(),
-                  (unsigned)ESP.getFreeHeap(),
-                  (unsigned)ESP.getMaxAllocHeap());
+    Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n", (unsigned)changed.size(),
+                  (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
   }
 
   Serial.printf("[OTA] changed.size=%u\n", (unsigned)changed.size());
@@ -442,6 +556,7 @@ bool assetOtaCheckNow(String *outMessage)
   for (size_t k = 0; k < changed.size(); ++k)
   {
     const AssetManifestFile &f = changed[k];
+
     const size_t pathLen = strlen(f.path);
     const size_t shaLen = strlen(f.sha256);
 
@@ -521,9 +636,15 @@ bool assetOtaCheckNow(String *outMessage)
 
   for (size_t i = 0; i < changed.size(); ++i)
   {
-    Serial.printf("[OTA] loop-begin i=%u\n", (unsigned)i);
-
     const AssetManifestFile &mf = changed[i];
+
+    if (localAssetMatches(mf))
+    {
+      Serial.printf("[OTA] skipping already-valid file: %s\n", mf.path);
+      continue;
+    }
+
+    Serial.printf("[OTA] loop-begin i=%u\n", (unsigned)i);
 
     s_status = AssetOtaStatus::DOWNLOADING;
     s_state.status = (uint8_t)s_status;

@@ -24,3 +24,5 @@ bool assetOtaDidReleaseGraphics();
 
 bool assetOtaConfirmActive();
 void assetOtaSetConfirmActive(bool v);
+
+bool assetOtaRunInWorkerTask(String *outMessage);
