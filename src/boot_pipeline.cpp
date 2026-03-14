@@ -118,9 +118,6 @@ bool sdAssetsPresent()
       return false;
   }
 
-  if (SD.exists(assetOtaStagingRoot()))
-    return false;
-
   if (SD.exists(kSdAssetsLocalManifestPath))
     return true;
 

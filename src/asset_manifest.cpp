@@ -78,7 +78,6 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
   filter["channel"] = true;
   filter["files"][0]["path"] = true;
   filter["files"][0]["size"] = true;
-  filter["files"][0]["url"] = true;
   filter["files"][0]["sha256"] = true;
 
   DynamicJsonDocument doc(65536);
@@ -127,7 +126,7 @@ static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestDat
   Serial.printf("[OTA] files array count=%u free=%u largest=%u\n", (unsigned)files.size(), (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
-                out->files.reserve(files.size());
+  out->files.reserve(files.size());
 
   unsigned fileIndex = 0;
   const unsigned totalFiles = files.size();
@@ -407,13 +406,14 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
 }
 
 void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetManifestData &remoteManifest,
-                            std::vector<AssetManifestFile> &outChangedFiles)
+  std::vector<AssetManifestFile> &outChangedFiles)
 {
-  outChangedFiles.clear();
+outChangedFiles.clear();
+outChangedFiles.reserve(remoteManifest.files.size());
 
-  for (const auto &rf : remoteManifest.files)
-  {
-    String normPath;
+for (const auto &rf : remoteManifest.files)
+{
+      String normPath;
     if (!assetManifestNormalizePath(String(rf.path), &normPath))
     {
       Serial.printf("[OTA] skipping remote manifest entry with invalid path '%s'\n", rf.path);
@@ -453,44 +453,46 @@ void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetM
   }
 }
 
-bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &localManifest, String *outPackVersion,
-                                   std::vector<AssetManifestFile> &outChangedFiles)
+bool assetManifestDownloadDiffOnly(const char *url,
+  const AssetManifestData &localManifest,
+  String *outPackVersion,
+  std::vector<AssetManifestFile> &outChangedFiles)
 {
-  AssetManifestData remoteManifest;
-  if (!assetManifestDownloadRemote(url, &remoteManifest))
-    return false;
-  
-  Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n",
-                (unsigned)remoteManifest.files.size(),
-                (unsigned)localManifest.files.size(),
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-  
-  if (outPackVersion)
-    *outPackVersion = remoteManifest.packVersion;
-  
-  if (localManifest.files.empty())
-  {
-    Serial.printf("[OTA] local manifest empty; moving all %u remote files into changed list\n",
-                  (unsigned)remoteManifest.files.size());
-  
-    outChangedFiles.clear();
-    outChangedFiles.swap(remoteManifest.files);
-  
-    Serial.printf("[OTA] moved changed.size=%u free=%u largest=%u\n",
-                  (unsigned)outChangedFiles.size(),
-                  (unsigned)ESP.getFreeHeap(),
-                  (unsigned)ESP.getMaxAllocHeap());
-  
-    return true;
-  }
-  
-  assetManifestBuildDiff(localManifest, remoteManifest, outChangedFiles);
-  
-  Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n",
-                (unsigned)outChangedFiles.size(),
-                (unsigned)ESP.getFreeHeap(),
-                (unsigned)ESP.getMaxAllocHeap());
-  
-  return true;
-  }
+AssetManifestData remoteManifest;
+if (!assetManifestDownloadRemote(url, &remoteManifest))
+return false;
+
+if (outPackVersion)
+*outPackVersion = remoteManifest.packVersion;
+
+Serial.printf("[OTA] pre-diff remote=%u local=%u free=%u largest=%u\n",
+(unsigned)remoteManifest.files.size(),
+(unsigned)localManifest.files.size(),
+(unsigned)ESP.getFreeHeap(),
+(unsigned)ESP.getMaxAllocHeap());
+
+if (localManifest.files.empty())
+{
+Serial.printf("[OTA] local manifest empty; swapping in all %u remote files\n",
+(unsigned)remoteManifest.files.size());
+
+outChangedFiles.clear();
+outChangedFiles.swap(remoteManifest.files);
+
+Serial.printf("[OTA] swap complete changed.size=%u free=%u largest=%u\n",
+(unsigned)outChangedFiles.size(),
+(unsigned)ESP.getFreeHeap(),
+(unsigned)ESP.getMaxAllocHeap());
+
+return true;
+}
+
+assetManifestBuildDiff(localManifest, remoteManifest, outChangedFiles);
+
+Serial.printf("[OTA] diff complete changed.size=%u free=%u largest=%u\n",
+(unsigned)outChangedFiles.size(),
+(unsigned)ESP.getFreeHeap(),
+(unsigned)ESP.getMaxAllocHeap());
+
+return true;
+}
