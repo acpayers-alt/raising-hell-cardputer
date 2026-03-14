@@ -12,7 +12,6 @@ const char *assetOtaStateTmpPath();
 const char *assetOtaLocalManifestPath();
 const char *assetOtaLocalManifestTmpPath();
 const char *assetOtaStagingRoot();
-const char *assetOtaLegacyMarkerPath();
 
 void assetOtaConfigDefaults(AssetOtaConfig &cfg);
 void assetOtaStateDefaults(AssetOtaState &st);

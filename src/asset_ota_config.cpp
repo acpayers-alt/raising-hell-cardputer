@@ -13,7 +13,6 @@ static const char *kStateTmpPath = "/raising_hell/save/asset_ota_state.tmp";
 static const char *kLocalManifestPath = "/raising_hell/assets/manifest_local.json";
 static const char *kLocalManifestTmpPath = "/raising_hell/assets/manifest_local.tmp";
 static const char *kStagingRoot = "/raising_hell/assets_staging";
-static const char *kLegacyMarkerPath = "/raising_hell/ASSET_MANIFEST.txt";
 
 static const char *kPublicManifestUrl =
 "https://assets.raisinghellgame.com/manifest-public.json";
@@ -28,7 +27,6 @@ const char *assetOtaStateTmpPath() { return kStateTmpPath; }
 const char *assetOtaLocalManifestPath() { return kLocalManifestPath; }
 const char *assetOtaLocalManifestTmpPath() { return kLocalManifestTmpPath; }
 const char *assetOtaStagingRoot() { return kStagingRoot; }
-const char *assetOtaLegacyMarkerPath() { return kLegacyMarkerPath; }
 
 const char *assetOtaManifestUrlForChannel(AssetOtaChannel ch)
 {

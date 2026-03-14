@@ -82,14 +82,9 @@ bool assetOtaRunInWorkerTask(String *outMessage)
     return false;
   }
 
-  BaseType_t rc = xTaskCreatePinnedToCore(
-      assetOtaWorkerTask,
-      "asset_ota_worker",
-      16384,          // start here; can raise to 20480 if needed
-      heapMsg,
-      1,
-      &g_otaTaskHandle,
-      1);
+  BaseType_t rc = xTaskCreatePinnedToCore(assetOtaWorkerTask, "asset_ota_worker",
+                                          16384, // start here; can raise to 20480 if needed
+                                          heapMsg, 1, &g_otaTaskHandle, 1);
 
   if (rc != pdPASS)
   {
@@ -322,24 +317,6 @@ static bool installStagedFile(const String &relPath, const String &stagingPath)
   if (!SD.rename(stagingPath.c_str(), livePath.c_str()))
     return false;
 
-  return true;
-}
-
-static bool writeLegacyMarker(const char *version)
-{
-  if (!assetOtaEnsureParentDir(assetOtaLegacyMarkerPath()))
-    return false;
-
-  if (SD.exists(assetOtaLegacyMarkerPath()))
-    SD.remove(assetOtaLegacyMarkerPath());
-
-  File f = SD.open(assetOtaLegacyMarkerPath(), FILE_WRITE);
-  if (!f)
-    return false;
-
-  f.print(version ? version : "unknown");
-  f.print("\n");
-  f.close();
   return true;
 }
 
@@ -654,13 +631,6 @@ bool assetOtaCheckNow(String *outMessage)
     otaRedrawProvisionScreen("Downloading assets...", mf.path);
     String rawPath(mf.path);
 
-    if (rawPath.equalsIgnoreCase("raising_hell/ASSET_MANIFEST.txt") ||
-        rawPath.equalsIgnoreCase("/raising_hell/ASSET_MANIFEST.txt"))
-    {
-      Serial.println("[OTA] skipping legacy marker from remote manifest");
-      continue;
-    }
-
     Serial.printf("[OTA] normalize candidate path='%s'\n", rawPath.c_str());
 
     String rel;
@@ -770,8 +740,6 @@ bool assetOtaCheckNow(String *outMessage)
     restoreMainUiSprite();
     return false;
   }
-
-  (void)writeLegacyMarker(remotePackVersion.c_str());
 
   s_installedVersion = remotePackVersion;
   s_status = AssetOtaStatus::SUCCESS;

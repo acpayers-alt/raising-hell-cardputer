@@ -48,7 +48,6 @@
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
 // -----------------------------------------------------------------------------
-static const char *kSdAssetsMarkerPath = "/raising_hell/ASSET_MANIFEST.txt";
 static const char *kSdAssetsLocalManifestPath = "/raising_hell/assets/manifest_local.json";
 
 bool g_assetsChecked = false;
