@@ -20,10 +20,20 @@ static int      g_shakeHits = 0;
 static uint32_t g_cooldownUntilMs = 0;
 
 // Tunables (tweak if needed)
-static constexpr float    SHAKE_DELTA_G     = 0.90f;  // |mag - lpMag| threshold (g)
-static constexpr int      SHAKE_HITS_N      = 6;      // hits needed
-static constexpr uint32_t SHAKE_WINDOW_MS   = 500;    // hits must occur within this window
-static constexpr uint32_t SHAKE_COOLDOWN_MS = 1500;   // ignore shakes after trigger
+static constexpr float    SHAKE_DELTA_G     = 0.55f;  // |mag - lpMag| threshold (g)
+static constexpr int      SHAKE_HITS_N      = 3;      // hits needed
+static constexpr uint32_t SHAKE_WINDOW_MS   = 650;    // hits must occur within this window
+static constexpr uint32_t SHAKE_COOLDOWN_MS = 1200;   // ignore shakes after trigger
+
+void motionResetShakeDetector(uint32_t cooldownMs)
+{
+  const uint32_t now = millis();
+
+  g_lpMag = 1.0f;
+  g_windowStartMs = 0;
+  g_shakeHits = 0;
+  g_cooldownUntilMs = now + cooldownMs;
+}
 
 void initMotion() {
   if (g_inited) return;

@@ -59,9 +59,16 @@ void screenWake() {
 }
 
 void noteUserActivity() {
-setLastInputActivityMs(millis());
+  const uint32_t now = millis();
+  setLastInputActivityMs(now);
 
-  // If we're asleep/off, wake immediately.
+  // Add a window where we suppress waking if screen was turned off manually in the last 250 ms.
+  if (!isScreenOn() && (uint32_t)(now - screenPowerLastManualToggleMs()) < 250) {
+    // If the screen is off and the last manual toggle was within 250 ms, ignore wake request
+    return;
+  }
+
+  // Now proceed to wake the screen if it's off (and not in the ignore window)
   if (!isScreenOn()) {
     screenWake();
   }
@@ -75,6 +82,11 @@ void autoScreenTick() {
   if (timeout == 0) return;
 
   const uint32_t now = millis();
+
+  // Prevent auto-screen sleep if the user has manually toggled the screen recently
+  const uint32_t kManualToggleGuardMs = 800;
+  if ((uint32_t)(now - screenPowerLastManualToggleMs()) < kManualToggleGuardMs)
+    return;
 
   // If already off, nothing to do (wake is handled by noteUserActivity / shake-to-wake)
   if (!isScreenOn()) return;

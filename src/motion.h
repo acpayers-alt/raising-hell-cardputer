@@ -24,4 +24,6 @@ bool motionShakeDetected();
 // runtime flag: true when IMU was detected and initialized
 extern bool motionAvailable;
 
+void motionResetShakeDetector(uint32_t cooldownMs = 0);
+
 #endif

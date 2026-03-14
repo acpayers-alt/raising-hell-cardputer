@@ -18,16 +18,26 @@
 #include "display_dims_state.h" 
 #include "anim_engine.h"
 
+static uint32_t s_lastManualScreenToggleMs = 0;
+
+// Canvas framebuffer
+M5Canvas spr(&M5Cardputer.Display);
+
 void toggleScreenPower() {
-SET_SCREEN_POWER(!isScreenOn());
+  SET_SCREEN_POWER(!isScreenOn());
 }
 
 bool isScreenOn() {
   return g_app.screenOn;
 }
 
-// Canvas framebuffer
-M5Canvas spr(&M5Cardputer.Display);
+uint32_t screenPowerLastManualToggleMs() {
+  return s_lastManualScreenToggleMs;
+}
+
+void markScreenPowerManualToggle(uint32_t now) {
+  s_lastManualScreenToggleMs = now;
+}
 
 static inline uint8_t clampU8(int v) {
   if (v < 0) return 0;

@@ -4504,20 +4504,11 @@ void drawInfernalDodger()
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
-  const char *bgPath = fireballRunBgPathForPet();
-
   M5Canvas *bg = nullptr;
   int bw = 0;
   int bh = 0;
-  const bool haveBg = s_flappyBgReady && mgAssetsSharedBg() != nullptr;
 
-  if (haveBg)
-  {
-    bg = mgAssetsSharedBg();
-    bw = s_flappyBgW;
-    bh = s_flappyBgH;
-  }
-
+  const bool haveBg = mgAssetsSharedBg() != nullptr;
   if (haveBg)
   {
     bg = mgAssetsSharedBg();
@@ -4526,7 +4517,11 @@ void drawInfernalDodger()
   }
 
   const bool needFireballs = (s_dodgerPhase == DODGER_PHASE_FIREBALLS);
-  const bool haveFireballs = needFireballs && s_dodgerFireball1Spr && s_dodgerFireball2Spr && s_dodgerFireball3Spr;
+  const bool haveFireballs = needFireballs &&
+                             s_dodgerFireball1Spr &&
+                             s_dodgerFireball2Spr &&
+                             s_dodgerFireball3Spr;
+
   const bool haveCar = (s_dodgerCarSpr != nullptr);
 
   M5Canvas *fbFrame0 = s_dodgerFireball1Spr;
@@ -4534,20 +4529,25 @@ void drawInfernalDodger()
   M5Canvas *fbFrame2 = s_dodgerFireball3Spr;
   M5Canvas *carSpr = s_dodgerCarSpr;
 
-  spr.fillSprite(TFT_BLACK);
   bool drewBg = false;
 
   if (haveBg && bg && bw > 0 && bh > 0)
   {
-    int x = -(s_flappyBgScrollX % bw);
-    if (x > 0)
-      x -= bw;
+    int y = -(s_dodgerBgScrollY % bh);
+    if (y > 0)
+      y -= bh;
 
-    for (int drawX = x - bw; drawX < gW + bw; drawX += bw)
-      bg->pushSprite(&spr, drawX, 0);
+    while (y > -bh)
+      y -= bh;
+
+    for (int drawY = y; drawY < gH; drawY += bh)
+      bg->pushSprite(&spr, 0, drawY);
 
     drewBg = true;
   }
+
+  if (!drewBg)
+    spr.fillSprite(TFT_BLACK);
 
   if (mgRewardShowing())
   {
@@ -4563,6 +4563,50 @@ void drawInfernalDodger()
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
+    return;
+  }
+
+  if (s_dodgerShowIntro)
+  {
+    spr.fillSprite(TFT_BLACK);
+    spr.setTextDatum(CC_DATUM);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Arrow keys or A/L to dodge", gW / 2, 8, 2);
+    spr.drawCentreString("Stay on the road, smash the Imp!", gW / 2, 26, 2);
+
+    const int impX = (gW - 48) / 2;
+    const int impY = 44;
+
+    const char *introImp =
+        (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1ResolvedPath() : dodgerGoalFrame2ResolvedPath();
+
+    if (introImp && introImp[0])
+      sprDrawPngFromSD(introImp, impX, impY);
+    else
+      spr.fillRect(impX, impY, 48, 48, TFT_RED);
+
+    const int cbY = 102;
+    const int cbSize = 10;
+    const int textOffset = 16;
+    const int lineWidth = 150;
+    const int cbX = (gW - lineWidth) / 2;
+
+    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
+
+    if (s_dodgerDontShowAgain)
+    {
+      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
+      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
+    }
+
+    spr.setTextDatum(ML_DATUM);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
     return;
   }
 

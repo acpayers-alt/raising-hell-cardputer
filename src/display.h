@@ -64,3 +64,9 @@ constexpr int CONTENT_H = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
 
 void backlightPulseBegin(uint8_t level);
 void backlightPulseEnd();
+
+uint32_t screenPowerLastManualToggleMs();
+void markScreenPowerManualToggle(uint32_t now);
+
+uint32_t screenPowerLastManualToggleMs();
+void markScreenPowerManualToggle(uint32_t now);
