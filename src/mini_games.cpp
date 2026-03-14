@@ -587,28 +587,71 @@ void startFlappyFireball()
 
 static bool flappyCollides(int fbX, int fbY, int r, const FlappyPipe &p, int w, int h)
 {
-  const int pipeW = 26;
+  const int pipeVisualW = (s_flappyPipeW > 0) ? s_flappyPipeW : 26;
   const int gapH = 64;
 
-  const int kPipeInsetPx = 2;
-  const int kGapBonusPx = 4;
+  // General forgiveness
   const int kScreenForgive = 2;
+  const int kGapBonusPx = 8;
+
+  // Make the pipe collision narrower than the art so the tapered spike mouths
+  // feel fair instead of like invisible flat walls.
+  const int kPipeSideInset = 6;
+
+  // Additional forgiveness near the mouth of the gap.
+  // As the fireball gets closer to the left/right edge of the pipe column,
+  // widen the safe opening a bit.
+  const int kMouthForgiveMax = 8;
 
   if (fbY - r < -kScreenForgive)
     return true;
   if (fbY + r >= h + kScreenForgive)
     return true;
 
-  int pipeL = p.x + kPipeInsetPx;
-  int pipeR = p.x + pipeW - kPipeInsetPx;
+  const int drawX = p.x + (26 - pipeVisualW) / 2;
+
+  int pipeL = drawX + kPipeSideInset;
+  int pipeR = drawX + pipeVisualW - kPipeSideInset;
+
+  if (pipeR <= pipeL)
+  {
+    pipeL = drawX;
+    pipeR = drawX + pipeVisualW;
+  }
 
   if (fbX + r < pipeL)
     return false;
   if (fbX - r > pipeR)
     return false;
 
-  int gapTop = (p.gapY - gapH / 2) - kGapBonusPx;
-  int gapBot = (p.gapY + gapH / 2) + kGapBonusPx;
+  int gapTop = p.gapY - gapH / 2 - kGapBonusPx;
+  int gapBot = p.gapY + gapH / 2 + kGapBonusPx;
+
+  if (gapTop < 0)
+    gapTop = 0;
+  if (gapBot > h)
+    gapBot = h;
+
+  // Mouth forgiveness:
+  // near the left/right edge of the pipe band, allow a little extra gap
+  // because the spike art is tapered there.
+  const int pipeMid = (pipeL + pipeR) / 2;
+  const int halfW = (pipeR - pipeL) / 2;
+
+  int dx = fbX - pipeMid;
+  if (dx < 0)
+    dx = -dx;
+
+  int mouthForgive = 0;
+  if (halfW > 0)
+  {
+    mouthForgive = (dx * kMouthForgiveMax) / halfW;
+    if (mouthForgive > kMouthForgiveMax)
+      mouthForgive = kMouthForgiveMax;
+  }
+
+  gapTop -= mouthForgive;
+  gapBot += mouthForgive;
 
   if (gapTop < 0)
     gapTop = 0;
