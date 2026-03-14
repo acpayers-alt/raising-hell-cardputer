@@ -262,11 +262,6 @@ void freeImpWaveSprites()
 {
   mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave1");
   mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave2");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn1");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn2");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn3");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn4");
-  mgmem::releaseSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn5");
 
   s_impWave1Spr = nullptr;
   s_impWave2Spr = nullptr;
@@ -414,11 +409,6 @@ static bool ensureImpWaveSprites()
 {
   s_impWave1Spr = nullptr;
   s_impWave2Spr = nullptr;
-  s_impBurn1Spr = nullptr;
-  s_impBurn2Spr = nullptr;
-  s_impBurn3Spr = nullptr;
-  s_impBurn4Spr = nullptr;
-  s_impBurn5Spr = nullptr;
 
   if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_wave1", flappyImpWave1PathForPet(), 8, kSpriteKey,
                            s_impWave1Spr))
@@ -428,24 +418,7 @@ static bool ensureImpWaveSprites()
                            s_impWave2Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn1", kImpBurnFrames[0], 8, kSpriteKey, s_impBurn1Spr))
-    return false;
-
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn2", kImpBurnFrames[1], 8, kSpriteKey, s_impBurn2Spr))
-    return false;
-
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn3", kImpBurnFrames[2], 8, kSpriteKey, s_impBurn3Spr))
-    return false;
-
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn4", kImpBurnFrames[3], 8, kSpriteKey, s_impBurn4Spr))
-    return false;
-
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "imp_burn5", kImpBurnFrames[4], 8, kSpriteKey, s_impBurn5Spr))
-    return false;
-
-  s_impWaveSprReady = s_impWave1Spr && s_impWave2Spr && s_impBurn1Spr && s_impBurn2Spr && s_impBurn3Spr &&
-                      s_impBurn4Spr && s_impBurn5Spr;
-
+  s_impWaveSprReady = s_impWave1Spr && s_impWave2Spr;
   return s_impWaveSprReady;
 }
 
@@ -1115,11 +1088,13 @@ void drawFlappyFireball()
     return;
   }
 
-  const bool haveFireball =
-      s_flappyFireball1Spr && s_flappyFireball2Spr && s_flappyFireball3Spr;
+  const bool haveFireball = s_flappyFireball1Spr && s_flappyFireball2Spr && s_flappyFireball3Spr;
 
-  const bool havePipes =
-      s_flappyPipeUpSpr && s_flappyPipeDownSpr;
+  const bool havePipes = s_flappyPipeUpSpr && s_flappyPipeDownSpr;
+
+  M5Canvas *fbFrame0 = s_flappyFireball1Spr;
+  M5Canvas *fbFrame1 = s_flappyFireball2Spr;
+  M5Canvas *fbFrame2 = s_flappyFireball3Spr;
 
   M5Canvas *bg = nullptr;
   int bw = 0;
@@ -1186,39 +1161,48 @@ void drawFlappyFireball()
 
     if (!s_impHit)
     {
-      impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+      M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+      if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
+        impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
     }
     else
     {
+      const char *burnPath = nullptr;
+
       switch (s_impFrame)
       {
       case 0:
-        impSpr = s_impBurn1Spr;
+        burnPath = kImpBurnFrames[0];
         break;
       case 1:
-        impSpr = s_impBurn2Spr;
+        burnPath = kImpBurnFrames[1];
         break;
       case 2:
-        impSpr = s_impBurn3Spr;
+        burnPath = kImpBurnFrames[2];
         break;
       case 3:
-        impSpr = s_impBurn4Spr;
+        burnPath = kImpBurnFrames[3];
         break;
       default:
-        impSpr = s_impBurn5Spr;
+        burnPath = kImpBurnFrames[4];
         break;
       }
+
+      if (burnPath && burnPath[0])
+        sprDrawPngFromSD(burnPath, impX, impY);
     }
-
-    if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
-      impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
   }
-
   if (!s_impHit)
   {
-    M5Canvas *fbFrames[3] = {s_flappyFireball1Spr, s_flappyFireball2Spr, s_flappyFireball3Spr};
+    if ((!s_flappyFireball1Spr || !s_flappyFireball2Spr || !s_flappyFireball3Spr) && s_flappyBgPath[0])
+      ensureFlappyFireballSprites(s_flappyBgPath);
 
-    if (haveFireball && fbFrames[0] && fbFrames[1] && fbFrames[2])
+    M5Canvas *fbFrames[3] = {
+        s_flappyFireball1Spr,
+        s_flappyFireball2Spr,
+        s_flappyFireball3Spr};
+
+    if (fbFrames[0] && fbFrames[1] && fbFrames[2])
     {
       const int frame = (millis() / 80) % 3;
       M5Canvas *fb = fbFrames[frame];
