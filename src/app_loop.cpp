@@ -3,6 +3,7 @@
 #include "M5Cardputer.h"
 #include "anim_engine.h"
 #include "app_state.h"
+#include "asset_ota.h"
 #include "auto_screen.h"
 #include "boot_pipeline.h"
 #include "build_flags.h"
@@ -31,13 +32,15 @@
 #include "time_persist.h"
 #include "time_state.h"
 #include "ui_actions.h"
+#include "ui_input_router.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
-#include "ui_input_router.h"
 #include "ui_state_console.h"
 #include "ui_tabs.h"
 #include "wifi_time.h"
-#include "asset_ota.h"
+#include "flow_boot_wifi.h"
+#include "launcher_wifi_import.h"
+#include "wifi_store.h"
 
 #include <Arduino.h>
 #include <cstring>
@@ -65,15 +68,18 @@ static inline UIState uiStateForTab(Tab t)
 {
   switch (t)
   {
-    case Tab::TAB_SLEEP: return UIState::SLEEP_MENU;
-    case Tab::TAB_INV:   return UIState::INVENTORY;
-    case Tab::TAB_SHOP:  return UIState::SHOP;
-    case Tab::TAB_PET:
-    case Tab::TAB_STATS:
-    case Tab::TAB_FEED:
-    case Tab::TAB_PLAY:
-    default:
-      return UIState::PET_SCREEN;
+  case Tab::TAB_SLEEP:
+    return UIState::SLEEP_MENU;
+  case Tab::TAB_INV:
+    return UIState::INVENTORY;
+  case Tab::TAB_SHOP:
+    return UIState::SHOP;
+  case Tab::TAB_PET:
+  case Tab::TAB_STATS:
+  case Tab::TAB_FEED:
+  case Tab::TAB_PLAY:
+  default:
+    return UIState::PET_SCREEN;
   }
 }
 
@@ -142,10 +148,8 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   appServicesTick(now);
 
-  const bool inDeathFlow =
-  (g_app.uiState == UIState::DEATH) ||
-  (g_app.uiState == UIState::MINI_GAME) ||
-  (g_app.uiState == UIState::BURIAL_SCREEN);
+  const bool inDeathFlow = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::MINI_GAME) ||
+                           (g_app.uiState == UIState::BURIAL_SCREEN);
 
   const bool screenOnNow = isScreenOn();
 
@@ -158,7 +162,7 @@ void appMainLoopTick()
   }
 
   s_prevScreenOn = screenOnNow;
-  
+
   // ---------------------------------------------------------------------------
   // SCREEN OFF PATH
   // ---------------------------------------------------------------------------
@@ -185,8 +189,8 @@ void appMainLoopTick()
 
     // Near-death beep MUST work even with screen off.
     soundLowHealthTick((uint8_t)pet.health, sleepingNow_off,
-    /*screenOn=*/false,
-    /*inDeathScreen=*/inDeathFlow);
+                       /*screenOn=*/false,
+                       /*inDeathScreen=*/inDeathFlow);
 
     if (motionAvailable && motionShakeDetected())
     {
@@ -532,14 +536,10 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   if (input.homeOnce)
   {
-    const bool canHome =
-        (g_app.uiState != UIState::SET_TIME) &&
-        (g_app.uiState != UIState::POWER_MENU) &&
-        (g_app.uiState != UIState::DEATH) &&
-        (g_app.uiState != UIState::BURIAL_SCREEN) &&
-        (g_app.uiState != UIState::MINI_GAME) &&
-        (g_app.uiState != UIState::HATCHING) &&
-        (g_app.uiState != UIState::EVOLUTION);
+    const bool canHome = (g_app.uiState != UIState::SET_TIME) && (g_app.uiState != UIState::POWER_MENU) &&
+                         (g_app.uiState != UIState::DEATH) && (g_app.uiState != UIState::BURIAL_SCREEN) &&
+                         (g_app.uiState != UIState::MINI_GAME) && (g_app.uiState != UIState::HATCHING) &&
+                         (g_app.uiState != UIState::EVOLUTION);
 
     if (canHome && g_app.uiState != UIState::PET_SLEEPING)
     {
@@ -568,7 +568,8 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   // Input-driven redraw hint (single copy)
   // ---------------------------------------------------------------------------
-  if (input.menuOnce || input.escOnce || input.selectOnce || input.upOnce || input.downOnce || (input.encoderDelta != 0))
+  if (input.menuOnce || input.escOnce || input.selectOnce || input.upOnce || input.downOnce ||
+      (input.encoderDelta != 0))
   {
     requestUIRedraw();
   }
@@ -662,15 +663,13 @@ void appMainLoopTick()
 
   static bool s_prevDbgRedraw = false;
   static int s_prevDbgUiState = -1;
-  
+
   static constexpr bool kLogUiStateTransitions = false;
 
   if (kLogUiStateTransitions && (int)g_app.uiState != s_prevDbgUiState)
   {
-    Serial.printf("[UI STATE] uiState=%d screenOn=%d\n",
-                  (int)g_app.uiState,
-                  (int)isScreenOn());
-  
+    Serial.printf("[UI STATE] uiState=%d screenOn=%d\n", (int)g_app.uiState, (int)isScreenOn());
+
     s_prevDbgUiState = (int)g_app.uiState;
   }
 
@@ -683,8 +682,8 @@ void appMainLoopTick()
   s_prevSleeping = sleepingNow2;
 
   soundLowHealthTick((uint8_t)pet.health, sleepingNow2,
-  /*screenOn=*/isScreenOn(),
-  /*inDeathScreen=*/inDeathFlow);
+                     /*screenOn=*/isScreenOn(),
+                     /*inDeathScreen=*/inDeathFlow);
 
   if (g_sdReady)
   {

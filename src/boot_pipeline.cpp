@@ -22,11 +22,13 @@
 #include "display_dims_state.h"
 #include "display_state.h"
 #include "eeprom_addrs.h"
+#include "flow_boot_wifi.h"
 #include "flow_boot_wizard.h"
 #include "flow_time_editor.h"
 #include "graphics.h"
 #include "input.h"
 #include "inventory.h"
+#include "launcher_wifi_import.h"
 #include "new_pet_flow_state.h"
 #include "save_manager.h"
 #include "sdcard.h"
@@ -38,6 +40,7 @@
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
 #include "wifi_power.h"
+#include "wifi_store.h"
 #include "wifi_time.h"
 #include <WiFi.h>
 #include <esp_system.h>
@@ -83,6 +86,7 @@ void drawAssetsMissingScreen()
 // First Run Flag (factory reset helper)
 // -----------------------------------------------------------------------------
 static const char *kFirstRunFlagPath = "/raising_hell/first_run.flag";
+static const char *kPostProvisionControlsHelpFlagPath = "/raising_hell/post_provision_controls.flag";
 
 static bool consumeFirstRunFlagIfPresent()
 {
@@ -92,6 +96,32 @@ static bool consumeFirstRunFlagIfPresent()
     return false;
 
   SD.remove(kFirstRunFlagPath);
+  return true;
+}
+
+static bool writePostProvisionControlsHelpFlag()
+{
+  if (!g_sdReady)
+    return false;
+
+  File f = SD.open(kPostProvisionControlsHelpFlagPath, FILE_WRITE);
+  if (!f)
+    return false;
+
+  f.print("1\n");
+  f.close();
+  return true;
+}
+
+static bool consumePostProvisionControlsHelpFlagIfPresent()
+{
+  if (!g_sdReady)
+    return false;
+
+  if (!SD.exists(kPostProvisionControlsHelpFlagPath))
+    return false;
+
+  SD.remove(kPostProvisionControlsHelpFlagPath);
   return true;
 }
 
@@ -144,6 +174,7 @@ static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
 static bool g_bootProvisionWifiStarted = false;
 static bool g_forceControlsHelpAfterProvision = false;
+static bool g_postProvisionControlsHelpPending = false;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -329,6 +360,17 @@ static bool runBootAssetProvision()
   // Success only counts if assets are actually present afterward.
   if (ok && !g_assetsMissing)
   {
+    if (g_bootAssetProvisionMustComplete && !bootSaveFileExists())
+    {
+      writePostProvisionControlsHelpFlag();
+    }
+
+    if (g_bootAssetProvisionMustComplete)
+    {
+      settingsSetWifiEnabled(true);
+      saveSettingsToSD();
+    }
+
     g_bootAssetProvisionActive = false;
     g_bootUiBlockedForAssetProvision = false;
     ESP.restart();
@@ -370,6 +412,13 @@ static bool bootAssetProvisionWifiReady()
 
     wifiSetEnabled(shouldEnableWifi);
     applyWifiPower(shouldEnableWifi);
+
+    if (g_bootAssetProvisionMustComplete && shouldEnableWifi)
+    {
+      settingsSetWifiEnabled(true);
+      saveSettingsToSD();
+    }
+
     wifiTimeInit();
 
     g_bootProvisionWifiStarted = true;
@@ -413,9 +462,9 @@ static void finalizeBootLanding()
     g_app.inventory.resetToDefaults();
     ui_setBootSplashActive(false);
 
-    if (g_forceControlsHelpAfterProvision)
+    if (g_postProvisionControlsHelpPending)
     {
-      g_forceControlsHelpAfterProvision = false;
+      g_postProvisionControlsHelpPending = false;
       g_controlsHelpSeen = 0;
       beginForcedSetTimeBootGate(UIState::CHOOSE_PET, Tab::TAB_PET);
       controlsHelpBegin(UIState::SET_TIME, Tab::TAB_PET);
@@ -584,6 +633,8 @@ void postBootInitTick()
       saveSettingsToSD();
     }
 
+    g_postProvisionControlsHelpPending = consumePostProvisionControlsHelpFlagIfPresent();
+
     // Apply loaded brightness immediately
     if (isScreenOn())
     {
@@ -695,7 +746,25 @@ void postBootInitTick()
         return;
       }
 
-      bootWizardBegin(afterOk, Tab::TAB_PET);
+      String importedSsid;
+      String importedPwd;
+
+      if (launcherImportWifiCreds(importedSsid, importedPwd))
+      {
+        wifiStoreSave(importedSsid, importedPwd);
+        settingsSetWifiEnabled(true);
+        saveSettingsToSD();
+
+        bootWifiSetImportedInfo(importedSsid.c_str());
+        wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+
+        uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
+      }
+      else
+      {
+        uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
+      }
+
       return;
     }
 
@@ -711,7 +780,7 @@ void postBootInitTick()
       g_bootWizardAfterOkState = afterOk;
       g_bootWizardAfterOkTab = Tab::TAB_PET;
 
-      bootWizardBegin(afterOk, Tab::TAB_PET);
+      uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
       requestFullUIRedraw();
       invalidateBackgroundCache();
       requestUIRedraw();
@@ -749,7 +818,7 @@ void postBootInitTick()
           g_bootAssetProvisionActive = false;
           ui_setBootSplashActive(false);
 
-          bootWizardBegin(UIState::BOOT, Tab::TAB_PET);
+          uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
           requestFullUIRedraw();
           requestUIRedraw();
           clearInputLatch();

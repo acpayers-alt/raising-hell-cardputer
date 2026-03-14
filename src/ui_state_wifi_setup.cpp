@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <ctype.h>
 #include <string.h>
+#include "save_manager.h"
 
 #include "app_state.h"
 #include "input.h"
@@ -102,9 +103,15 @@ static void wifiSetupSelect()
   // Persist credentials (so the rest of the system can use them)
   wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
 
+  if (g_wifiSetupFromBootWizard)
+  {
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+  }
+  
   // Kick off connection attempt NOW (this is what makes BOOT_WIFI_WAIT dismiss)
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
-
+  
   if (g_wifiSetupFromBootWizard)
   {
     uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_app.currentTab, true);

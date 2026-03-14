@@ -24,6 +24,12 @@
 #include "flow_boot_wizard.h"
 #include "timezone.h"
 
+#include "launcher_wifi_import.h"
+#include "wifi_store.h"
+#include "settings_state.h"
+#include "wifi_setup_state.h"
+#include "save_manager.h"
+
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
 extern Tab     g_bootWizardAfterOkTab;
@@ -213,7 +219,35 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   }
 
   g_bootProvisionWifiOnboardingStarted = true;
-  uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+
+  String importedSsid;
+  String importedPwd;
+
+  if (launcherImportWifiCreds(importedSsid, importedPwd))
+  {
+    wifiStoreSave(importedSsid, importedPwd);
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+
+    bootWifiSetImportedInfo(importedSsid.c_str());
+    wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+
+    uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
+  }
+  else
+  {
+    g_wifiSetupFromBootWizard = true;
+    wifiSetupStage = 0;
+    wifiSetupSsid[0] = 0;
+    wifiSetupPass[0] = 0;
+    wifiSetupBuf[0] = 0;
+
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+
+    uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
+  }
+
   requestUIRedraw();
   uiActionSwallowAll(in);
   uiDrainKb(in);
