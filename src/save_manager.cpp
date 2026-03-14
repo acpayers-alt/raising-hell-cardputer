@@ -203,19 +203,19 @@ static bool loadGameOptionsFromSD_internal()
   if (!ensureSaveDir())
     return false;
 
-    if (!SD.exists(GAMEOPT_PATH))
-    {
-      DBG_ON("[SAVE] gameopt missing, using defaults\n");
-      return false;
-    }
-    
-    File f = SD.open(GAMEOPT_PATH, FILE_READ);
-    if (!f)
-    {
-      DBG_ON("[SAVE] gameopt open failed\n");
-      return false;
-    }
-    
+  if (!SD.exists(GAMEOPT_PATH))
+  {
+    DBG_ON("[SAVE] gameopt missing, using defaults\n");
+    return false;
+  }
+
+  File f = SD.open(GAMEOPT_PATH, FILE_READ);
+  if (!f)
+  {
+    DBG_ON("[SAVE] gameopt open failed\n");
+    return false;
+  }
+
   if ((size_t)f.size() != sizeof(GameOptionsData))
   {
     f.close();
@@ -674,7 +674,7 @@ static bool saveSettingsToSD_internal()
   g_settings.brightnessLevel = brightnessLevel;
   g_settings.autoScreenOffEnabled = g_app.autoScreenOffEnabled;
   g_settings.soundEnabled = soundEnabled;
-  g_settings.wifiEnabled = wifiIsEnabled() ? 1 : 0;
+  g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
   g_settings.tzIndex = tzIndex;
 
   g_settings.autoScreenTimeoutSel = autoScreenTimeoutSel;

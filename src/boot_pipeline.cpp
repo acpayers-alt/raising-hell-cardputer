@@ -12,6 +12,7 @@
 // Keep includes broad/safe like you’ve been doing
 #include "app_state.h"
 #include "asset_ota.h"
+#include "asset_ota_config.h"
 #include "asset_provision_request.h"
 #include "boot_state.h"
 #include "brightness_state.h"
@@ -40,7 +41,6 @@
 #include "wifi_time.h"
 #include <WiFi.h>
 #include <esp_system.h>
-#include "asset_ota_config.h"
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
@@ -143,6 +143,7 @@ static bool g_sdTriedLoad = false;
 static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
 static bool g_bootProvisionWifiStarted = false;
+static bool g_forceControlsHelpAfterProvision = false;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -231,8 +232,7 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
       d.drawString(line2, 12, 40);
 
     char dbg1[64];
-    snprintf(dbg1, sizeof(dbg1), "st=%d  cur=%u  total=%u",
-             (int)st, (unsigned)cur, (unsigned)total);
+    snprintf(dbg1, sizeof(dbg1), "st=%d  cur=%u  total=%u", (int)st, (unsigned)cur, (unsigned)total);
     d.drawString(dbg1, 12, 56);
 
     char dbg2[48];
@@ -277,23 +277,20 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
   drawUi(spr);
   spr.pushSprite(0, 0);
 }
-void bootAssetProvisionRedraw(const char *line1, const char *line2)
-{
-  drawBootAssetProvisionScreen(line1, line2);
-}
+void bootAssetProvisionRedraw(const char *line1, const char *line2) { drawBootAssetProvisionScreen(line1, line2); }
 
 static bool bootAssetProvisionWifiOnboardingActive()
 {
   switch (g_app.uiState)
   {
-    case UIState::BOOT_WIFI_PROMPT:
-    case UIState::BOOT_WIFI_IMPORTED:
-    case UIState::BOOT_WIFI_WAIT:
-    case UIState::BOOT_TZ_PICK:
-    case UIState::BOOT_NTP_WAIT:
-    case UIState::BOOT_ASSET_WIFI_REQUIRED:
-    case UIState::WIFI_SETUP:
-      return true;
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_WIFI_IMPORTED:
+  case UIState::BOOT_WIFI_WAIT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+  case UIState::WIFI_SETUP:
+    return true;
   default:
     return false;
   }
@@ -415,6 +412,15 @@ static void finalizeBootLanding()
 
     g_app.inventory.resetToDefaults();
     ui_setBootSplashActive(false);
+
+    if (g_forceControlsHelpAfterProvision)
+    {
+      g_forceControlsHelpAfterProvision = false;
+      g_controlsHelpSeen = 0;
+      beginForcedSetTimeBootGate(UIState::CHOOSE_PET, Tab::TAB_PET);
+      controlsHelpBegin(UIState::SET_TIME, Tab::TAB_PET);
+      return;
+    }
 
     if (!g_controlsHelpSeen)
     {
@@ -571,7 +577,8 @@ void postBootInitTick()
     }
 
     // FIRST RUN FLAG (from factory reset)
-    if (consumeFirstRunFlagIfPresent())
+    const bool forcedFirstRun = consumeFirstRunFlagIfPresent();
+    if (forcedFirstRun)
     {
       g_controlsHelpSeen = 0;
       saveSettingsToSD();
@@ -602,18 +609,16 @@ void postBootInitTick()
     updateTime();
     uiInitLevelPopupTracker();
 
-    const bool firstBootWizard = !settingsLoaded;
-    const bool saveFileExists = bootSaveFileExists();
+    const bool firstBootWizard = !settingsLoaded || forcedFirstRun;
+    const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
     const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
-    
+
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool assetsPresentNow = sdAssetsPresent();
 
-    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n",
-                  provisionRequested ? 1 : 0,
-                  provisionMandatory ? 1 : 0,
-                  assetsPresentNow ? 1 : 0);
+    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n", provisionRequested ? 1 : 0,
+                  provisionMandatory ? 1 : 0, assetsPresentNow ? 1 : 0);
 
     const bool deferForAssetProvision = bootAssetProvisionRequired();
 
@@ -637,12 +642,18 @@ void postBootInitTick()
       g_app.inventory.init();
     }
 
+    if (forcedFirstRun)
+    {
+      g_app.inventory.resetToDefaults();
+    }
+
     if (deferForAssetProvision)
     {
       g_bootLandingDeferredForAssetProvision = true;
       g_bootAssetProvisionMustComplete = bootAssetProvisionMandatory();
       g_bootUiBlockedForAssetProvision = true;
       g_bootProvisionWifiOnboardingStarted = false;
+      g_forceControlsHelpAfterProvision = g_bootAssetProvisionMustComplete && !bootSaveFileExists();
 
       ui_setBootSplashActive(false);
 
@@ -724,7 +735,7 @@ void postBootInitTick()
     if (now >= g_nextWifiTryMs)
     {
       g_nextWifiTryMs = now + 1000;
-  
+
       if (bootAssetProvisionRequired())
       {
         // For mandatory provisioning, wait on the explicit intro screen until
@@ -747,7 +758,7 @@ void postBootInitTick()
 
         if (bootAssetProvisionWifiOnboardingActive())
           return;
-      }  
+      }
       if (!g_wifiApplied)
       {
         const bool pref = settingsWifiEnabled();
@@ -755,23 +766,23 @@ void postBootInitTick()
         applyWifiPower(pref);
         g_wifiApplied = true;
       }
-  
+
       wifiTimeInit();
-  
+
       if (bootAssetProvisionRequired())
       {
         g_bootAssetProvisionActive = true;
-  
+
         if (!bootAssetProvisionWifiReady())
           return;
       }
-  
+
       g_postBootInitDone = true;
       requestUIRedraw();
     }
     return;
   }
-  
+
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------
