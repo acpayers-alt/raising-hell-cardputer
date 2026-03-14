@@ -207,81 +207,71 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
   const uint16_t cur = assetOtaCurrentFileIndex();
   const uint16_t total = assetOtaTotalFileCount();
   const AssetOtaStatus st = assetOtaStatus();
+  const char *statusText = assetOtaStatusString();
+
+  auto drawUi = [&](auto &d)
+  {
+    d.fillScreen(TFT_BLACK);
+    d.setTextFont(1);
+    d.setTextSize(1);
+    d.setTextDatum(TL_DATUM);
+
+    d.setTextColor(TFT_RED, TFT_BLACK);
+    d.drawString("ASSET PROVISIONING", 12, 8);
+
+    d.setTextColor(TFT_WHITE, TFT_BLACK);
+    if (line1 && line1[0])
+      d.drawString(line1, 12, 28);
+    if (line2 && line2[0])
+      d.drawString(line2, 12, 40);
+
+    char dbg1[64];
+    snprintf(dbg1, sizeof(dbg1), "st=%d  cur=%u  total=%u",
+             (int)st, (unsigned)cur, (unsigned)total);
+    d.drawString(dbg1, 12, 56);
+
+    char dbg2[48];
+    snprintf(dbg2, sizeof(dbg2), "status=%s", statusText ? statusText : "");
+    d.drawString(dbg2, 12, 68);
+
+    // Force a visible test box exactly where the bar should live
+    d.fillRect(12, 84, SCREEN_W - 24, 14, TFT_DARKGREY);
+    d.drawRect(12, 84, SCREEN_W - 24, 14, TFT_WHITE);
+
+    // Draw progress fill even if total is 0, so we can see the area
+    if (total > 0)
+    {
+      int fillW = (int)(((uint32_t)(SCREEN_W - 26) * cur) / total);
+      if (fillW < 0)
+        fillW = 0;
+      if (fillW > (SCREEN_W - 26))
+        fillW = SCREEN_W - 26;
+
+      if (fillW > 0)
+        d.fillRect(13, 85, fillW, 12, TFT_GREEN);
+
+      char prog[40];
+      snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
+      d.setTextColor(TFT_WHITE, TFT_BLACK);
+      d.drawString(prog, 12, 104);
+    }
+    else
+    {
+      d.setTextColor(TFT_YELLOW, TFT_BLACK);
+      d.drawString("total == 0", 12, 104);
+    }
+  };
 
   if (assetOtaDidReleaseGraphics())
   {
     auto &d = M5Cardputer.Display;
-
-    d.fillScreen(TFT_BLACK);
-    d.setTextDatum(textdatum_t::middle_center);
-    d.setTextFont(2);
-    d.setTextSize(1);
-
-    d.setTextColor(TFT_RED, TFT_BLACK);
-    d.drawString("ASSET PROVISIONING", SCREEN_W / 2, SCREEN_H / 2 - 34);
-
-    d.setTextColor(TFT_WHITE, TFT_BLACK);
-    if (line1 && line1[0])
-      d.drawString(line1, SCREEN_W / 2, SCREEN_H / 2 - 6);
-    if (line2 && line2[0])
-      d.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 14);
-
-    if ((st == AssetOtaStatus::DOWNLOADING || st == AssetOtaStatus::INSTALLING) && total > 0)
-    {
-      char prog[40];
-      snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
-      d.drawString(prog, SCREEN_W / 2, SCREEN_H / 2 + 40);
-
-      const int barW = SCREEN_W - 40;
-      const int barH = 10;
-      const int barX = 20;
-      const int barY = SCREEN_H / 2 + 54;
-
-      d.drawRect(barX, barY, barW, barH, TFT_WHITE);
-
-      int fillW = (int)(((uint32_t)(barW - 2) * cur) / total);
-      if (fillW > 0)
-        d.fillRect(barX + 1, barY + 1, fillW, barH - 2, TFT_WHITE);
-    }
-
+    drawUi(d);
     return;
   }
 
-  spr.fillScreen(TFT_BLACK);
-  spr.setTextDatum(textdatum_t::middle_center);
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-
-  spr.setTextColor(TFT_RED, TFT_BLACK);
-  spr.drawString("ASSET PROVISIONING", SCREEN_W / 2, SCREEN_H / 2 - 34);
-
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  if (line1 && line1[0])
-    spr.drawString(line1, SCREEN_W / 2, SCREEN_H / 2 - 6);
-  if (line2 && line2[0])
-    spr.drawString(line2, SCREEN_W / 2, SCREEN_H / 2 + 14);
-
-  if ((st == AssetOtaStatus::DOWNLOADING || st == AssetOtaStatus::INSTALLING) && total > 0)
-  {
-    char prog[40];
-    snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
-    spr.drawString(prog, SCREEN_W / 2, SCREEN_H / 2 + 40);
-
-    const int barW = SCREEN_W - 40;
-    const int barH = 10;
-    const int barX = 20;
-    const int barY = SCREEN_H / 2 + 54;
-
-    spr.drawRect(barX, barY, barW, barH, TFT_WHITE);
-
-    int fillW = (int)(((uint32_t)(barW - 2) * cur) / total);
-    if (fillW > 0)
-      spr.fillRect(barX + 1, barY + 1, fillW, barH - 2, TFT_WHITE);
-  }
-
+  drawUi(spr);
   spr.pushSprite(0, 0);
 }
-
 void bootAssetProvisionRedraw(const char *line1, const char *line2)
 {
   drawBootAssetProvisionScreen(line1, line2);

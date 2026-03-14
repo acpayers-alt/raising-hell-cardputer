@@ -676,19 +676,92 @@ static void drawBootWifiImportedScreen()
   spr.setTextDatum(CC_DATUM);
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawCentreString("Wi-Fi Settings", screenW / 2, 42, 2);
-  spr.drawCentreString("Imported from Launcher", screenW / 2, 62, 2);
+  spr.drawCentreString("Wi-Fi Settings", screenW / 2, 16, 2);
+  spr.drawCentreString("Imported from Launcher", screenW / 2, 34, 2);
 
   const char *ssid = bootWifiImportedSsid();
   if (ssid && ssid[0])
   {
     spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     String line = String("SSID: ") + ssid;
-    spr.drawCentreString(line.c_str(), screenW / 2, 92, 2);
+    spr.drawCentreString(line.c_str(), screenW / 2, 54, 2);
   }
 
-  spr.setTextColor(TFT_GREEN, TFT_BLACK);
-  spr.drawCentreString("Connecting...", screenW / 2, 116, 2);
+  const AssetOtaStatus st = assetOtaStatus();
+  const char *statusText = assetOtaStatusString();
+  const char *errText = assetOtaLastErrorString();
+
+  const uint16_t cur = assetOtaCurrentFileIndex();
+  const uint16_t total = assetOtaTotalFileCount();
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  switch (st)
+  {
+  case AssetOtaStatus::CHECKING:
+    spr.drawCentreString("Checking assets...", screenW / 2, 74, 2);
+    break;
+  case AssetOtaStatus::DOWNLOADING:
+    spr.drawCentreString("Downloading assets...", screenW / 2, 74, 2);
+    break;
+  case AssetOtaStatus::INSTALLING:
+    spr.drawCentreString("Installing assets...", screenW / 2, 74, 2);
+    break;
+  case AssetOtaStatus::SUCCESS:
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("Assets ready", screenW / 2, 74, 2);
+    break;
+  case AssetOtaStatus::FAILED:
+    spr.setTextColor(TFT_RED, TFT_BLACK);
+    spr.drawCentreString("Asset setup failed", screenW / 2, 74, 2);
+    break;
+  case AssetOtaStatus::IDLE:
+  default:
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString("Connecting...", screenW / 2, 74, 2);
+    break;
+  }
+
+  if (total > 0)
+  {
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+    char prog[32];
+    snprintf(prog, sizeof(prog), "%u / %u", (unsigned)cur, (unsigned)total);
+    spr.drawCentreString(prog, screenW / 2, 94, 2);
+
+    const int barX = 20;
+    const int barY = 106;
+    const int barW = screenW - 40;
+    const int barH = 10;
+
+    spr.drawRect(barX, barY, barW, barH, TFT_WHITE);
+
+    int fillW = 0;
+    if (total > 0)
+      fillW = (int)(((uint32_t)cur * (uint32_t)(barW - 2)) / (uint32_t)total);
+
+    if (fillW < 0)
+      fillW = 0;
+    if (fillW > (barW - 2))
+      fillW = barW - 2;
+
+    if (fillW > 0)
+      spr.fillRect(barX + 1, barY + 1, fillW, barH - 2, TFT_GREEN);
+  }
+
+  if (st == AssetOtaStatus::FAILED && errText && errText[0])
+  {
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(errText, screenW / 2, 126, 1);
+  }
+  else if (statusText && statusText[0])
+  {
+    spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    spr.drawCentreString(statusText, screenW / 2, 126, 1);
+  }
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 // -----------------------------------------------------------------------------

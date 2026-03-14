@@ -113,9 +113,7 @@ static void restoreMainUiSprite()
   }
 
   const bool ok = spr.createSprite(SCREEN_W, SCREEN_H);
-  Serial.printf("[OTA/UI] recreate main sprite ok=%d free=%u largest=%u\n",
-                (int)ok,
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA/UI] recreate main sprite ok=%d free=%u largest=%u\n", (int)ok, (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   if (!ok)
@@ -129,6 +127,12 @@ static void restoreMainUiSprite()
   invalidateBackgroundCache();
   requestUIRedraw();
   renderUI();
+}
+
+static void otaRedrawProvisionScreen(const char *line1, const char *line2)
+{
+  drawBootAssetProvisionScreen(line1, line2);
+  delay(1);
 }
 
 static void setFailure(AssetOtaError err)
@@ -368,6 +372,7 @@ bool assetOtaCheckNow(String *outMessage)
   s_state.currentFileIndex = 0;
   s_state.targetPackVersion[0] = '\0';
   assetOtaStateSave(s_state);
+  otaRedrawProvisionScreen("Checking assets...", "Downloading manifest...");
 
   const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
@@ -383,8 +388,7 @@ bool assetOtaCheckNow(String *outMessage)
   AssetManifestData localManifest;
   (void)assetManifestLoadLocal(&localManifest);
 
-  Serial.printf("[OTA] before cleanup free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   graphicsReleasePetLayerForOta();
@@ -392,8 +396,7 @@ bool assetOtaCheckNow(String *outMessage)
   spr.deleteSprite();
   s_graphicsReleasedForOta = true;
 
-  Serial.printf("[OTA] after cleanup free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] after cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   String remotePackVersion;
@@ -416,11 +419,8 @@ bool assetOtaCheckNow(String *outMessage)
     const size_t pathLen = strlen(f.path);
     const size_t shaLen = strlen(f.sha256);
 
-    Serial.printf("[OTA] verify[%u] pathLen=%u size=%u shaLen=%u\n",
-      (unsigned)k,
-      (unsigned)pathLen,
-      (unsigned)f.size,
-      (unsigned)shaLen);
+    Serial.printf("[OTA] verify[%u] pathLen=%u size=%u shaLen=%u\n", (unsigned)k, (unsigned)pathLen, (unsigned)f.size,
+                  (unsigned)shaLen);
 
     if (pathLen == 0)
     {
@@ -434,10 +434,7 @@ bool assetOtaCheckNow(String *outMessage)
 
     if (shaLen > 0 && shaLen != 64)
     {
-      Serial.printf("[OTA] BAD ENTRY[%u]: bad sha len=%u path=%s\n",
-                    (unsigned)k,
-                    (unsigned)shaLen,
-                    f.path);
+      Serial.printf("[OTA] BAD ENTRY[%u]: bad sha len=%u path=%s\n", (unsigned)k, (unsigned)shaLen, f.path);
       setFailure(AssetOtaError::JSON_FAIL);
       if (outMessage)
         *outMessage = "Manifest contains invalid sha256";
@@ -447,10 +444,7 @@ bool assetOtaCheckNow(String *outMessage)
 
     if (k >= 255 && k <= 270)
     {
-      Serial.printf("[OTA] ENTRY[%u] path=%s sha=%s\n",
-                    (unsigned)k,
-                    f.path,
-                    shaLen ? f.sha256 : "(none)");
+      Serial.printf("[OTA] ENTRY[%u] path=%s sha=%s\n", (unsigned)k, f.path, shaLen ? f.sha256 : "(none)");
     }
   }
 
@@ -459,10 +453,11 @@ bool assetOtaCheckNow(String *outMessage)
   s_state.totalFileCount = (uint16_t)changed.size();
   assetOtaStateSave(s_state);
 
+  otaRedrawProvisionScreen("Preparing downloads...", "Building file list...");
+
   if (remotePackVersion == s_installedVersion && changed.empty())
   {
-    Serial.printf("[OTA] already current; installed=%s remote=%s\n",
-                  s_installedVersion.c_str(),
+    Serial.printf("[OTA] already current; installed=%s remote=%s\n", s_installedVersion.c_str(),
                   remotePackVersion.c_str());
     s_status = AssetOtaStatus::SUCCESS;
     assetOtaStateDefaults(s_state);
@@ -502,12 +497,14 @@ bool assetOtaCheckNow(String *outMessage)
   {
     Serial.printf("[OTA] loop-begin i=%u\n", (unsigned)i);
 
+    const AssetManifestFile &mf = changed[i];
+
     s_status = AssetOtaStatus::DOWNLOADING;
     s_state.status = (uint8_t)s_status;
     s_state.currentFileIndex = (uint16_t)(i + 1);
     assetOtaStateSave(s_state);
 
-    const AssetManifestFile &mf = changed[i];
+    otaRedrawProvisionScreen("Downloading assets...", mf.path);
     String rawPath(mf.path);
 
     if (rawPath.equalsIgnoreCase("raising_hell/ASSET_MANIFEST.txt") ||
@@ -528,10 +525,7 @@ bool assetOtaCheckNow(String *outMessage)
 
     String resolvedUrl = assetFileResolvedUrl(mf);
 
-    Serial.printf("[OTA] download index=%u/%u path=%s\n",
-                  (unsigned)(i + 1),
-                  (unsigned)changed.size(),
-                  rawPath.c_str());
+    Serial.printf("[OTA] download index=%u/%u path=%s\n", (unsigned)(i + 1), (unsigned)changed.size(), rawPath.c_str());
     Serial.printf("[OTA] resolved url=%s\n", resolvedUrl.c_str());
 
     AssetManifestFile dlFile{};
@@ -582,9 +576,7 @@ bool assetOtaCheckNow(String *outMessage)
       return false;
     }
 
-    Serial.printf("[OTA] pre-install-state idx=%u path=%s\n",
-                  (unsigned)(i + 1),
-                  rel.c_str());
+    Serial.printf("[OTA] pre-install-state idx=%u path=%s\n", (unsigned)(i + 1), rel.c_str());
 
     s_status = AssetOtaStatus::INSTALLING;
     s_state.status = (uint8_t)s_status;
@@ -593,9 +585,9 @@ bool assetOtaCheckNow(String *outMessage)
     assetOtaStateSave(s_state);
     Serial.println("[OTA] post-state-save");
 
-    Serial.printf("[OTA] pre-install-staged live=%s staging=%s\n",
-                  rel.c_str(),
-                  stagingPath.c_str());
+    otaRedrawProvisionScreen("Installing asset...", rel.c_str());
+
+    Serial.printf("[OTA] pre-install-staged live=%s staging=%s\n", rel.c_str(), stagingPath.c_str());
 
     const bool installOk = installStagedFile(rel, stagingPath);
 
@@ -641,9 +633,7 @@ bool assetOtaCheckNow(String *outMessage)
   assetOtaStateDefaults(s_state);
   assetOtaStateSave(s_state);
 
-  Serial.printf("[OTA] install success; version=%s files=%u\n",
-                remotePackVersion.c_str(),
-                (unsigned)changed.size());
+  Serial.printf("[OTA] install success; version=%s files=%u\n", remotePackVersion.c_str(), (unsigned)changed.size());
 
   if (outMessage)
   {
