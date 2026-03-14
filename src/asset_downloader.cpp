@@ -114,7 +114,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     began = http.begin(secureClient, fileUrl);  }
   else
   {
-    began = http.begin(plainClient, fileUrl);  }
+began = http.begin(plainClient, fileUrl);  }
 
   if (!began)
   {

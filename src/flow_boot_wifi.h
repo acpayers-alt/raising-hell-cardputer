@@ -9,13 +9,18 @@ struct InputState;
 void bootWizardBegin(UIState afterState, Tab afterTab);
 
 // Boot wizard UIState handlers (routed by ui_input_router)
-void uiBootWifiPromptHandle(InputState& in);
-void uiBootWifiWaitHandle(InputState& in);
-void uiBootTzPickHandle(InputState& in);
-void uiBootNtpWaitHandle(InputState& in);
+void uiBootWifiPromptHandle(InputState &in);
+void uiBootWifiWaitHandle(InputState &in);
+void uiBootWifiImportedHandle(InputState &in);
+void uiBootTzPickHandle(InputState &in);
+void uiBootNtpWaitHandle(InputState &in);
+void uiBootAssetWifiRequiredHandle(InputState &in);
+
 
 //Launcher Import Handlers
 void bootWifiSetImportedInfo(const char *ssid);
 void bootWifiClearImportedInfo();
-void uiBootWifiImportedHandle(InputState &in);
+
 const char *bootWifiImportedSsid();
+
+extern bool g_bootProvisionWifiOnboardingStarted;

@@ -1,6 +1,7 @@
 #include "graphics.h"
 
 #include "app_state.h"
+#include "boot_pipeline.h"
 #include "display.h"
 #include "display_dims_state.h"
 #include "tft_compat.h"
@@ -9,7 +10,6 @@
 #include <SD.h>
 #include <cstring>
 #include <time.h>
-#include "boot_pipeline.h"
 
 #include "console.h"
 #include "death_state.h"
@@ -63,7 +63,6 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
-#include "asset_ota.h"
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -667,6 +666,27 @@ void drawBootWifiPromptScreen()
   spr.pushSprite(0, 0);
 }
 
+void drawBootAssetWifiRequiredScreen()
+{
+  spr.fillScreen(TFT_BLACK);
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  spr.setTextColor(TFT_RED, TFT_BLACK);
+  spr.drawString("Initial asset download", 10, 10);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("Raising Hell requires", 10, 36);
+  spr.drawString("an internet connection", 10, 54);
+  spr.drawString("for initial asset", 10, 72);
+  spr.drawString("download.", 10, 90);
+
+  spr.setTextColor(TFT_GREEN, TFT_BLACK);
+  spr.drawString("ENTER: Set up Wi-Fi", 10, 122);
+
+  spr.pushSprite(0, 0);
+}
 // -----------------------------------------------------------------------------
 // Import wifi credentials from HLauncher
 // -----------------------------------------------------------------------------
@@ -4644,6 +4664,7 @@ static bool uiIsBootWifiOnboardingState(UIState s)
   case UIState::BOOT_WIFI_WAIT:
   case UIState::BOOT_TZ_PICK:
   case UIState::BOOT_NTP_WAIT:
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
   case UIState::WIFI_SETUP:
     return true;
   default:
@@ -4764,6 +4785,10 @@ static void drawCurrentScreen(bool redrawBg)
     drawBootWifiImportedScreen();
     return;
 
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+    drawBootAssetWifiRequiredScreen();
+    return;
+
   case UIState::BOOT_TZ_PICK:
     drawBootTimezonePickScreen();
     return;
@@ -4846,8 +4871,7 @@ void renderUI()
     return;
   }
 
-  if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) &&
-      !uiIsBootWifiOnboardingState(g_app.uiState))
+  if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) && !uiIsBootWifiOnboardingState(g_app.uiState))
   {
     drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
     spr.pushSprite(0, 0);

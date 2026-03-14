@@ -46,7 +46,8 @@ enum class UIState : uint8_t {
   BOOT_NTP_WAIT    = 22,
   EVOLUTION        = 23,
   MG_PAUSE         = 24,
-  BOOT_WIFI_IMPORTED,
+  BOOT_WIFI_IMPORTED =25,
+  BOOT_ASSET_WIFI_REQUIRED =26,
 };
 
 // --------------------

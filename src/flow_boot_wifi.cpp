@@ -19,6 +19,11 @@
 #include "time_state.h"
 #include "time_persist.h"
 
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "flow_boot_wizard.h"
+#include "timezone.h"
+
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
 extern Tab     g_bootWizardAfterOkTab;
@@ -57,6 +62,122 @@ const char *bootWifiImportedSsid()
   return s_bootWifiImportedSsid;
 }
 
+static int tzIndexFromDetectedName(const String &tzNameStr)
+{
+  if (tzNameStr.isEmpty())
+    return -1;
+
+  if (tzNameStr == "UTC" || tzNameStr == "Etc/UTC")
+    return 0;
+
+  if (tzNameStr == "America/New_York" ||
+      tzNameStr == "America/Detroit" ||
+      tzNameStr == "America/Indiana/Indianapolis" ||
+      tzNameStr == "America/Indiana/Marengo" ||
+      tzNameStr == "America/Indiana/Petersburg" ||
+      tzNameStr == "America/Indiana/Vevay" ||
+      tzNameStr == "America/Indiana/Vincennes" ||
+      tzNameStr == "America/Indiana/Winamac" ||
+      tzNameStr == "America/Kentucky/Louisville" ||
+      tzNameStr == "America/Kentucky/Monticello")
+    return 1;
+
+  if (tzNameStr == "America/Chicago" ||
+      tzNameStr == "America/Indiana/Knox" ||
+      tzNameStr == "America/Indiana/Tell_City" ||
+      tzNameStr == "America/Menominee" ||
+      tzNameStr == "America/North_Dakota/Beulah" ||
+      tzNameStr == "America/North_Dakota/Center" ||
+      tzNameStr == "America/North_Dakota/New_Salem")
+    return 2;
+
+  if (tzNameStr == "America/Denver" ||
+      tzNameStr == "America/Boise")
+    return 3;
+
+  if (tzNameStr == "America/Los_Angeles")
+    return 4;
+
+  if (tzNameStr == "America/Anchorage" ||
+      tzNameStr == "America/Juneau" ||
+      tzNameStr == "America/Nome" ||
+      tzNameStr == "America/Sitka" ||
+      tzNameStr == "America/Yakutat" ||
+      tzNameStr == "America/Metlakatla")
+    return 5;
+
+  if (tzNameStr == "Pacific/Honolulu")
+    return 6;
+
+  return -1;
+}
+
+static bool bootTryDetectTimezoneFromWifi()
+{
+  if (!wifiIsConnectedNow())
+    return false;
+
+  HTTPClient http;
+  http.setReuse(false);
+  http.setTimeout(8000);
+  http.addHeader("Accept", "application/json");
+  http.addHeader("Cache-Control", "no-cache");
+  http.setUserAgent("RaisingHellCardputer/1.0");
+
+  WiFiClient client;
+  const char *url = "http://ip-api.com/json/?fields=status,timezone";
+
+  if (!http.begin(client, url))
+  {
+    Serial.println("[BOOTWIFI] timezone detect http.begin failed");
+    return false;
+  }
+
+  const int code = http.GET();
+  Serial.printf("[BOOTWIFI] timezone detect http=%d\n", code);
+
+  if (code != HTTP_CODE_OK)
+  {
+    http.end();
+    return false;
+  }
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, *http.getStreamPtr());
+  http.end();
+
+  if (err)
+  {
+    Serial.printf("[BOOTWIFI] timezone detect json failed: %s\n", err.c_str());
+    return false;
+  }
+
+  const char *status = doc["status"] | "";
+  const char *tzNameRaw = doc["timezone"] | "";
+
+  if (strcmp(status, "success") != 0 || !tzNameRaw[0])
+  {
+    Serial.println("[BOOTWIFI] timezone detect no usable timezone");
+    return false;
+  }
+
+  String tzNameStr = String(tzNameRaw);
+  const int detectedIdx = tzIndexFromDetectedName(tzNameStr);
+
+  Serial.printf("[BOOTWIFI] timezone detect raw='%s' mapped=%d\n",
+                tzNameStr.c_str(),
+                detectedIdx);
+
+  if (detectedIdx < 0)
+    return false;
+
+  tzIndex = detectedIdx;
+  applyTimezoneIndex((uint8_t)tzIndex);
+  saveTzIndexToNVS((uint8_t)tzIndex);
+
+  return true;
+}
+
 void uiBootWifiImportedHandle(InputState &in)
 {
   const uint32_t kImportedShowMs = 1200;
@@ -83,6 +204,22 @@ void uiBootWifiImportedHandle(InputState &in)
 // -----------------------------------------------------------------------------
 // BOOT_WIFI_PROMPT
 // -----------------------------------------------------------------------------
+void uiBootAssetWifiRequiredHandle(InputState &in)
+{
+  if (!in.selectOnce)
+  {
+    uiActionSwallowAll(in);
+    return;
+  }
+
+  g_bootProvisionWifiOnboardingStarted = true;
+  uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+  requestUIRedraw();
+  uiActionSwallowAll(in);
+  uiDrainKb(in);
+  clearInputLatch();
+}
+
 void uiBootWifiPromptHandle(InputState& in)
 {
   (void)UiBootWizardMenu::HandleWifiPrompt(in);
@@ -119,16 +256,15 @@ void uiBootWifiWaitHandle(InputState& in)
     uiDrainKb(in);
     clearInputLatch();
 
-    // Mandatory asset provisioning does not need TZ/NTP flow if time is already valid.
-    // Return to BOOT so provisioning can resume immediately.
-    if (g_bootAssetProvisionMustComplete && timeIsSynced())    {
-      uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
-      requestFullUIRedraw();
+    const bool tzDetected = bootTryDetectTimezoneFromWifi();
+
+    if (tzDetected)
+    {
+      uiActionEnterState(UIState::BOOT_NTP_WAIT, g_bootWizardAfterOkTab, true);
       requestUIRedraw();
       return;
     }
 
-    // Normal boot wizard behavior
     uiActionEnterState(UIState::BOOT_TZ_PICK, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
@@ -171,28 +307,36 @@ void uiBootNtpWaitHandle(InputState& in)
 
   if (timeIsSynced())
   {
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+
+    if (g_bootAssetProvisionMustComplete)
+    {
+      uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
+      return;
+    }
+
     UIState nextState = g_bootWizardAfterOkState;
-  
+
     if (g_sdReady &&
         (SD.exists("/raising_hell/save/save.bin") ||
          SD.exists("raising_hell/save/save.bin")))
     {
       nextState = UIState::PET_SCREEN;
     }
-  
+
     if (nextState == UIState::CHOOSE_PET)
     {
       g_choosePetBlockHatchUntilRelease = true;
     }
-  
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
-  
+
     uiActionEnterState(nextState, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
   }
-  
+
   uiActionSwallowAll(in);
 }

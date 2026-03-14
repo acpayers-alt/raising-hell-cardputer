@@ -37,3 +37,5 @@ extern bool g_bootAssetProvisionActive;
 void drawBootAssetProvisionScreen(const char *line1, const char *line2);
 
 extern bool g_bootUiBlockedForAssetProvision;
+
+extern bool g_bootProvisionWifiOnboardingStarted;

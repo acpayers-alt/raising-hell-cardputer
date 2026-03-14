@@ -27,6 +27,7 @@ void ui_showMessage(const char *msg);
 // -----------------------------------------------------------------------------
 void drawBackground(const char *path);
 void drawBootSplash();
+void drawBootAssetWifiRequiredScreen();
 
 void ui_setBootSplashActive(bool on);
 bool ui_isBootSplashActive();

@@ -135,7 +135,7 @@ bool g_bootAssetProvisionActive = false;
 extern bool g_bootAssetProvisionMustComplete;
 bool g_bootAssetProvisionMustComplete = false;
 
-static bool g_bootProvisionWifiOnboardingStarted = false;
+bool g_bootProvisionWifiOnboardingStarted = false;
 static bool g_bootLandingDeferredForAssetProvision = false;
 static bool g_bootLandingDone = false;
 static bool g_postBootInitDone = false;
@@ -286,13 +286,14 @@ static bool bootAssetProvisionWifiOnboardingActive()
 {
   switch (g_app.uiState)
   {
-  case UIState::BOOT_WIFI_PROMPT:
-  case UIState::BOOT_WIFI_IMPORTED:
-  case UIState::BOOT_WIFI_WAIT:
-  case UIState::BOOT_TZ_PICK:
-  case UIState::BOOT_NTP_WAIT:
-  case UIState::WIFI_SETUP:
-    return true;
+    case UIState::BOOT_WIFI_PROMPT:
+    case UIState::BOOT_WIFI_IMPORTED:
+    case UIState::BOOT_WIFI_WAIT:
+    case UIState::BOOT_TZ_PICK:
+    case UIState::BOOT_NTP_WAIT:
+    case UIState::BOOT_ASSET_WIFI_REQUIRED:
+    case UIState::WIFI_SETUP:
+      return true;
   default:
     return false;
   }
@@ -400,6 +401,7 @@ static void finalizeBootLanding()
 
   g_bootLandingDone = true;
   g_bootAssetProvisionMustComplete = false;
+  g_bootProvisionWifiOnboardingStarted = false;
   const bool saveFileExists = bootSaveFileExists();
   const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
@@ -640,8 +642,21 @@ void postBootInitTick()
       g_bootLandingDeferredForAssetProvision = true;
       g_bootAssetProvisionMustComplete = bootAssetProvisionMandatory();
       g_bootUiBlockedForAssetProvision = true;
+      g_bootProvisionWifiOnboardingStarted = false;
 
       ui_setBootSplashActive(false);
+
+      if (g_bootAssetProvisionMustComplete)
+      {
+        g_bootAssetProvisionActive = false;
+        uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        renderUI();
+        clearInputLatch();
+        return;
+      }
+
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
       g_bootAssetProvisionActive = true;
       requestUIRedraw();
@@ -712,24 +727,27 @@ void postBootInitTick()
   
       if (bootAssetProvisionRequired())
       {
-        // For mandatory provisioning, let the boot WiFi/import flow own WiFi startup.
+        // For mandatory provisioning, wait on the explicit intro screen until
+        // the user presses ENTER to begin Wi-Fi setup.
         if (g_bootAssetProvisionMustComplete && !g_bootProvisionWifiOnboardingStarted)
         {
+          if (g_app.uiState == UIState::BOOT_ASSET_WIFI_REQUIRED)
+            return;
+
           g_bootProvisionWifiOnboardingStarted = true;
           g_bootAssetProvisionActive = false;
           ui_setBootSplashActive(false);
-  
+
           bootWizardBegin(UIState::BOOT, Tab::TAB_PET);
           requestFullUIRedraw();
           requestUIRedraw();
           clearInputLatch();
           return;
         }
-  
+
         if (bootAssetProvisionWifiOnboardingActive())
           return;
-      }
-  
+      }  
       if (!g_wifiApplied)
       {
         const bool pref = settingsWifiEnabled();
