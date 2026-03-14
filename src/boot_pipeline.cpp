@@ -40,6 +40,7 @@
 #include "wifi_time.h"
 #include <WiFi.h>
 #include <esp_system.h>
+#include "asset_ota_config.h"
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
@@ -110,10 +111,17 @@ bool sdAssetsPresent()
   if (!g_sdReady)
     return false;
 
-  if (SD.exists(kSdAssetsLocalManifestPath))
-    return true;
+  AssetOtaState st;
+  if (assetOtaStateLoad(&st))
+  {
+    if (st.inProgress)
+      return false;
+  }
 
-  if (SD.exists("/raising_hell/graphics/background/rh_splash.jpg"))
+  if (SD.exists(assetOtaStagingRoot()))
+    return false;
+
+  if (SD.exists(kSdAssetsLocalManifestPath))
     return true;
 
   return false;

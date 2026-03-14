@@ -237,13 +237,10 @@ static void loadAssetOtaFromSdIfAvailable()
   else
     s_installedVersion = "";
 
-  if (s_state.inProgress)
-  {
-    removeTree(assetOtaStagingRoot());
-    assetOtaEnsureCoreDirs();
-    assetOtaStateDefaults(s_state);
-    assetOtaStateSave(s_state);
-  }
+    if (s_state.inProgress)
+    {
+      Serial.println("[OTA] detected interrupted OTA session; preserving inProgress state for boot recovery");
+    }
 
   s_loadedFromSd = true;
 }
