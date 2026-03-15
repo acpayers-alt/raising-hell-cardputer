@@ -23,6 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "asset_ota.h"
+#include "build_flags.h"
+#include "version.h"
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -366,6 +369,8 @@ static void execLine(char *line)
     logLine("  age                 show birth epoch + age string");
     logLine("  name <pet name>      set pet name");
     logLine("  pet                 show current pet type");
+    logLine("  version             show firmware + asset version");
+    logLine("  uptime              show device uptime");
 
 #if !PUBLIC_BUILD
     logLine("  giveinf <amount>    add Inferium");
@@ -853,6 +858,39 @@ static void execLine(char *line)
     logf("age:   %s", s);
     return;
   }
+
+  if (!strcmp(argv[0], "version"))
+  {
+    logLine("Raising Hell");
+  
+    logf("Firmware: %s", RH_VERSION_STRING);
+  
+    const char *assetVer = assetOtaInstalledVersion();
+    if (assetVer && assetVer[0])
+      logf("Assets:   %s", assetVer);
+    else
+      logLine("Assets:   none installed");
+  
+    return;
+  }
+
+if (!strcmp(argv[0], "uptime"))
+{
+  uint32_t ms = millis();
+  uint32_t sec = ms / 1000;
+  uint32_t min = sec / 60;
+  uint32_t hr = min / 60;
+
+  sec %= 60;
+  min %= 60;
+
+  logf("Uptime: %lu:%02lu:%02lu",
+       (unsigned long)hr,
+       (unsigned long)min,
+       (unsigned long)sec);
+
+  return;
+}
 
   // MONITOR
   if (!strcmp(argv[0], "mon"))

@@ -1,9 +1,9 @@
 {
-  "packVersion": "0.1.5",
-  "pack_version": "0.1.5",
+  "packVersion": "0.1.6",
+  "pack_version": "0.1.6",
   "channel": "public",
-  "generatedAt": "2026-03-14T23:57:59.726355+00:00",
-  "fileCount": 383,
+  "generatedAt": "2026-03-15T05:53:23.690764+00:00",
+  "fileCount": 382,
   "files": [
     {
       "path": "raising_hell/graphics/background/al/al_bg.jpg",
@@ -77,18 +77,13 @@
     },
     {
       "path": "raising_hell/graphics/background/flow/rh_splash.jpg",
-      "size": 15317,
-      "sha256": "afe64f597202bbfdface294bd1eb3358cfce01b88e89171ee43582f70ab26fc3"
+      "size": 27206,
+      "sha256": "8c4c274cc208a65b0603263c60e7142b75d658ea3baf6c77143c52a3a177bdd9"
     },
     {
       "path": "raising_hell/graphics/background/kai/kai_bg.jpg",
       "size": 20709,
       "sha256": "65866f14d60e38b7175286311c2dc1fbbc79ea780bd8a7e2da5c742212261734"
-    },
-    {
-      "path": "raising_hell/graphics/background/rh_splash.jpg",
-      "size": 15317,
-      "sha256": "afe64f597202bbfdface294bd1eb3358cfce01b88e89171ee43582f70ab26fc3"
     },
     {
       "path": "raising_hell/graphics/mini_games/crossy/dev/dev_goal_zone.png",
