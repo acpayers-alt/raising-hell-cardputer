@@ -1240,10 +1240,7 @@ void drawFlappyFireball()
     if ((!s_flappyFireball1Spr || !s_flappyFireball2Spr || !s_flappyFireball3Spr) && s_flappyBgPath[0])
       ensureFlappyFireballSprites(s_flappyBgPath);
 
-    M5Canvas *fbFrames[3] = {
-        s_flappyFireball1Spr,
-        s_flappyFireball2Spr,
-        s_flappyFireball3Spr};
+    M5Canvas *fbFrames[3] = {s_flappyFireball1Spr, s_flappyFireball2Spr, s_flappyFireball3Spr};
 
     if (fbFrames[0] && fbFrames[1] && fbFrames[2])
     {
@@ -1298,9 +1295,6 @@ static int s_rrSnakeCrouchH = 0;
 static int s_rrSnakeJumpW = 0;
 static int s_rrSnakeJumpH = 0;
 
-static int s_rrSkyW = 0;
-static int s_rrSkyH = 0;
-
 static M5Canvas *s_rrSnakeRun1Spr = nullptr;
 static M5Canvas *s_rrSnakeRun2Spr = nullptr;
 static M5Canvas *s_rrSnakeCrouchSpr = nullptr;
@@ -1309,7 +1303,6 @@ static M5Canvas *s_rrSnakeWin1Spr = nullptr;
 static M5Canvas *s_rrSnakeWin2Spr = nullptr;
 
 static M5Canvas *s_rrGroundSpr = nullptr;
-static M5Canvas *s_rrSkySpr = nullptr;
 static M5Canvas *s_rrHand1Spr = nullptr;
 static M5Canvas *s_rrHand2Spr = nullptr;
 static M5Canvas *s_rrLadybugGroundSpr = nullptr;
@@ -1317,18 +1310,6 @@ static M5Canvas *s_rrLadybugFly1Spr = nullptr;
 static M5Canvas *s_rrLadybugFly2Spr = nullptr;
 
 static void rrResetObstacles();
-
-static const char *resRunSkyTilePathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/sky_tile.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/sky_tile.png";
-  }
-}
 
 enum RRPhase : uint8_t
 {
@@ -1354,21 +1335,6 @@ static constexpr int kRrHandExitSpeed = 3;
 static constexpr uint32_t kRrHandHoldMs = 250;
 static constexpr uint32_t kRrHandContactHoldMs = 350;
 static constexpr uint32_t kRrWinHoldMs = 500;
-
-static bool ensureResRunSkySprite()
-{
-  s_rrSkySpr = nullptr;
-
-  if (!mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile", resRunSkyTilePathForPet(), 8, kSpriteKey, s_rrSkySpr))
-    return false;
-
-  if (!s_rrSkySpr || s_rrSkySpr->width() <= 0 || s_rrSkySpr->height() <= 0)
-    return false;
-
-  s_rrSkyW = (int)s_rrSkySpr->width();
-  s_rrSkyH = (int)s_rrSkySpr->height();
-  return true;
-}
 
 static const char *resRunSnakeCrouchPathForPet()
 {
@@ -1719,7 +1685,6 @@ void freeResRunSprites()
   mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_crouch");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "snake_jump");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "branch_ground");
-  mgmem::releaseSprite(MiniGame::RESURRECTION, "sky_tile");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "hand_1");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "hand_2");
   mgmem::releaseSprite(MiniGame::RESURRECTION, "ladybug_ground");
@@ -1735,7 +1700,6 @@ void freeResRunSprites()
   s_rrSnakeWin1Spr = nullptr;
   s_rrSnakeWin2Spr = nullptr;
   s_rrGroundSpr = nullptr;
-  s_rrSkySpr = nullptr;
   s_rrHand1Spr = nullptr;
   s_rrHand2Spr = nullptr;
   s_rrLadybugGroundSpr = nullptr;
@@ -1750,8 +1714,6 @@ void freeResRunSprites()
   s_rrSnakeJumpH = 0;
   s_rrGroundW = 0;
   s_rrGroundH = 0;
-  s_rrSkyW = 0;
-  s_rrSkyH = 0;
   s_rrHandW = 0;
   s_rrHandH = 0;
   s_rrLadybugW = 0;
@@ -1875,16 +1837,14 @@ void startResurrectionRun()
 
   const bool snakeOk = ensureResRunSnakeSprites();
   const bool groundOk = ensureResRunGroundSprite();
-  const bool skyOk = ensureResRunSkySprite();
   const bool handOk = ensureResRunHandSprites();
   const bool ladybugOk = ensureResRunLadybugSprites();
 
-  Serial.printf("RESRUN preload: snake=%d ground=%d sky=%d hand=%d ladybug=%d run=%dx%d crouch=%dx%d jump=%dx%d "
-                "sky=%dx%d hand=%dx%d bug=%dx%d free=%u largest=%u\n",
-                snakeOk ? 1 : 0, groundOk ? 1 : 0, skyOk ? 1 : 0, handOk ? 1 : 0, ladybugOk ? 1 : 0, s_rrSnakeW,
-                s_rrSnakeH, s_rrSnakeCrouchW, s_rrSnakeCrouchH, s_rrSnakeJumpW, s_rrSnakeJumpH, s_rrSkyW, s_rrSkyH,
-                s_rrHandW, s_rrHandH, s_rrLadybugW, s_rrLadybugH, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  Serial.printf("RESRUN preload: snake=%d ground=%d hand=%d ladybug=%d run=%dx%d crouch=%dx%d jump=%dx%d "
+                "hand=%dx%d bug=%dx%d free=%u largest=%u\n",
+                snakeOk ? 1 : 0, groundOk ? 1 : 0, handOk ? 1 : 0, ladybugOk ? 1 : 0, s_rrSnakeW, s_rrSnakeH,
+                s_rrSnakeCrouchW, s_rrSnakeCrouchH, s_rrSnakeJumpW, s_rrSnakeJumpH, s_rrHandW, s_rrHandH, s_rrLadybugW,
+                s_rrLadybugH, (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   g_app.inMiniGame = true;
   g_app.gameOver = false;
@@ -2244,7 +2204,6 @@ void drawResurrectionRun()
                          s_rrSnakeWin1Spr && s_rrSnakeWin2Spr;
 
   const bool haveGround = (s_rrGroundSpr != nullptr);
-  const bool haveSky = (s_rrSkySpr != nullptr);
   const bool haveHand = (s_rrHand1Spr != nullptr && s_rrHand2Spr != nullptr);
   const bool haveLadybug = s_rrLadybugGroundSpr && s_rrLadybugFly1Spr && s_rrLadybugFly2Spr;
 
@@ -2255,7 +2214,6 @@ void drawResurrectionRun()
   M5Canvas *snakeWin1 = s_rrSnakeWin1Spr;
   M5Canvas *snakeWin2 = s_rrSnakeWin2Spr;
   M5Canvas *groundSpr = s_rrGroundSpr;
-  M5Canvas *skySpr = s_rrSkySpr;
   M5Canvas *hand1 = s_rrHand1Spr;
   M5Canvas *hand2 = s_rrHand2Spr;
   M5Canvas *ladybugGround = s_rrLadybugGroundSpr;
@@ -2277,11 +2235,6 @@ void drawResurrectionRun()
   {
     mgmem::ensureSprite(MiniGame::RESURRECTION, "branch_ground", resRunBranchGroundPathForPet(), 8, kResRunKey,
                         groundSpr);
-  }
-
-  if (haveSky)
-  {
-    mgmem::ensureSprite(MiniGame::RESURRECTION, "sky_tile", resRunSkyTilePathForPet(), 8, kResRunKey, skySpr);
   }
 
   if (haveHand)
@@ -2357,22 +2310,7 @@ void drawResurrectionRun()
     return;
   }
 
-  if (skySpr && skySpr->width() > 0 && skySpr->height() > 0)
-  {
-    const int tileW = (int)skySpr->width();
-    const int tileH = (int)skySpr->height();
-    const int skyScrollX = (rr_distance / 6) % tileW;
-
-    for (int y = 0; y < groundY; y += tileH)
-    {
-      for (int x = -skyScrollX; x < gW; x += tileW)
-        skySpr->pushSprite(&spr, x, y, kResRunKey);
-    }
-  }
-  else
-  {
-    spr.fillRect(0, 0, gW, groundY, TFT_CYAN);
-  }
+  spr.fillRect(0, 0, gW, groundY, TFT_CYAN);
 
   if (groundSpr && groundSpr->width() > 0 && groundSpr->height() > 0)
   {
@@ -4560,10 +4498,7 @@ void drawInfernalDodger()
   }
 
   const bool needFireballs = (s_dodgerPhase == DODGER_PHASE_FIREBALLS);
-  const bool haveFireballs = needFireballs &&
-                             s_dodgerFireball1Spr &&
-                             s_dodgerFireball2Spr &&
-                             s_dodgerFireball3Spr;
+  const bool haveFireballs = needFireballs && s_dodgerFireball1Spr && s_dodgerFireball2Spr && s_dodgerFireball3Spr;
 
   const bool haveCar = (s_dodgerCarSpr != nullptr);
 
