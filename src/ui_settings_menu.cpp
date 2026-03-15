@@ -31,6 +31,7 @@
 #include "asset_provision_request.h"
 #include <esp_system.h>
 #include "user_toggles_state.h"
+#include "name_entry_state.h"
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -332,6 +333,26 @@ static void actWifi_CheckAssetOta(InputState &)
 // ------------------------------------------------------------
 // GAME page actions
 // ------------------------------------------------------------
+static void actGame_RenamePet(InputState &input)
+{
+  strncpy(g_pendingPetName, pet.getName(), PET_NAME_MAX);
+  g_pendingPetName[PET_NAME_MAX] = '\0';
+
+  g_namePetRenameMode = true;
+  g_namePetJustOpened = true;
+
+  inputSetTextCapture(true);
+  g_textCaptureMode = true;
+
+  g_app.uiState = UIState::NAME_PET;
+
+  requestUIRedraw();
+  invalidateBackgroundCache();
+  uiDrainKb(input);
+  clearInputLatch();
+  playBeep();
+}
+
 static void actGame_DecayMode(InputState &)
 {
   g_app.decayModeIndex = (int)saveManagerGetDecayMode();
@@ -435,6 +456,7 @@ static MenuItem kWifiItems[] = {
   };
 
   static MenuItem kGameItems[] = {
+    {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
     {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
     {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
     {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},

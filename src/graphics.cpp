@@ -683,11 +683,11 @@ static void drawControlsHelpScreen()
   // Title
   spr.setTextColor(TFT_CYAN, TFT_BLACK);
   spr.drawString("Controls", x, y);
-  y += 16; // tighter than before
+  y += 15; // tighter than before
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  const int lineGap = 14; // tighter vertical rhythm
+  const int lineGap = 12; // tighter vertical rhythm
 
   spr.drawString("LEFT/RIGHT : switch tabs", x, y);
   y += lineGap;
@@ -702,6 +702,8 @@ static void drawControlsHelpScreen()
   spr.drawString("Z-M        : jump to tab", x, y);
   y += lineGap;
   spr.drawString("GO         : toggle screen on/off", x, y);
+  y += lineGap;
+  spr.drawString("           : shake console to wake", x, y);
   y += lineGap;
   spr.drawString("\\          : console", x, y);
   y += lineGap;
@@ -1852,6 +1854,8 @@ static void drawGameOptionsMenu()
 
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
+  const char *renameLine = "Rename Pet";
+
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
 
@@ -1864,8 +1868,8 @@ static void drawGameOptionsMenu()
   char perfLine[32];
   snprintf(perfLine, sizeof(perfLine), "Pet Perf HUD: %s", g_petPerfHudEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {decayLine, deathLine, ledLine, perfLine};
-  const int totalItems = 4;
+  const char *labels[] = {renameLine, decayLine, deathLine, ledLine, perfLine};
+  const int totalItems = 5;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
@@ -2392,7 +2396,7 @@ static void drawCreditsScreen()
     snprintf(assetLine, sizeof(assetLine), "Asset OTA: %s", assetVer);
   else
     snprintf(assetLine, sizeof(assetLine), "Check Asset OTA");
-  
+
   spr.drawString(assetLine, SCREEN_W / 2, yAssets);
 
   spr.setTextDatum(TL_DATUM);
@@ -5490,7 +5494,7 @@ static void drawNamePetScreen(bool redrawBg)
   if (redrawBg)
     spr.fillSprite(TFT_BLACK);
 
-  drawCenteredLine("Name Your Pet", 18, 2, 1);
+  drawCenteredLine(g_namePetRenameMode ? "Rename Pet" : "Name Your Pet", 18, 2, 1);
 
   const char *name = (g_pendingPetName[0] != '\0') ? g_pendingPetName : "_";
 
@@ -5508,7 +5512,7 @@ static void drawNamePetScreen(bool redrawBg)
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString(name, boxX + 8, boxY + 6);
 
-  drawCenteredLine("Type name, press ENTER", screenH - 22, 1, 1);
+  drawCenteredLine(g_namePetRenameMode ? "Edit name, press ENTER" : "Type name, press ENTER", screenH - 22, 1, 1);
 }
 
 static void drawPetPerfHud()
