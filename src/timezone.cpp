@@ -4,23 +4,76 @@
 
 static const char* kTzNames[] = {
   "UTC",
+
+  // United States
   "US/Eastern",
   "US/Central",
   "US/Mountain",
   "US/Pacific",
   "US/Alaska",
-  "US/Hawaii"
+  "US/Hawaii",
+
+  // Europe
+  "Europe/UK",
+  "Europe/Central",
+  "Europe/Eastern",
+
+  // Asia
+  "Asia/Japan",
+  "Asia/Korea",
+  "Asia/China",
+  "Asia/India",
+  "Asia/Singapore",
+
+  // Oceania
+  "Australia/Eastern",
+  "Australia/Central",
+  "New Zealand",
+
+  // Americas
+  "Canada/Atlantic",
+  "Brazil",
+  "Argentina",
+
+  // Africa
+  "South Africa"
 };
 
-// POSIX TZ strings with DST rules
 static const char* kTzPosix[] = {
   "UTC0",
+
+  // United States
   "EST5EDT,M3.2.0/2,M11.1.0/2",
   "CST6CDT,M3.2.0/2,M11.1.0/2",
   "MST7MDT,M3.2.0/2,M11.1.0/2",
   "PST8PDT,M3.2.0/2,M11.1.0/2",
   "AKST9AKDT,M3.2.0/2,M11.1.0/2",
-  "HST10"
+  "HST10",
+
+  // Europe
+  "GMT0BST,M3.5.0/1,M10.5.0/2",      // UK
+  "CET-1CEST,M3.5.0/2,M10.5.0/3",    // Central Europe
+  "EET-2EEST,M3.5.0/3,M10.5.0/4",    // Eastern Europe
+
+  // Asia
+  "JST-9",
+  "KST-9",
+  "CST-8",
+  "IST-5:30",
+  "SGT-8",
+
+  // Oceania
+  "AEST-10AEDT,M10.1.0/2,M4.1.0/3",
+  "ACST-9:30ACDT,M10.1.0/2,M4.1.0/3",
+  "NZST-12NZDT,M9.5.0/2,M4.1.0/3",
+
+  // Americas
+  "AST4ADT,M3.2.0/2,M11.1.0/2",
+  "BRT3BRST,M11.1.0/0,M2.3.0/0",
+  "ART3",
+
+  // Africa
+  "SAST-2"
 };
 
 static const uint8_t kTzCount =
