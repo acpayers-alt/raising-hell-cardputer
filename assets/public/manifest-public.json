@@ -1,9 +1,9 @@
 {
-  "packVersion": "0.1.6",
-  "pack_version": "0.1.6",
+  "packVersion": "0.1.7",
+  "pack_version": "0.1.7",
   "channel": "public",
-  "generatedAt": "2026-03-15T05:53:23.690764+00:00",
-  "fileCount": 382,
+  "generatedAt": "2026-03-15T21:41:07.102728+00:00",
+  "fileCount": 381,
   "files": [
     {
       "path": "raising_hell/graphics/background/al/al_bg.jpg",
@@ -252,8 +252,8 @@
     },
     {
       "path": "raising_hell/graphics/mini_games/resrun/dev/branch_ground.png",
-      "size": 36061,
-      "sha256": "8e064da837e1ed20dcf20e6d9189adff7b2198344f70b02911121749bab8800f"
+      "size": 17667,
+      "sha256": "1816114e17bbef2154feeef637198bf7843dea8ee65ec61e34f11bbd075e0677"
     },
     {
       "path": "raising_hell/graphics/mini_games/resrun/dev/hand_1.png",
@@ -279,11 +279,6 @@
       "path": "raising_hell/graphics/mini_games/resrun/dev/ladybug_ground.png",
       "size": 1170,
       "sha256": "59c14d493a04b657679bfed49a3134bbbf1e82f53bd1683b77311b13991d43ee"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/resrun/dev/sky_tile.png",
-      "size": 17367,
-      "sha256": "b4a211abea84826d4a7aa06632af3e23115e4f9623a037d79f292e251f2c5df3"
     },
     {
       "path": "raising_hell/graphics/mini_games/resrun/dev/snake_crouch.png",
