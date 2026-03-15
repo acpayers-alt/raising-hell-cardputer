@@ -435,6 +435,78 @@ static const char *DEV_FACE_HAPPY_ELDER = "/raising_hell/graphics/pet/face/dev_e
 static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
 static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
 
+static constexpr int MINI_STAT_ICON_W = 22;
+static constexpr int MINI_STAT_ICON_H = 22;
+static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0x0001;
+
+static M5Canvas s_miniStatLifeIcon(&spr);
+static bool s_miniStatLifeIconReady = false;
+static M5Canvas s_miniStatCoinIcon(&spr);
+static bool s_miniStatCoinIconReady = false;
+
+static bool ensureMiniStatIconCache(M5Canvas &canvas, bool &ready, const char *path)
+{
+  if (ready)
+    return true;
+  if (!g_sdReady || !path || !*path)
+    return false;
+
+  canvas.setColorDepth(16);
+
+  if (!canvas.width() || !canvas.height())
+  {
+    if (!canvas.createSprite(MINI_STAT_ICON_W, MINI_STAT_ICON_H))
+      return false;
+  }
+
+  canvas.fillSprite(MINI_STAT_ICON_TRANSPARENT);
+
+  if (!canvasDrawPngFromSD(canvas, path, 0, 0))
+  {
+    canvas.deleteSprite();
+    ready = false;
+    return false;
+  }
+
+  ready = true;
+  return true;
+}
+
+static bool drawMiniStatIconCached(const char *path, int x, int y)
+{
+  M5Canvas *canvas = nullptr;
+  bool *ready = nullptr;
+
+  if (path == PATH_LIFE_ICON)
+  {
+    canvas = &s_miniStatLifeIcon;
+    ready = &s_miniStatLifeIconReady;
+  }
+  else if (path == PATH_INF_COIN)
+  {
+    canvas = &s_miniStatCoinIcon;
+    ready = &s_miniStatCoinIconReady;
+  }
+
+  if (canvas && ready && ensureMiniStatIconCache(*canvas, *ready, path))
+  {
+    canvas->pushSprite(x, y, MINI_STAT_ICON_TRANSPARENT);
+    return true;
+  }
+
+  if (g_sdReady)
+    return sprDrawPngFromSD(path, x, y);
+
+  return false;
+}
+
+static void drawMiniStatNumberRight(int value, int rightX, int y)
+{
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%d", value);
+  spr.drawString(buf, rightX, y);
+}
+
 // Shop item icons (per-pet theme)
 static const char *PATH_SHOP_DEV_FOOD = "/raising_hell/graphics/ui/shop_items/dev/dev_food.png";
 static const char *PATH_SHOP_DEV_MOOD = "/raising_hell/graphics/ui/shop_items/dev/dev_mood.png";
@@ -4427,19 +4499,15 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
 
     spr.setTextDatum(TR_DATUM);
 
-    bool okLife = false;
-    if (g_sdReady)
-      okLife = sprDrawPngFromSD(PATH_LIFE_ICON, iconX, lifeY);
+    bool okLife = drawMiniStatIconCached(PATH_LIFE_ICON, iconX, lifeY);
     (void)okLife;
-    spr.drawString(String(pet.health), numRightX, lifeY + TEXT_INSET_Y);
+    drawMiniStatNumberRight(pet.health, numRightX, lifeY + TEXT_INSET_Y);
 
     if (showCoin)
     {
-      bool okCoin = false;
-      if (g_sdReady)
-        okCoin = sprDrawPngFromSD(PATH_INF_COIN, iconX, coinY);
+      bool okCoin = drawMiniStatIconCached(PATH_INF_COIN, iconX, coinY);
       (void)okCoin;
-      spr.drawString(String(pet.inf), numRightX, coinY + TEXT_INSET_Y);
+      drawMiniStatNumberRight(pet.inf, numRightX, coinY + TEXT_INSET_Y);
     }
 
     spr.setTextDatum(TL_DATUM);
@@ -4454,19 +4522,15 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
   spr.setTextDatum(TR_DATUM);
   const int numRightX = x0 + panelW - 2;
 
-  bool okLife = false;
-  if (g_sdReady)
-    okLife = sprDrawPngFromSD(PATH_LIFE_ICON, iconX, lifeY);
+  bool okLife = drawMiniStatIconCached(PATH_LIFE_ICON, iconX, lifeY);
   (void)okLife;
-  spr.drawString(String(pet.health), numRightX, lifeY + TEXT_INSET_Y);
+  drawMiniStatNumberRight(pet.health, numRightX, lifeY + TEXT_INSET_Y);
 
   if (showCoin)
   {
-    bool okCoin = false;
-    if (g_sdReady)
-      okCoin = sprDrawPngFromSD(PATH_INF_COIN, iconX, coinY);
+    bool okCoin = drawMiniStatIconCached(PATH_INF_COIN, iconX, coinY);
     (void)okCoin;
-    spr.drawString(String(pet.inf), numRightX, coinY + TEXT_INSET_Y);
+    drawMiniStatNumberRight(pet.inf, numRightX, coinY + TEXT_INSET_Y);
   }
 
   spr.setTextDatum(TL_DATUM);
@@ -4523,11 +4587,9 @@ static void drawMiniStatPreviewSleepLeft()
   spr.setTextDatum(TR_DATUM);
   const int numRightX = x0 + panelW - 2;
 
-  bool okLife = false;
-  if (g_sdReady)
-    okLife = sprDrawPngFromSD(PATH_LIFE_ICON, iconX, lifeY);
+  bool okLife = drawMiniStatIconCached(PATH_LIFE_ICON, iconX, lifeY);
   (void)okLife;
-  spr.drawString(String(pet.health), numRightX, lifeY + TEXT_INSET_Y);
+  drawMiniStatNumberRight(pet.health, numRightX, lifeY + TEXT_INSET_Y);
 
   // Sleep quality line under the health readout
   spr.setTextDatum(TL_DATUM);
