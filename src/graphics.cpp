@@ -682,7 +682,7 @@ static void drawControlsHelpScreen()
 
   // Title
   spr.setTextColor(TFT_CYAN, TFT_BLACK);
-  spr.drawString("Controls - Hotkey (I)", x, y);
+  spr.drawString("Controls", x, y);
   y += 16; // tighter than before
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -693,24 +693,18 @@ static void drawControlsHelpScreen()
   y += lineGap;
   spr.drawString("UP/DOWN    : move selection", x, y);
   y += lineGap;
-  spr.drawString("Z-M        : jump to tab", x, y);
+  spr.drawString("ENTER/G    : confirm", x, y);
   y += lineGap;
-  spr.drawString("ENTER (G)  : confirm", x, y);
-  y += lineGap;
-  spr.drawString("(Q)        : back / home", x, y);
+  spr.drawString("Del/Q      : back / home", x, y);
   y += lineGap;
   spr.drawString("ESC        : open Settings / cancel", x, y);
   y += lineGap;
-
-#if !PUBLIC_BUILD
-  y += 2; // smaller spacer
-  spr.setTextColor(TFT_ORANGE, TFT_BLACK);
-  spr.drawString("Dev build:", x, y);
+  spr.drawString("Z-M        : jump to tab", x, y);
   y += lineGap;
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("C          : console", x, y);
+  spr.drawString("GO         : toggle screen on/off", x, y);
   y += lineGap;
-#endif
+  spr.drawString("\\          : console", x, y);
+  y += lineGap;
 
   // Alt Navigation Cluster section
   y += 2; // small separation
@@ -1860,16 +1854,16 @@ static void drawGameOptionsMenu()
 
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
-  
+
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
-  
+
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
-  
+
   char perfLine[32];
   snprintf(perfLine, sizeof(perfLine), "Pet Perf HUD: %s", g_petPerfHudEnabled ? "ON" : "OFF");
-  
+
   const char *labels[] = {decayLine, deathLine, ledLine, perfLine};
   const int totalItems = 4;
 
@@ -1919,16 +1913,11 @@ static void drawAutoScreenPickerMenu()
   drawTopBar();
 
   const int contentY = TOP_BAR_H;
-  const int contentH = SCREEN_H - TOP_BAR_H;
+  const int footerH = 14; // reserve room for bottom help text
+  const int contentH = SCREEN_H - TOP_BAR_H - footerH;
+  const int contentBottom = contentY + contentH;
 
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
-
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.setTextDatum(TC_DATUM);
-  spr.drawString("Auto Screen", SCREEN_W / 2, contentY + 10);
-  spr.setTextDatum(TL_DATUM);
+  spr.fillRect(0, contentY, SCREEN_W, SCREEN_H - contentY, TFT_BLACK);
 
   const char *choices[] = {"5 minutes", "30 minutes", "1 hour", "Off"};
   const int kCount = 4;
@@ -1939,11 +1928,20 @@ static void drawAutoScreenPickerMenu()
   int start = 0, visCount = 0;
   listWindow(kCount, g_app.autoScreenIndex, MAX_VISIBLE, start, visCount);
 
-  const int itemH = 22;
-  const int gap = 6;
+  int itemH = 22;
+  int gap = 6;
 
-  const int totalH = visCount * itemH + (visCount - 1) * gap;
-  const int startY = contentY + 28 + (contentH - 28 - totalH) / 2;
+  int totalH = visCount * itemH + (visCount - 1) * gap;
+  if (totalH > contentH)
+  {
+    itemH = 20;
+    gap = 5;
+    totalH = visCount * itemH + (visCount - 1) * gap;
+  }
+
+  const int bottomPad = 6; // small breathing room above screen bottom
+  int startY = contentBottom - totalH - bottomPad;
+  startY = clampi(startY, contentY + 18, contentBottom - totalH);
 
   const int boxW = (SCREEN_W * 3) / 4;
   const int boxX = (SCREEN_W - boxW) / 2;
@@ -1972,13 +1970,6 @@ static void drawAutoScreenPickerMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(choices[i], boxX + 10, ty);
   }
-
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("ENTER: Select   MENU: Back", SCREEN_W / 2, SCREEN_H - 6);
-  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawDecayModePickerMenu()
@@ -2040,13 +2031,6 @@ static void drawDecayModePickerMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(modes[idx], boxX + 10, ty);
   }
-
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("ENTER: select   MENU: back", SCREEN_W / 2, SCREEN_H - 6);
-  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawScreenSettingsMenu()
@@ -2106,13 +2090,6 @@ static void drawScreenSettingsMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(labels[i], boxX + 10, ty);
   }
-
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("MENU: Back", SCREEN_W / 2, SCREEN_H - 6);
-  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawWifiSettingsMenu()
@@ -2312,13 +2289,6 @@ static void drawSystemSettingsMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(labels[i], boxX + 10, ty);
   }
-
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("MENU: Back", SCREEN_W / 2, SCREEN_H - 6);
-  spr.setTextDatum(TL_DATUM);
 
   if (g_factoryReset.confirmActive)
   {
@@ -3413,7 +3383,7 @@ static void drawPetScreenImpl(bool redrawBg)
   drawMiniStatPreview();
   drawTabBar();
 
-  drawPetPerfHud();   // <-- add it here
+  drawPetPerfHud(); // <-- add it here
 }
 
 // -----------------------------------------------------------------------------
