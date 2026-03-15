@@ -30,6 +30,7 @@
 #include "asset_ota.h"
 #include "asset_provision_request.h"
 #include <esp_system.h>
+#include "user_toggles_state.h"
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -145,6 +146,16 @@ static void actTop_OpenGame(InputState &)
 {
   g_settingsFlow.settingsPage = SettingsPage::GAME;
   g_app.gameOptionsIndex = 0;
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actGame_TogglePetPerfHud(InputState &)
+{
+  g_petPerfHudEnabled = !g_petPerfHudEnabled;
+  saveSettingsToSD();
+  saveManagerMarkDirty();
   requestUIRedraw();
   playBeep();
   clearInputLatch();
@@ -434,10 +445,11 @@ static MenuItem kWifiItems[] = {
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
   };
 
-static MenuItem kGameItems[] = {
+  static MenuItem kGameItems[] = {
     {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
     {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
     {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
+    {"Pet Perf HUD", actGame_TogglePetPerfHud, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {

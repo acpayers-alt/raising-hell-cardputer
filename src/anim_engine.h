@@ -2,6 +2,16 @@
 #include <stdint.h>
 #include "anim_clips.h"
 
+struct PetPerfStats
+{
+  uint16_t petFrameMs = 0;
+  uint16_t petSpriteDrawMs = 0;
+  uint16_t animStepMs = 0;
+};
+
+const PetPerfStats &petPerfStats();
+void petPerfResetStats();
+
 void animTick();
 
 // Returns true once per frame change; clears the internal “changed” flag.

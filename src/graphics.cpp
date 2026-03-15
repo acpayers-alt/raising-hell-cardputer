@@ -74,6 +74,8 @@ static void drawEvolutionScreen();
 static void drawMiniStatPreview();
 static void drawMiniStatPreviewSleepLeft();
 
+static void drawPetPerfHud();
+
 // --- Compatibility wrappers / missing helpers (compile fix) ---
 static void drawSettingsScreen();
 static void drawInventoryScreen();
@@ -1858,19 +1860,22 @@ static void drawGameOptionsMenu()
 
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
-
+  
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
-
+  
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
-
-  const char *labels[] = {decayLine, deathLine, ledLine};
-  const int totalItems = 3;
+  
+  char perfLine[32];
+  snprintf(perfLine, sizeof(perfLine), "Pet Perf HUD: %s", g_petPerfHudEnabled ? "ON" : "OFF");
+  
+  const char *labels[] = {decayLine, deathLine, ledLine, perfLine};
+  const int totalItems = 4;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
-  constexpr int MAX_VISIBLE = 3;
+  constexpr int MAX_VISIBLE = 4;
   int start = 0, visCount = 0;
   listWindow(totalItems, g_app.gameOptionsIndex, MAX_VISIBLE, start, visCount);
 
@@ -1907,13 +1912,6 @@ static void drawGameOptionsMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(labels[i], boxX + 10, ty);
   }
-
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("ENTER: Select   MENU: Back", SCREEN_W / 2, SCREEN_H - 6);
-  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawAutoScreenPickerMenu()
@@ -3414,6 +3412,8 @@ static void drawPetScreenImpl(bool redrawBg)
 
   drawMiniStatPreview();
   drawTabBar();
+
+  drawPetPerfHud();   // <-- add it here
 }
 
 // -----------------------------------------------------------------------------
@@ -5535,6 +5535,44 @@ static void drawNamePetScreen(bool redrawBg)
   spr.drawString(name, boxX + 8, boxY + 6);
 
   drawCenteredLine("Type name, press ENTER", screenH - 22, 1, 1);
+}
+
+static void drawPetPerfHud()
+{
+  if (!g_petPerfHudEnabled)
+    return;
+
+  if (g_app.currentTab != Tab::TAB_PET)
+    return;
+
+  if (g_app.uiState != UIState::HOME && g_app.uiState != UIState::PET_SCREEN)
+    return;
+
+  const PetPerfStats &ps = petPerfStats();
+
+  const int boxW = 86;
+  const int boxH = 34;
+  const int x = SCREEN_W - boxW - 4;
+  const int y = TOP_BAR_H + 4;
+
+  spr.fillRoundRect(x, y, boxW, boxH, 4, TFT_BLACK);
+  spr.drawRoundRect(x, y, boxW, boxH, 4, TFT_DARKGREY);
+
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  char line[32];
+
+  snprintf(line, sizeof(line), "Pet:%ums", (unsigned)ps.petFrameMs);
+  spr.drawString(line, x + 4, y + 4);
+
+  snprintf(line, sizeof(line), "SD :%ums", (unsigned)ps.petSpriteDrawMs);
+  spr.drawString(line, x + 4, y + 14);
+
+  snprintf(line, sizeof(line), "Ani:%ums", (unsigned)ps.animStepMs);
+  spr.drawString(line, x + 4, y + 24);
 }
 
 static void drawEvolutionScreen()

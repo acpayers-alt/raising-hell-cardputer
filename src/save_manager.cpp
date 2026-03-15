@@ -649,6 +649,9 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
 
+  // ---- Perf HUD toggle ----
+  g_petPerfHudEnabled = (g_settings.petPerfHudEnabled != 0);
+
   uint8_t nvsTz;
   if (loadTzIndexFromNVS(&nvsTz))
   {
@@ -682,6 +685,9 @@ static bool saveSettingsToSD_internal()
   g_settings.petDeathEnabled = petDeathEnabled ? 1 : 0;
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
+
+  // ---- Perf HUD toggle ----
+  g_settings.petPerfHudEnabled = g_petPerfHudEnabled ? 1 : 0;
 
   tryRemove(SET_TMP_PATH);
 

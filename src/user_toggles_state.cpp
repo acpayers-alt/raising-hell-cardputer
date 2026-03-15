@@ -3,3 +3,4 @@
 
 bool soundEnabled = true;
 bool ledAlertsEnabled = true;
+bool g_petPerfHudEnabled = false;

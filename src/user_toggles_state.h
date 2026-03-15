@@ -4,3 +4,4 @@
 
 extern bool soundEnabled;
 extern bool ledAlertsEnabled;
+extern bool g_petPerfHudEnabled;

@@ -97,6 +97,9 @@ struct SettingsData {
 
   // v2+ (added later): 0 = not seen, 1 = seen
   uint8_t controlsHelpSeen;
+
+  // v3+ perf HUD toggle
+  uint8_t petPerfHudEnabled;
 };
 
 // ============================================================
