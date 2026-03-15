@@ -501,7 +501,6 @@ else
     }
   }
 
-#if !PUBLIC_BUILD
   // C toggles console
   if (g_app.uiState != UIState::SET_TIME && input.consoleOnce)
   {
@@ -528,7 +527,6 @@ else
     clearInputLatch();
     return;
   }
-#endif
 }
 
 // ---------------------------------------------------------------------------

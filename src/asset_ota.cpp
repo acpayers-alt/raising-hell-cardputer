@@ -402,7 +402,16 @@ bool assetOtaSetChannel(AssetOtaChannel ch)
   return assetOtaConfigSave(s_cfg);
 }
 
-const char *assetOtaInstalledVersion() { return s_installedVersion.c_str(); }
+const char *assetOtaInstalledVersion()
+{
+  if (!s_inited)
+    assetOtaInit();
+
+  if (!s_loadedFromSd && g_sdReady)
+    loadAssetOtaFromSdIfAvailable();
+
+  return s_installedVersion.c_str();
+}
 AssetOtaStatus assetOtaStatus() { return s_status; }
 AssetOtaError assetOtaLastError() { return s_lastErr; }
 uint16_t assetOtaCurrentFileIndex() { return s_state.currentFileIndex; }

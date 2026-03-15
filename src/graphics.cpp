@@ -2366,10 +2366,10 @@ static void drawCreditsScreen()
   spr.setTextSize(1);
   spr.setTextDatum(TC_DATUM);
 
-  const int LINE_H = 18;
+  const int LINE_H = 16;
   const int TIGHT_H = 14;
 
-  const int blockTopY = (SCREEN_H / 2);
+  const int blockTopY = (SCREEN_H / 2) + 8;
 
   const int yCreated = blockTopY;
   const int yAaron = yCreated + LINE_H;
@@ -2388,7 +2388,11 @@ static void drawCreditsScreen()
 
   const char *assetVer = assetOtaInstalledVersion();
   char assetLine[48];
-  snprintf(assetLine, sizeof(assetLine), "Assets %s", (assetVer && assetVer[0]) ? assetVer : "none");
+  if (assetVer && assetVer[0])
+    snprintf(assetLine, sizeof(assetLine), "Asset OTA: %s", assetVer);
+  else
+    snprintf(assetLine, sizeof(assetLine), "Check Asset OTA");
+  
   spr.drawString(assetLine, SCREEN_W / 2, yAssets);
 
   spr.setTextDatum(TL_DATUM);

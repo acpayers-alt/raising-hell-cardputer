@@ -1,6 +1,7 @@
 #include "console.h"
 
 #include "app_state.h"
+#include "build_flags.h"
 #include "currency.h"
 #include "debug.h"
 #include "graphics.h"
@@ -9,19 +10,19 @@
 #include "pet.h"
 #include "pet_age.h"
 #include "save_manager.h"
+#include "sdcard.h"
+#include "settings_state.h"
 #include "ui_runtime.h"
 #include "user_toggles_state.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
+#include <FS.h>
+#include <SD.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <FS.h>
-#include <SD.h>
-#include "sdcard.h"
-#include "settings_state.h"
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -355,33 +356,38 @@ static void execLine(char *line)
   {
     logLine("Commands:");
     logLine("  help | ?            show this");
-    logLine("  giveinf <amount>    add Inferium");
     logLine("  mon                 show stats");
     logLine("  clear               clear console");
     logLine("  exit                close console");
+    logLine("  wifi                 show wifi status + saved ssid");
+    logLine("  wifi off|on           toggle wifi power");
+    logLine("  wifi <ssid> <pass>    save + connect");
+    logLine("  wifi clear            clear saved creds");
+    logLine("  age                 show birth epoch + age string");
+    logLine("  name <pet name>      set pet name");
+    logLine("  pet                 show current pet type");
+
+#if !PUBLIC_BUILD
+    logLine("  giveinf <amount>    add Inferium");
     logLine("  sethunger <0-100>   set hunger");
     logLine("  setmood   <0-100>   set mood");
     logLine("  setrest   <0-100>   set energy");
     logLine("  sethealth <0-100>   set health");
     logLine("  ledtest             cycle LED colors (~5s)");
-    logLine("  wifi                 show wifi status + saved ssid");
-    logLine("  wifi off|on           toggle wifi power");
-    logLine("  wifi <ssid> <pass>    save + connect");
-    logLine("  wifi clear            clear saved creds");
-    logLine("  reset_settings      delete settings.bin");    logLine("  newpet!             OVERWRITE save + start a new pet");
-    logLine("  age                 show birth epoch + age string");
-    logLine("  name <pet name>      set pet name");
-    logLine("  pet                 show current pet type");
+    logLine("  reset_settings      delete settings.bin");
+    logLine("  newpet!             OVERWRITE save + start a new pet");
     logLine("  pet cycle|devil|kaiju|eldritch|alien   set pet type");
     logLine("  givexp <amount>     give the pet XP (levels up if needed)");
     logLine("  setlevel <level>    set pet level (resets XP progress)");
     logLine("  setevo <0-3|baby|teen|adult|elder>  force evo stage");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
+#endif
 
     return;
   }
 
-  // NEW PET (destructive)
+// NEW PET (destructive)
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "newpet"))
   {
     logLine("Type 'newpet!' to confirm (this overwrites your save).");
@@ -395,8 +401,10 @@ static void execLine(char *line)
     logLine("[OK] New pet created (save overwritten).");
     return;
   }
+#endif
 
-  // CLEAR
+// CLEAR
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "clear"))
   {
     consoleClear();
@@ -431,8 +439,10 @@ static void execLine(char *line)
     }
     return;
   }
+#endif
 
-  // GIVE INF
+// GIVE INF
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "giveinf"))
   {
     if (argc < 2)
@@ -450,8 +460,10 @@ static void execLine(char *line)
     logf("[OK] INF +%d (now %d)", amt, getInf());
     return;
   }
+#endif
 
-  // GIVE XP
+// GIVE XP
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "givexp"))
   {
     if (argc < 2)
@@ -474,8 +486,10 @@ static void execLine(char *line)
          (unsigned long)pet.xpForNextLevel());
     return;
   }
+#endif
 
-  // SET LEVEL
+// SET LEVEL
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setlevel"))
   {
     if (argc < 2)
@@ -497,11 +511,13 @@ static void execLine(char *line)
     logf("[OK] Level set to %ld (XP reset, next %lu)", lvl, (unsigned long)pet.xpForNextLevel());
     return;
   }
+#endif
 
-  // -------------------------------------------------
-  // SET EVO STAGE
-  // Usage: setevo <0-3|baby|teen|adult|elder>
-  // -------------------------------------------------
+// -------------------------------------------------
+// SET EVO STAGE
+// Usage: setevo <0-3|baby|teen|adult|elder>
+// -------------------------------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setevo"))
   {
     if (argc < 2)
@@ -536,6 +552,7 @@ static void execLine(char *line)
     logf("[OK] Evo stage set to %u", (unsigned)pet.evoStage);
     return;
   }
+#endif
 
   // -------------------------------------------------
   // SET NAME
@@ -596,6 +613,10 @@ static void execLine(char *line)
       return;
     }
 
+#if PUBLIC_BUILD
+    logLine("Command disabled in public build.");
+    return;
+#else
     if (!strcmp(argv[1], "cycle"))
     {
       int next = ((int)pet.type + 1) % 4;
@@ -618,11 +639,13 @@ static void execLine(char *line)
     requestUIRedraw();
     logf("[OK] Pet type set to: %s", petTypeToString(pet.type));
     return;
+#endif
   }
 
-  // -------------------------------------------------
-  // SET HUNGER
-  // -------------------------------------------------
+// -------------------------------------------------
+// SET HUNGER
+// -------------------------------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "sethunger"))
   {
     if (argc < 2)
@@ -637,10 +660,12 @@ static void execLine(char *line)
     logf("[OK] Hunger set to %d", pet.hunger);
     return;
   }
+#endif
 
-  // -------------------------------------------------
-  // SET MOOD (happiness)
-  // -------------------------------------------------
+// -------------------------------------------------
+// SET MOOD (happiness)
+// -------------------------------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setmood"))
   {
     if (argc < 2)
@@ -655,10 +680,12 @@ static void execLine(char *line)
     logf("[OK] Mood set to %d", pet.happiness);
     return;
   }
+#endif
 
-  // -------------------------------------------------
-  // SET REST (energy)
-  // -------------------------------------------------
+// -------------------------------------------------
+// SET REST (energy)
+// -------------------------------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setrest"))
   {
     if (argc < 2)
@@ -673,10 +700,12 @@ static void execLine(char *line)
     logf("[OK] Energy set to %d", pet.energy);
     return;
   }
+#endif
 
-  // -------------------------------------------------
-  // SET HEALTH
-  // -------------------------------------------------
+// -------------------------------------------------
+// SET HEALTH
+// -------------------------------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "sethealth"))
   {
     if (argc < 2)
@@ -691,10 +720,12 @@ static void execLine(char *line)
     logf("[OK] Health set to %d", pet.health);
     return;
   }
+#endif
 
-  // -------------------------------------------------
-  // KILL PET (force death flow immediately)
-  // -------------------------------------------------
+// -------------------------------------------------
+// KILL PET (force death flow immediately)
+// -------------------------------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "killpet"))
   {
     pet.health = 0;
@@ -713,6 +744,7 @@ static void execLine(char *line)
     logLine("[OK] Pet killed (death flow entered).");
     return;
   }
+#endif
 
   // WIFI
   if (!strcmp(argv[0], "wifi"))
@@ -917,11 +949,9 @@ void consoleUpdate(InputState &in)
     KeyEvent e = in.kbPop();
     uint8_t code = e.code;
 
-    const bool isEnter =
-        (code == (uint8_t)RH_KEY_ENTER) || (code == '\n') || (code == '\r');
+    const bool isEnter = (code == (uint8_t)RH_KEY_ENTER) || (code == '\n') || (code == '\r');
 
-    const bool isBackspace =
-        (code == (uint8_t)RH_KEY_BACKSPACE) || (code == '\b') || (code == 127);
+    const bool isBackspace = (code == (uint8_t)RH_KEY_BACKSPACE) || (code == '\b') || (code == 127);
 
     // -------------------------------------------------
     // Command history navigation (console-only)
@@ -930,12 +960,14 @@ void consoleUpdate(InputState &in)
     // -------------------------------------------------
     if (code == (uint8_t)';')
     {
-      if (histPrev()) touched = true;
+      if (histPrev())
+        touched = true;
       continue;
     }
     if (code == (uint8_t)'.')
     {
-      if (histNext()) touched = true;
+      if (histNext())
+        touched = true;
       continue;
     }
 
@@ -989,7 +1021,8 @@ void consoleUpdate(InputState &in)
         g_buf[g_len] = '\0';
         histCancelNav();
         touched = true;
-        if (touched) {
+        if (touched)
+        {
           requestUIRedraw();
         }
       }

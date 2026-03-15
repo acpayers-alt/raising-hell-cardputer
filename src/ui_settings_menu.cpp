@@ -163,27 +163,16 @@ static void actGame_TogglePetPerfHud(InputState &)
 
 static bool enConsole()
 {
-#if PUBLIC_BUILD
-  return false;
-#else
   return true;
-#endif
 }
 
 static void actTop_Console(InputState &input)
 {
-#if PUBLIC_BUILD
-  ui_showMessage("Console disabled");
-  soundError();
-  clearInputLatch();
-  (void)input;
-#else
   openConsoleWithReturn(UIState::SETTINGS, g_app.currentTab, true, g_settingsFlow.settingsPage);
   uiDrainKb(input);
   requestUIRedraw();
   playBeep();
   clearInputLatch();
-#endif
 }
 
 static void actTop_Credits(InputState &)

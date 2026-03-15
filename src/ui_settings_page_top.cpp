@@ -88,19 +88,12 @@ void Handle_TOP(InputState& input, int move) {
       }
 
       case 5: { // Console
-#if PUBLIC_BUILD
-        ui_showMessage("Console disabled");
-        soundError();
-        clearInputLatch();
-        return;
-#else
         openConsoleWithReturn(UIState::SETTINGS, g_app.currentTab, true, g_settingsFlow.settingsPage);
         uiDrainKb(input);
         clearInputLatch();
         requestUIRedraw();
         playBeep();
         return;
-#endif
       }
 
       case 6: { // Credits
