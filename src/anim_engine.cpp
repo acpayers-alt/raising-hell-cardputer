@@ -1,127 +1,99 @@
 #include "anim_engine.h"
 
-#include "M5Cardputer.h" // <-- add this
+#include "M5Cardputer.h"  // <-- add this
 
-#include <FS.h>
 #include <SD.h>
+#include <FS.h>
 #include <lgfx/v1/misc/DataWrapper.hpp>
 
-#include "anim_clips.h"
-#include "app_state.h"
-#include "display.h"
-#include "runtime_flags_state.h"
 #include "sdcard.h"
-#include "ui_invalidate.h"
+#include "display.h"
 #include "graphics.h"
+#include "anim_clips.h"
+#include "ui_invalidate.h"
+#include "runtime_flags_state.h"
+#include "app_state.h"
 
 // -----------------------------------------------------------------------------
 // Arduino File -> LovyanGFX DataWrapper (same as pet_anim.cpp, but centralized)
 // -----------------------------------------------------------------------------
-class ArduinoFileDataWrapper : public lgfx::v1::DataWrapper
-{
-public:
-  explicit ArduinoFileDataWrapper(File *f) : _f(f) {}
+class ArduinoFileDataWrapper : public lgfx::v1::DataWrapper {
+ public:
+  explicit ArduinoFileDataWrapper(File* f) : _f(f) {}
 
-  int read(uint8_t *buf, uint32_t len) override
-  {
-    if (!_f)
-      return 0;
+  int read(uint8_t* buf, uint32_t len) override {
+    if (!_f) return 0;
     return (int)_f->read(buf, len);
   }
 
-  void skip(int32_t offset) override
-  {
-    if (!_f)
-      return;
+  void skip(int32_t offset) override {
+    if (!_f) return;
     uint32_t pos = (uint32_t)_f->position();
     _f->seek(pos + offset);
   }
 
-  bool seek(uint32_t offset) override
-  {
-    if (!_f)
-      return false;
+  bool seek(uint32_t offset) override {
+    if (!_f) return false;
     return _f->seek(offset);
   }
 
-  void close() override
-  {
+  void close() override {
     // No-op
   }
 
-  int32_t tell() override
-  {
-    if (!_f)
-      return 0;
+  int32_t tell() override {
+    if (!_f) return 0;
     return (int32_t)_f->position();
   }
 
-private:
-  File *_f = nullptr;
+ private:
+  File* _f = nullptr;
 };
 
-static bool drawPngPathAnim(const char *path, int x, int y)
-{
-  if (!g_sdReady || !path)
-    return false;
-
-  File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
-
-  ArduinoFileDataWrapper w(&f);
-  bool ok = spr.drawPng(&w, x, y);
-  f.close();
-  return ok;
+static bool drawPngPathAnim(const char* path, int x, int y) {
+  if (!g_sdReady || !path) return false;
+  return sprDrawPngFromSD(path, x, y);
 }
 
 // Read PNG width/height from IHDR. Fast and avoids drawing just to measure.
-static bool pngReadWH(const char *path, int *outW, int *outH)
-{
-  if (!g_sdReady || !path || !outW || !outH)
-    return false;
+static bool pngReadWH(const char* path, int* outW, int* outH) {
+  if (!g_sdReady || !path || !outW || !outH) return false;
 
   File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
+  if (!f) return false;
 
   uint8_t buf[24];
   const int n = (int)f.read(buf, sizeof(buf));
   f.close();
-  if (n < (int)sizeof(buf))
-    return false;
+  if (n < (int)sizeof(buf)) return false;
 
   // PNG signature
-  static const uint8_t sig[8] = {137, 80, 78, 71, 13, 10, 26, 10};
-  for (int i = 0; i < 8; i++)
-  {
-    if (buf[i] != sig[i])
-      return false;
+  static const uint8_t sig[8] = { 137, 80, 78, 71, 13, 10, 26, 10 };
+  for (int i = 0; i < 8; i++) {
+    if (buf[i] != sig[i]) return false;
   }
 
   // Chunk type should be IHDR at bytes 12..15
-  if (buf[12] != 'I' || buf[13] != 'H' || buf[14] != 'D' || buf[15] != 'R')
-    return false;
+  if (buf[12] != 'I' || buf[13] != 'H' || buf[14] != 'D' || buf[15] != 'R') return false;
 
-  auto be32 = [&](int off) -> int
-  {
-    return (int)((uint32_t)buf[off] << 24 | (uint32_t)buf[off + 1] << 16 | (uint32_t)buf[off + 2] << 8 |
+  auto be32 = [&](int off) -> int {
+    return (int)((uint32_t)buf[off] << 24 |
+                 (uint32_t)buf[off + 1] << 16 |
+                 (uint32_t)buf[off + 2] << 8  |
                  (uint32_t)buf[off + 3]);
   };
 
   const int w = be32(16);
   const int h = be32(20);
-  if (w <= 0 || h <= 0)
-    return false;
+  if (w <= 0 || h <= 0) return false;
 
   *outW = w;
   *outH = h;
   return true;
 }
 
-struct PngSizeCacheEntry
-{
-  const char *path;
+struct PngSizeCacheEntry {
+  const char* path;
   int16_t w;
   int16_t h;
 };
@@ -129,15 +101,11 @@ struct PngSizeCacheEntry
 static PngSizeCacheEntry s_pngSizeCache[24] = {};
 static uint8_t s_pngSizeCacheNext = 0;
 
-static bool pngReadWHCached(const char *path, int *outW, int *outH)
-{
-  if (!path || !outW || !outH)
-    return false;
+static bool pngReadWHCached(const char* path, int* outW, int* outH) {
+  if (!path || !outW || !outH) return false;
 
-  for (const auto &e : s_pngSizeCache)
-  {
-    if (e.path == path && e.w > 0 && e.h > 0)
-    {
+  for (const auto& e : s_pngSizeCache) {
+    if (e.path == path && e.w > 0 && e.h > 0) {
       *outW = e.w;
       *outH = e.h;
       return true;
@@ -146,8 +114,7 @@ static bool pngReadWHCached(const char *path, int *outW, int *outH)
 
   int w = 0;
   int h = 0;
-  if (!pngReadWH(path, &w, &h))
-    return false;
+  if (!pngReadWH(path, &w, &h)) return false;
 
   s_pngSizeCache[s_pngSizeCacheNext].path = path;
   s_pngSizeCache[s_pngSizeCacheNext].w = (int16_t)w;
@@ -162,41 +129,36 @@ static bool pngReadWHCached(const char *path, int *outW, int *outH)
 // -----------------------------------------------------------------------------
 // Engine state
 // -----------------------------------------------------------------------------
-static AnimId s_baseId = ANIM_NONE;
-static uint8_t s_baseIdx = 0;
-static uint32_t s_baseNextMs = 0;
+static AnimId    s_baseId = ANIM_NONE;
+static uint8_t   s_baseIdx = 0;
+static uint32_t  s_baseNextMs = 0;
 
-static AnimId s_overrideId = ANIM_NONE;
-static uint8_t s_overrideIdx = 0;
-static uint32_t s_overrideNextMs = 0;
-static bool s_overridePlaying = false;
+static AnimId    s_overrideId = ANIM_NONE;
+static uint8_t   s_overrideIdx = 0;
+static uint32_t  s_overrideNextMs = 0;
+static bool      s_overridePlaying = false;
 
-static uint32_t s_nextTriggerMs = 0;
+static uint32_t  s_nextTriggerMs = 0;
 
-static bool s_frameChanged = false;
+static bool      s_frameChanged = false;
 
-static uint32_t randRangeInclusive(uint32_t lo, uint32_t hi)
-{
-  if (hi <= lo)
-    return lo;
+static uint32_t randRangeInclusive(uint32_t lo, uint32_t hi) {
+  if (hi <= lo) return lo;
   return (uint32_t)random((long)lo, (long)(hi + 1));
 }
 
-static void markFrameChanged()
-{
+static void markFrameChanged() {
   s_frameChanged = true;
   requestUIRedraw();
 }
 
-static void resetBaseTo(AnimId id, uint32_t now)
-{
+static void resetBaseTo(AnimId id, uint32_t now) {
   s_baseId = id;
   s_baseIdx = 0;
 
-  const AnimClip *clip = animGetClip(s_baseId);
+  const AnimClip* clip = animGetClip(s_baseId);
   uint16_t ms = clip ? clip->frameMs : 1000;
-  if (ms < 40)
-    ms = 40;
+  if (ms < 40) ms = 40;
 
   s_baseNextMs = now + ms;
 
@@ -208,55 +170,46 @@ static void resetBaseTo(AnimId id, uint32_t now)
 
   // reset trigger schedule
   s_nextTriggerMs = 0;
-  const AnimBehavior *beh = animGetBehavior(s_baseId);
-  if (beh && beh->triggerId != ANIM_NONE)
-  {
+  const AnimBehavior* beh = animGetBehavior(s_baseId);
+  if (beh && beh->triggerId != ANIM_NONE) {
     s_nextTriggerMs = now + randRangeInclusive(beh->triggerMinMs, beh->triggerMaxMs);
   }
 
   markFrameChanged();
 }
 
-static void startOverride(AnimId id, uint32_t now)
-{
+static void startOverride(AnimId id, uint32_t now) {
   s_overridePlaying = true;
   s_overrideId = id;
   s_overrideIdx = 0;
 
-  const AnimClip *clip = animGetClip(s_overrideId);
+  const AnimClip* clip = animGetClip(s_overrideId);
   uint16_t ms = clip ? clip->frameMs : 90;
-  if (ms < 40)
-    ms = 40;
+  if (ms < 40) ms = 40;
 
   s_overrideNextMs = now + ms;
 
   markFrameChanged();
 }
 
-static void stopOverrideAndScheduleNext(uint32_t now)
-{
+static void stopOverrideAndScheduleNext(uint32_t now) {
   s_overridePlaying = false;
   s_overrideId = ANIM_NONE;
   s_overrideIdx = 0;
   s_overrideNextMs = 0;
 
-  const AnimBehavior *beh = animGetBehavior(s_baseId);
-  if (beh && beh->triggerId != ANIM_NONE)
-  {
+  const AnimBehavior* beh = animGetBehavior(s_baseId);
+  if (beh && beh->triggerId != ANIM_NONE) {
     s_nextTriggerMs = now + randRangeInclusive(beh->triggerMinMs, beh->triggerMaxMs);
-  }
-  else
-  {
+  } else {
     s_nextTriggerMs = 0;
   }
 
   markFrameChanged();
 }
 
-void animTick()
-{
-  if (!g_sdReady)
-    return;
+void animTick() {
+  if (!g_sdReady) return;
 
   const uint32_t now = millis();
 
@@ -264,13 +217,11 @@ void animTick()
   const AnimId desired = animSelectPetScreen();
 
   // Leaving pet tab/screen => ANIM_NONE
-  if (desired == ANIM_NONE)
-  {
+  if (desired == ANIM_NONE) {
     // IMPORTANT:
     // When leaving the pet tab/screen, clear animation state WITHOUT requesting a redraw.
     // Otherwise we can force extra work during navigation and it feels like a brief hang.
-    if (s_baseId != ANIM_NONE)
-    {
+    if (s_baseId != ANIM_NONE) {
       s_baseId = ANIM_NONE;
       s_baseIdx = 0;
       s_baseNextMs = 0;
@@ -289,48 +240,38 @@ void animTick()
   }
 
   // Base changed?
-  if (desired != s_baseId)
-  {
+  if (desired != s_baseId) {
     resetBaseTo(desired, now);
     return;
   }
 
   // Gesture trigger?
-  const AnimBehavior *beh = animGetBehavior(s_baseId);
-  if (beh && beh->triggerId != ANIM_NONE)
-  {
-    if (!s_overridePlaying && s_nextTriggerMs != 0 && (int32_t)(now - s_nextTriggerMs) >= 0)
-    {
+  const AnimBehavior* beh = animGetBehavior(s_baseId);
+  if (beh && beh->triggerId != ANIM_NONE) {
+    if (!s_overridePlaying && s_nextTriggerMs != 0 && (int32_t)(now - s_nextTriggerMs) >= 0) {
       startOverride(beh->triggerId, now);
       return;
     }
   }
 
   // Advance override if playing
-  if (s_overridePlaying)
-  {
-    const AnimClip *clip = animGetClip(s_overrideId);
-    if (!clip || clip->frameCount == 0)
-    {
+  if (s_overridePlaying) {
+    const AnimClip* clip = animGetClip(s_overrideId);
+    if (!clip || clip->frameCount == 0) {
       stopOverrideAndScheduleNext(now);
       return;
     }
 
-    if ((int32_t)(now - s_overrideNextMs) < 0)
-      return;
+    if ((int32_t)(now - s_overrideNextMs) < 0) return;
 
     uint16_t ms = clip->frameMs;
-    if (ms < 40)
-      ms = 40;
+    if (ms < 40) ms = 40;
     s_overrideNextMs = now + ms;
 
-    if (s_overrideIdx + 1 < clip->frameCount)
-    {
+    if (s_overrideIdx + 1 < clip->frameCount) {
       s_overrideIdx++;
       markFrameChanged();
-    }
-    else
-    {
+    } else {
       // one-shot done
       stopOverrideAndScheduleNext(now);
     }
@@ -338,41 +279,31 @@ void animTick()
   }
 
   // Advance base
-  const AnimClip *base = animGetClip(s_baseId);
-  if (!base || base->frameCount == 0)
-    return;
+  const AnimClip* base = animGetClip(s_baseId);
+  if (!base || base->frameCount == 0) return;
 
-  if ((int32_t)(now - s_baseNextMs) < 0)
-    return;
+  if ((int32_t)(now - s_baseNextMs) < 0) return;
 
   uint16_t ms = base->frameMs;
-  if (ms < 40)
-    ms = 40;
+  if (ms < 40) ms = 40;
   s_baseNextMs = now + ms;
 
-  if (base->frameCount <= 1)
-    return;
+  if (base->frameCount <= 1) return;
 
-  if (base->loop)
-  {
+  if (base->loop) {
     s_baseIdx = (uint8_t)((s_baseIdx + 1) % base->frameCount);
     markFrameChanged();
-  }
-  else
-  {
+  } else {
     // non-loop base clips aren’t expected here; clamp at end
-    if (s_baseIdx + 1 < base->frameCount)
-    {
+    if (s_baseIdx + 1 < base->frameCount) {
       s_baseIdx++;
       markFrameChanged();
     }
   }
 }
 
-void animNotifyScreenWake()
-{
-  if (!g_sdReady)
-    return;
+void animNotifyScreenWake() {
+  if (!g_sdReady) return;
 
   const uint32_t now = millis();
 
@@ -380,15 +311,13 @@ void animNotifyScreenWake()
   const AnimId desired = animSelectPetScreen();
 
   // If we shouldn't be animating anymore, stop cleanly.
-  if (desired == ANIM_NONE)
-  {
+  if (desired == ANIM_NONE) {
     animForceStop();
     return;
   }
 
   // If the base clip should change (mood/stage changed while asleep), reset it.
-  if (desired != s_baseId)
-  {
+  if (desired != s_baseId) {
     resetBaseTo(desired, now);
     return;
   }
@@ -400,108 +329,83 @@ void animNotifyScreenWake()
 
   // Nudge a frame immediately so the first wake render isn't "same frame".
   // Nudge whichever clip is currently visible (override wins).
-  if (s_overridePlaying)
-  {
-    const AnimClip *o = animGetClip(s_overrideId);
-    if (o && o->frameCount > 1)
-    {
-      if (s_overrideIdx + 1 < o->frameCount)
-        s_overrideIdx++;
-      else
-        s_overrideIdx = 0; // safe wrap even for one-shot; worst-case shows first frame
+  if (s_overridePlaying) {
+    const AnimClip* o = animGetClip(s_overrideId);
+    if (o && o->frameCount > 1) {
+      if (s_overrideIdx + 1 < o->frameCount) s_overrideIdx++;
+      else s_overrideIdx = 0; // safe wrap even for one-shot; worst-case shows first frame
+    }
+  } else {
+    const AnimClip* base = animGetClip(s_baseId);
+    if (base && base->frameCount > 1) {
+      if (base->loop) s_baseIdx = (uint8_t)((s_baseIdx + 1) % base->frameCount);
+      else if (s_baseIdx + 1 < base->frameCount) s_baseIdx++; // non-loop: advance once
     }
   }
-  else
-  {
-    const AnimClip *base = animGetClip(s_baseId);
-    if (base && base->frameCount > 1)
-    {
-      if (base->loop)
-        s_baseIdx = (uint8_t)((s_baseIdx + 1) % base->frameCount);
-      else if (s_baseIdx + 1 < base->frameCount)
-        s_baseIdx++; // non-loop: advance once
-    }
-  }
-  markFrameChanged();
+    markFrameChanged();
 }
 
-bool animConsumeFrameChanged()
-{
+bool animConsumeFrameChanged() {
   const bool v = s_frameChanged;
   s_frameChanged = false;
   return v;
 }
 
-void animDrawPetFrame(int x, int y)
-{
-  if (!g_sdReady)
-    return;
+void animDrawPetFrame(int x, int y) {
+  if (!g_sdReady) return;
 
   AnimId id = s_baseId;
   uint8_t idx = s_baseIdx;
 
-  if (s_overridePlaying)
-  {
+  if (s_overridePlaying) {
     id = s_overrideId;
     idx = s_overrideIdx;
   }
 
-  const AnimClip *clip = animGetClip(id);
-  if (!clip || clip->frameCount == 0)
-    return;
+  const AnimClip* clip = animGetClip(id);
+  if (!clip || clip->frameCount == 0) return;
 
-  if (idx >= clip->frameCount)
-    idx = 0;
-  const char *path = clip->frames[idx];
+  if (idx >= clip->frameCount) idx = 0;
+  const char* path = clip->frames[idx];
   (void)drawPngPathAnim(path, x, y);
 }
 
-void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
-{
-  if (!g_sdReady)
-    return;
+void animDrawPetFrameAnchoredBottom(int centerX, int bottomY) {
+  if (!g_sdReady) return;
 
   // Clamp anchor so sprite bottoms never go under the tab bar.
   // This is the actual bottom of the pet area.
   const int petBottom = SCREEN_H - TAB_BAR_H;
-  if (bottomY > petBottom)
-    bottomY = petBottom;
+  if (bottomY > petBottom) bottomY = petBottom;
 
   AnimId id = s_baseId;
   uint8_t idx = s_baseIdx;
 
-  if (s_overridePlaying)
-  {
+  if (s_overridePlaying) {
     id = s_overrideId;
     idx = s_overrideIdx;
   }
 
-  const AnimClip *clip = animGetClip(id);
-  if (!clip || clip->frameCount == 0)
-    return;
+  const AnimClip* clip = animGetClip(id);
+  if (!clip || clip->frameCount == 0) return;
 
-  if (idx >= clip->frameCount)
-    idx = 0;
-  const char *path = clip->frames[idx];
+  if (idx >= clip->frameCount) idx = 0;
+  const char* path = clip->frames[idx];
 
   int w = 0;
   int h = 0;
-  if (pngReadWHCached(path, &w, &h))
-  {
+  if (pngReadWHCached(path, &w, &h)) {
     const int drawX = centerX - (w / 2);
     const int drawY = bottomY - h;
     (void)drawPngPathAnim(path, drawX, drawY);
-  }
-  else
-  {
+  } else {
     // Best-effort fallback: at least honor the bottom anchor on Y.
     // (Without width/height we can't center accurately.)
     (void)drawPngPathAnim(path, centerX, bottomY);
   }
 }
 
-void animForceStop()
-{
+void animForceStop() {
   s_baseId = ANIM_NONE;
   s_baseIdx = 0;
   s_baseNextMs = 0;
