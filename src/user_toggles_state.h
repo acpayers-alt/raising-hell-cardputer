@@ -1,6 +1,6 @@
 #pragma once
-#include <stdbool.h>
 #include "wifi_time.h"
+#include <stdbool.h>
 
 extern bool soundEnabled;
 extern bool ledAlertsEnabled;
