@@ -34,6 +34,8 @@ Del/Q
 
 GO          - Screen Off/On
 
+Shake Your cardputer to wake the screen
+
 Hold GO     - Power Menu
 
 /           - Console
