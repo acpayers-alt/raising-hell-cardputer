@@ -38,7 +38,7 @@ First post-release stability update following v1.0.0.
 Focus on crash fixes, OTA reliability, and user-facing diagnostics.
 Lays groundwork for future full OTA firmware updates.
 
-
+---
 ## [0.1.0] - 2026-02-21
 
 
