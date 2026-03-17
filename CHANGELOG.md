@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.1] - 2026-03-16
 
+
 Added
 Console system (public build enabled)
 Version command (firmware + asset version reporting)
@@ -39,6 +40,7 @@ Lays groundwork for future full OTA firmware updates.
 
 
 ## [0.1.0] - 2026-02-21
+
 
 ### Added
 - Initial public GitHub release
