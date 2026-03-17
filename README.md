@@ -63,6 +63,8 @@ add heartbeat sequence to death flow
 
 Clock Mode
 
+Human reasable/editable settings file for easy recovery
+
 
 ------------------------------------------------------------
 Project Structure
