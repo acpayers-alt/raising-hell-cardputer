@@ -21,3 +21,9 @@ Thumbs.db
 # assets/**/*.png
 # assets/**/*.wav
 *.zip
+
+# Dev assets (never commit)
+assets/dev/
+
+# Dev manifests
+assets/**/manifest-dev.json
