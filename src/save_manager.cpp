@@ -947,6 +947,14 @@ bool saveManagerLoad()
   return false;
 }
 
+void saveManagerStampBirthNow()
+{
+  uint32_t now = getNowEpochOrZero();
+  g_birthEpoch = now;
+  pet.birth_epoch = now;
+  saveManagerMarkDirty();
+}
+
 bool saveManagerSave()
 {
   if (!g_sdReady)

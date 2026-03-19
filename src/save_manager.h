@@ -51,3 +51,5 @@ uint32_t saveManagerLastLoadSize();
 void saveManagerDeleteAll();
 // Delete ONLY the pet save (used for burial). Keeps settings/game options.
 void saveManagerDeletePetOnly();
+
+void saveManagerStampBirthNow();

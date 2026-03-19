@@ -38,7 +38,10 @@ void finalizeNewPetFromName(InputState& in)
   // New pet must start with the canonical starter inventory, regardless of
   // what the previous pet had (death / factory reset / flow restart, etc.).
   g_app.inventory.resetToDefaults();
-  saveManagerMarkDirty();
+
+  // Birth time starts when the pet is actually named/finalized.
+  saveManagerStampBirthNow();
+
   saveManagerForce();
   
   g_app.newPetFlowActive = false;
