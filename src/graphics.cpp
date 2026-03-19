@@ -4787,6 +4787,26 @@ static void drawWifiConnectWaitScreen()
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   spr.setTextDatum(CC_DATUM);
+
+  if (g_wifi.connectResultPending)
+  {
+    if (g_wifi.connectResultSuccess)
+    {
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+      spr.drawString("Connected!", SCREEN_W / 2, contentY + 34, 2);
+    }
+    else
+    {
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+      spr.drawString("Connection failed", SCREEN_W / 2, contentY + 28, 2);
+      spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+      spr.drawString("Please retry", SCREEN_W / 2, contentY + 52, 2);
+    }
+
+    spr.setTextDatum(TL_DATUM);
+    return;
+  }
+
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString("Connecting...", SCREEN_W / 2, contentY + 22, 2);
 

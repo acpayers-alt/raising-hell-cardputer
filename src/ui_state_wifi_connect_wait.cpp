@@ -1,6 +1,7 @@
 #include "ui_state_wifi_connect_wait.h"
 
 #include <WiFi.h>
+#include <Arduino.h>
 
 #include "app_state.h"
 #include "input.h"
@@ -17,6 +18,55 @@ void uiWifiConnectWaitHandle(InputState &in)
 {
   (void)in;
 
+  if (g_wifi.connectResultPending)
+  {
+    const uint32_t elapsed = millis() - g_wifi.connectResultShownAtMs;
+    if (elapsed < 1000)
+      return;
+
+    g_wifi.connectResultPending = false;
+
+    if (g_wifi.connectResultSuccess)
+    {
+      if (g_wifiSetupFromBootWizard)
+      {
+        uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
+      }
+      else
+      {
+        uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+      }
+
+      requestUIRedraw();
+      return;
+    }
+
+    // Failure path after message delay
+    wifiSetupPass[0] = 0;
+    wifiSetupBuf[0] = 0;
+
+    if (g_wifi.connectFailCount < 2)
+    {
+      wifiSetupStage = WIFI_SETUP_STAGE_PASS;
+    }
+    else
+    {
+      g_wifi.connectFailCount = 0;
+      wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+      g_wifi.scanStarted = false;
+      g_wifi.scanInProgress = false;
+      g_wifi.scanCount = 0;
+      g_wifi.scanIndex = 0;
+    }
+
+    clearInputLatch();
+    inputForceClear();
+
+    uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
+    requestUIRedraw();
+    return;
+  }
+
   const int wifiStatus = wifiConsoleStatus();
   const uint32_t connectAgeMs = wifiConsoleConnectAgeMs();
 
@@ -32,19 +82,12 @@ void uiWifiConnectWaitHandle(InputState &in)
   if (wifiIsConnected())
   {
     g_wifi.connectFailCount = 0;
+    g_wifi.connectResultPending = true;
+    g_wifi.connectResultSuccess = true;
+    g_wifi.connectResultShownAtMs = millis();
 
     clearInputLatch();
     inputForceClear();
-
-    if (g_wifiSetupFromBootWizard)
-    {
-      uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
-    }
-    else
-    {
-      uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
-    }
-
     requestUIRedraw();
     return;
   }
@@ -52,33 +95,14 @@ void uiWifiConnectWaitHandle(InputState &in)
   if (failedStatus || timedOut)
   {
     wifiConsoleDisconnect(false);
+
     g_wifi.connectFailCount++;
-
-    // Clear the password/buffer so retry is clean.
-    wifiSetupPass[0] = 0;
-    wifiSetupBuf[0] = 0;
-
-    if (g_wifi.connectFailCount < 2)
-    {
-      // First failure: keep same SSID, retry password.
-      wifiSetupStage = WIFI_SETUP_STAGE_PASS;
-    }
-    else
-    {
-      // Second failure: back to scan picker.
-      g_wifi.connectFailCount = 0;
-      wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
-
-      g_wifi.scanStarted = false;
-      g_wifi.scanInProgress = false;
-      g_wifi.scanCount = 0;
-      g_wifi.scanIndex = 0;
-    }
+    g_wifi.connectResultPending = true;
+    g_wifi.connectResultSuccess = false;
+    g_wifi.connectResultShownAtMs = millis();
 
     clearInputLatch();
     inputForceClear();
-
-    uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
     requestUIRedraw();
     return;
   }

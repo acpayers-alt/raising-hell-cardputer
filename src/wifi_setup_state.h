@@ -10,6 +10,7 @@ enum WifiSetupStage : uint8_t
   WIFI_SETUP_STAGE_SCAN = 0,
   WIFI_SETUP_STAGE_SSID = 1,
   WIFI_SETUP_STAGE_PASS = 2
+  
 };
 
 struct WifiSetupState
@@ -36,6 +37,9 @@ struct WifiSetupState
   int16_t scanRssi[kMaxScanResults] = {};
 
   uint8_t connectFailCount = 0;
+  bool connectResultPending = false;
+  bool connectResultSuccess = false;
+  uint32_t connectResultShownAtMs = 0;
 };
 
 extern WifiSetupState g_wifi;
@@ -48,17 +52,3 @@ extern char (&wifiSetupSsid)[33];
 extern char (&wifiSetupPass)[65];
 extern char (&wifiSetupBuf)[65];
 
-extern WifiSetupState g_wifi;
-extern bool g_wifiSetupFromBootWizard;
-
-// -----------------------------------------------------------------------------
-// Legacy reference aliases
-// -----------------------------------------------------------------------------
-// Keep these for older code that still uses bare names like wifiSetupBuf.
-// IMPORTANT: do NOT use macros for these names.
-
-extern int& wifiSettingsIndex;
-extern uint8_t& wifiSetupStage;
-extern char (&wifiSetupSsid)[33];
-extern char (&wifiSetupPass)[65];
-extern char (&wifiSetupBuf)[65];
