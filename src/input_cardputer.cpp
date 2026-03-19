@@ -763,7 +763,6 @@ static void readKeyboard(InputState &out)
     {
       case UIState::NAME_PET:
       case UIState::CHOOSE_PET:
-      case UIState::SET_TIME:
         return true;
       default:
         return false;

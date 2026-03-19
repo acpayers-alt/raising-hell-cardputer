@@ -44,7 +44,6 @@ static inline bool escBlockedInState(UIState s)
   {
     case UIState::NAME_PET:
     case UIState::CHOOSE_PET:
-    case UIState::SET_TIME:
       return true;
     default:
       return false;

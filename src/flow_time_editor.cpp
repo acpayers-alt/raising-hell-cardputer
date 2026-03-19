@@ -10,6 +10,7 @@
 #include "time_persist.h"
 #include "ui_actions.h"
 #include "ui_invalidate.h"
+#include "wifi_setup_state.h"
 
 // -----------------------------------------------------------------------------
 // Set-Time flow
@@ -253,7 +254,7 @@ void uiSetTimeHandle(InputState& in)
     }
   }
 
-  // ESC cancels (unless forced)
+  // ESC cancels normally; during forced boot time entry, return to Wi-Fi setup.
   if (in.escOnce)
   {
     if (!g_setTimeForceNoCancel)
@@ -261,8 +262,20 @@ void uiSetTimeHandle(InputState& in)
       returnFromSetTime();
       return;
     }
-  }
 
+    g_setTimeActive = false;
+    g_wifiSetupFromBootWizard = true;
+    g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
+    g_wifi.scanIndex = 0;
+    g_wifi.buf[0] = '\0';
+
+    uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
+    requestUIRedraw();
+    inputForceClear();
+    in.clearEdges();
+    return;
+  }
+  
   if (anyUiChange)
     requestUIRedraw();
 
