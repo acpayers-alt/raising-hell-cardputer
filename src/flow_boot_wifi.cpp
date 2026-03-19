@@ -29,6 +29,7 @@
 #include "settings_state.h"
 #include "wifi_setup_state.h"
 #include "save_manager.h"
+#include "graphics.h"
 
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
@@ -237,10 +238,16 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   else
   {
     g_wifiSetupFromBootWizard = true;
-    wifiSetupStage = 0;
+    wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
     wifiSetupSsid[0] = 0;
     wifiSetupPass[0] = 0;
     wifiSetupBuf[0] = 0;
+
+    g_wifi.scanStarted = false;
+    g_wifi.scanInProgress = false;
+    g_wifi.scanCount = 0;
+    g_wifi.scanIndex = 0;
+    g_wifi.connectFailCount = 0;
 
     settingsSetWifiEnabled(true);
     saveSettingsToSD();
@@ -268,10 +275,55 @@ static void bootWifiFallBackToManualEntry(InputState &in)
   bootWifiClearImportedInfo();
 
   g_wifiSetupFromBootWizard = true;
-  wifiSetupStage = 0;
+  g_wifi.connectFailCount = 0;
+
+  wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
   wifiSetupSsid[0] = 0;
   wifiSetupPass[0] = 0;
   wifiSetupBuf[0] = 0;
+
+  g_wifi.scanStarted = false;
+  g_wifi.scanInProgress = false;
+  g_wifi.scanCount = 0;
+  g_wifi.scanIndex = 0;
+
+  uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
+  requestUIRedraw();
+  uiActionSwallowAll(in);
+  uiDrainKb(in);
+  clearInputLatch();
+}
+
+static void bootWifiRetryOrReturnToScan(InputState &in)
+{
+  wifiConsoleDisconnect(false);
+
+  g_wifi.connectFailCount++;
+
+  ui_showMessage("Connection failed\nPlease retry");
+  requestUIRedraw();
+  delay(900);
+
+  g_wifiSetupFromBootWizard = true;
+  wifiSetupPass[0] = 0;
+  wifiSetupBuf[0] = 0;
+
+  if (g_wifi.connectFailCount < 2)
+  {
+    // First failure: retry password for same SSID
+    wifiSetupStage = WIFI_SETUP_STAGE_PASS;
+  }
+  else
+  {
+    // Second failure: back to scan picker
+    g_wifi.connectFailCount = 0;
+    wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+
+    g_wifi.scanStarted = false;
+    g_wifi.scanInProgress = false;
+    g_wifi.scanCount = 0;
+    g_wifi.scanIndex = 0;
+  }
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
@@ -317,14 +369,18 @@ void uiBootWifiWaitHandle(InputState& in)
       (connectAgeMs >= 15000) &&
       !wifiIsConnected();
 
-  if (failedStatus || timedOut)
-  {
-    bootWifiFallBackToManualEntry(in);
-    return;
-  }
-  
+      if (failedStatus || timedOut)
+      {
+        if (bootWifiImportedSsid()[0] != 0)
+          bootWifiFallBackToManualEntry(in);
+        else
+          bootWifiRetryOrReturnToScan(in);
+        return;
+      }
+
   if (wifiIsConnected())
   {
+    g_wifi.connectFailCount = 0;
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();

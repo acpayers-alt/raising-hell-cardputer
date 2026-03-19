@@ -76,10 +76,15 @@ void Handle_WIFI(InputState& input, int move) {
       case 1: { // Set WiFi Network (SSID/PASS entry)
         g_wifiSetupFromBootWizard = false;
 
-        g_wifi.setupStage = 0;
-        g_wifi.buf[0]     = '\0';
-        g_wifi.ssid[0]    = '\0';
-        g_wifi.pass[0]    = '\0';
+        g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
+        g_wifi.buf[0] = '\0';
+        g_wifi.ssid[0] = '\0';
+        g_wifi.pass[0] = '\0';
+
+        g_wifi.scanStarted = false;
+        g_wifi.scanInProgress = false;
+        g_wifi.scanCount = 0;
+        g_wifi.scanIndex = 0;
 
         g_app.uiState = UIState::WIFI_SETUP;
         requestUIRedraw();

@@ -43,10 +43,15 @@ static void bootWizardEnterWifiSetup()
   g_wifiSetupFromBootWizard = true;
 
   // Reset WiFi setup state so the wizard starts clean.
-  wifiSetupStage = 0;
+  wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
   wifiSetupSsid[0] = 0;
   wifiSetupPass[0] = 0;
-  wifiSetupBuf[0]  = 0;
+  wifiSetupBuf[0] = 0;
+
+  g_wifi.scanStarted = false;
+  g_wifi.scanInProgress = false;
+  g_wifi.scanCount = 0;
+  g_wifi.scanIndex = 0;
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();

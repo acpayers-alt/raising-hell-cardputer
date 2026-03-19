@@ -2,7 +2,7 @@
 
 #include "app_state.h"
 #include "input.h"
-
+#include "wifi_setup_state.h"
 #include "ui_actions.h"
 #include "ui_input_interceptors.h"
 #include "ui_state_handlers.h"
@@ -16,9 +16,12 @@ bool uiWantsTextCaptureForState(UIState s)
   switch (s)
   {
     case UIState::CONSOLE:
-    case UIState::WIFI_SETUP:
     case UIState::NAME_PET:
       return true;
+
+    case UIState::WIFI_SETUP:
+      return (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID) ||
+             (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS);
 
     default:
       return false;

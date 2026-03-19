@@ -4679,8 +4679,92 @@ void drawConsoleScreen()
 // ============================================================================
 static void drawWifiSetupScreen()
 {
-  const bool isPass = (g_wifi.setupStage == 1);
-  ui_drawMessageWindow("WiFi Setup", isPass ? "Password:" : "SSID:", wifiSetupBuf,
+  if (g_wifi.setupStage == WIFI_SETUP_STAGE_SCAN)
+  {
+    drawTopBar();
+
+    const int contentY = TOP_BAR_H;
+    const int contentH = SCREEN_H - TOP_BAR_H;
+    spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+    spr.setTextFont(2);
+    spr.setTextSize(1);
+
+    if (g_wifi.scanInProgress)
+    {
+      spr.setTextDatum(CC_DATUM);
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+      spr.drawString("Scanning WiFi...", SCREEN_W / 2, contentY + 16);
+      spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+      spr.drawString("Please wait", SCREEN_W / 2, contentY + 36);
+      spr.setTextDatum(TL_DATUM);
+      return;
+    }
+
+    const int totalItems = g_wifi.scanCount + 2; // Manual Entry + Rescan
+    const int itemH = 20;
+    const int gap = 5;
+    const int maxVisible = 5;
+
+    int start = 0;
+    int visCount = totalItems;
+    if (visCount > maxVisible)
+      visCount = maxVisible;
+
+    if (g_wifi.scanIndex < start)
+      start = g_wifi.scanIndex;
+    if (g_wifi.scanIndex >= start + visCount)
+      start = g_wifi.scanIndex - visCount + 1;
+
+    const int totalH = visCount * itemH + (visCount - 1) * gap;
+    const int startY = contentY + (contentH - totalH) / 2;
+
+    const int boxW = (SCREEN_W * 3) / 4;
+    const int boxX = (SCREEN_W - boxW) / 2;
+    const int radius = 8;
+
+    for (int row = 0; row < visCount; ++row)
+    {
+      const int i = start + row;
+      const int y = startY + row * (itemH + gap);
+      const bool sel = (i == g_wifi.scanIndex);
+
+      const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
+      const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
+      const uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
+
+      spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);
+      spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);
+
+      char line[48];
+
+      if (i < g_wifi.scanCount)
+      {
+        snprintf(line, sizeof(line), "%s (%d)", g_wifi.scanSsids[i], (int)g_wifi.scanRssi[i]);
+      }
+      else if (i == g_wifi.scanCount)
+      {
+        snprintf(line, sizeof(line), "Manual Entry...");
+      }
+      else
+      {
+        snprintf(line, sizeof(line), "Rescan");
+      }
+
+      spr.setTextDatum(TL_DATUM);
+      spr.setTextColor(textCol, fill);
+      const int th = spr.fontHeight();
+      const int ty = y + (itemH - th) / 2;
+      spr.drawString(line, boxX + 8, ty);
+    }
+
+    return;
+  }
+
+  const bool isPass = (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS);
+  ui_drawMessageWindow("WiFi Setup",
+                       isPass ? "Password:" : "SSID:",
+                       wifiSetupBuf,
                        /*maskLine2=*/isPass,
                        /*showCursor=*/true);
 }
