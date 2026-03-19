@@ -731,7 +731,7 @@ void drawBootWifiPromptScreen()
   spr.drawString("Setup WiFi to auto-set time?", 10, 40);
 
   spr.drawString("ENTER: Setup WiFi", 10, 80);
-  spr.drawString("ESC: Skip", 10, 100);
+  spr.drawString("ESC: Enter Time Manually", 10, 100);
 
   spr.pushSprite(0, 0);
 }
