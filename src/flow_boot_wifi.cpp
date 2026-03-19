@@ -260,6 +260,27 @@ void uiBootWifiPromptHandle(InputState& in)
 }
 
 // -----------------------------------------------------------------------------
+// Fall back to manual entry if imported wifi hotspot fails to connect
+// -----------------------------------------------------------------------------
+static void bootWifiFallBackToManualEntry(InputState &in)
+{
+  wifiConsoleDisconnect(false);
+  bootWifiClearImportedInfo();
+
+  g_wifiSetupFromBootWizard = true;
+  wifiSetupStage = 0;
+  wifiSetupSsid[0] = 0;
+  wifiSetupPass[0] = 0;
+  wifiSetupBuf[0] = 0;
+
+  uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
+  requestUIRedraw();
+  uiActionSwallowAll(in);
+  uiDrainKb(in);
+  clearInputLatch();
+}
+
+// -----------------------------------------------------------------------------
 // BOOT_WIFI_WAIT
 // After WiFi setup returns, wait for connection then advance.
 // ESC always skips to manual time.
@@ -284,6 +305,24 @@ void uiBootWifiWaitHandle(InputState& in)
     return;
   }
 
+  const int wifiStatus = wifiConsoleStatus();
+  const uint32_t connectAgeMs = wifiConsoleConnectAgeMs();
+
+  const bool failedStatus =
+      (wifiStatus == WL_CONNECT_FAILED) ||
+      (wifiStatus == WL_NO_SSID_AVAIL) ||
+      (wifiStatus == WL_CONNECTION_LOST);
+
+  const bool timedOut =
+      (connectAgeMs >= 15000) &&
+      !wifiIsConnected();
+
+  if (failedStatus || timedOut)
+  {
+    bootWifiFallBackToManualEntry(in);
+    return;
+  }
+  
   if (wifiIsConnected())
   {
     uiActionSwallowAll(in);
