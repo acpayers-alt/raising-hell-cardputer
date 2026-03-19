@@ -4762,11 +4762,35 @@ static void drawWifiSetupScreen()
   }
 
   const bool isPass = (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS);
-  ui_drawMessageWindow("WiFi Setup",
-                       isPass ? "Password:" : "SSID:",
-                       wifiSetupBuf,
+  ui_drawMessageWindow("WiFi Setup", isPass ? "Password:" : "SSID:", wifiSetupBuf,
                        /*maskLine2=*/isPass,
                        /*showCursor=*/true);
+}
+
+static void drawWifiConnectWaitScreen()
+{
+  drawTopBar();
+
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H;
+  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+  spr.setTextDatum(CC_DATUM);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("Connecting...", SCREEN_W / 2, contentY + 22, 2);
+
+  if (wifiSetupSsid[0])
+  {
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString(wifiSetupSsid, SCREEN_W / 2, contentY + 46, 2);
+  }
+
+  const uint32_t ageMs = wifiConsoleConnectAgeMs();
+  char line[24];
+  snprintf(line, sizeof(line), "%lus", (unsigned long)(ageMs / 1000));
+  spr.drawString(line, SCREEN_W / 2, contentY + 70, 2);
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 // ============================================================================
@@ -4872,6 +4896,10 @@ static void drawCurrentScreen(bool redrawBg)
   case UIState::WIFI_SETUP:
     drawWifiSetupScreen();
     return;
+
+  case UIState::WIFI_CONNECT_WAIT:
+    drawWifiConnectWaitScreen();
+    break;
 
   case UIState::SET_TIME:
     drawSetTimeScreen();

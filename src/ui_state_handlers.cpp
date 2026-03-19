@@ -25,39 +25,41 @@
 #include "ui_state_sleep_menu.h"  // uiSleepMenuHandle
 #include "ui_state_tab_driven.h"  // uiTabDrivenHandle
 #include "ui_state_wifi_setup.h"  // uiWifiSetupHandle
+#include "ui_state_wifi_connect_wait.h"
 
-static constexpr int kUiStateCount = 27; // UIState is 0..26 in ui_defs.h
+static constexpr int kUiStateCount = 28; // UIState is 0..26 in ui_defs.h
 
 static inline int toIndex(UIState s) { return (int)s; }
 
 static StateHandlerFn kHandlers[kUiStateCount] = {
-    /*  0 BOOT                       */ nullptr,
-    /*  1 HOME                       */ uiTabDrivenHandle,
-    /*  2 PET_SCREEN                 */ uiTabDrivenHandle,
-    /*  3 POWER_MENU                 */ uiPowerMenuHandle,
-    /*  4 MINI_GAME                  */ uiMiniGameHandle,
-    /*  5 CHOOSE_PET                 */ uiChoosePetHandle,
-    /*  6 NAME_PET                   */ uiNamePetHandle,
-    /*  7 WIFI_SETUP                 */ uiWifiSetupHandle,
-    /*  8 DEATH                      */ uiDeathHandle,
-    /*  9 BURIAL_SCREEN              */ uiBurialHandle,
-    /* 10 PET_SLEEPING               */ uiPetSleepingHandle,
-    /* 11 SETTINGS                   */ uiSettingsHandle,
-    /* 12 CONSOLE                    */ uiConsoleHandle,
-    /* 13 INVENTORY                  */ uiInventoryHandle,
-    /* 14 SHOP                       */ uiShopHandle,
-    /* 15 SLEEP_MENU                 */ uiSleepMenuHandle,
-    /* 16 SET_TIME                   */ uiSetTimeHandle,
-    /* 17 HATCHING                   */ uiHatchingHandle,
-    /* 18 CONTROLS_HELP              */ uiControlsHelpHandle,
-    /* 19 BOOT_WIFI_PROMPT           */ uiBootWifiPromptHandle,
-    /* 20 BOOT_WIFI_WAIT             */ uiBootWifiWaitHandle,
-    /* 21 BOOT_TZ_PICK               */ uiBootTzPickHandle,
-    /* 22 BOOT_NTP_WAIT              */ uiBootNtpWaitHandle,
-    /* 23 EVOLUTION                  */ uiEvolutionHandle,
-    /* 24 MG_PAUSE                   */ uiMgPauseHandle,
-    /* 25 BOOT_WIFI_IMPORTED         */ uiBootWifiImportedHandle,
-    /* 26 BOOT_ASSET_WIFI_REQUIRED   */ uiBootAssetWifiRequiredHandle,
+  /*  0 BOOT                       */ nullptr,
+  /*  1 HOME                       */ uiTabDrivenHandle,
+  /*  2 PET_SCREEN                 */ uiTabDrivenHandle,
+  /*  3 POWER_MENU                 */ uiPowerMenuHandle,
+  /*  4 MINI_GAME                  */ uiMiniGameHandle,
+  /*  5 CHOOSE_PET                 */ uiChoosePetHandle,
+  /*  6 NAME_PET                   */ uiNamePetHandle,
+  /*  7 WIFI_SETUP                 */ uiWifiSetupHandle,
+  /*  8 WIFI_CONNECT_WAIT          */ uiWifiConnectWaitHandle,
+  /*  9 DEATH                      */ uiDeathHandle,
+  /* 10 BURIAL_SCREEN              */ uiBurialHandle,
+  /* 11 PET_SLEEPING               */ uiPetSleepingHandle,
+  /* 12 SETTINGS                   */ uiSettingsHandle,
+  /* 13 CONSOLE                    */ uiConsoleHandle,
+  /* 14 INVENTORY                  */ uiInventoryHandle,
+  /* 15 SHOP                       */ uiShopHandle,
+  /* 16 SLEEP_MENU                 */ uiSleepMenuHandle,
+  /* 17 SET_TIME                   */ uiSetTimeHandle,
+  /* 18 HATCHING                   */ uiHatchingHandle,
+  /* 19 CONTROLS_HELP              */ uiControlsHelpHandle,
+  /* 20 BOOT_WIFI_PROMPT           */ uiBootWifiPromptHandle,
+  /* 21 BOOT_WIFI_WAIT             */ uiBootWifiWaitHandle,
+  /* 22 BOOT_TZ_PICK               */ uiBootTzPickHandle,
+  /* 23 BOOT_NTP_WAIT              */ uiBootNtpWaitHandle,
+  /* 24 EVOLUTION                  */ uiEvolutionHandle,
+  /* 25 MG_PAUSE                   */ uiMgPauseHandle,
+  /* 26 BOOT_WIFI_IMPORTED         */ uiBootWifiImportedHandle,
+  /* 27 BOOT_ASSET_WIFI_REQUIRED   */ uiBootAssetWifiRequiredHandle,
 };
 
 StateHandlerFn uiGetStateHandler(UIState state)

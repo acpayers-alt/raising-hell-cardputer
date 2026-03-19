@@ -279,14 +279,9 @@ static void wifiSetupSelect()
   }
 
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
-
-  if (g_wifiSetupFromBootWizard)
-  {
-    uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_app.currentTab, true);
-    return;
-  }
-
-  uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+  uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_app.currentTab, true);
+  requestUIRedraw();
+  return;
 }
 
 static void wifiSetupNavLeft()
