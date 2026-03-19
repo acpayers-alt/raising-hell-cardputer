@@ -4701,7 +4701,8 @@ static void drawWifiSetupScreen()
       return;
     }
 
-    const int totalItems = g_wifi.scanCount + 2; // Manual Entry + Rescan
+    const bool hasResults = (g_wifi.scanCount > 0);
+    const int totalItems = hasResults ? (g_wifi.scanCount + 1) : 2;
     const int itemH = 20;
     const int gap = 5;
     const int maxVisible = 5;
@@ -4738,17 +4739,27 @@ static void drawWifiSetupScreen()
 
       char line[48];
 
-      if (i < g_wifi.scanCount)
+      if (!hasResults)
       {
-        snprintf(line, sizeof(line), "%s (%d)", g_wifi.scanSsids[i], (int)g_wifi.scanRssi[i]);
-      }
-      else if (i == g_wifi.scanCount)
-      {
-        snprintf(line, sizeof(line), "Manual Entry...");
+        if (i == 0)
+        {
+          snprintf(line, sizeof(line), "Scan for networks");
+        }
+        else
+        {
+          snprintf(line, sizeof(line), "Manual entry");
+        }
       }
       else
       {
-        snprintf(line, sizeof(line), "Rescan");
+        if (i < g_wifi.scanCount)
+        {
+          snprintf(line, sizeof(line), "%s (%d)", g_wifi.scanSsids[i], (int)g_wifi.scanRssi[i]);
+        }
+        else
+        {
+          snprintf(line, sizeof(line), "Manual entry");
+        }
       }
 
       spr.setTextDatum(TL_DATUM);
@@ -4829,6 +4840,7 @@ static bool uiStateBlocksOverlays(UIState s)
   case UIState::PET_SLEEPING:
   case UIState::MINI_GAME:
   case UIState::WIFI_SETUP:
+  case UIState::WIFI_CONNECT_WAIT:
   case UIState::SET_TIME:
   case UIState::CHOOSE_PET:
   case UIState::NAME_PET:
@@ -4899,7 +4911,7 @@ static void drawCurrentScreen(bool redrawBg)
 
   case UIState::WIFI_CONNECT_WAIT:
     drawWifiConnectWaitScreen();
-    break;
+    return;
 
   case UIState::SET_TIME:
     drawSetTimeScreen();
