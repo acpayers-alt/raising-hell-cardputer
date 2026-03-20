@@ -2118,12 +2118,30 @@ static void drawWifiSettingsMenu()
   else
     snprintf(otaCheckLine, sizeof(otaCheckLine), "Check Asset OTA");
 
-  char otaChannelLine[32];
-  snprintf(otaChannelLine, sizeof(otaChannelLine), "OTA Channel: %s",
-           ((AssetOtaChannel)assetOtaGetConfig().channel == AssetOtaChannel::DEV) ? "Dev" : "Public");
-
-  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaCheckLine, otaChannelLine};
-  const int totalItems = 6;
+    #if defined(PUBLIC_BUILD)
+    const char *labels[] = {
+      wLine,
+      "Set WiFi Network",
+      "Reset WiFi Settings",
+      tzLine,
+      otaCheckLine
+    };
+    const int totalItems = 5;
+  #else
+    char otaChannelLine[32];
+    snprintf(otaChannelLine, sizeof(otaChannelLine), "OTA Channel: %s",
+             ((AssetOtaChannel)assetOtaGetConfig().channel == AssetOtaChannel::DEV) ? "Dev" : "Public");
+  
+    const char *labels[] = {
+      wLine,
+      "Set WiFi Network",
+      "Reset WiFi Settings",
+      tzLine,
+      otaCheckLine,
+      otaChannelLine
+    };
+    const int totalItems = 6;
+  #endif
 
   g_wifi.wifiSettingsIndex = clampi(g_wifi.wifiSettingsIndex, 0, totalItems - 1);
 
