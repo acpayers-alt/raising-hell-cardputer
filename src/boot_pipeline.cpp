@@ -86,6 +86,41 @@ void drawAssetsMissingScreen()
 // -----------------------------------------------------------------------------
 static const char *kFirstRunFlagPath = "/raising_hell/first_run.flag";
 static const char *kPostProvisionControlsHelpFlagPath = "/raising_hell/post_provision_controls.flag";
+static const char *kBootSetupPendingFlagPath = "/raising_hell/boot_setup_pending.flag";
+
+bool bootSetupPendingFlagExists()
+{
+  if (!g_sdReady)
+    return false;
+  return SD.exists(kBootSetupPendingFlagPath);
+}
+
+void bootSetupWritePendingFlag()
+{
+  if (!g_sdReady)
+    return;
+
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+  if (!SD.exists("/raising_hell/save"))
+    SD.mkdir("/raising_hell/save");
+
+  File f = SD.open(kBootSetupPendingFlagPath, FILE_WRITE);
+  if (f)
+  {
+    f.print("1\n");
+    f.close();
+  }
+}
+
+void bootSetupClearPendingFlag()
+{
+  if (!g_sdReady)
+    return;
+
+  if (SD.exists(kBootSetupPendingFlagPath))
+    SD.remove(kBootSetupPendingFlagPath);
+}
 
 static bool consumeFirstRunFlagIfPresent()
 {
@@ -638,8 +673,8 @@ void postBootInitTick()
     updateTime();
     uiInitLevelPopupTracker();
 
-    const bool firstBootWizard = !settingsLoaded || forcedFirstRun;
-    const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
+    const bool setupPending = bootSetupPendingFlagExists();
+    const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;    const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
     const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
     const bool provisionRequested = bootAssetProvisionRequested();
@@ -715,6 +750,7 @@ void postBootInitTick()
     // -----------------------------------------------------------------------
     if (firstBootWizard)
     {
+      bootSetupWritePendingFlag();
       extern UIState g_bootWizardAfterOkState;
       extern Tab g_bootWizardAfterOkTab;
       g_bootWizardAfterOkState = afterOk;
@@ -755,6 +791,7 @@ void postBootInitTick()
     // -----------------------------------------------------------------------
     if (!timeIsValid())
     {
+      bootSetupWritePendingFlag();
       extern UIState g_bootWizardAfterOkState;
       extern Tab g_bootWizardAfterOkTab;
       g_bootWizardAfterOkState = afterOk;

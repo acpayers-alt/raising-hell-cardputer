@@ -11,6 +11,7 @@
 #include "ui_actions.h"
 #include "ui_invalidate.h"
 #include "wifi_setup_state.h"
+#include "boot_pipeline.h"
 
 // -----------------------------------------------------------------------------
 // Set-Time flow
@@ -151,6 +152,7 @@ static void commitSetTime()
 
   // Persist anchor used by your time system.
   saveTimeAnchor();
+  bootSetupClearPendingFlag();
 }
 
 // -----------------------------------------------------------------------------

@@ -436,6 +436,7 @@ void uiBootNtpWaitHandle(InputState& in)
 
   if (timeIsSynced())
   {
+    bootSetupWritePendingFlag();
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
