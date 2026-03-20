@@ -462,11 +462,15 @@ void uiBootNtpWaitHandle(InputState &in)
     {
       g_choosePetBlockHatchUntilRelease = true;
     }
-
+    else
+    {
+      bootSetupClearPendingFlag();
+    }
+    
     uiActionEnterState(nextState, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
-  }
+    }
 
   uiActionSwallowAll(in);
 }

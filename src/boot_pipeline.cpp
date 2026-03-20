@@ -794,12 +794,11 @@ void postBootInitTick()
     // -----------------------------------------------------------------------
     if (!timeIsValid())
     {
-      bootSetupWritePendingFlag();
       extern UIState g_bootWizardAfterOkState;
       extern Tab g_bootWizardAfterOkTab;
       g_bootWizardAfterOkState = afterOk;
       g_bootWizardAfterOkTab = Tab::TAB_PET;
-
+    
       uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
       requestFullUIRedraw();
       invalidateBackgroundCache();
