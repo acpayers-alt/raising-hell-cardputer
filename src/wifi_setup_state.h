@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "ui_defs.h"
 
 // Dedicated WiFi UI/Wizard state.
 // This replaces the old g_ui.wifi* bucket fields.
@@ -40,6 +41,9 @@ struct WifiSetupState
   bool connectResultPending = false;
   bool connectResultSuccess = false;
   uint32_t connectResultShownAtMs = 0;
+
+  UIState returnState = UIState::SETTINGS;
+  Tab returnTab = Tab::TAB_PET;
 };
 
 extern WifiSetupState g_wifi;

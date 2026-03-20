@@ -1,31 +1,28 @@
 #include "ui_boot_wizard_menu.h"
 
 #include "app_state.h"
-#include "input.h"
-#include "ui_actions.h"
-#include "ui_runtime.h"
-#include "ui_input_common.h"   // uiDrainKb()
 #include "boot_pipeline.h"
-#include "timezone.h"
-#include "wifi_time.h"
 #include "flow_time_editor.h"
+#include "input.h"
+#include "timezone.h"
+#include "ui_actions.h"
+#include "ui_input_common.h" // uiDrainKb()
+#include "ui_runtime.h"
+#include "wifi_time.h"
 
 // Boot-wizard WiFi setup needs the boot flag + the legacy aliases for fields
-#include "wifi_setup_state.h"  // g_wifiSetupFromBootWizard, wifiSetupStage/Buf/Ssid/Pass
+#include "wifi_setup_state.h" // g_wifiSetupFromBootWizard, wifiSetupStage/Buf/Ssid/Pass
 
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
-extern Tab     g_bootWizardAfterOkTab;
+extern Tab g_bootWizardAfterOkTab;
 
 // -----------------------------------------------------------------------------
 // Local wizard choice state
 // -----------------------------------------------------------------------------
 static uint8_t s_wifiPromptChoice = 0; // 0 = WiFi/NTP path, 1 = manual time
 
-void UiBootWizardMenu::ResetWifiPromptChoice()
-{
-  s_wifiPromptChoice = 0;
-}
+void UiBootWizardMenu::ResetWifiPromptChoice() { s_wifiPromptChoice = 0; }
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -53,6 +50,9 @@ static void bootWizardEnterWifiSetup()
   g_wifi.scanCount = 0;
   g_wifi.scanIndex = 0;
 
+  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnTab = g_bootWizardAfterOkTab;
+
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
 }
@@ -60,17 +60,22 @@ static void bootWizardEnterWifiSetup()
 static void tzPrev()
 {
   const uint8_t n = tzCount();
-  if (n == 0) return;
-  if (tzIndex <= 0) tzIndex = (int)n - 1;
-  else tzIndex--;
+  if (n == 0)
+    return;
+  if (tzIndex <= 0)
+    tzIndex = (int)n - 1;
+  else
+    tzIndex--;
 }
 
 static void tzNext()
 {
   const uint8_t n = tzCount();
-  if (n == 0) return;
+  if (n == 0)
+    return;
   tzIndex++;
-  if (tzIndex >= (int)n) tzIndex = 0;
+  if (tzIndex >= (int)n)
+    tzIndex = 0;
 }
 
 static void tzCommit()
@@ -82,7 +87,7 @@ static void tzCommit()
 // -----------------------------------------------------------------------------
 // BOOT_WIFI_PROMPT
 // -----------------------------------------------------------------------------
-bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
+bool UiBootWizardMenu::HandleWifiPrompt(InputState &in)
 {
   // For mandatory asset provisioning, do not allow skipping WiFi.
   if (!g_bootAssetProvisionMustComplete && in.escOnce)
@@ -132,7 +137,7 @@ bool UiBootWizardMenu::HandleWifiPrompt(InputState& in)
 // -----------------------------------------------------------------------------
 // BOOT_TZ_PICK
 // -----------------------------------------------------------------------------
-bool UiBootWizardMenu::HandleTimezonePick(InputState& in)
+bool UiBootWizardMenu::HandleTimezonePick(InputState &in)
 {
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
@@ -150,7 +155,7 @@ bool UiBootWizardMenu::HandleTimezonePick(InputState& in)
     clearInputLatch();
     return true;
   }
-  
+
   if (in.upOnce)
   {
     tzPrev();

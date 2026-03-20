@@ -19,19 +19,19 @@
 #include "wifi_store.h"
 #include "wifi_time.h"
 
+#include "asset_ota.h"
+#include "asset_provision_request.h"
+#include "flow_console.h"
 #include "flow_controls_help.h"
 #include "flow_factory_reset.h"
 #include "flow_time_editor.h"
 #include "game_options_state.h"
-#include "graphics.h"       // ui_showMessage
-#include "ui_input_utils.h" // uiDrainKb
-#include "flow_console.h"
-#include "ui_settings_actions.h"
-#include "asset_ota.h"
-#include "asset_provision_request.h"
-#include <esp_system.h>
-#include "user_toggles_state.h"
+#include "graphics.h" // ui_showMessage
 #include "name_entry_state.h"
+#include "ui_input_utils.h" // uiDrainKb
+#include "ui_settings_actions.h"
+#include "user_toggles_state.h"
+#include <esp_system.h>
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -162,10 +162,7 @@ static void actGame_TogglePetPerfHud(InputState &)
   clearInputLatch();
 }
 
-static bool enConsole()
-{
-  return true;
-}
+static bool enConsole() { return true; }
 
 static void actTop_Console(InputState &input)
 {
@@ -288,6 +285,9 @@ static void actWifi_SetNetwork(InputState &input)
   g_wifi.buf[0] = '\0';
   g_wifi.ssid[0] = '\0';
   g_wifi.pass[0] = '\0';
+
+  g_wifi.returnState = UIState::SETTINGS;
+  g_wifi.returnTab = g_app.currentTab;
 
   g_app.uiState = UIState::WIFI_SETUP;
   requestUIRedraw();
@@ -438,8 +438,7 @@ static MenuItem kScreenItems[] = {
 static void actWifi_AssetOtaChannelToggle(InputState &)
 {
   const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
-  const AssetOtaChannel next =
-      (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
+  const AssetOtaChannel next = (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
   assetOtaSetChannel(next);
   requestUIRedraw();
   playBeep();
@@ -453,9 +452,9 @@ static MenuItem kWifiItems[] = {
     {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
     {"Check Asset OTA", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
-  };
+};
 
-  static MenuItem kGameItems[] = {
+static MenuItem kGameItems[] = {
     {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
     {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
     {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
@@ -538,7 +537,7 @@ bool Handle(InputState &input, int move)
 
     return true;
   }
-  
+
   // Move
   if (move != 0)
   {

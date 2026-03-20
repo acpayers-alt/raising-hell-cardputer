@@ -5,13 +5,13 @@
 #include <time.h>
 
 #include "app_state.h"
+#include "boot_pipeline.h"
 #include "input.h"
 #include "time_editor_state.h"
 #include "time_persist.h"
 #include "ui_actions.h"
 #include "ui_invalidate.h"
 #include "wifi_setup_state.h"
-#include "boot_pipeline.h"
 
 // -----------------------------------------------------------------------------
 // Set-Time flow
@@ -33,16 +33,16 @@
 //        - If on OK: behaves like cancel (if allowed)
 // -----------------------------------------------------------------------------
 
-static constexpr uint8_t kFieldYear   = 0;
-static constexpr uint8_t kFieldMonth  = 1;
-static constexpr uint8_t kFieldDay    = 2;
-static constexpr uint8_t kFieldHour   = 3;
+static constexpr uint8_t kFieldYear = 0;
+static constexpr uint8_t kFieldMonth = 1;
+static constexpr uint8_t kFieldDay = 2;
+static constexpr uint8_t kFieldHour = 3;
 static constexpr uint8_t kFieldMinute = 4;
-static constexpr uint8_t kFieldOk     = 5;
+static constexpr uint8_t kFieldOk = 5;
 
 static inline bool fieldIsAdjustable(uint8_t f) { return (f <= kFieldMinute); }
 
-static void normalizeAndClampTm(struct tm& t)
+static void normalizeAndClampTm(struct tm &t)
 {
   // Normalize with mktime() (handles overflow like month 13, day 0, etc.)
   time_t epoch = mktime(&t);
@@ -51,11 +51,11 @@ static void normalizeAndClampTm(struct tm& t)
     // Fallback to a sane default if normalization fails.
     memset(&t, 0, sizeof(t));
     t.tm_year = 2026 - 1900;
-    t.tm_mon  = 0;
+    t.tm_mon = 0;
     t.tm_mday = 1;
     t.tm_hour = 12;
-    t.tm_min  = 0;
-    t.tm_sec  = 0;
+    t.tm_min = 0;
+    t.tm_sec = 0;
     (void)mktime(&t);
     return;
   }
@@ -82,25 +82,25 @@ static void initEditorFromNow()
   {
     memset(&g_setTimeTm, 0, sizeof(g_setTimeTm));
     g_setTimeTm.tm_year = 2026 - 1900;
-    g_setTimeTm.tm_mon  = 0;
+    g_setTimeTm.tm_mon = 0;
     g_setTimeTm.tm_mday = 1;
     g_setTimeTm.tm_hour = 12;
-    g_setTimeTm.tm_min  = 0;
-    g_setTimeTm.tm_sec  = 0;
+    g_setTimeTm.tm_min = 0;
+    g_setTimeTm.tm_sec = 0;
     normalizeAndClampTm(g_setTimeTm);
     return;
   }
 
-  struct tm* lt = localtime(&now);
+  struct tm *lt = localtime(&now);
   if (!lt)
   {
     memset(&g_setTimeTm, 0, sizeof(g_setTimeTm));
     g_setTimeTm.tm_year = 2026 - 1900;
-    g_setTimeTm.tm_mon  = 0;
+    g_setTimeTm.tm_mon = 0;
     g_setTimeTm.tm_mday = 1;
     g_setTimeTm.tm_hour = 12;
-    g_setTimeTm.tm_min  = 0;
-    g_setTimeTm.tm_sec  = 0;
+    g_setTimeTm.tm_min = 0;
+    g_setTimeTm.tm_sec = 0;
     normalizeAndClampTm(g_setTimeTm);
     return;
   }
@@ -114,12 +114,23 @@ static void adjustEditorField(uint8_t field, int delta)
 {
   switch (field)
   {
-    case kFieldYear:   g_setTimeTm.tm_year += delta; break;
-    case kFieldMonth:  g_setTimeTm.tm_mon  += delta; break;
-    case kFieldDay:    g_setTimeTm.tm_mday += delta; break;
-    case kFieldHour:   g_setTimeTm.tm_hour += delta; break;
-    case kFieldMinute: g_setTimeTm.tm_min  += delta; break;
-    default: return;
+  case kFieldYear:
+    g_setTimeTm.tm_year += delta;
+    break;
+  case kFieldMonth:
+    g_setTimeTm.tm_mon += delta;
+    break;
+  case kFieldDay:
+    g_setTimeTm.tm_mday += delta;
+    break;
+  case kFieldHour:
+    g_setTimeTm.tm_hour += delta;
+    break;
+  case kFieldMinute:
+    g_setTimeTm.tm_min += delta;
+    break;
+  default:
+    return;
   }
 
   normalizeAndClampTm(g_setTimeTm);
@@ -145,7 +156,7 @@ static void commitSetTime()
   if (epoch > 0)
   {
     timeval tv;
-    tv.tv_sec  = epoch;
+    tv.tv_sec = epoch;
     tv.tv_usec = 0;
     settimeofday(&tv, nullptr);
   }
@@ -163,7 +174,7 @@ void beginForcedSetTimeBootGate(UIState returnState, Tab returnTab)
 {
   g_setTimeReturnValid = true;
   g_setTimeReturnState = (uint8_t)returnState;
-  g_setTimeReturnTab   = (uint8_t)returnTab;
+  g_setTimeReturnTab = (uint8_t)returnTab;
   g_setTimeForceNoCancel = true;
   g_setTimeActive = true;
   g_setTimeField = kFieldYear;
@@ -178,7 +189,7 @@ void beginSetTimeEditorFromSettings(SettingsPage /*page*/, UIState returnState, 
 {
   g_setTimeReturnValid = true;
   g_setTimeReturnState = (uint8_t)returnState;
-  g_setTimeReturnTab   = (uint8_t)returnTab;
+  g_setTimeReturnTab = (uint8_t)returnTab;
   g_setTimeForceNoCancel = false;
   g_setTimeActive = true;
   g_setTimeField = kFieldYear;
@@ -193,7 +204,7 @@ void beginSetTimeEditorFromSettings(SettingsPage /*page*/, UIState returnState, 
 // UI handler
 // -----------------------------------------------------------------------------
 
-void uiSetTimeHandle(InputState& in)
+void uiSetTimeHandle(InputState &in)
 {
   if (!g_setTimeActive)
     return;
@@ -271,13 +282,16 @@ void uiSetTimeHandle(InputState& in)
     g_wifi.scanIndex = 0;
     g_wifi.buf[0] = '\0';
 
+    g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+    g_wifi.returnTab = Tab::TAB_PET;
+
     uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
     requestUIRedraw();
     inputForceClear();
     in.clearEdges();
     return;
   }
-  
+
   if (anyUiChange)
     requestUIRedraw();
 

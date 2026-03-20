@@ -236,9 +236,11 @@ static void wifiSetupCancel()
 
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS)
   {
-    strncpy(g_wifi.buf, g_wifi.ssid, sizeof(g_wifi.buf) - 1);
-    g_wifi.buf[sizeof(g_wifi.buf) - 1] = '\0';
-    g_wifi.setupStage = WIFI_SETUP_STAGE_SSID;
+    g_wifi.buf[0] = '\0';
+    g_wifi.pass[0] = '\0';
+    g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
+
+    uiActionEnterState(g_wifi.returnState, g_wifi.returnTab, true);
     requestUIRedraw();
     return;
   }
@@ -251,13 +253,8 @@ static void wifiSetupCancel()
     return;
   }
 
-  if (g_wifiSetupFromBootWizard)
-  {
-    uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_app.currentTab, true);
-    return;
-  }
-
-  uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+  uiActionEnterState(g_wifi.returnState, g_wifi.returnTab, true);
+  requestUIRedraw();
 }
 
 static void wifiSetupSelect()
@@ -444,6 +441,16 @@ void uiWifiSetupHandle(InputState &in)
       return;
     }
   }
+
+  if (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID ||
+    g_wifi.setupStage == WIFI_SETUP_STAGE_PASS)
+{
+  if (in.escOnce || in.menuOnce)
+  {
+    wifiSetupCancel();
+    return;
+  }
+}
 
   // If text changed, swallow remaining queued key events this tick.
   if (didTextChange)

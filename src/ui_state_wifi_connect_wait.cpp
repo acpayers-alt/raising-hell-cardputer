@@ -1,13 +1,13 @@
 #include "ui_state_wifi_connect_wait.h"
 
-#include <WiFi.h>
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "app_state.h"
 #include "input.h"
 #include "ui_actions.h"
-#include "ui_runtime.h"
 #include "ui_defs.h"
+#include "ui_runtime.h"
 #include "wifi_setup_state.h"
 #include "wifi_time.h"
 
@@ -62,6 +62,9 @@ void uiWifiConnectWaitHandle(InputState &in)
     clearInputLatch();
     inputForceClear();
 
+    g_wifi.returnState = g_wifiSetupFromBootWizard ? UIState::BOOT_WIFI_PROMPT : UIState::SETTINGS;
+    g_wifi.returnTab = g_app.currentTab;
+
     uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
     requestUIRedraw();
     return;
@@ -71,13 +74,9 @@ void uiWifiConnectWaitHandle(InputState &in)
   const uint32_t connectAgeMs = wifiConsoleConnectAgeMs();
 
   const bool failedStatus =
-      (wifiStatus == WL_CONNECT_FAILED) ||
-      (wifiStatus == WL_NO_SSID_AVAIL) ||
-      (wifiStatus == WL_CONNECTION_LOST);
+      (wifiStatus == WL_CONNECT_FAILED) || (wifiStatus == WL_NO_SSID_AVAIL) || (wifiStatus == WL_CONNECTION_LOST);
 
-  const bool timedOut =
-      (connectAgeMs >= 15000) &&
-      !wifiIsConnected();
+  const bool timedOut = (connectAgeMs >= 15000) && !wifiIsConnected();
 
   if (wifiIsConnected())
   {

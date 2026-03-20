@@ -231,6 +231,9 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     settingsSetWifiEnabled(true);
     saveSettingsToSD();
 
+    g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+    g_wifi.returnTab = g_bootWizardAfterOkTab;
+
     uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   }
 
@@ -262,6 +265,9 @@ static void bootWifiFallBackToManualEntry(InputState &in)
   g_wifi.scanInProgress = false;
   g_wifi.scanCount = 0;
   g_wifi.scanIndex = 0;
+
+  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnTab = g_bootWizardAfterOkTab;
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
@@ -300,6 +306,9 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
     g_wifi.scanCount = 0;
     g_wifi.scanIndex = 0;
   }
+  
+  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnTab = g_bootWizardAfterOkTab;
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
