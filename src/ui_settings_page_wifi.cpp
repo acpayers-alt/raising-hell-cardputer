@@ -104,7 +104,8 @@ void Handle_WIFI(InputState &input, int move)
       g_wifi.scanIndex = 0;
       g_wifi.returnState = UIState::SETTINGS;
       g_wifi.returnTab = g_app.currentTab;
-
+      g_wifi.aborted = false;
+      
       g_app.uiState = UIState::WIFI_SETUP;
       requestUIRedraw();
 

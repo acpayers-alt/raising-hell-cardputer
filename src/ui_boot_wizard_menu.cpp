@@ -52,6 +52,7 @@ static void bootWizardEnterWifiSetup()
 
   g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
   g_wifi.returnTab = g_bootWizardAfterOkTab;
+  g_wifi.aborted = false;
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();

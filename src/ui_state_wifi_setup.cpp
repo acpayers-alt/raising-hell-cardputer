@@ -239,7 +239,7 @@ static void wifiSetupCancel()
     g_wifi.buf[0] = '\0';
     g_wifi.pass[0] = '\0';
     g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
-
+    g_wifi.aborted = true;
     uiActionEnterState(g_wifi.returnState, g_wifi.returnTab, true);
     requestUIRedraw();
     return;
@@ -253,6 +253,7 @@ static void wifiSetupCancel()
     return;
   }
 
+  g_wifi.aborted = true;
   uiActionEnterState(g_wifi.returnState, g_wifi.returnTab, true);
   requestUIRedraw();
 }

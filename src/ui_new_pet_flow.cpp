@@ -10,6 +10,7 @@
 #include "pet.h"
 #include "ui_runtime.h"
 #include "save_manager.h"
+#include "boot_pipeline.h"
 
 void beginNamePetFlow()
 {
@@ -43,7 +44,9 @@ void finalizeNewPetFromName(InputState& in)
   saveManagerStampBirthNow();
 
   saveManagerForce();
-  
+  saveManagerClearNamePendingFlag();
+  bootSetupClearPendingFlag();
+
   g_app.newPetFlowActive = false;
 
   // Leave NAME flow and go back to pet screen

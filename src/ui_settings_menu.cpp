@@ -288,7 +288,8 @@ static void actWifi_SetNetwork(InputState &input)
 
   g_wifi.returnState = UIState::SETTINGS;
   g_wifi.returnTab = g_app.currentTab;
-
+  g_wifi.aborted = false;
+  
   g_app.uiState = UIState::WIFI_SETUP;
   requestUIRedraw();
 

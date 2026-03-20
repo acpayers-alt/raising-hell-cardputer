@@ -110,17 +110,6 @@ static void writeNamePendingFlag()
   }
 }
 
-static void clearNamePendingFlag()
-{
-  if (!g_sdReady)
-    return;
-  if (SD.exists(NAME_PENDING_FLAG_PATH))
-    SD.remove(NAME_PENDING_FLAG_PATH);
-}
-
-// Back-compat: older code called this name.
-static void removeNamePendingFlag() { clearNamePendingFlag(); }
-
 static void forceChoosePetFlowFromBoot()
 {
   // Starting a brand-new pet lifecycle.
@@ -131,8 +120,12 @@ static void forceChoosePetFlowFromBoot()
   inputSetTextCapture(false);
   g_textCaptureMode = false;
 
-  // No pending name.
-  clearNamePendingFlag();
+  // IMPORTANT:
+  // Do NOT clear the pending-name flag here.
+  // Choose-pet is still part of the unfinished first-boot/new-pet flow.
+  // The pending-name flag must survive until the pet is actually finalized
+  // from NAME_PET.
+  // clearNamePendingFlag();
 
   // Go to Choose Pet flow state
   g_app.uiState = UIState::CHOOSE_PET;
@@ -152,6 +145,7 @@ static void unpack(const SavePayload &p);
 static void newPetInternal();
 static bool ensureSaveDir();
 static void tryRemove(const char *path);
+static void clearNamePendingFlag();
 
 static bool loadSettingsFromSD_internal(bool *outLoadedOld = nullptr);
 static bool saveSettingsToSD_internal();
@@ -172,6 +166,11 @@ static void printState(const char *tag)
          pet.energy, pet.health, (int)pet.type, (int)pet.isSleeping, (int)pet.inf, g_app.inventory.countItems(),
          g_app.inventory.selectedIndex);
 }
+
+void saveManagerClearNamePendingFlag() { clearNamePendingFlag(); }
+
+// Back-compat: older code called this name.
+static void removeNamePendingFlag() { clearNamePendingFlag(); }
 
 // ------------------------------------------------------------
 // GAME OPTIONS (separate file so we don't break SettingsData)
@@ -730,6 +729,14 @@ static void newPetInternalNoSave(bool resetName)
   writeNamePendingFlag();
 }
 
+static void clearNamePendingFlag()
+{
+  if (!g_sdReady)
+    return;
+  if (SD.exists(NAME_PENDING_FLAG_PATH))
+    SD.remove(NAME_PENDING_FLAG_PATH);
+}
+
 // ------------------------------------------------------------
 // SAVEGAME IO (SavePayload)
 // ------------------------------------------------------------
@@ -915,15 +922,15 @@ bool saveManagerLoad()
 
     if (namePendingFlagExists())
     {
-      DBGLN_ON("[SAVE] name_pending.flag present -> forcing NAME_PET flow");
-      forceNamePetFlowFromBoot();
+      DBGLN_ON("[SAVE] name_pending.flag present -> forcing CHOOSE_PET flow");
+      forceChoosePetFlowFromBoot();
     }
     else if (isBlankName(pet.name))
     {
-      DBGLN_ON("[SAVE] Blank pet name but NOT in pending-name flow -> forcing CHOOSE_PET");
+      DBGLN_ON("[SAVE] Blank pet name -> forcing CHOOSE_PET");
       forceChoosePetFlowFromBoot();
     }
-
+    
     return true;
   }
 
@@ -1019,6 +1026,11 @@ void saveManagerForce()
     dirty = false;
     lastSaveMs = millis();
     DBGLN_ON("[SAVE] FORCE OK");
+
+    if (namePendingFlagExists() && !isBlankName(pet.name))
+    {
+      clearNamePendingFlag();
+    }
   }
   else
   {

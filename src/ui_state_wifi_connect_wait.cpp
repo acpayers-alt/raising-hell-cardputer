@@ -64,7 +64,8 @@ void uiWifiConnectWaitHandle(InputState &in)
 
     g_wifi.returnState = g_wifiSetupFromBootWizard ? UIState::BOOT_WIFI_PROMPT : UIState::SETTINGS;
     g_wifi.returnTab = g_app.currentTab;
-
+    g_wifi.aborted = false;
+    
     uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
     requestUIRedraw();
     return;

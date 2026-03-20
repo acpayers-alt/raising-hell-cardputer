@@ -163,7 +163,6 @@ static void commitSetTime()
 
   // Persist anchor used by your time system.
   saveTimeAnchor();
-  bootSetupClearPendingFlag();
 }
 
 // -----------------------------------------------------------------------------
@@ -284,6 +283,7 @@ void uiSetTimeHandle(InputState &in)
 
     g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
     g_wifi.returnTab = Tab::TAB_PET;
+    g_wifi.aborted = false;
 
     uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
     requestUIRedraw();

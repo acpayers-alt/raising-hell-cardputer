@@ -53,3 +53,5 @@ void saveManagerDeleteAll();
 void saveManagerDeletePetOnly();
 
 void saveManagerStampBirthNow();
+
+void saveManagerClearNamePendingFlag();

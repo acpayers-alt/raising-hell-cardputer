@@ -44,6 +44,8 @@ struct WifiSetupState
 
   UIState returnState = UIState::SETTINGS;
   Tab returnTab = Tab::TAB_PET;
+
+  bool aborted = false;
 };
 
 extern WifiSetupState g_wifi;

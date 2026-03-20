@@ -674,17 +674,20 @@ void postBootInitTick()
     uiInitLevelPopupTracker();
 
     const bool setupPending = bootSetupPendingFlagExists();
-    const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;    const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
-    const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+    const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;
+    const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
+
+    // Critical rule:
+    // If setup is still pending, post-wizard landing must NOT go to PET_SCREEN.
+    const UIState afterOk =
+        setupPending ? UIState::CHOOSE_PET : (saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET);
 
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool assetsPresentNow = sdAssetsPresent();
-    
-    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n",
-                  provisionRequested ? 1 : 0,
-                  provisionMandatory ? 1 : 0,
-                  assetsPresentNow ? 1 : 0);
+
+    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n", provisionRequested ? 1 : 0,
+                  provisionMandatory ? 1 : 0, assetsPresentNow ? 1 : 0);
 
     const bool deferForAssetProvision = bootAssetProvisionRequired();
 

@@ -169,6 +169,21 @@ static bool bootTryDetectTimezoneFromWifi()
 
 void uiBootWifiImportedHandle(InputState &in)
 {
+  if (g_wifi.aborted)
+{
+  Serial.println("[BOOTWIFI] aborted by user");
+
+  g_wifi.aborted = false;
+
+  uiActionSwallowAll(in);
+  uiDrainKb(in);
+  clearInputLatch();
+
+  uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+  requestUIRedraw();
+  return;
+}
+
   const uint32_t kImportedShowMs = 1200;
 
   const bool continueNow = in.selectOnce || in.upOnce ||
@@ -233,6 +248,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
 
     g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
     g_wifi.returnTab = g_bootWizardAfterOkTab;
+    g_wifi.aborted = false;
 
     uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   }
@@ -268,6 +284,7 @@ static void bootWifiFallBackToManualEntry(InputState &in)
 
   g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
   g_wifi.returnTab = g_bootWizardAfterOkTab;
+        g_wifi.aborted = false;
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
@@ -306,9 +323,10 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
     g_wifi.scanCount = 0;
     g_wifi.scanIndex = 0;
   }
-  
+
   g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
   g_wifi.returnTab = g_bootWizardAfterOkTab;
+  g_wifi.aborted = false;
 
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
@@ -324,6 +342,18 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
 // -----------------------------------------------------------------------------
 void uiBootWifiWaitHandle(InputState &in)
 {
+
+  if (g_wifi.aborted)
+  {
+    g_wifi.aborted = false;
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+    uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+    requestUIRedraw();
+    return;
+  }
+  
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
     uiActionSwallowAll(in);
@@ -414,7 +444,6 @@ void uiBootNtpWaitHandle(InputState &in)
 
   if (timeIsSynced())
   {
-    bootSetupClearPendingFlag();
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
@@ -428,11 +457,6 @@ void uiBootNtpWaitHandle(InputState &in)
     }
 
     UIState nextState = g_bootWizardAfterOkState;
-
-    if (g_sdReady && (SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin")))
-    {
-      nextState = UIState::PET_SCREEN;
-    }
 
     if (nextState == UIState::CHOOSE_PET)
     {
