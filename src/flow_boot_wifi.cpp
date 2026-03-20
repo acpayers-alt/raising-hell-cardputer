@@ -3,37 +3,37 @@
 #include "app_state.h"
 #include "input.h"
 #include "ui_actions.h"
+#include "ui_input_common.h" // uiDrainKb()
 #include "ui_runtime.h"
-#include "ui_input_common.h"   // uiDrainKb()
 
+#include "sdcard.h"
 #include <FS.h>
 #include <SD.h>
-#include "sdcard.h"
 
-#include "wifi_time.h"
 #include "flow_time_editor.h"
 #include "new_pet_flow_state.h"
+#include "wifi_time.h"
 
-#include "ui_boot_wizard_menu.h"
 #include "boot_pipeline.h"
-#include "time_state.h"
 #include "time_persist.h"
+#include "time_state.h"
+#include "ui_boot_wizard_menu.h"
 
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
 #include "flow_boot_wizard.h"
 #include "timezone.h"
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
 
+#include "graphics.h"
 #include "launcher_wifi_import.h"
-#include "wifi_store.h"
+#include "save_manager.h"
 #include "settings_state.h"
 #include "wifi_setup_state.h"
-#include "save_manager.h"
-#include "graphics.h"
+#include "wifi_store.h"
 
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
-extern Tab     g_bootWizardAfterOkTab;
+extern Tab g_bootWizardAfterOkTab;
 
 // -----------------------------------------------------------------------------
 // Launcher Import
@@ -64,10 +64,7 @@ void bootWifiClearImportedInfo()
   s_bootWifiImportedAtMs = 0;
 }
 
-const char *bootWifiImportedSsid()
-{
-  return s_bootWifiImportedSsid;
-}
+const char *bootWifiImportedSsid() { return s_bootWifiImportedSsid; }
 
 static int tzIndexFromDetectedName(const String &tzNameStr)
 {
@@ -77,40 +74,27 @@ static int tzIndexFromDetectedName(const String &tzNameStr)
   if (tzNameStr == "UTC" || tzNameStr == "Etc/UTC")
     return 0;
 
-  if (tzNameStr == "America/New_York" ||
-      tzNameStr == "America/Detroit" ||
-      tzNameStr == "America/Indiana/Indianapolis" ||
-      tzNameStr == "America/Indiana/Marengo" ||
-      tzNameStr == "America/Indiana/Petersburg" ||
-      tzNameStr == "America/Indiana/Vevay" ||
-      tzNameStr == "America/Indiana/Vincennes" ||
-      tzNameStr == "America/Indiana/Winamac" ||
-      tzNameStr == "America/Kentucky/Louisville" ||
-      tzNameStr == "America/Kentucky/Monticello")
+  if (tzNameStr == "America/New_York" || tzNameStr == "America/Detroit" ||
+      tzNameStr == "America/Indiana/Indianapolis" || tzNameStr == "America/Indiana/Marengo" ||
+      tzNameStr == "America/Indiana/Petersburg" || tzNameStr == "America/Indiana/Vevay" ||
+      tzNameStr == "America/Indiana/Vincennes" || tzNameStr == "America/Indiana/Winamac" ||
+      tzNameStr == "America/Kentucky/Louisville" || tzNameStr == "America/Kentucky/Monticello")
     return 1;
 
-  if (tzNameStr == "America/Chicago" ||
-      tzNameStr == "America/Indiana/Knox" ||
-      tzNameStr == "America/Indiana/Tell_City" ||
-      tzNameStr == "America/Menominee" ||
-      tzNameStr == "America/North_Dakota/Beulah" ||
-      tzNameStr == "America/North_Dakota/Center" ||
+  if (tzNameStr == "America/Chicago" || tzNameStr == "America/Indiana/Knox" ||
+      tzNameStr == "America/Indiana/Tell_City" || tzNameStr == "America/Menominee" ||
+      tzNameStr == "America/North_Dakota/Beulah" || tzNameStr == "America/North_Dakota/Center" ||
       tzNameStr == "America/North_Dakota/New_Salem")
     return 2;
 
-  if (tzNameStr == "America/Denver" ||
-      tzNameStr == "America/Boise")
+  if (tzNameStr == "America/Denver" || tzNameStr == "America/Boise")
     return 3;
 
   if (tzNameStr == "America/Los_Angeles")
     return 4;
 
-  if (tzNameStr == "America/Anchorage" ||
-      tzNameStr == "America/Juneau" ||
-      tzNameStr == "America/Nome" ||
-      tzNameStr == "America/Sitka" ||
-      tzNameStr == "America/Yakutat" ||
-      tzNameStr == "America/Metlakatla")
+  if (tzNameStr == "America/Anchorage" || tzNameStr == "America/Juneau" || tzNameStr == "America/Nome" ||
+      tzNameStr == "America/Sitka" || tzNameStr == "America/Yakutat" || tzNameStr == "America/Metlakatla")
     return 5;
 
   if (tzNameStr == "Pacific/Honolulu")
@@ -171,9 +155,7 @@ static bool bootTryDetectTimezoneFromWifi()
   String tzNameStr = String(tzNameRaw);
   const int detectedIdx = tzIndexFromDetectedName(tzNameStr);
 
-  Serial.printf("[BOOTWIFI] timezone detect raw='%s' mapped=%d\n",
-                tzNameStr.c_str(),
-                detectedIdx);
+  Serial.printf("[BOOTWIFI] timezone detect raw='%s' mapped=%d\n", tzNameStr.c_str(), detectedIdx);
 
   if (detectedIdx < 0)
     return false;
@@ -189,11 +171,8 @@ void uiBootWifiImportedHandle(InputState &in)
 {
   const uint32_t kImportedShowMs = 1200;
 
-  const bool continueNow =
-      in.selectOnce ||
-      in.upOnce ||
-      (s_bootWifiImportedAtMs != 0 &&
-       (millis() - s_bootWifiImportedAtMs) >= kImportedShowMs);
+  const bool continueNow = in.selectOnce || in.upOnce ||
+                           (s_bootWifiImportedAtMs != 0 && (millis() - s_bootWifiImportedAtMs) >= kImportedShowMs);
 
   if (continueNow)
   {
@@ -261,10 +240,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   clearInputLatch();
 }
 
-void uiBootWifiPromptHandle(InputState& in)
-{
-  (void)UiBootWizardMenu::HandleWifiPrompt(in);
-}
+void uiBootWifiPromptHandle(InputState &in) { (void)UiBootWizardMenu::HandleWifiPrompt(in); }
 
 // -----------------------------------------------------------------------------
 // Fall back to manual entry if imported wifi hotspot fails to connect
@@ -337,7 +313,7 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
 // After WiFi setup returns, wait for connection then advance.
 // ESC always skips to manual time.
 // -----------------------------------------------------------------------------
-void uiBootWifiWaitHandle(InputState& in)
+void uiBootWifiWaitHandle(InputState &in)
 {
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
@@ -361,22 +337,18 @@ void uiBootWifiWaitHandle(InputState& in)
   const uint32_t connectAgeMs = wifiConsoleConnectAgeMs();
 
   const bool failedStatus =
-      (wifiStatus == WL_CONNECT_FAILED) ||
-      (wifiStatus == WL_NO_SSID_AVAIL) ||
-      (wifiStatus == WL_CONNECTION_LOST);
+      (wifiStatus == WL_CONNECT_FAILED) || (wifiStatus == WL_NO_SSID_AVAIL) || (wifiStatus == WL_CONNECTION_LOST);
 
-  const bool timedOut =
-      (connectAgeMs >= 15000) &&
-      !wifiIsConnected();
+  const bool timedOut = (connectAgeMs >= 15000) && !wifiIsConnected();
 
-      if (failedStatus || timedOut)
-      {
-        if (bootWifiImportedSsid()[0] != 0)
-          bootWifiFallBackToManualEntry(in);
-        else
-          bootWifiRetryOrReturnToScan(in);
-        return;
-      }
+  if (failedStatus || timedOut)
+  {
+    if (bootWifiImportedSsid()[0] != 0)
+      bootWifiFallBackToManualEntry(in);
+    else
+      bootWifiRetryOrReturnToScan(in);
+    return;
+  }
 
   if (wifiIsConnected())
   {
@@ -405,16 +377,13 @@ void uiBootWifiWaitHandle(InputState& in)
 // -----------------------------------------------------------------------------
 // BOOT_TZ_PICK
 // -----------------------------------------------------------------------------
-void uiBootTzPickHandle(InputState& in)
-{
-  (void)UiBootWizardMenu::HandleTimezonePick(in);
-}
+void uiBootTzPickHandle(InputState &in) { (void)UiBootWizardMenu::HandleTimezonePick(in); }
 
 // -----------------------------------------------------------------------------
 // BOOT_NTP_WAIT
 // Wait for time sync; ESC skips to manual. Once synced, continue.
 // -----------------------------------------------------------------------------
-void uiBootNtpWaitHandle(InputState& in)
+void uiBootNtpWaitHandle(InputState &in)
 {
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
@@ -436,7 +405,7 @@ void uiBootNtpWaitHandle(InputState& in)
 
   if (timeIsSynced())
   {
-    bootSetupWritePendingFlag();
+    bootSetupClearPendingFlag();
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
@@ -451,9 +420,7 @@ void uiBootNtpWaitHandle(InputState& in)
 
     UIState nextState = g_bootWizardAfterOkState;
 
-    if (g_sdReady &&
-        (SD.exists("/raising_hell/save/save.bin") ||
-         SD.exists("raising_hell/save/save.bin")))
+    if (g_sdReady && (SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin")))
     {
       nextState = UIState::PET_SCREEN;
     }
