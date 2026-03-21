@@ -28,6 +28,7 @@
 #include "game_options_state.h"
 #include "graphics.h" // ui_showMessage
 #include "name_entry_state.h"
+#include "ui_actions.h"
 #include "ui_input_utils.h" // uiDrainKb
 #include "ui_settings_actions.h"
 #include "user_toggles_state.h"
@@ -289,8 +290,8 @@ static void actWifi_SetNetwork(InputState &input)
   g_wifi.returnState = UIState::SETTINGS;
   g_wifi.returnTab = g_app.currentTab;
   g_wifi.aborted = false;
-  
-  g_app.uiState = UIState::WIFI_SETUP;
+
+  uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
   requestUIRedraw();
 
   inputSetTextCapture(true);
@@ -345,7 +346,7 @@ static void actGame_RenamePet(InputState &input)
   inputSetTextCapture(true);
   g_textCaptureMode = true;
 
-  g_app.uiState = UIState::NAME_PET;
+  uiActionEnterState(UIState::NAME_PET, g_app.currentTab, true);
 
   requestUIRedraw();
   invalidateBackgroundCache();

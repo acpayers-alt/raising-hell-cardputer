@@ -19,6 +19,7 @@
 #include "wifi_setup_state.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
+#include "ui_actions.h"
 
 namespace UiSettingsPages
 {
@@ -106,7 +107,7 @@ void Handle_WIFI(InputState &input, int move)
       g_wifi.returnTab = g_app.currentTab;
       g_wifi.aborted = false;
       
-      g_app.uiState = UIState::WIFI_SETUP;
+      uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
       requestUIRedraw();
 
       inputSetTextCapture(true);

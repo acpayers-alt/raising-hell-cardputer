@@ -10,6 +10,7 @@
 #include "sleep_state.h"
 #include "ui_runtime.h"
 #include "ui_suppress.h"
+#include "ui_actions.h"
 
 void uiSleepMenuSetUntilAwakened(uint32_t nowMs)
 {
@@ -41,8 +42,7 @@ void uiSleepMenuEnterSleep(uint32_t nowMs)
 
   pet.isSleeping   = true;
   g_app.isSleeping = true;
-  g_app.uiState    = UIState::PET_SLEEPING;
-  g_app.currentTab = Tab::TAB_PET;
+  uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
 
   requestUIRedraw();
 

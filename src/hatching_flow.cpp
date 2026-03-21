@@ -11,6 +11,8 @@
 #include "ui_invalidate.h"
 #include "graphics.h"
 #include "ui_runtime.h"
+#include "ui_actions.h"
+
 void updateHatching() {
   const uint32_t now = millis();
 
@@ -256,12 +258,11 @@ void updateHatching() {
         // Now enable text capture for name entry
         inputSetTextCapture(true);
 
-        g_app.uiState = UIState::NAME_PET;
+        uiActionEnterState(UIState::NAME_PET, Tab::TAB_PET, true);
         requestFullUIRedraw();
 
         // One more latch clear for safety (cheap and avoids double-enter)
-        clearInputLatch();
-      }
+        clearInputLatch();      }
       break;
   }
 }

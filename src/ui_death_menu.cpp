@@ -6,6 +6,7 @@
 #include "mini_games.h"   // startResurrectionRun(), currentMiniGame, MiniGame::RESURRECTION
 #include "sound.h"
 #include "ui_runtime.h"   // requestUIRedraw()
+#include "ui_actions.h"
 
 extern int deathMenuIndex;
 
@@ -22,7 +23,7 @@ static void actResurrect(InputState& in)
 
   g_app.inMiniGame = true;
   g_app.gameOver   = false;
-  g_app.uiState    = UIState::MINI_GAME;
+  uiActionEnterState(UIState::MINI_GAME, Tab::TAB_PET, true);
   requestUIRedraw();
 
   invalidateBackgroundCache();
@@ -41,9 +42,9 @@ static void actBury(InputState& in)
   soundResetDeathDirgeLatch();
   soundFuneralDirge();
 
-  g_app.uiState = UIState::BURIAL_SCREEN;
+  uiActionEnterState(UIState::BURIAL_SCREEN, Tab::TAB_PET, true);
   requestUIRedraw();
-
+  
   invalidateBackgroundCache();
 
   inputForceClear();
