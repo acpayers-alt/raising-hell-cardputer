@@ -284,7 +284,8 @@ static void wifiSetupSelect()
   }
 
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
-  uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_wifi.returnTab, true);  requestUIRedraw();
+  uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_wifi.returnTab, true);
+  requestUIRedraw();
   return;
 }
 
@@ -442,15 +443,14 @@ void uiWifiSetupHandle(InputState &in)
     }
   }
 
-  if (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID ||
-    g_wifi.setupStage == WIFI_SETUP_STAGE_PASS)
-{
-  if (in.escOnce || in.menuOnce)
+  if (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID || g_wifi.setupStage == WIFI_SETUP_STAGE_PASS)
   {
-    wifiSetupCancel();
-    return;
+    if (in.escOnce || in.menuOnce)
+    {
+      wifiSetupCancel();
+      return;
+    }
   }
-}
 
   // If text changed, swallow remaining queued key events this tick.
   if (didTextChange)

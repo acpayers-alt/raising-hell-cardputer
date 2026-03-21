@@ -48,7 +48,7 @@ void MainMenuState::update()
     else
     {
       Serial.println("Opening settings...");
-      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);    }
-    return;
+      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::TOP);    return;
   }
+}
 }

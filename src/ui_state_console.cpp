@@ -4,10 +4,10 @@
 #include "console.h"
 #include "input.h"
 #include "settings_flow_state.h"
+#include "ui_actions.h"
 #include "ui_input_common.h"
 #include "ui_input_utils.h"
 #include "ui_runtime.h"
-#include "ui_actions.h"
 
 // Console return target
 static UIState g_consoleReturnState = UIState::PET_SCREEN;
@@ -27,11 +27,11 @@ void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSetting
   consoleOpen();
 
   // Centralized transition (no raw g_app.uiState writes)
-  uiActionEnterState(UIState::CONSOLE, g_app.currentTab, true);
+  uiActionEnterState(UIState::CONSOLE, returnTab, true);
   requestUIRedraw();
 }
 
-static inline void swallowTypingAndEdges(InputState& in)
+static inline void swallowTypingAndEdges(InputState &in)
 {
   // Drain any typed chars accumulated this frame
   uiActionDrainKb(in);
@@ -77,7 +77,7 @@ void uiConsoleHandle(InputState &input)
   requestUIRedraw();
 }
 
-bool closeConsoleAndReturn(InputState& input)
+bool closeConsoleAndReturn(InputState &input)
 {
   // Only makes sense if console is actually active
   if (g_app.uiState != UIState::CONSOLE)
