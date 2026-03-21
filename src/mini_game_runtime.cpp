@@ -273,12 +273,17 @@ void miniGameExitToReturnUi(bool beginLockout)
   s_rewardMsg[0] = 0;
 
   UIState target = miniGameGetReturnUiOrDefault(UIState::PET_SCREEN);
+  Tab targetTab = miniGameGetReturnTabOrDefault(Tab::TAB_PET);
+
   if (target == UIState::MINI_GAME || target == UIState::MG_PAUSE)
+  {
     target = UIState::PET_SCREEN;
+    targetTab = Tab::TAB_PET;
+  }
 
   miniGameClearReturnUi();
 
-  g_app.uiState = target;
+  uiActionEnterState(target, targetTab, true);
 
   g_app.inMiniGame = false;
   g_app.gameOver = false;

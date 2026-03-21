@@ -12,6 +12,7 @@
 #include "death_state.h"
 #include "graphics.h"  
 #include "mini_game_runtime.h"
+#include "ui_actions.h"
 
 // ==================================================================
 // MAIN DISPATCHER (thin wrapper)
@@ -47,7 +48,7 @@ void onResurrectionMiniGameResult(bool success)
 
   // Failed: return to death screen
   resetDeathMenu();
-  g_app.uiState = UIState::DEATH;
+  uiActionEnterState(UIState::DEATH, Tab::TAB_PET, true);
 
   requestUIRedraw();
   invalidateBackgroundCache();

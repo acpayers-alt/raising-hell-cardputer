@@ -32,6 +32,7 @@
 #include "time_state.h"
 #include "user_toggles_state.h"
 #include "app_lifecycle.h"
+#include "ui_actions.h"
 
 static bool dirty = false;
 static uint32_t lastSaveMs = 0;
@@ -129,8 +130,7 @@ static void forceChoosePetFlowFromBoot()
   // clearNamePendingFlag();
 
   // Go to Choose Pet flow state
-  g_app.uiState = UIState::CHOOSE_PET;
-  g_app.currentTab = Tab::TAB_PET;
+  uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
   g_app.uiNeedsRedraw = true;
 
   // Clear latches
@@ -372,8 +372,7 @@ static void migrateV2ToRuntime(const SavePayloadV2 &p2)
 
   if (g_app.uiState == UIState::PET_SLEEPING)
   {
-    g_app.uiState = UIState::PET_SCREEN;
-    g_app.currentTab = Tab::TAB_PET;
+    uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
   }
 
   g_app.inventory.fromPersist(p2.inv);
@@ -886,7 +885,7 @@ static bool isBlankName(const char *s)
 static void forceNamePetFlowFromBoot()
 {
   inputSetTextCapture(true);
-  g_app.uiState = UIState::NAME_PET;
+  uiActionEnterState(UIState::NAME_PET, Tab::TAB_PET, true);
 
   g_app.uiNeedsRedraw = true;
   requestFullUIRedraw();

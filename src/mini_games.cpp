@@ -537,7 +537,7 @@ void startFlappyFireball()
 
   logMiniGameHeap("startFlappyFireball");
 
-  miniGameSetReturnUi(retUi);
+  miniGameSetReturnUi(retUi, g_app.currentTab);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   s_flappyInited = true;
@@ -1831,7 +1831,7 @@ void startResurrectionRun()
   mgmem::logUsage("rr beginSession");
   freeResRunSprites();
 
-  miniGameSetReturnUi(UIState::DEATH);
+  miniGameSetReturnUi(UIState::DEATH, Tab::TAB_PET);
 
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
@@ -2887,7 +2887,7 @@ void startCrossyRoad()
   if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
     retUi = UIState::PET_SCREEN;
 
-  miniGameSetReturnUi(retUi);
+  miniGameSetReturnUi(retUi, g_app.currentTab);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   s_crossyInited = true;
@@ -4059,7 +4059,7 @@ void startInfernalDodger()
   if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
     retUi = UIState::PET_SCREEN;
 
-  miniGameSetReturnUi(retUi);
+  miniGameSetReturnUi(retUi, g_app.currentTab);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   s_dodgerInited = false;

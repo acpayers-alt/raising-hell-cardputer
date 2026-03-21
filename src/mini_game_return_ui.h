@@ -1,7 +1,9 @@
 #pragma once
 
-#include "ui_defs.h"  // UIState
+#include "ui_defs.h"
 
-void   miniGameSetReturnUi(UIState s);
-void   miniGameClearReturnUi();
-UIState miniGameGetReturnUiOrDefault(UIState fallback);
+void miniGameSetReturnUi(UIState state, Tab tab);
+void miniGameClearReturnUi();
+
+UIState miniGameGetReturnUiOrDefault(UIState fallbackState);
+Tab miniGameGetReturnTabOrDefault(Tab fallbackTab);

@@ -7,6 +7,7 @@
 #include "ui_defs.h"
 #include "app_state.h"
 #include "ui_invalidate.h"
+#include "ui_actions.h"
 
 static inline int clampi_local(int v, int lo, int hi) {
   if (v < lo) return lo;
@@ -38,7 +39,7 @@ void feedPet(int mode) {
   }
 
   // Return to pet screen
-  g_app.uiState = UIState::PET_SCREEN;
+  uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
   requestUIRedraw();
 }
 
@@ -64,12 +65,12 @@ void handleFeedInput(const InputState& in) {
 
   // Cancel / back
   if (in.menuOnce) {
-    g_app.uiState = UIState::PET_SCREEN;
+    uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
     soundCancel();
     requestUIRedraw();
     return;
   }
-
+  
   // Select (ENTER)
   if (in.selectOnce) {
     feedPet(g_app.feedMenuIndex);

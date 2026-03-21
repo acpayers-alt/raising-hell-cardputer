@@ -2,28 +2,30 @@
 
 #include <Arduino.h>
 
-#include "app_state.h"     
-#include "pet.h"            
-#include "input.h"          
-#include "sound.h"          
-#include "graphics.h"       
-#include "ui_invalidate.h"  
+#include "app_state.h"
+#include "graphics.h"
+#include "input.h"
+#include "pet.h"
+#include "sound.h"
+#include "ui_actions.h"
+#include "ui_invalidate.h"
 #include "ui_runtime.h"
 
 static bool s_evoFlashSoundPlayed = false;
 
-void beginEvolution(uint8_t fromStage, uint8_t toStage) {
+void beginEvolution(uint8_t fromStage, uint8_t toStage)
+{
   const uint32_t now = millis();
 
-  g_app.flow.evo.active       = true;
-  g_app.flow.evo.showingMsg   = true;
-  g_app.flow.evo.msgStartMs   = now;
-  g_app.flow.evo.fromStage    = fromStage;
-  g_app.flow.evo.toStage      = toStage;
-  g_app.flow.evo.phase        = 0;
+  g_app.flow.evo.active = true;
+  g_app.flow.evo.showingMsg = true;
+  g_app.flow.evo.msgStartMs = now;
+  g_app.flow.evo.fromStage = fromStage;
+  g_app.flow.evo.toStage = toStage;
+  g_app.flow.evo.phase = 0;
   g_app.flow.evo.phaseStartMs = 0;
-  g_app.flow.evo.flashWhite   = false;
-  s_evoFlashSoundPlayed       = false;
+  g_app.flow.evo.flashWhite = false;
+  s_evoFlashSoundPlayed = false;
 
   clearInputLatch();
   requestUIRedraw();
@@ -46,7 +48,7 @@ void updateEvolution() {
 
     // Switch into the black evolution screen
     g_app.flow.evo.showingMsg = false;
-    g_app.uiState             = UIState::EVOLUTION;
+    uiActionEnterState(UIState::EVOLUTION, Tab::TAB_PET, true);
 
     g_app.flow.evo.phase        = 0;
     g_app.flow.evo.phaseStartMs = now;
@@ -59,7 +61,7 @@ void updateEvolution() {
 
   // If we somehow got here without being in EVOLUTION state, force it
   if (g_app.uiState != UIState::EVOLUTION) {
-    g_app.uiState = UIState::EVOLUTION;
+    uiActionEnterState(UIState::EVOLUTION, Tab::TAB_PET, true);
 
     g_app.flow.evo.phase        = 0;
     g_app.flow.evo.phaseStartMs = now;
@@ -109,8 +111,7 @@ void updateEvolution() {
       g_app.flow.evo.active     = false;
       g_app.flow.evo.flashWhite = false;
 
-      g_app.uiState    = UIState::PET_SCREEN;
-      g_app.currentTab = Tab::TAB_PET;
+      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
 
       requestFullUIRedraw();
       clearInputLatch();

@@ -19,6 +19,7 @@
 #include "mini_games.h"
 #include "pet_state.h"   
 #include "feed_actions.h"
+#include "ui_actions.h"
 
 // -----------------------------------------------------------------------------
 // PRE-BIRTH GUARD
@@ -368,8 +369,7 @@ void Pet::petSleepTick()
       requestUIRedraw();
 
       if (g_app.uiState == UIState::PET_SLEEPING) {
-        g_app.uiState    = UIState::PET_SCREEN;
-        g_app.currentTab = Tab::TAB_PET;
+        uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
       }
       return;
     }
@@ -391,9 +391,9 @@ void Pet::petSleepTick()
           requestUIRedraw();
 
           if (g_app.uiState == UIState::PET_SLEEPING) {
-            g_app.uiState    = UIState::PET_SCREEN;
-            g_app.currentTab = Tab::TAB_PET;
+            uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
           }
+
           return;
         }
       }
@@ -786,8 +786,8 @@ void petEnterDeathState()
   inputForceClear();
   clearInputLatch();
 
-  g_app.uiState = UIState::DEATH;
-
+  uiActionEnterState(UIState::DEATH, Tab::TAB_PET, true);
+  
   if (consoleIsOpen()) {
     consoleClose();
   }

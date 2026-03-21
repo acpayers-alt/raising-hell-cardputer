@@ -1,20 +1,29 @@
 #include "mini_game_return_ui.h"
 
-static bool    s_hasReturn = false;
-static UIState s_returnUi  = UIState::PET_SCREEN;
+static bool s_hasMiniGameReturnUi = false;
+static UIState s_miniGameReturnState = UIState::PET_SCREEN;
+static Tab s_miniGameReturnTab = Tab::TAB_PET;
 
-void miniGameSetReturnUi(UIState s)
+void miniGameSetReturnUi(UIState state, Tab tab)
 {
-  s_hasReturn = true;
-  s_returnUi  = s;
+  s_hasMiniGameReturnUi = true;
+  s_miniGameReturnState = state;
+  s_miniGameReturnTab = tab;
 }
 
 void miniGameClearReturnUi()
 {
-  s_hasReturn = false;
+  s_hasMiniGameReturnUi = false;
+  s_miniGameReturnState = UIState::PET_SCREEN;
+  s_miniGameReturnTab = Tab::TAB_PET;
 }
 
-UIState miniGameGetReturnUiOrDefault(UIState fallback)
+UIState miniGameGetReturnUiOrDefault(UIState fallbackState)
 {
-  return s_hasReturn ? s_returnUi : fallback;
+  return s_hasMiniGameReturnUi ? s_miniGameReturnState : fallbackState;
+}
+
+Tab miniGameGetReturnTabOrDefault(Tab fallbackTab)
+{
+  return s_hasMiniGameReturnUi ? s_miniGameReturnTab : fallbackTab;
 }
