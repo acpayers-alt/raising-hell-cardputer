@@ -16,6 +16,7 @@
 #include "ui_input_common.h"
 #include "ui_new_pet_flow.h"
 #include "ui_runtime.h"
+#include "ui_state_settings.h"
 
 void uiNamePetHandle(InputState &in)
 {
@@ -40,15 +41,13 @@ void uiNamePetHandle(InputState &in)
     {
       g_namePetRenameMode = false;
       g_settingsFlow.settingsPage = SettingsPage::GAME;
-      uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
-    }
+      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);    }
     else
     {
       // ESC is intentionally ignored on NAME_PET during new pet flow;
       // MENU returns to choose pet.
       g_choosePetBlockHatchUntilRelease = true;
-      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
-    }
+      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);    }
 
     requestUIRedraw();
     uiDrainKb(in);

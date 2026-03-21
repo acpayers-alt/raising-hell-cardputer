@@ -51,6 +51,17 @@
 
 void resetSettingsNav(bool resetTopIndex);
 
+void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage startPage)
+{
+  g_settingsFlow.settingsReturnState = returnState;
+  g_settingsFlow.settingsReturnTab = returnTab;
+  g_settingsFlow.settingsReturnValid = true;
+  g_settingsFlow.settingsPage = startPage;
+
+  uiActionEnterState(UIState::SETTINGS, returnTab, true);
+  requestUIRedraw();
+}
+
 void uiSettingsHandle(InputState& input)
 {
   if (g_settingsFlow.settingsPage == SettingsPage::SYSTEM)

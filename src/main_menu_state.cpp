@@ -5,6 +5,7 @@
 #include "sound.h"
 #include "state_manager.h"
 #include "ui_actions.h"
+#include "ui_state_settings.h"
 
 void MainMenuState::enter()
 {
@@ -47,8 +48,7 @@ void MainMenuState::update()
     else
     {
       Serial.println("Opening settings...");
-      uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
-    }
+      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);    }
     return;
   }
 }
