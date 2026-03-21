@@ -4,22 +4,24 @@
 #include <string.h>
 
 #include "app_state.h"
+#include "graphics.h"
 #include "input.h"
 #include "name_entry_state.h"
 #include "new_pet_flow_state.h"
 #include "pet.h"
+#include "save_manager.h"
+#include "settings_flow_state.h"
 #include "sound.h"
+#include "ui_actions.h"
+#include "ui_input_common.h"
 #include "ui_new_pet_flow.h"
 #include "ui_runtime.h"
-#include "ui_input_common.h"
-#include "settings_flow_state.h"
-#include "save_manager.h"
-#include "graphics.h"
 
-void uiNamePetHandle(InputState& in)
+void uiNamePetHandle(InputState &in)
 {
   // One-time cleanup after entering the screen
-  if (g_namePetJustOpened) {
+  if (g_namePetJustOpened)
+  {
     g_namePetJustOpened = false;
     uiDrainKb(in);
     inputForceClear();
@@ -29,19 +31,23 @@ void uiNamePetHandle(InputState& in)
   bool changed = false;
 
   // Back cancels
-  if (in.menuOnce) {
+  if (in.menuOnce)
+  {
     inputSetTextCapture(false);
     g_textCaptureMode = false;
 
-    if (g_namePetRenameMode) {
+    if (g_namePetRenameMode)
+    {
       g_namePetRenameMode = false;
-      g_app.uiState = UIState::SETTINGS;
       g_settingsFlow.settingsPage = SettingsPage::GAME;
-    } else {
+      uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+    }
+    else
+    {
       // ESC is intentionally ignored on NAME_PET during new pet flow;
       // MENU returns to choose pet.
-      g_app.uiState = UIState::CHOOSE_PET;
       g_choosePetBlockHatchUntilRelease = true;
+      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
     }
 
     requestUIRedraw();
@@ -51,18 +57,22 @@ void uiNamePetHandle(InputState& in)
     return;
   }
 
-  while (in.kbHasEvent()) {
+  while (in.kbHasEvent())
+  {
     KeyEvent ev = in.kbPop();
     const uint8_t c = ev.code;
 
     // Enter → finalize
-    if (c == '\n' || c == RH_KEY_ENTER) {
-      if (g_pendingPetName[0] == '\0') {
+    if (c == '\n' || c == RH_KEY_ENTER)
+    {
+      if (g_pendingPetName[0] == '\0')
+      {
         playBeep();
         continue;
       }
 
-      if (g_namePetRenameMode) {
+      if (g_namePetRenameMode)
+      {
         inputSetTextCapture(false);
         g_textCaptureMode = false;
 
@@ -70,13 +80,14 @@ void uiNamePetHandle(InputState& in)
         saveManagerMarkDirty();
 
         g_namePetRenameMode = false;
-        g_app.uiState = UIState::SETTINGS;
         g_settingsFlow.settingsPage = SettingsPage::GAME;
+        uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
 
         requestUIRedraw();
         invalidateBackgroundCache();
 
-        while (in.kbHasEvent()) (void)in.kbPop();
+        while (in.kbHasEvent())
+          (void)in.kbPop();
         inputForceClear();
         clearInputLatch();
         playBeep();
@@ -88,9 +99,11 @@ void uiNamePetHandle(InputState& in)
     }
 
     // Backspace
-    if (c == '\b' || c == RH_KEY_BACKSPACE) {
+    if (c == '\b' || c == RH_KEY_BACKSPACE)
+    {
       size_t n = strnlen(g_pendingPetName, PET_NAME_MAX);
-      if (n > 0) {
+      if (n > 0)
+      {
         g_pendingPetName[n - 1] = '\0';
         changed = true;
       }
@@ -98,10 +111,12 @@ void uiNamePetHandle(InputState& in)
     }
 
     // Printable ASCII only
-    if (c < 32 || c > 126) continue;
+    if (c < 32 || c > 126)
+      continue;
 
     size_t n = strnlen(g_pendingPetName, PET_NAME_MAX);
-    if (n >= PET_NAME_MAX) {
+    if (n >= PET_NAME_MAX)
+    {
       playBeep();
       continue;
     }
@@ -111,6 +126,7 @@ void uiNamePetHandle(InputState& in)
     changed = true;
   }
 
-  if (changed) requestUIRedraw();
+  if (changed)
+    requestUIRedraw();
   clearInputLatch();
 }

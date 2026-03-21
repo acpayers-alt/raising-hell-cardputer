@@ -11,6 +11,7 @@
 #include "ui_runtime.h"
 #include "save_manager.h"
 #include "boot_pipeline.h"
+#include "ui_actions.h"
 
 void beginNamePetFlow()
 {
@@ -19,7 +20,7 @@ void beginNamePetFlow()
   g_textCaptureMode   = true;
   g_namePetJustOpened = true;
 
-  g_app.uiState = UIState::NAME_PET;
+  uiActionEnterState(UIState::NAME_PET, Tab::TAB_PET, true);
   requestUIRedraw();
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -50,8 +51,7 @@ void finalizeNewPetFromName(InputState& in)
   g_app.newPetFlowActive = false;
 
   // Leave NAME flow and go back to pet screen
-  g_app.uiState    = UIState::PET_SCREEN;
-  g_app.currentTab = Tab::TAB_PET;
+  uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
 
   requestUIRedraw();
   invalidateBackgroundCache();

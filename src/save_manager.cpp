@@ -31,6 +31,7 @@
 #include "time_persist.h"
 #include "time_state.h"
 #include "user_toggles_state.h"
+#include "app_lifecycle.h"
 
 static bool dirty = false;
 static uint32_t lastSaveMs = 0;
@@ -920,17 +921,19 @@ bool saveManagerLoad()
   if (saveOk)
   {
 
-    if (namePendingFlagExists())
-    {
-      DBGLN_ON("[SAVE] name_pending.flag present -> forcing CHOOSE_PET flow");
-      forceChoosePetFlowFromBoot();
-    }
-    else if (isBlankName(pet.name))
-    {
-      DBGLN_ON("[SAVE] Blank pet name -> forcing CHOOSE_PET");
-      forceChoosePetFlowFromBoot();
-    }
+    const bool namePending = namePendingFlagExists();
+    const bool blankPetName = isBlankName(pet.name);
     
+    if (appLifecycleLoadedSaveRequiresChoosePet(namePending, blankPetName))
+    {
+      if (namePending)
+        DBGLN_ON("[SAVE] lifecycle: name_pending.flag present -> forcing CHOOSE_PET flow");
+      else
+        DBGLN_ON("[SAVE] lifecycle: blank pet name -> forcing CHOOSE_PET");
+    
+      forceChoosePetFlowFromBoot();
+    }
+        
     return true;
   }
 

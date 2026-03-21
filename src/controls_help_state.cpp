@@ -7,7 +7,8 @@
 #include "graphics.h"
 #include "input.h"
 #include "save_manager.h"
-#include "sdcard.h"   // <-- add this
+#include "sdcard.h"   
+#include "ui_actions.h"
 
 uint8_t g_controlsHelpSeen = 0;
 
@@ -18,7 +19,7 @@ void controlsHelpBegin(UIState returnState, Tab returnTab) {
 s_controlsHelpReturnState = returnState;
 s_controlsHelpReturnTab   = returnTab;
 
-g_app.uiState = UIState::CONTROLS_HELP;
+uiActionEnterState(UIState::CONTROLS_HELP, returnTab, true);
 requestFullUIRedraw();
 }
 
@@ -42,7 +43,6 @@ void controlsHelpDismiss() {
     return;
   }
 
-  g_app.uiState    = s_controlsHelpReturnState;
-  g_app.currentTab = s_controlsHelpReturnTab;
+  uiActionEnterState(s_controlsHelpReturnState, s_controlsHelpReturnTab, true);
   requestFullUIRedraw();
 }

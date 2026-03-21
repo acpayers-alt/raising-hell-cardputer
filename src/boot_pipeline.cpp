@@ -44,6 +44,7 @@
 #include "wifi_time.h"
 #include <WiFi.h>
 #include <esp_system.h>
+#include "app_lifecycle.h"
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
@@ -673,14 +674,11 @@ void postBootInitTick()
     updateTime();
     uiInitLevelPopupTracker();
 
-    const bool setupPending = bootSetupPendingFlagExists();
+    const bool setupPending = appLifecycleHasPendingOnboarding();
     const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;
     const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
-
-    // Critical rule:
-    // If setup is still pending, post-wizard landing must NOT go to PET_SCREEN.
-    const UIState afterOk =
-        setupPending ? UIState::CHOOSE_PET : (saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET);
+    
+    const UIState afterOk = appLifecycleResolveBootAfterOkState(saveFileExists);
 
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
