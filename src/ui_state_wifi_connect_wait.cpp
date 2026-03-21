@@ -34,7 +34,7 @@ void uiWifiConnectWaitHandle(InputState &in)
       }
       else
       {
-        uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+        uiActionEnterState(g_wifi.returnState, g_wifi.returnTab, true);
       }
 
       requestUIRedraw();
@@ -62,12 +62,9 @@ void uiWifiConnectWaitHandle(InputState &in)
     clearInputLatch();
     inputForceClear();
 
-    g_wifi.returnState = g_wifiSetupFromBootWizard ? UIState::BOOT_WIFI_PROMPT : UIState::SETTINGS;
-    g_wifi.returnTab = g_app.currentTab;
     g_wifi.aborted = false;
-    
-    uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
-    requestUIRedraw();
+
+    uiActionEnterState(UIState::WIFI_SETUP, g_wifi.returnTab, true);    requestUIRedraw();
     return;
   }
 

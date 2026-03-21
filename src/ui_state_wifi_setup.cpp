@@ -284,8 +284,7 @@ static void wifiSetupSelect()
   }
 
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
-  uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_app.currentTab, true);
-  requestUIRedraw();
+  uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_wifi.returnTab, true);  requestUIRedraw();
   return;
 }
 
