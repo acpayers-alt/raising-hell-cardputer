@@ -36,6 +36,8 @@ const char *assetOtaManifestUrlForChannel(AssetOtaChannel ch)
 void assetOtaConfigDefaults(AssetOtaConfig &cfg)
 {
   cfg = AssetOtaConfig{};
+  cfg.magic = 0x41544346UL;
+  cfg.version = 1;
   cfg.autoCheckEnabled = 0;
   cfg.channel = (uint8_t)AssetOtaChannel::PUBLIC;
 }

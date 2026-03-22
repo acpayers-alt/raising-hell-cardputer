@@ -26,7 +26,7 @@ namespace UiSettingsPages
 
 void Handle_WIFI(InputState &input, int move)
 {
-#if defined(BUILD_PUBLIC)
+  #if PUBLIC_BUILD
   const int totalItems = 6;
   const int otaChannelRow = -1;
 #else
@@ -55,8 +55,8 @@ void Handle_WIFI(InputState &input, int move)
     return;
   }
 
-#if !defined(PUBLIC_BUILD)
-  // Asset OTA channel cycle on row 5
+  #if !PUBLIC_BUILD
+    // Asset OTA channel cycle on row 5
   if (g_wifi.wifiSettingsIndex == otaChannelRow && (input.leftOnce || input.rightOnce))
   {
     const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
@@ -147,7 +147,7 @@ void Handle_WIFI(InputState &input, int move)
       return;
     }
 
-#if !defined(PUBLIC_BUILD)
+    #if !PUBLIC_BUILD
     case 5:
     { // Asset OTA Channel
       const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;

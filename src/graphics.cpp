@@ -2118,7 +2118,7 @@ static void drawWifiSettingsMenu()
   else
     snprintf(otaCheckLine, sizeof(otaCheckLine), "Check Asset OTA");
 
-#if defined(PUBLIC_BUILD)
+#if PUBLIC_BUILD
   const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaCheckLine};
   const int totalItems = 5;
 #else

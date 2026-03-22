@@ -390,6 +390,10 @@ bool assetOtaSetAutoCheckEnabled(bool en)
 {
   if (!s_inited)
     assetOtaInit();
+
+  if (!s_loadedFromSd && g_sdReady)
+    loadAssetOtaFromSdIfAvailable();
+
   s_cfg.autoCheckEnabled = en ? 1 : 0;
   return assetOtaConfigSave(s_cfg);
 }
@@ -398,6 +402,10 @@ bool assetOtaSetChannel(AssetOtaChannel ch)
 {
   if (!s_inited)
     assetOtaInit();
+
+  if (!s_loadedFromSd && g_sdReady)
+    loadAssetOtaFromSdIfAvailable();
+
   s_cfg.channel = (uint8_t)ch;
   return assetOtaConfigSave(s_cfg);
 }
@@ -426,6 +434,9 @@ bool assetOtaCheckNow(String *outMessage)
 
   if (!s_inited)
     assetOtaInit();
+
+  if (!s_loadedFromSd && g_sdReady)
+    loadAssetOtaFromSdIfAvailable();
 
   s_graphicsReleasedForOta = false;
 
@@ -478,8 +489,14 @@ bool assetOtaCheckNow(String *outMessage)
   assetOtaStateSave(s_state);
   otaRedrawProvisionScreen("Checking assets...", "Downloading manifest...");
 
+  Serial.printf("[OTA DBG] loadedFromSd=%d channel=%u\n",
+    s_loadedFromSd ? 1 : 0,
+    (unsigned)s_cfg.channel);
+
   const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
+  
+  Serial.printf("[OTA DBG] manifestUrl=%s\n", manifestUrl);
   if (!manifestUrl || !manifestUrl[0])
   {
     setFailure(AssetOtaError::NO_MANIFEST);
