@@ -184,6 +184,18 @@ static const char *const kEldBurnFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/eld/mer_curse5.png",
 };
 
+static const char *miniGameFlappyNameForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Flappy Curse";
+  case PET_DEVIL:
+  default:
+    return "Flappy Fireball";
+  }
+}
+
 static const char *const *flappyBurnFramesForPet()
 {
   switch (pet.type)
@@ -1178,7 +1190,7 @@ void drawFlappyFireball()
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
     spr.drawCentreString(flappyIntroTargetTextForPet(), gW / 2, 22, 2);
-    
+
     const int impX = (gW - 48) / 2;
     const int impY = 40;
 
@@ -1278,7 +1290,7 @@ void drawFlappyFireball()
     const int impH = 48;
     const int impX = s_flappyGoalX;
     const int impY = s_flappyGoalY - impH;
-  
+
     if (!s_impHit)
     {
       M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
@@ -1289,7 +1301,7 @@ void drawFlappyFireball()
     {
       const char *const *burnFrames = flappyBurnFramesForPet();
       const char *burnPath = nullptr;
-  
+
       switch (s_impFrame)
       {
       case 0:
@@ -1308,30 +1320,30 @@ void drawFlappyFireball()
         burnPath = burnFrames[4];
         break;
       }
-  
+
       if (burnPath && burnPath[0])
         sprDrawPngFromSD(burnPath, impX, impY);
     }
   }
-  
+
   if (!s_impHit)
   {
     if ((!s_flappyFireball1Spr || !s_flappyFireball2Spr || !s_flappyFireball3Spr) && s_flappyBgPath[0])
       ensureFlappyFireballSprites(s_flappyBgPath);
-  
+
     M5Canvas *fbFrames[3] = {s_flappyFireball1Spr, s_flappyFireball2Spr, s_flappyFireball3Spr};
-  
+
     if (fbFrames[0] && fbFrames[1] && fbFrames[2])
     {
       const int frame = (millis() / 80) % 3;
       M5Canvas *fb = fbFrames[frame];
-  
+
       const int w = fb->width();
       const int h = fb->height();
-  
+
       const int drawX = s_fbX - w / 2;
       const int drawY = s_fbY - h / 2;
-  
+
       fb->pushSprite(&spr, drawX, drawY, kFireKey);
     }
     else
@@ -3653,7 +3665,7 @@ static uint32_t s_dodgerDirHoldMs = 0;
 static DodgerBall s_dodgerBalls[8];
 
 static const uint16_t kDodgerKey = kSpriteKey;
-
+static const uint16_t kDodgerCarKey = 0xF81F;
 static int s_dodgerBgScrollY = 0;
 
 static int s_dodgerFireballW = 0;
@@ -3948,7 +3960,7 @@ static bool ensureDodgerCarSprite(const char *path)
 
   s_dodgerCarSpr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "car", path, 8, kDodgerKey, s_dodgerCarSpr))
+  if (!mgmem::ensureSprite(MiniGame::INFERNAL_DODGER, "car", path, 8, kDodgerCarKey, s_dodgerCarSpr))
     return false;
 
   if (!s_dodgerCarSpr || s_dodgerCarSpr->width() <= 0 || s_dodgerCarSpr->height() <= 0)
@@ -4794,7 +4806,7 @@ void drawInfernalDodger()
     {
       const int drawX = s_dodgerPx - (s_dodgerCarW / 2);
       const int drawY = s_dodgerPy - (s_dodgerCarH / 2);
-      carSpr->pushSprite(&spr, drawX, drawY, kDodgerKey);
+      carSpr->pushSprite(&spr, drawX, drawY, kDodgerCarKey);
     }
     else
     {

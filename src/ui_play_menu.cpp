@@ -2,6 +2,7 @@
 
 #include "input.h"
 #include "mini_games.h" // startFlappyFireball(), startInfernalDodger(), startCrossyRoad()
+#include "pet.h"
 
 namespace {
 
@@ -34,6 +35,18 @@ static const MenuItem kItems[] = {
   {"Crossy Hell",      actCrossy},
 };
 
+static const char* flappyMenuLabelForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Flappy Curse";
+  case PET_DEVIL:
+  default:
+    return "Flappy Fireball";
+  }
+}
+
 } // namespace
 
 int uiPlayMenuCount()
@@ -43,7 +56,12 @@ int uiPlayMenuCount()
 
 const char* uiPlayMenuLabel(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount()) return "";
+  if (idx < 0 || idx >= uiPlayMenuCount())
+    return "";
+
+  if (idx == 0)
+    return flappyMenuLabelForPet();
+
   return kItems[idx].label;
 }
 
