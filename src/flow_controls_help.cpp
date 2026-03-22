@@ -2,9 +2,9 @@
 
 #include "app_state.h"
 #include "controls_help_state.h"
+#include "input.h"
 #include "ui_actions.h"
 #include "ui_defs.h"
-#include "input.h"
 
 // Public entry points used by app hotkeys / settings menu
 void openControlsHelpFromSettings()
@@ -20,20 +20,18 @@ void openControlsHelpFromAnywhere()
 }
 
 // Controls help UIState handler (routed by ui_input_router)
-void uiControlsHelpHandle(InputState& in)
+void uiControlsHelpHandle(InputState &in)
 {
-  
-// Dismiss on ENTER/SELECT (and optionally MENU/BACK), not ESC.
-// This prevents ESC from skipping required flows/screens.
-if (in.selectOnce || in.menuOnce)
-{
-  // Swallow this frame's input so it doesn't leak into the next screen.
-  uiActionSwallowAll(in);
+  if (!controlsHelpDismissAllowed())
+  {
+    uiActionSwallowAll(in);
+    return;
+  }
 
-  controlsHelpDismiss();
-  return;
-}
-
-
-  // No other interactions needed for this help screen.
+  if (in.selectOnce || in.menuOnce || in.escOnce)
+  {
+    uiActionSwallowAll(in);
+    controlsHelpDismiss();
+    return;
+  }
 }

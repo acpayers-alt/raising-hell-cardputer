@@ -41,13 +41,15 @@ void uiNamePetHandle(InputState &in)
     {
       g_namePetRenameMode = false;
       g_settingsFlow.settingsPage = SettingsPage::GAME;
-      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);    }
+      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);
+    }
     else
     {
       // ESC is intentionally ignored on NAME_PET during new pet flow;
       // MENU returns to choose pet.
       g_choosePetBlockHatchUntilRelease = true;
-      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);    }
+      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);
+    }
 
     requestUIRedraw();
     uiDrainKb(in);
@@ -80,8 +82,7 @@ void uiNamePetHandle(InputState &in)
 
         g_namePetRenameMode = false;
         g_settingsFlow.settingsPage = SettingsPage::GAME;
-        uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
-
+        openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);
         requestUIRedraw();
         invalidateBackgroundCache();
 

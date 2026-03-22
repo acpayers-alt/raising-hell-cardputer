@@ -17,6 +17,7 @@
 #include "factory_reset_state.h"
 #include "flow_factory_reset.h"
 #include "ui_actions.h"
+#include "ui_state_settings.h"
 
 // Keep the boot fix local to this module.
 static bool s_bootNamePetFixApplied = false;
@@ -71,20 +72,9 @@ static bool uiInterceptGlobalShortcuts(InputState& in)
 
     if (!menuSuppressedNow() && canOpenSettingsFrom(g_app.uiState))
     {
-      // IMPORTANT:
-      // Set return target BEFORE entering SETTINGS, otherwise Settings can fall back
-      // to PET/tab defaults (symptom: menu flashes then snaps home).
-      g_settingsFlow.settingsReturnState = g_app.uiState;
-      g_settingsFlow.settingsReturnTab   = g_app.currentTab;
-      g_settingsFlow.settingsReturnValid = true;
-
-      // When opening settings via ESC, start at TOP.
-      g_settingsFlow.settingsPage       = SettingsPage::TOP;
       g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
-
-      // uiActionEnterState signature: (state, tab, fullRedraw)
-      uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
-
+      openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
+      
       // Swallow everything this tick so ESC doesn't also act as HOME/tab-jump/etc.
       in.clearEdges();
       return true;

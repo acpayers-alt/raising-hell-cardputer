@@ -5,15 +5,16 @@
 #include "input.h"
 #include "led_status.h"
 #include "pet.h"
+#include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
-#include "settings_flow_state.h"
+#include "ui_state_settings.h"
 
 // Entry guard to prevent "carried-held ENTER" from instantly waking the pet.
 static uint32_t s_enterSleepUiMs = 0;
 static bool s_prevSelectHeld = false;
 
-void uiPetSleepingOnEnter(const InputState& in)
+void uiPetSleepingOnEnter(const InputState &in)
 {
   s_enterSleepUiMs = millis();
 
@@ -44,15 +45,9 @@ void uiPetSleepingHandle(InputState &in)
   // MENU/ESC opens Settings WITHOUT waking the pet
   if (in.menuOnce || in.escOnce)
   {
-    // IMPORTANT: tell Settings where to return (otherwise it will default to PET tab)
-    g_settingsFlow.settingsReturnState = g_app.uiState;     // PET_SLEEPING
-    g_settingsFlow.settingsReturnTab   = g_app.currentTab;  // should be TAB_SLEEP
-    g_settingsFlow.settingsReturnPage  = SettingsPage::TOP;
-    g_settingsFlow.settingsPage        = SettingsPage::TOP;
-    g_settingsFlow.settingsReturnValid = true;
-
-    uiActionEnterStateClean(UIState::SETTINGS, g_app.currentTab, true, in, 150);
-    requestUIRedraw();
+    g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
+    openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
+    uiActionSwallowAll(in);
     return;
   }
 
