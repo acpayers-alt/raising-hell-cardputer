@@ -2,6 +2,7 @@
 
 #include "asset_ota_types.h"
 
-bool assetDownloadToStaging(const AssetManifestFile &file,
-                            String *outStagingPath,
-                            String *outErr);
+bool assetDownloadToStaging(const String &fileUrl,
+    const AssetManifestFile &file,
+    String *stagingPath,
+    String *err);

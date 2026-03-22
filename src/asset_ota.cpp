@@ -696,7 +696,7 @@ bool assetOtaCheckNow(String *outMessage)
 
       Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, rawPath.c_str());
 
-      if (assetDownloadToStaging(dlFile, &stagingPath, &dlErr))
+      if (assetDownloadToStaging(resolvedUrl, dlFile, &stagingPath, &dlErr))
       {
         dlOk = true;
         break;

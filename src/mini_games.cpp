@@ -168,7 +168,7 @@ static constexpr uint32_t kImpWaveFrameMs = 180;
 static constexpr uint32_t kImpBurnFrameMs = 180;
 static constexpr uint32_t kImpLastFrameHoldMs = 500;
 
-static const char *const kImpBurnFrames[] = {
+static const char *const kDevBurnFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn1.png",
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn2.png",
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn3.png",
@@ -176,12 +176,32 @@ static const char *const kImpBurnFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn5.png",
 };
 
+static const char *const kEldBurnFrames[] = {
+    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse1.png",
+    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse2.png",
+    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse3.png",
+    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse4.png",
+    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse5.png",
+};
+
+static const char *const *flappyBurnFramesForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return kEldBurnFrames;
+  case PET_DEVIL:
+  default:
+    return kDevBurnFrames;
+  }
+}
+
 static const char *flappyImpWave1PathForPet()
 {
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/imp_wave1.png";
+    return "/raising_hell/graphics/mini_games/flappy/eld/mer_taunt1.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png";
@@ -193,10 +213,82 @@ static const char *flappyImpWave2PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/imp_wave2.png";
+    return "/raising_hell/graphics/mini_games/flappy/eld/mer_taunt2.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png";
+  }
+}
+
+static const char *flappyProjectile1PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/starfish1.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/fireball1.png";
+  }
+}
+
+static const char *flappyProjectile2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/starfish2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/fireball2.png";
+  }
+}
+
+static const char *flappyProjectile3PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/starfish3.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/fireball3.png";
+  }
+}
+
+static const char *flappyObstacleUpPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/column_up.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/rock_spike_up.png";
+  }
+}
+
+static const char *flappyObstacleDownPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/flappy/eld/column_down.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/flappy/dev/rock_spike_down.png";
+  }
+}
+
+static const char *flappyIntroTargetTextForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Curse the Merman!";
+  case PET_DEVIL:
+  default:
+    return "Torch the Imp!";
   }
 }
 
@@ -424,32 +516,25 @@ static bool ensureImpWaveSprites()
 
 static bool ensureFlappyFireballSprites(const char *bgPath)
 {
-  if (!bgPath || !bgPath[0] || !g_sdReady)
-    return false;
+  (void)bgPath;
 
-  char dir[128];
-  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-  if (!dir[0])
+  if (!g_sdReady)
     return false;
-
-  char path1[192];
-  char path2[192];
-  char path3[192];
-  snprintf(path1, sizeof(path1), "%sfireball1.png", dir);
-  snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
-  snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
 
   s_flappyFireball1Spr = nullptr;
   s_flappyFireball2Spr = nullptr;
   s_flappyFireball3Spr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball1", path1, 8, kFireKey, s_flappyFireball1Spr))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball1", flappyProjectile1PathForPet(), 8, kFireKey,
+                           s_flappyFireball1Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball2", path2, 8, kFireKey, s_flappyFireball2Spr))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball2", flappyProjectile2PathForPet(), 8, kFireKey,
+                           s_flappyFireball2Spr))
     return false;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball3", path3, 8, kFireKey, s_flappyFireball3Spr))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "fireball3", flappyProjectile3PathForPet(), 8, kFireKey,
+                           s_flappyFireball3Spr))
     return false;
 
   if (!s_flappyFireball1Spr || s_flappyFireball1Spr->width() <= 0 || s_flappyFireball1Spr->height() <= 0)
@@ -464,23 +549,16 @@ static const uint16_t kPipeKey = kSpriteKey;
 
 static bool ensureFlappyPipeSprites(const char *bgPath)
 {
-  if (!bgPath || !bgPath[0] || !g_sdReady)
-    return false;
+  (void)bgPath;
 
-  char dir[128];
-  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-  if (!dir[0])
+  if (!g_sdReady)
     return false;
-
-  char upPath[192];
-  char downPath[192];
-  snprintf(upPath, sizeof(upPath), "%srock_spike_up.png", dir);
-  snprintf(downPath, sizeof(downPath), "%srock_spike_down.png", dir);
 
   s_flappyPipeUpSpr = nullptr;
   s_flappyPipeDownSpr = nullptr;
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up", upPath, 8, kPipeKey, s_flappyPipeUpSpr))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_up", flappyObstacleUpPathForPet(), 8, kPipeKey,
+                           s_flappyPipeUpSpr))
   {
     s_flappyPipeLoadFailed = true;
     s_flappyPipeW = 0;
@@ -488,7 +566,8 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
     return false;
   }
 
-  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down", downPath, 8, kPipeKey, s_flappyPipeDownSpr))
+  if (!mgmem::ensureSprite(MiniGame::FLAPPY_FIREBALL, "pipe_down", flappyObstacleDownPathForPet(), 8, kPipeKey,
+                           s_flappyPipeDownSpr))
   {
     s_flappyPipeLoadFailed = true;
     s_flappyPipeW = 0;
@@ -1098,8 +1177,8 @@ void drawFlappyFireball()
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString("Press Enter or G to boost", gW / 2, 4, 2);
-    spr.drawCentreString("Torch the Imp!", gW / 2, 22, 2);
-
+    spr.drawCentreString(flappyIntroTargetTextForPet(), gW / 2, 22, 2);
+    
     const int impX = (gW - 48) / 2;
     const int impY = 40;
 
@@ -1199,9 +1278,7 @@ void drawFlappyFireball()
     const int impH = 48;
     const int impX = s_flappyGoalX;
     const int impY = s_flappyGoalY - impH;
-
-    M5Canvas *impSpr = nullptr;
-
+  
     if (!s_impHit)
     {
       M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
@@ -1210,49 +1287,51 @@ void drawFlappyFireball()
     }
     else
     {
+      const char *const *burnFrames = flappyBurnFramesForPet();
       const char *burnPath = nullptr;
-
+  
       switch (s_impFrame)
       {
       case 0:
-        burnPath = kImpBurnFrames[0];
+        burnPath = burnFrames[0];
         break;
       case 1:
-        burnPath = kImpBurnFrames[1];
+        burnPath = burnFrames[1];
         break;
       case 2:
-        burnPath = kImpBurnFrames[2];
+        burnPath = burnFrames[2];
         break;
       case 3:
-        burnPath = kImpBurnFrames[3];
+        burnPath = burnFrames[3];
         break;
       default:
-        burnPath = kImpBurnFrames[4];
+        burnPath = burnFrames[4];
         break;
       }
-
+  
       if (burnPath && burnPath[0])
         sprDrawPngFromSD(burnPath, impX, impY);
     }
   }
+  
   if (!s_impHit)
   {
     if ((!s_flappyFireball1Spr || !s_flappyFireball2Spr || !s_flappyFireball3Spr) && s_flappyBgPath[0])
       ensureFlappyFireballSprites(s_flappyBgPath);
-
+  
     M5Canvas *fbFrames[3] = {s_flappyFireball1Spr, s_flappyFireball2Spr, s_flappyFireball3Spr};
-
+  
     if (fbFrames[0] && fbFrames[1] && fbFrames[2])
     {
       const int frame = (millis() / 80) % 3;
       M5Canvas *fb = fbFrames[frame];
-
+  
       const int w = fb->width();
       const int h = fb->height();
-
+  
       const int drawX = s_fbX - w / 2;
       const int drawY = s_fbY - h / 2;
-
+  
       fb->pushSprite(&spr, drawX, drawY, kFireKey);
     }
     else
