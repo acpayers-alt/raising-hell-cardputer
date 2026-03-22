@@ -47,6 +47,30 @@ static const char* flappyMenuLabelForPet()
   }
 }
 
+static const char* dodgerMenuLabelForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Submarine Run";
+  case PET_DEVIL:
+  default:
+    return "Fireball Run";
+  }
+}
+
+static const char* crossyMenuLabelForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Crossy Cosmos";
+  case PET_DEVIL:
+  default:
+    return "Crossy Hell";
+  }
+}
+
 } // namespace
 
 int uiPlayMenuCount()
@@ -59,10 +83,17 @@ const char* uiPlayMenuLabel(int idx)
   if (idx < 0 || idx >= uiPlayMenuCount())
     return "";
 
-  if (idx == 0)
+  switch (idx)
+  {
+  case 0:
     return flappyMenuLabelForPet();
-
-  return kItems[idx].label;
+  case 1:
+    return dodgerMenuLabelForPet();
+  case 2:
+    return crossyMenuLabelForPet();
+  default:
+    return kItems[idx].label;
+  }
 }
 
 bool uiPlayMenuActivate(int idx, InputState& in)
