@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ui_defs.h"
+#include "return_target.h"
 
 // Centralizes "where Settings should return to" and Settings page navigation state.
 // This was previously stored inside g_ui (ui_runtime.h). Keep it separate from other
@@ -20,9 +21,8 @@ struct SettingsFlowState {
   bool    settingsReturnValid = false;
 
   // Return target when exiting Power Menu
-  bool    powerMenuReturnToSleep = false;
-  UIState powerMenuReturnState   = UIState::PET_SCREEN;
-  Tab     powerMenuReturnTab     = Tab::TAB_PET;
+  bool         powerMenuReturnToSleep = false;
+  ReturnTarget powerMenuReturn{};
 };
 
 extern SettingsFlowState g_settingsFlow;

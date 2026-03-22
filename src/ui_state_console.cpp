@@ -3,6 +3,7 @@
 #include "app_state.h"
 #include "console.h"
 #include "input.h"
+#include "return_target.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_input_common.h"
@@ -10,8 +11,7 @@
 #include "ui_runtime.h"
 
 // Console return target
-static UIState g_consoleReturnState = UIState::PET_SCREEN;
-static Tab g_consoleReturnTab = Tab::TAB_PET;
+static ReturnTarget g_consoleReturn{};
 
 // Special case: console was opened from inside Settings and should return back into Settings
 static bool g_consoleReturnToSettings = false;
@@ -19,8 +19,8 @@ static SettingsPage g_consoleReturnPage = SettingsPage::TOP;
 
 void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSettings, SettingsPage retSettingsPage)
 {
-  g_consoleReturnState = returnState;
-  g_consoleReturnTab = returnTab;
+  g_consoleReturn.state = returnState;
+  g_consoleReturn.tab = returnTab;
   g_consoleReturnToSettings = retToSettings;
   g_consoleReturnPage = retSettingsPage;
 
@@ -61,14 +61,12 @@ void uiConsoleHandle(InputState &input)
       // Settings already knows where to exit to; we just want to go back into it.
       g_settingsFlow.settingsPage = g_consoleReturnPage;
 
-      uiActionEnterState(UIState::SETTINGS, g_consoleReturnTab, true);
-      requestUIRedraw();
+      uiActionEnterState(UIState::SETTINGS, g_consoleReturn.tab, true);      requestUIRedraw();
       return;
     }
 
     // Normal behavior: return to the UI state we came from
-    uiActionEnterState(g_consoleReturnState, g_consoleReturnTab, true);
-    requestUIRedraw();
+    uiActionEnterState(g_consoleReturn.state, g_consoleReturn.tab, true);    requestUIRedraw();
     return;
   }
 
@@ -93,12 +91,10 @@ bool closeConsoleAndReturn(InputState &input)
     // Restore settings page only; do NOT touch settings return plumbing.
     g_settingsFlow.settingsPage = g_consoleReturnPage;
 
-    uiActionEnterState(UIState::SETTINGS, g_consoleReturnTab, true);
-    requestUIRedraw();
+    uiActionEnterState(UIState::SETTINGS, g_consoleReturn.tab, true);    requestUIRedraw();
     return true;
   }
 
-  uiActionEnterState(g_consoleReturnState, g_consoleReturnTab, true);
-  requestUIRedraw();
+  uiActionEnterState(g_consoleReturn.state, g_consoleReturn.tab, true);  requestUIRedraw();
   return true;
 }

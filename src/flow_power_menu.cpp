@@ -17,15 +17,15 @@
 #include "settings_flow_state.h"
 #include "sleep_state.h"
 #include "sound.h"
+#include "ui_actions.h"
+#include "ui_input_common.h"
 #include "ui_menu_state.h"
 #include "ui_runtime.h"
 #include "ui_suppress.h"
 #include "wifi_power.h"
-#include "ui_input_common.h"
-#include "ui_actions.h"
 
-#include "ui_sleep_menu_actions.h"
 #include "ui_power_menu.h"
+#include "ui_sleep_menu_actions.h"
 
 bool powerMenuSleepWakeSuppressedNow() { return uiIsSleepWakeSuppressed(); }
 
@@ -36,12 +36,12 @@ void openPowerMenuFromHere(uint32_t nowMs)
   if (g_app.uiState == UIState::POWER_MENU)
     return;
 
-  g_settingsFlow.powerMenuReturnState = g_app.uiState;
-  g_settingsFlow.powerMenuReturnTab   = g_app.currentTab;
+  g_settingsFlow.powerMenuReturn.state = g_app.uiState;
+  g_settingsFlow.powerMenuReturn.tab = g_app.currentTab;
 
   powerMenuIndex = 0;
   uiActionEnterState(UIState::POWER_MENU, g_app.currentTab, true);
-  
+
   clearInputLatch();
   inputForceClear();
 
@@ -82,25 +82,24 @@ void powerMenuActShutdown()
 
 void powerMenuClose()
 {
-    const bool returningToSleep = g_settingsFlow.powerMenuReturnToSleep;
+  const bool returningToSleep = g_settingsFlow.powerMenuReturnToSleep;
 
-    if (returningToSleep)
-    {
-        uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
-    }
-    else
-    {
-        uiActionEnterState(g_settingsFlow.powerMenuReturnState,
-                           g_settingsFlow.powerMenuReturnTab,
-                           true);
-    }
-
-    g_settingsFlow.powerMenuReturnToSleep = false;
-    g_settingsFlow.powerMenuReturnState = UIState::PET_SCREEN;
-    g_settingsFlow.powerMenuReturnTab   = Tab::TAB_PET;
+  if (returningToSleep)
+  {
+    uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
+  }
+  else
+  {
+    uiActionEnterState(g_settingsFlow.powerMenuReturn.state,
+                       g_settingsFlow.powerMenuReturn.tab,
+                       true);
   }
 
-static void handlePowerMenuInput(InputState& input)
+  g_settingsFlow.powerMenuReturnToSleep = false;
+  g_settingsFlow.powerMenuReturn = ReturnTarget{};
+}
+
+static void handlePowerMenuInput(InputState &input)
 {
   bool exitPressed = (input.menuOnce || input.escOnce);
 
@@ -138,19 +137,19 @@ static void handlePowerMenuInput(InputState& input)
     }
     else
     {
-      uiActionEnterState(g_settingsFlow.powerMenuReturnState,
-                         g_settingsFlow.powerMenuReturnTab,
+      uiActionEnterState(g_settingsFlow.powerMenuReturn.state,
+                         g_settingsFlow.powerMenuReturn.tab,
                          true);
     }
 
     g_settingsFlow.powerMenuReturnToSleep = false;
-    g_settingsFlow.powerMenuReturnState = UIState::PET_SCREEN;
-    g_settingsFlow.powerMenuReturnTab   = Tab::TAB_PET;
+    g_settingsFlow.powerMenuReturn = ReturnTarget{};
 
     uiGuardTransition(input, returningToSleep ? 400 : 0);
-    return;  }
+    return;
+  }
 
-    const int itemCount = uiPowerMenuCount();
+  const int itemCount = uiPowerMenuCount();
 
   int mv = 0;
   if (input.upOnce) mv = -1;
@@ -188,7 +187,4 @@ static void handlePowerMenuInput(InputState& input)
   input.clearEdges();
 }
 
-void uiPowerMenuHandle(InputState& in)
-{
-  handlePowerMenuInput(in);
-}
+  void uiPowerMenuHandle(InputState & in) { handlePowerMenuInput(in); }
