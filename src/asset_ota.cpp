@@ -17,13 +17,24 @@
 #include <string.h>
 #include <vector>
 
-static String assetFileResolvedUrl(const AssetManifestFile &f)
+static String assetFileResolvedUrl(const AssetManifestData &manifest,
+  const AssetManifestFile &f)
 {
-  String url = "https://assets.raisinghellgame.com/assets/";
-  if (!url.endsWith("/"))
-    url += "/";
-  url += f.path;
-  return url;
+String url = "https://assets.raisinghellgame.com/assets/";
+if (!url.endsWith("/"))
+url += "/";
+
+// Add version prefix
+if (manifest.packVersion[0] != '\0')
+{
+url += manifest.packVersion;
+if (!url.endsWith("/"))
+url += "/";
+}
+
+url += f.path;
+
+return url;
 }
 
 static AssetOtaConfig s_cfg{};
@@ -489,13 +500,11 @@ bool assetOtaCheckNow(String *outMessage)
   assetOtaStateSave(s_state);
   otaRedrawProvisionScreen("Checking assets...", "Downloading manifest...");
 
-  Serial.printf("[OTA DBG] loadedFromSd=%d channel=%u\n",
-    s_loadedFromSd ? 1 : 0,
-    (unsigned)s_cfg.channel);
+  Serial.printf("[OTA DBG] loadedFromSd=%d channel=%u\n", s_loadedFromSd ? 1 : 0, (unsigned)s_cfg.channel);
 
   const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
-  
+
   Serial.printf("[OTA DBG] manifestUrl=%s\n", manifestUrl);
   if (!manifestUrl || !manifestUrl[0])
   {
@@ -666,8 +675,8 @@ bool assetOtaCheckNow(String *outMessage)
       continue;
     }
 
-    String resolvedUrl = assetFileResolvedUrl(mf);
-
+    String resolvedUrl = assetFileResolvedUrl(remoteManifest, mf);
+    
     Serial.printf("[OTA] download index=%u/%u path=%s\n", (unsigned)(i + 1), (unsigned)changed.size(), rawPath.c_str());
     Serial.printf("[OTA] resolved url=%s\n", resolvedUrl.c_str());
 

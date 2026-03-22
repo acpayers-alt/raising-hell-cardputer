@@ -10,10 +10,7 @@
 #include "asset_ota_config.h"
 #include "sdcard.h"
 
-static String joinStagingPath(const String &relPath)
-{
-  return String(assetOtaStagingRoot()) + "/" + relPath + ".part";
-}
+static String joinStagingPath(const String &relPath) { return String(assetOtaStagingRoot()) + "/" + relPath + ".part"; }
 
 static String synthesizeAssetUrl(const char *relPath)
 {
@@ -89,8 +86,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
 
   String fileUrl = synthesizeAssetUrl(file.path);
   Serial.printf("[OTA] file url=%s\n", fileUrl.c_str());
-    Serial.printf("[OTA] file pre-http free=%u largest=%u\n",
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[OTA] file pre-http free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
 
   HTTPClient http;
@@ -101,7 +97,7 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
   http.setUserAgent("RaisingHellCardputer/1.0");
 
   const String sUrl = fileUrl;
-    bool began = false;
+  bool began = false;
 
   WiFiClient plainClient;
   WiFiClientSecure secureClient;
@@ -111,10 +107,12 @@ bool assetDownloadToStaging(const AssetManifestFile &file, String *outStagingPat
     secureClient.setInsecure();
     secureClient.setTimeout(15000);
     secureClient.setHandshakeTimeout(15);
-    began = http.begin(secureClient, fileUrl);  }
+    began = http.begin(secureClient, fileUrl);
+  }
   else
   {
-began = http.begin(plainClient, fileUrl);  }
+    began = http.begin(plainClient, fileUrl);
+  }
 
   if (!began)
   {
@@ -140,9 +138,7 @@ began = http.begin(plainClient, fileUrl);  }
 
   WiFiClient *stream = http.getStreamPtr();
   const int contentLength = http.getSize();
-  Serial.printf("[OTA] file contentLength=%d expected=%u\n",
-                contentLength,
-                (unsigned)file.size);
+  Serial.printf("[OTA] file contentLength=%d expected=%u\n", contentLength, (unsigned)file.size);
 
   String wantHash(file.sha256);
   wantHash.toLowerCase();
@@ -207,6 +203,10 @@ began = http.begin(plainClient, fileUrl);  }
   out.close();
   http.end();
 
+  Serial.printf("[OTA] dl path=%s\n", file.path);
+  Serial.printf("[OTA] dl contentLength=%ld total=%u manifestSize=%u\n", (long)contentLength, (unsigned)total,
+                (unsigned)file.size);
+
   if (contentLength >= 0 && total != (uint32_t)contentLength)
   {
     SD.remove(stagingPath.c_str());
@@ -223,9 +223,7 @@ began = http.begin(plainClient, fileUrl);  }
     return false;
   }
 
-  Serial.printf("[OTA] file total=%u wantSize=%u\n",
-                (unsigned)total,
-                (unsigned)file.size);
+  Serial.printf("[OTA] file total=%u wantSize=%u\n", (unsigned)total, (unsigned)file.size);
 
   if (verifyHash)
   {
