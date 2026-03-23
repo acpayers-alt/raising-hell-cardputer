@@ -870,10 +870,22 @@ static const char* evoStageToDevilDescriptor(uint8_t stage) {
   }
 }
 
+static const char* evoStageToEldritchDescriptor(uint8_t stage) {
+  switch (stage) {
+    case 0: return "Voidspawn";
+    case 1: return "Warped Youth";
+    case 2: return "Cult Horror";
+    case 3: return "Outer Horror";
+    default: return "Voidspawn";
+  }
+}
+
 const char* Pet::getEvolutionDescriptor() const {
   switch (type) {
     case PET_DEVIL:
       return evoStageToDevilDescriptor(evoStage);
+    case PET_ELDRITCH:
+      return evoStageToEldritchDescriptor(evoStage);
     default:
       return "";
   }
