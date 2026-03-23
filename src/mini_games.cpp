@@ -1397,6 +1397,8 @@ static int s_rrSnakeCrouchW = 0;
 static int s_rrSnakeCrouchH = 0;
 static int s_rrSnakeJumpW = 0;
 static int s_rrSnakeJumpH = 0;
+static const int kRrFlyingBugVisualLift = 16;
+static const int kRrFlyingBugBob = 2;
 
 static M5Canvas *s_rrSnakeRun1Spr = nullptr;
 static M5Canvas *s_rrSnakeRun2Spr = nullptr;
@@ -1432,7 +1434,7 @@ static bool s_rrHandTouched = false;
 static int s_rrHandX = 0;
 static int s_rrHandY = 0;
 
-static constexpr int kRrHandTriggerDist = 2200;
+static constexpr int kRrHandTriggerDist = 7200;
 static constexpr int kRrHandEnterSpeed = 2;
 static constexpr int kRrHandExitSpeed = 3;
 static constexpr uint32_t kRrHandHoldMs = 250;
@@ -1470,10 +1472,11 @@ struct RRObs
   int w;
   int h;
   bool active;
+  bool flying;
 };
 
 static RRObs rr_obs[8];
-static int rr_courseLen = 2600;
+static int rr_courseLen = 7800;
 
 struct RRSpawn
 {
@@ -1484,10 +1487,22 @@ struct RRSpawn
 
 static const uint8_t RR_SPIKE = 0;
 static const uint8_t RR_LOW_FIRE = 1;
+static const uint8_t RR_FLY_BUG = 2;
 
 static const RRSpawn rr_script[] = {
-    {520, RR_SPIKE, 0},     {860, RR_LOW_FIRE, 0}, {1200, RR_SPIKE, 0},
-    {1540, RR_LOW_FIRE, 0}, {1880, RR_SPIKE, 0},   {2220, RR_LOW_FIRE, 0},
+  // --- pass 1 ---
+  {520, RR_SPIKE, 0},    {860, RR_LOW_FIRE, 0}, {1080, RR_FLY_BUG, 0},  {1320, RR_SPIKE, 0},   {1540, RR_LOW_FIRE, 0},
+  {1760, RR_FLY_BUG, 0}, {1980, RR_SPIKE, 0},   {2220, RR_LOW_FIRE, 0}, {2380, RR_FLY_BUG, 0},
+
+  // --- pass 2 ---
+  {520 + 2600, RR_SPIKE, 0},    {860 + 2600, RR_LOW_FIRE, 0}, {1080 + 2600, RR_FLY_BUG, 0},
+  {1320 + 2600, RR_SPIKE, 0},   {1540 + 2600, RR_LOW_FIRE, 0}, {1760 + 2600, RR_FLY_BUG, 0},
+  {1980 + 2600, RR_SPIKE, 0},   {2220 + 2600, RR_LOW_FIRE, 0}, {2380 + 2600, RR_FLY_BUG, 0},
+
+  // --- pass 3 ---
+  {520 + 5200, RR_SPIKE, 0},    {860 + 5200, RR_LOW_FIRE, 0}, {1080 + 5200, RR_FLY_BUG, 0},
+  {1320 + 5200, RR_SPIKE, 0},   {1540 + 5200, RR_LOW_FIRE, 0}, {1760 + 5200, RR_FLY_BUG, 0},
+  {1980 + 5200, RR_SPIKE, 0},   {2220 + 5200, RR_LOW_FIRE, 0}, {2380 + 5200, RR_FLY_BUG, 0},
 };
 
 static const int rr_scriptCount = (int)(sizeof(rr_script) / sizeof(rr_script[0]));
@@ -1837,7 +1852,7 @@ static void rrResetRunState()
   rr_vy = 0.0f;
   rr_onGround = true;
 
-  rr_courseLen = 2600;
+  rr_courseLen = 7800;
   rrResetObstacles();
   rr_nextSpawn = 0;
 
@@ -1891,31 +1906,40 @@ static void rrSpawnObstacle(uint8_t type)
 
   const int spawnScreenLead = 72;
   const int spawnWorldX = rr_distance + w + spawnScreenLead;
-
   const int groundY = h - kRrGroundH;
+
+  RRObs &o = rr_obs[slot];
+  o.x = spawnWorldX;
+  o.active = true;
+  o.flying = false;
 
   if (type == RR_SPIKE)
   {
-    rr_obs[slot].x = spawnWorldX;
-    rr_obs[slot].y = groundY - kRrJumpObsH;
-    rr_obs[slot].w = kRrJumpObsW;
-    rr_obs[slot].h = kRrJumpObsH;
-    rr_obs[slot].active = true;
+    o.y = groundY - kRrJumpObsH;
+    o.w = kRrJumpObsW;
+    o.h = kRrJumpObsH;
+    o.flying = false;
+  }
+  else if (type == RR_FLY_BUG)
+  {
+    o.y = groundY - kRrPlayerH - kRrDuckObsClearance;
+    o.w = kRrDuckObsW;
+    o.h = kRrDuckObsH;
+    o.flying = true;
   }
   else
   {
-    rr_obs[slot].x = spawnWorldX;
-    rr_obs[slot].y = groundY - kRrPlayerH - kRrDuckObsClearance;
-    rr_obs[slot].w = kRrDuckObsW;
-    rr_obs[slot].h = kRrDuckObsH;
-    rr_obs[slot].active = true;
+    o.y = groundY - kRrPlayerH - kRrDuckObsClearance;
+    o.w = kRrDuckObsW;
+    o.h = kRrDuckObsH;
+    o.flying = false;
   }
 }
 
 static void rrResetObstacles()
 {
   for (auto &o : rr_obs)
-    o = {0, 0, 0, 0, false};
+  o = {0, 0, 0, 0, false, false};
 }
 
 static bool rrAabb(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh)
@@ -2139,13 +2163,15 @@ void updateResurrectionRun(const InputState &input)
       s_rrPhaseStartMs = now;
       s_rrHandActive = true;
       s_rrHandTouched = false;
-      s_rrHandX = gW;
+    
+      // HAND_ENTER uses world-space, because draw code subtracts rr_distance.
+      s_rrHandX = rr_distance + gW;
       s_rrHandY = groundY - s_rrHandH + 8;
-
+    
       for (auto &o : rr_obs)
         o.active = false;
     }
-  }
+    }
 
   if (s_rrPhase == RR_PHASE_RUN)
   {
@@ -2498,35 +2524,39 @@ void drawResurrectionRun()
     if (ox < -80 || ox > gW + 80)
       continue;
 
-    if (ladybugGround && ladybugGround->width() > 0 && ladybugGround->height() > 0)
+    M5Canvas *bugSpr = nullptr;
+
+    if (o.flying)
+      bugSpr = (s_rrLadybugAnimFrame == 0) ? ladybugFly1 : ladybugFly2;
+    else
+      bugSpr = ladybugGround;
+
+    if (bugSpr && bugSpr->width() > 0 && bugSpr->height() > 0)
     {
       const int drawW = o.w;
       const int drawH = o.h;
       const int drawX = ox;
-      const int drawY = o.y;
 
-      ladybugGround->pushRotateZoom(&spr, drawX + drawW / 2, drawY + drawH / 2, 0.0f,
-                                    (float)drawW / (float)ladybugGround->width(),
-                                    (float)drawH / (float)ladybugGround->height(), kResRunKey);
+      int drawY = o.y;
+
+      if (o.flying)
+      {
+        const int bob = ((millis() / 120) % 2 == 0) ? 0 : kRrFlyingBugBob;
+        drawY = o.y - kRrFlyingBugVisualLift - bob;
+      }
+      else
+      {
+        drawY = groundY - drawH + 4;
+      }
+      
+      bugSpr->pushRotateZoom(&spr, drawX + drawW / 2, drawY + drawH / 2, 0.0f, (float)drawW / (float)bugSpr->width(),
+                             (float)drawH / (float)bugSpr->height(), kResRunKey);
     }
     else
     {
       spr.fillRoundRect(ox, o.y, o.w, o.h, 4, TFT_GREEN);
     }
   }
-
-  int barW = gW - 20;
-  int barX = 10;
-  int barY = 8;
-  spr.drawRect(barX, barY, barW, 6, TFT_DARKGREY);
-
-  int fill = (rr_distance * (barW - 2)) / rr_courseLen;
-  if (fill < 0)
-    fill = 0;
-  if (fill > barW - 2)
-    fill = barW - 2;
-
-  spr.fillRect(barX + 1, barY + 1, fill, 4, TFT_YELLOW);
 }
 
 // -----------------------------------------------------------------------------
@@ -3694,7 +3724,7 @@ static M5Canvas *s_dodgerGoalFrame1Spr = nullptr;
 static M5Canvas *s_dodgerGoalFrame2Spr = nullptr;
 static M5Canvas *s_dodgerGoreSpr = nullptr;
 
-static const char* dodgerIntroLine1()
+static const char *dodgerIntroLine1()
 {
   switch (pet.type)
   {
@@ -3705,7 +3735,7 @@ static const char* dodgerIntroLine1()
   }
 }
 
-static const char* dodgerIntroLine2()
+static const char *dodgerIntroLine2()
 {
   switch (pet.type)
   {
@@ -4696,7 +4726,8 @@ void drawInfernalDodger()
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString(dodgerIntroLine1(), gW / 2, 8, 2);
-    spr.drawCentreString(dodgerIntroLine2(), gW / 2, 26, 2);    const int impX = (gW - 48) / 2;
+    spr.drawCentreString(dodgerIntroLine2(), gW / 2, 26, 2);
+    const int impX = (gW - 48) / 2;
     const int impY = 44;
 
     const char *introImp =
