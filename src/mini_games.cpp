@@ -208,6 +208,18 @@ static const char *const *flappyBurnFramesForPet()
   }
 }
 
+static const char *fireballRunBgPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bg.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bg.png";
+  }
+}
+
 static const char *flappyImpWave1PathForPet()
 {
   switch (pet.type)
@@ -3682,6 +3694,29 @@ static M5Canvas *s_dodgerGoalFrame1Spr = nullptr;
 static M5Canvas *s_dodgerGoalFrame2Spr = nullptr;
 static M5Canvas *s_dodgerGoreSpr = nullptr;
 
+static const char* dodgerIntroLine1()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Arrow keys or A/L to dodge";
+  default:
+    return "Arrow keys or A/L to dodge";
+  }
+}
+
+static const char* dodgerIntroLine2()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Pilot the sub, smash the Merman!!";
+  case PET_DEVIL:
+  default:
+    return "Stay on the road, smash the Imp!";
+  }
+}
+
 void freeDodgerGoalFrames()
 {
   mgmem::releaseSprite(MiniGame::INFERNAL_DODGER, "goal_frame_1");
@@ -3704,7 +3739,7 @@ static const char *dodgerGoalFrame1PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/imp_stack1.png";
+    return "/raising_hell/graphics/mini_games/fbrun/eld/mertaunt1.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png";
@@ -3716,7 +3751,7 @@ static const char *dodgerGoalFrame2PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/imp_stack2.png";
+    return "/raising_hell/graphics/mini_games/fbrun/eld/mertaunt2.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png";
@@ -3728,22 +3763,46 @@ static const char *dodgerGoalGorePathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/imp_gore.png";
+    return "/raising_hell/graphics/mini_games/fbrun/eld/mer_gore.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
   }
 }
 
-static const char *fireballRunBgPathForPet()
+static const char *dodgerProjectile1PathForPet()
 {
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bg.png";
+    return "/raising_hell/graphics/mini_games/fbrun/eld/trident1.png";
   case PET_DEVIL:
   default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bg.png";
+    return "/raising_hell/graphics/mini_games/fbrun/dev/fireball1.png";
+  }
+}
+
+static const char *dodgerProjectile2PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/fbrun/eld/trident2.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/fbrun/dev/fireball2.png";
+  }
+}
+
+static const char *dodgerProjectile3PathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/fbrun/eld/trident3.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/fbrun/dev/fireball3.png";
   }
 }
 
@@ -3805,7 +3864,7 @@ static const char *fireballRunCarPathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/car.png";
+    return "/raising_hell/graphics/mini_games/fbrun/eld/sub_sprite.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/fbrun/dev/car.png";
@@ -3915,22 +3974,17 @@ void freeDodgerCarSprite()
 
 static bool ensureDodgerBgCache(const char *path) { return mgAssetsEnsureSharedBg(MiniGame::INFERNAL_DODGER, path); }
 
-static bool ensureDodgerFireballSprites(const char *bgPath)
+static bool ensureDodgerFireballSprites()
 {
-  if (!bgPath || !bgPath[0] || !g_sdReady)
+  if (!g_sdReady)
     return false;
 
-  char dir[128];
-  flappyDirFromBgPath(bgPath, dir, sizeof(dir));
-  if (!dir[0])
-    return false;
+  const char *path1 = dodgerProjectile1PathForPet();
+  const char *path2 = dodgerProjectile2PathForPet();
+  const char *path3 = dodgerProjectile3PathForPet();
 
-  char path1[192];
-  char path2[192];
-  char path3[192];
-  snprintf(path1, sizeof(path1), "%sfireball1.png", dir);
-  snprintf(path2, sizeof(path2), "%sfireball2.png", dir);
-  snprintf(path3, sizeof(path3), "%sfireball3.png", dir);
+  if (!path1 || !path2 || !path3 || !path1[0] || !path2[0] || !path3[0])
+    return false;
 
   s_dodgerFireball1Spr = nullptr;
   s_dodgerFireball2Spr = nullptr;
@@ -4172,7 +4226,7 @@ void startInfernalDodger()
   const bool bgOk = ensureDodgerBgCache(bgPath);
   mgmem::logUsage("dodger-after-bg-ensure");
 
-  const bool fireballOk = ensureDodgerFireballSprites(bgPath);
+  const bool fireballOk = ensureDodgerFireballSprites();
   mgmem::logUsage("dodger-after-fireballs-ensure");
 
   const bool carOk = ensureDodgerCarSprite(fireballRunCarPathForPet());
@@ -4641,54 +4695,8 @@ void drawInfernalDodger()
     spr.setTextDatum(CC_DATUM);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Arrow keys or A/L to dodge", gW / 2, 8, 2);
-    spr.drawCentreString("Stay on the road, smash the Imp!", gW / 2, 26, 2);
-
-    const int impX = (gW - 48) / 2;
-    const int impY = 44;
-
-    const char *introImp =
-        (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1ResolvedPath() : dodgerGoalFrame2ResolvedPath();
-
-    if (introImp && introImp[0])
-      sprDrawPngFromSD(introImp, impX, impY);
-    else
-      spr.fillRect(impX, impY, 48, 48, TFT_RED);
-
-    const int cbY = 102;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_dodgerDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-    }
-
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
-
-    spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
-    return;
-  }
-
-  if (s_dodgerShowIntro)
-  {
-    spr.fillSprite(TFT_BLACK);
-    spr.setTextDatum(CC_DATUM);
-
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Arrow keys or A/L to dodge", gW / 2, 8, 2);
-    spr.drawCentreString("Stay on the road, smash the Imp!", gW / 2, 26, 2);
-
-    const int impX = (gW - 48) / 2;
+    spr.drawCentreString(dodgerIntroLine1(), gW / 2, 8, 2);
+    spr.drawCentreString(dodgerIntroLine2(), gW / 2, 26, 2);    const int impX = (gW - 48) / 2;
     const int impY = 44;
 
     const char *introImp =
