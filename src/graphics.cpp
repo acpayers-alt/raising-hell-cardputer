@@ -4142,24 +4142,11 @@ static void drawSleepScreenImpl(bool redrawBg)
   if (!isScreenOn())
     return;
 
-  // Note: keep separate state per "mode" so switching baby<->teen doesn't reuse frame counters weirdly
   static uint8_t s_frame = 0;
   static uint32_t s_nextFrameMs = 0;
   static bool s_hasBg = false;
 
-  // 0 = static, 1 = devil baby, 2 = devil teen, 3 = devil adult, 4 = devil elder,
-  // 5 = eld baby, 6 = eld teen
-
   static uint8_t s_mode = 0;
-
-  static constexpr uint8_t DEV_BABY_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t DEV_TEEN_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t DEV_ADULT_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t DEV_ELDER_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t ELD_BABY_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t ELD_TEEN_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t ELD_ADULT_SLEEP_FRAME_COUNT = 4;
-  static constexpr uint8_t ELD_ELDER_SLEEP_FRAME_COUNT = 4;
 
   const uint32_t now = millis();
 
@@ -4198,7 +4185,7 @@ static void drawSleepScreenImpl(bool redrawBg)
     newMode = 7;
   else if (eldElderAnim)
     newMode = 8;
-  // If mode changes, force a clean restart of the animation state + rebuild cache
+
   if (newMode != s_mode)
   {
     s_mode = newMode;
@@ -4206,23 +4193,18 @@ static void drawSleepScreenImpl(bool redrawBg)
     s_nextFrameMs = 0;
     s_hasBg = false;
     redrawBg = true;
-
-    // Mode switch means different frame set -> drop cache
     freeSleepAnimFrameCache();
   }
 
   bool frameChanged = false;
 
-  // Pick background path / anim table
   const char *bgPath = nullptr;
 
-  // Track mode switches so animation restarts instantly
   static uint8_t s_lastMode = 0;
   static bool s_animInited = false;
 
   const bool modeChanged = (s_mode != s_lastMode);
 
-  // Select anim table for the current sleep mode
   const char *const *frames = nullptr;
   uint8_t frameCount = 0;
   uint32_t frameMs = 0;
@@ -4231,93 +4213,79 @@ static void drawSleepScreenImpl(bool redrawBg)
   {
   case 1:
     frames = DEV_BABY_SLEEP_FRAMES;
-    frameCount = DEV_BABY_SLEEP_FRAME_COUNT;
+    frameCount = sizeof(DEV_BABY_SLEEP_FRAMES) / sizeof(DEV_BABY_SLEEP_FRAMES[0]);
     frameMs = DEV_BABY_SLEEP_FRAME_MS;
     break;
   case 2:
     frames = DEV_TEEN_SLEEP_FRAMES;
-    frameCount = DEV_TEEN_SLEEP_FRAME_COUNT;
+    frameCount = sizeof(DEV_TEEN_SLEEP_FRAMES) / sizeof(DEV_TEEN_SLEEP_FRAMES[0]);
     frameMs = DEV_TEEN_SLEEP_FRAME_MS;
     break;
   case 3:
     frames = DEV_ADULT_SLEEP_FRAMES;
-    frameCount = DEV_ADULT_SLEEP_FRAME_COUNT;
+    frameCount = sizeof(DEV_ADULT_SLEEP_FRAMES) / sizeof(DEV_ADULT_SLEEP_FRAMES[0]);
     frameMs = DEV_ADULT_SLEEP_FRAME_MS;
     break;
   case 4:
     frames = DEV_ELDER_SLEEP_FRAMES;
-    frameCount = DEV_ELDER_SLEEP_FRAME_COUNT;
+    frameCount = sizeof(DEV_ELDER_SLEEP_FRAMES) / sizeof(DEV_ELDER_SLEEP_FRAMES[0]);
     frameMs = DEV_ELDER_SLEEP_FRAME_MS;
     break;
   case 5:
     frames = ELD_BABY_SLEEP_FRAMES;
-    frameCount = 4;
+    frameCount = sizeof(ELD_BABY_SLEEP_FRAMES) / sizeof(ELD_BABY_SLEEP_FRAMES[0]);
     frameMs = ELD_BABY_SLEEP_FRAME_MS;
     break;
   case 6:
     frames = ELD_TEEN_SLEEP_FRAMES;
-    frameCount = ELD_TEEN_SLEEP_FRAME_COUNT;
+    frameCount = sizeof(ELD_TEEN_SLEEP_FRAMES) / sizeof(ELD_TEEN_SLEEP_FRAMES[0]);
     frameMs = ELD_TEEN_SLEEP_FRAME_MS;
     break;
   case 7:
     frames = ELD_ADULT_SLEEP_FRAMES;
-    frameCount = ELD_ADULT_SLEEP_FRAME_COUNT;
+    frameCount = sizeof(ELD_ADULT_SLEEP_FRAMES) / sizeof(ELD_ADULT_SLEEP_FRAMES[0]);
     frameMs = ELD_ADULT_SLEEP_FRAME_MS;
     break;
   case 8:
     frames = ELD_ELDER_SLEEP_FRAMES;
-    frameCount = 4;
+    frameCount = sizeof(ELD_ELDER_SLEEP_FRAMES) / sizeof(ELD_ELDER_SLEEP_FRAMES[0]);
     frameMs = ELD_ELDER_SLEEP_FRAME_MS;
     break;
   default:
     bgPath = sleepBgForPet(pet.type);
     s_lastMode = s_mode;
-    // keep anim flags as-is
     break;
   }
 
-  // Kick handling (entering sleep OR waking screen): make animation eligible NOW.
   const bool anyKick = (kick || wakeKick);
 
   if (anyKick && frames && frameCount > 0 && frameMs > 0)
   {
-    // Ensure anim is considered initialized so we don't immediately overwrite timing below.
     s_animInited = true;
-
-    // Make next step eligible immediately.
     s_nextFrameMs = now;
 
-    // Force a visible change on the first post-kick draw.
     if (frameCount > 1)
     {
       s_frame = (uint8_t)((s_frame + 1) % frameCount);
       frameChanged = true;
     }
 
-    // Ensure background will be redrawn / swapped.
     s_hasBg = false;
   }
 
   if (frames && frameCount > 0 && frameMs > 0)
   {
-    // Restart ONLY when the mode changes or the animation has never been inited.
     if (!s_animInited || modeChanged)
     {
       s_animInited = true;
 
-      // Start/resume immediately (don't wait frameMs before the first advance).
-      // Also don't force s_frame=0 here — that can erase a "kick" that already nudged it.
       if (s_nextFrameMs == 0)
-      {
         s_frame = 0;
-      }
-      s_nextFrameMs = now; // eligible immediately
-      frameChanged = true;
 
-      // Force first draw of the anim background
+      s_nextFrameMs = now;
+      frameChanged = true;
       s_hasBg = false;
 
-      // New anim set -> drop and rebuild cache
       freeSleepAnimFrameCache();
     }
     else
@@ -4330,12 +4298,8 @@ static void drawSleepScreenImpl(bool redrawBg)
           steps = frameCount;
 
         s_frame = (uint8_t)((s_frame + steps) % frameCount);
-        s_nextFrameMs += (uint32_t)steps * (uint32_t)frameMs;
+        s_nextFrameMs += steps * frameMs;
         frameChanged = true;
-
-        // IMPORTANT CHANGE:
-        // Do NOT flip s_hasBg=false just to "force redraw" (that causes SD decode each frame).
-        // We will swap frames from RAM cache below.
       }
     }
 
@@ -4344,18 +4308,15 @@ static void drawSleepScreenImpl(bool redrawBg)
 
   s_lastMode = s_mode;
 
-  // Export timing to loop-level heartbeat so animation advances even without input
   g_sleepAnimActive = (frames && frameCount > 0 && frameMs > 0);
   g_sleepAnimNextFrameMs = (g_sleepAnimActive ? s_nextFrameMs : 0);
 
-  // Only redraw the background when necessary
   const bool needBgDraw = redrawBg || frameChanged || !s_hasBg;
 
   if (needBgDraw)
   {
     bool ok = false;
 
-    // Animated modes: cache decoded frames once, then memcpy into sprite buffer.
     if (s_mode != 0 && frames && frameCount > 0)
     {
       if (ensureSleepAnimFrameCache(s_mode, frames, frameCount, 0, 18))
@@ -4364,14 +4325,12 @@ static void drawSleepScreenImpl(bool redrawBg)
         if (sprBuf && s_sleepAnimFrameCache && s_sleepAnimFrameCache[s_frame])
         {
           const size_t pxCount = (size_t)SCREEN_W * (size_t)SCREEN_H;
-          const size_t bufBytes = pxCount * sizeof(uint16_t);
-          memcpy(sprBuf, s_sleepAnimFrameCache[s_frame], bufBytes);
+          memcpy(sprBuf, s_sleepAnimFrameCache[s_frame], pxCount * sizeof(uint16_t));
           ok = true;
         }
       }
     }
 
-    // Static fallback OR anim-cache failure fallback: draw from SD as before
     if (!ok)
     {
       if (g_sdReady && bgPath)
