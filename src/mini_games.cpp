@@ -1446,7 +1446,7 @@ static const char *resRunSnakeCrouchPathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/snake_crouch.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/worm_crouch.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/snake_crouch.png";
@@ -1458,7 +1458,7 @@ static const char *resRunSnakeJumpPathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/snake_jump.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/worm_jump.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/snake_jump.png";
@@ -1609,7 +1609,7 @@ static const char *resRunHand1PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/hand_1.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/cult_hand1.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/hand_1.png";
@@ -1621,7 +1621,7 @@ static const char *resRunHand2PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/hand_2.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/cult_hand2.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/hand_2.png";
@@ -1633,7 +1633,7 @@ static const char *resRunLadybugGroundPathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/ladybug_ground.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/rat_ground.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_ground.png";
@@ -1645,7 +1645,7 @@ static const char *resRunLadybugFly1PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/ladybug_fly1.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/bat_fly1.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly1.png";
@@ -1657,7 +1657,7 @@ static const char *resRunLadybugFly2PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/ladybug_fly2.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/bat_fly2.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly2.png";

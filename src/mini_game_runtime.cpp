@@ -199,10 +199,20 @@ void mgApplyResultAndShowReward(bool won)
   {
     if (won)
     {
-      snprintf(
-        s_rewardMsg,
-        sizeof(s_rewardMsg),
-        "Fall of Man has begun\nYou may return to life");
+      if (pet.type == PET_ELDRITCH)
+      {
+        snprintf(
+          s_rewardMsg,
+          sizeof(s_rewardMsg),
+          "The darkness has returned\nYou may return to life");
+      }
+      else
+      {
+        snprintf(
+          s_rewardMsg,
+          sizeof(s_rewardMsg),
+          "Fall of Man has begun\nYou may return to life");
+      }
     }
     else
     {
