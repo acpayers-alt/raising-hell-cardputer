@@ -2690,6 +2690,9 @@ static inline int crossyClamp(int v, int lo, int hi)
   return v;
 }
 
+static M5Canvas *s_crossyLava0 = nullptr;
+static M5Canvas *s_crossyLava1 = nullptr;
+
 static const char *crossyStoneSmallPathForPet();
 static const char *crossyStoneXSPathForPet();
 static const char *crossyImpPathForPet(CrossyFacing facing);
@@ -2725,13 +2728,6 @@ static bool ensureCrossyLavaZoneSprite(uint8_t frame)
 
   M5Canvas *sprPtr = nullptr;
   return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, assetId, crossyLavaZonePathForPet(i), 16, TFT_BLACK, sprPtr);
-}
-
-static bool ensureCrossyIntroSprite()
-{
-  M5Canvas *sprPtr = nullptr;
-  return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "intro_goal",
-                             "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png", 8, kSpriteKey, sprPtr);
 }
 
 static void crossyInitLanes()
@@ -2821,6 +2817,9 @@ void freeCrossyZoneSprites()
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "intro_goal");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_0");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_1");
+
+  s_crossyLava0 = nullptr;
+  s_crossyLava1 = nullptr;
 }
 
 static const char *crossyStartZonePathForPet()
@@ -3082,6 +3081,9 @@ void startCrossyRoad()
 
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
+
+  mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_0", crossyLavaZonePathForPet(0), 16, TFT_BLACK, s_crossyLava0);
+  mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_1", crossyLavaZonePathForPet(1), 16, TFT_BLACK, s_crossyLava1);
 
   mgmem::logUsage("crossy-after-asset-free");
 
@@ -3481,24 +3483,8 @@ void drawCrossyRoad()
     mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "start_zone", crossyStartZonePathForPet(), 8, kSpriteKey, startZoneSpr);
   }
 
-  const bool haveLava0 = ensureCrossyLavaZoneSprite(0);
-  const bool haveLava1 = ensureCrossyLavaZoneSprite(1);
-
-  M5Canvas *lavaZoneSpr0 = nullptr;
-  M5Canvas *lavaZoneSpr1 = nullptr;
-
-  if (haveLava0)
-  {
-    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_0", crossyLavaZonePathForPet(0), 16, TFT_BLACK, lavaZoneSpr0);
-  }
-
-  if (haveLava1)
-  {
-    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_1", crossyLavaZonePathForPet(1), 16, TFT_BLACK, lavaZoneSpr1);
-  }
-
-  (void)haveLava0;
-  (void)haveLava1;
+  M5Canvas *lavaZoneSpr0 = s_crossyLava0;
+  M5Canvas *lavaZoneSpr1 = s_crossyLava1;
 
   spr.fillSprite(TFT_BLACK);
 
@@ -3527,32 +3513,20 @@ void drawCrossyRoad()
     spr.drawCentreString("Escape Hell! Use Arrow Keys", gW / 2, 8, 2);
     spr.drawCentreString("Avoid Lava, Exit between Torches!", gW / 2, 26, 2);
 
-    M5Canvas *introSpr = nullptr;
     const char *introPath = "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png";
 
-    if (ensureCrossyIntroSprite() &&
-        mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "intro_goal", introPath, 8, kSpriteKey, introSpr) && introSpr &&
-        introSpr->width() > 0 && introSpr->height() > 0)
+    int iw = 0, ih = 0;
+    const char *useIntroPath = nullptr;
+
+    if (mgAssetsReadPngDims(introPath, &iw, &ih, &useIntroPath))
     {
-      const int ix = (gW - (int)introSpr->width()) / 2;
+      const int ix = (gW - iw) / 2;
       const int iy = 48;
-      introSpr->pushSprite(&spr, ix, iy, kSpriteKey);
+      sprDrawPngFromSD(useIntroPath ? useIntroPath : introPath, ix, iy);
     }
     else
     {
-      int iw = 0, ih = 0;
-      const char *useIntroPath = nullptr;
-
-      if (mgAssetsReadPngDims(introPath, &iw, &ih, &useIntroPath))
-      {
-        const int ix = (gW - iw) / 2;
-        const int iy = 48;
-        sprDrawPngFromSD(useIntroPath ? useIntroPath : introPath, ix, iy);
-      }
-      else
-      {
-        sprDrawPngFromSD(introPath, (gW - 68) / 2, 48);
-      }
+      sprDrawPngFromSD(introPath, (gW - 68) / 2, 48);
     }
 
     const int cbY = 102;
