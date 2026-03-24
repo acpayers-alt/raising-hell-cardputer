@@ -1465,6 +1465,30 @@ static const char *resRunSnakeJumpPathForPet()
   }
 }
 
+static const char *resRunIntroLine1ForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Up/Down to Jump/Duck G to boost";
+  case PET_DEVIL:
+  default:
+    return "Up/Down to Jump/Duck G to boost";
+  }
+}
+
+static const char *resRunIntroLine2ForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Deliver the tome to the cult";
+  case PET_DEVIL:
+  default:
+    return "Deliver the apple to our ally";
+  }
+}
+
 struct RRObs
 {
   int x;
@@ -1490,19 +1514,38 @@ static const uint8_t RR_LOW_FIRE = 1;
 static const uint8_t RR_FLY_BUG = 2;
 
 static const RRSpawn rr_script[] = {
-  // --- pass 1 ---
-  {520, RR_SPIKE, 0},    {860, RR_LOW_FIRE, 0}, {1080, RR_FLY_BUG, 0},  {1320, RR_SPIKE, 0},   {1540, RR_LOW_FIRE, 0},
-  {1760, RR_FLY_BUG, 0}, {1980, RR_SPIKE, 0},   {2220, RR_LOW_FIRE, 0}, {2380, RR_FLY_BUG, 0},
+    // --- pass 1 ---
+    {520, RR_SPIKE, 0},
+    {860, RR_LOW_FIRE, 0},
+    {1080, RR_FLY_BUG, 0},
+    {1320, RR_SPIKE, 0},
+    {1540, RR_LOW_FIRE, 0},
+    {1760, RR_FLY_BUG, 0},
+    {1980, RR_SPIKE, 0},
+    {2220, RR_LOW_FIRE, 0},
+    {2380, RR_FLY_BUG, 0},
 
-  // --- pass 2 ---
-  {520 + 2600, RR_SPIKE, 0},    {860 + 2600, RR_LOW_FIRE, 0}, {1080 + 2600, RR_FLY_BUG, 0},
-  {1320 + 2600, RR_SPIKE, 0},   {1540 + 2600, RR_LOW_FIRE, 0}, {1760 + 2600, RR_FLY_BUG, 0},
-  {1980 + 2600, RR_SPIKE, 0},   {2220 + 2600, RR_LOW_FIRE, 0}, {2380 + 2600, RR_FLY_BUG, 0},
+    // --- pass 2 ---
+    {520 + 2600, RR_SPIKE, 0},
+    {860 + 2600, RR_LOW_FIRE, 0},
+    {1080 + 2600, RR_FLY_BUG, 0},
+    {1320 + 2600, RR_SPIKE, 0},
+    {1540 + 2600, RR_LOW_FIRE, 0},
+    {1760 + 2600, RR_FLY_BUG, 0},
+    {1980 + 2600, RR_SPIKE, 0},
+    {2220 + 2600, RR_LOW_FIRE, 0},
+    {2380 + 2600, RR_FLY_BUG, 0},
 
-  // --- pass 3 ---
-  {520 + 5200, RR_SPIKE, 0},    {860 + 5200, RR_LOW_FIRE, 0}, {1080 + 5200, RR_FLY_BUG, 0},
-  {1320 + 5200, RR_SPIKE, 0},   {1540 + 5200, RR_LOW_FIRE, 0}, {1760 + 5200, RR_FLY_BUG, 0},
-  {1980 + 5200, RR_SPIKE, 0},   {2220 + 5200, RR_LOW_FIRE, 0}, {2380 + 5200, RR_FLY_BUG, 0},
+    // --- pass 3 ---
+    {520 + 5200, RR_SPIKE, 0},
+    {860 + 5200, RR_LOW_FIRE, 0},
+    {1080 + 5200, RR_FLY_BUG, 0},
+    {1320 + 5200, RR_SPIKE, 0},
+    {1540 + 5200, RR_LOW_FIRE, 0},
+    {1760 + 5200, RR_FLY_BUG, 0},
+    {1980 + 5200, RR_SPIKE, 0},
+    {2220 + 5200, RR_LOW_FIRE, 0},
+    {2380 + 5200, RR_FLY_BUG, 0},
 };
 
 static const int rr_scriptCount = (int)(sizeof(rr_script) / sizeof(rr_script[0]));
@@ -1626,7 +1669,7 @@ static const char *resRunSnakeRun1PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/snake_run1.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/worm_run1.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/snake_run1.png";
@@ -1638,7 +1681,7 @@ static const char *resRunSnakeRun2PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/snake_run2.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/worm_run2.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/snake_run2.png";
@@ -1674,7 +1717,7 @@ static const char *resRunBranchGroundPathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/branch_ground.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/dock_ground.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/branch_ground.png";
@@ -1939,7 +1982,7 @@ static void rrSpawnObstacle(uint8_t type)
 static void rrResetObstacles()
 {
   for (auto &o : rr_obs)
-  o = {0, 0, 0, 0, false, false};
+    o = {0, 0, 0, 0, false, false};
 }
 
 static bool rrAabb(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh)
@@ -2163,15 +2206,15 @@ void updateResurrectionRun(const InputState &input)
       s_rrPhaseStartMs = now;
       s_rrHandActive = true;
       s_rrHandTouched = false;
-    
+
       // HAND_ENTER uses world-space, because draw code subtracts rr_distance.
       s_rrHandX = rr_distance + gW;
       s_rrHandY = groundY - s_rrHandH + 8;
-    
+
       for (auto &o : rr_obs)
         o.active = false;
     }
-    }
+  }
 
   if (s_rrPhase == RR_PHASE_RUN)
   {
@@ -2388,15 +2431,10 @@ void drawResurrectionRun()
     spr.setTextDatum(CC_DATUM);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Up/Down to Jump/Duck G to boost", gW / 2, 8, 2);
-    spr.drawCentreString("Deliver the apple to our ally", gW / 2, 26, 2);
+    spr.drawCentreString(resRunIntroLine1ForPet(), gW / 2, 8, 2);
+    spr.drawCentreString(resRunIntroLine2ForPet(), gW / 2, 26, 2);
 
-    M5Canvas *introSnake1 = s_rrSnakeRun1Spr;
-    M5Canvas *introSnake2 = s_rrSnakeRun2Spr;
-    M5Canvas *introSnake = nullptr;
-
-    if (haveSnake)
-      introSnake = (s_rrAnimFrame == 0) ? introSnake1 : introSnake2;
+    M5Canvas *introSnake = (s_rrAnimFrame == 0) ? s_rrSnakeRun1Spr : s_rrSnakeRun2Spr;
 
     if (introSnake && introSnake->width() > 0 && introSnake->height() > 0)
     {
@@ -2439,7 +2477,23 @@ void drawResurrectionRun()
     return;
   }
 
-  spr.fillRect(0, 0, gW, groundY, TFT_CYAN);
+  uint16_t skyColor = TFT_CYAN;
+
+  if (pet.type == PET_ELDRITCH)
+  {
+    skyColor = spr.color565(12, 0, 20); // very dark purple
+  }
+  if (pet.type == PET_ELDRITCH)
+  {
+    for (int y = 0; y < groundY; y += 4)
+    {
+      uint8_t shade = 8 + (y / 8);
+      uint16_t c = spr.color565(shade, 0, shade * 2);
+      spr.drawFastHLine(0, y, gW, c);
+    }
+  }
+
+  spr.fillRect(0, 0, gW, groundY, skyColor);
 
   if (groundSpr && groundSpr->width() > 0 && groundSpr->height() > 0)
   {
@@ -2458,8 +2512,6 @@ void drawResurrectionRun()
   {
     spr.fillRect(0, groundY, gW, kRrGroundH, TFT_BROWN);
   }
-
-  spr.drawFastHLine(0, groundY, gW, TFT_DARKGREY);
 
   const int px = kRrPlayerX;
   int py = groundY - kRrPlayerH + (int)rr_y;
@@ -2548,7 +2600,7 @@ void drawResurrectionRun()
       {
         drawY = groundY - drawH + 4;
       }
-      
+
       bugSpr->pushRotateZoom(&spr, drawX + drawW / 2, drawY + drawH / 2, 0.0f, (float)drawW / (float)bugSpr->width(),
                              (float)drawH / (float)bugSpr->height(), kResRunKey);
     }
