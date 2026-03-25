@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <stdint.h>
-#include <vector>
+#include <deque>
 
 enum class AssetOtaChannel : uint8_t {
   PUBLIC = 0,
@@ -46,7 +46,7 @@ struct AssetManifestFile
 struct AssetManifestData {
   String packVersion;
   String channel;
-  std::vector<AssetManifestFile> files;
+  std::deque<AssetManifestFile> files;
 
   void clear()
   {

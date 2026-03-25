@@ -17,24 +17,23 @@
 #include <string.h>
 #include <vector>
 
-static String assetFileResolvedUrl(const AssetManifestData &manifest,
-  const AssetManifestFile &f)
+static String assetFileResolvedUrl(const AssetManifestData &manifest, const AssetManifestFile &f)
 {
-String url = "https://assets.raisinghellgame.com/assets/";
-if (!url.endsWith("/"))
-url += "/";
+  String url = "https://assets.raisinghellgame.com/assets/";
+  if (!url.endsWith("/"))
+    url += "/";
 
-// Add version prefix
-if (manifest.packVersion[0] != '\0')
-{
-url += manifest.packVersion;
-if (!url.endsWith("/"))
-url += "/";
-}
+  // Add version prefix
+  if (manifest.packVersion[0] != '\0')
+  {
+    url += manifest.packVersion;
+    if (!url.endsWith("/"))
+      url += "/";
+  }
 
-url += f.path;
+  url += f.path;
 
-return url;
+  return url;
 }
 
 static AssetOtaConfig s_cfg{};
@@ -550,7 +549,11 @@ bool assetOtaCheckNow(String *outMessage)
     Serial.printf("[OTA] local manifest empty; swapping in all %u remote files\n",
                   (unsigned)remoteManifest.files.size());
 
-    changed.swap(remoteManifest.files);
+    changed.clear();
+    changed.reserve(remoteManifest.files.size());
+
+    for (const auto &f : remoteManifest.files)
+      changed.push_back(f);
 
     Serial.printf("[OTA] swap complete changed.size=%u free=%u largest=%u\n", (unsigned)changed.size(),
                   (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
@@ -676,7 +679,7 @@ bool assetOtaCheckNow(String *outMessage)
     }
 
     String resolvedUrl = assetFileResolvedUrl(remoteManifest, mf);
-    
+
     Serial.printf("[OTA] download index=%u/%u path=%s\n", (unsigned)(i + 1), (unsigned)changed.size(), rawPath.c_str());
     Serial.printf("[OTA] resolved url=%s\n", resolvedUrl.c_str());
 

@@ -2052,8 +2052,10 @@ static void rrDrawEldritchStars(int groundY, uint32_t now)
       spr.drawPixel(s.x, s.y, c);
       if (glow >= 8)
       {
-        if (s.x > 0) spr.drawPixel(s.x - 1, s.y, c);
-        if (s.x + 1 < ((screenW > 0) ? screenW : 240)) spr.drawPixel(s.x + 1, s.y, c);
+        if (s.x > 0)
+          spr.drawPixel(s.x - 1, s.y, c);
+        if (s.x + 1 < ((screenW > 0) ? screenW : 240))
+          spr.drawPixel(s.x + 1, s.y, c);
       }
     }
     else if (s.kind == 2)
@@ -2061,8 +2063,10 @@ static void rrDrawEldritchStars(int groundY, uint32_t now)
       spr.drawPixel(s.x, s.y, c);
       if (glow >= 8)
       {
-        if (s.y > 0) spr.drawPixel(s.x, s.y - 1, c);
-        if (s.y + 1 < groundY) spr.drawPixel(s.x, s.y + 1, c);
+        if (s.y > 0)
+          spr.drawPixel(s.x, s.y - 1, c);
+        if (s.y + 1 < groundY)
+          spr.drawPixel(s.x, s.y + 1, c);
       }
     }
     else
@@ -2070,10 +2074,14 @@ static void rrDrawEldritchStars(int groundY, uint32_t now)
       spr.drawPixel(s.x, s.y, c);
       if (glow >= 10)
       {
-        if (s.x > 0) spr.drawPixel(s.x - 1, s.y, c);
-        if (s.x + 1 < ((screenW > 0) ? screenW : 240)) spr.drawPixel(s.x + 1, s.y, c);
-        if (s.y > 0) spr.drawPixel(s.x, s.y - 1, c);
-        if (s.y + 1 < groundY) spr.drawPixel(s.x, s.y + 1, c);
+        if (s.x > 0)
+          spr.drawPixel(s.x - 1, s.y, c);
+        if (s.x + 1 < ((screenW > 0) ? screenW : 240))
+          spr.drawPixel(s.x + 1, s.y, c);
+        if (s.y > 0)
+          spr.drawPixel(s.x, s.y - 1, c);
+        if (s.y + 1 < groundY)
+          spr.drawPixel(s.x, s.y + 1, c);
       }
     }
   }
@@ -2577,14 +2585,14 @@ void drawResurrectionRun()
   {
     skyColor = spr.color565(12, 0, 20); // very dark purple/black
     spr.fillRect(0, 0, gW, groundY, skyColor);
-  
+
     for (int y = 0; y < groundY; y += 4)
     {
       uint8_t shade = 8 + (y / 8);
       uint16_t c = spr.color565(shade, 0, shade * 2);
       spr.drawFastHLine(0, y, gW, c);
     }
-  
+
     rrDrawEldritchStars(groundY, millis());
   }
   else
@@ -2731,6 +2739,17 @@ static uint8_t s_crossyLandingGraceFrames = 0;
 static uint32_t s_crossyWinPoseStart = 0;
 static bool s_crossyWinPoseActive = false;
 
+struct CrossyStar
+{
+  int16_t x;
+  int16_t y;
+  uint8_t phase;
+  uint8_t kind;
+};
+
+static constexpr int kCrossyStarCount = 28;
+static CrossyStar s_crossyStars[kCrossyStarCount];
+
 enum CrossyLaneType : uint8_t
 {
   CROSSY_LANE_SAFE = 0,
@@ -2869,6 +2888,20 @@ static bool ensureCrossyLavaZoneSprite(uint8_t frame)
 
   M5Canvas *&target = (i == 0) ? s_crossyLava0 : s_crossyLava1;
   return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, assetId, crossyLavaZonePathForPet(i), 16, TFT_BLACK, target);
+}
+
+static void crossyInitStars()
+{
+  const int gW = kCrossyCols * kCrossyTileW;
+  const int gH = kCrossyRows * kCrossyTileH;
+
+  for (int i = 0; i < kCrossyStarCount; ++i)
+  {
+    s_crossyStars[i].x = (int16_t)random(0, gW);
+    s_crossyStars[i].y = (int16_t)random(0, gH);
+    s_crossyStars[i].phase = (uint8_t)random(0, 64);
+    s_crossyStars[i].kind = (uint8_t)random(0, 4);
+  }
 }
 
 static void crossyInitLanes()
@@ -3136,6 +3169,60 @@ static const char *crossyStonePathForPet()
   }
 }
 
+static void drawCrossyEldritchStarsForRow(int y, int rowH, uint32_t now)
+{
+  const int laneTop = y;
+  const int laneBottom = y + rowH;
+  const uint32_t tick = now / 90U;
+  const int gW = kCrossyCols * kCrossyTileW;
+
+  for (int i = 0; i < kCrossyStarCount; ++i)
+  {
+    const CrossyStar &s = s_crossyStars[i];
+
+    if (s.y < laneTop || s.y >= laneBottom)
+      continue;
+
+    const uint8_t t = (uint8_t)((tick + s.phase) & 31U);
+    const uint8_t glow = (t < 16U) ? t : (31U - t);
+
+    if (glow < 2)
+      continue;
+
+    uint16_t c;
+    if (glow < 5)
+      c = spr.color565(80, 80, 96);
+    else if (glow < 9)
+      c = spr.color565(150, 150, 180);
+    else
+      c = spr.color565(235, 235, 255);
+
+    const int sx = s.x;
+    const int sy = s.y;
+
+    if (sx < 0 || sx >= gW)
+      continue;
+
+    spr.drawPixel(sx, sy, c);
+
+    if (s.kind >= 1 && glow >= 8)
+    {
+      if (sx > 0)
+        spr.drawPixel(sx - 1, sy, c);
+      if (sx + 1 < gW)
+        spr.drawPixel(sx + 1, sy, c);
+    }
+
+    if (s.kind >= 2 && glow >= 8)
+    {
+      if (sy > laneTop)
+        spr.drawPixel(sx, sy - 1, c);
+      if (sy + 1 < laneBottom)
+        spr.drawPixel(sx, sy + 1, c);
+    }
+  }
+}
+
 static void drawCrossyStoneChunk(int x, int y, int w, int h, uint8_t platSize)
 {
   M5Canvas *stone = nullptr;
@@ -3216,6 +3303,7 @@ static void crossyReset()
   s_crossyLandingGraceFrames = 0;
 
   crossyInitLanes();
+  crossyInitStars();
 }
 
 void startCrossyRoad()
@@ -3272,21 +3360,11 @@ void startCrossyRoad()
   bool lava1 = false;
   bool eldBgOk = false;
 
-  if (pet.type == PET_ELDRITCH)
-  {
-    eldBgOk = mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "eld_bg",
-                                  "/raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg.png", 16, TFT_BLACK,
-                                  s_crossyEldBg);
-    mgmem::logUsage("crossy-after-eld-bg");
-  }
-  else
-  {
-    lava0 = ensureCrossyLavaZoneSprite(0);
-    mgmem::logUsage("crossy-after-lava0");
+  lava0 = ensureCrossyLavaZoneSprite(0);
+  mgmem::logUsage("crossy-after-lava0");
 
-    lava1 = ensureCrossyLavaZoneSprite(1);
-    mgmem::logUsage("crossy-after-lava1");
-  }
+  lava1 = ensureCrossyLavaZoneSprite(1);
+  mgmem::logUsage("crossy-after-lava1");
 
   const bool stoneOk = ensureCrossyStoneSprite();
   mgmem::logUsage("crossy-after-stone-lg");
@@ -3684,25 +3762,27 @@ void drawCrossyRoad()
 
     case CROSSY_LANE_WATER:
     {
-      M5Canvas *bgSpr = nullptr;
-
       if (pet.type == PET_ELDRITCH)
-        bgSpr = s_crossyEldBg;
-      else
-      {
-        const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
-        bgSpr = (lavaFrame == 0) ? s_crossyLava0 : s_crossyLava1;
-      }
-
-      if (bgSpr && bgSpr->width() > 0 && bgSpr->height() > 0)
-      {
-        const int tileW = (int)bgSpr->width();
-        for (int x = 0; x < gW; x += tileW)
-          bgSpr->pushSprite(&spr, x, y);
-      }
-      else
       {
         spr.fillRect(0, y, gW, kCrossyTileH, TFT_BLACK);
+        drawCrossyEldritchStarsForRow(y, kCrossyTileH, millis());
+      }
+      else
+      {
+        M5Canvas *bgSpr = nullptr;
+        const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
+        bgSpr = (lavaFrame == 0) ? s_crossyLava0 : s_crossyLava1;
+
+        if (bgSpr && bgSpr->width() > 0 && bgSpr->height() > 0)
+        {
+          const int tileW = (int)bgSpr->width();
+          for (int x = 0; x < gW; x += tileW)
+            bgSpr->pushSprite(&spr, x, y);
+        }
+        else
+        {
+          spr.fillRect(0, y, gW, kCrossyTileH, TFT_BLACK);
+        }
       }
 
       break;
@@ -3745,7 +3825,7 @@ void drawCrossyRoad()
   }
   const int playerX = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
   const int playerY = kCrossyOriginY + s_crossyPy * kCrossyTileH - 8;
-  
+
   drawCrossyImp(playerX, playerY, kCrossyTileW, kCrossyTileH, now);
 }
 // -----------------------------------------------------------------------------
