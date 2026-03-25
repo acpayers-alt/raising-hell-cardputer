@@ -1414,7 +1414,20 @@ static M5Canvas *s_rrLadybugGroundSpr = nullptr;
 static M5Canvas *s_rrLadybugFly1Spr = nullptr;
 static M5Canvas *s_rrLadybugFly2Spr = nullptr;
 
+static void rrInitStars();
+
 static void rrResetObstacles();
+
+struct RrStar
+{
+  int16_t x;
+  int16_t y;
+  uint8_t phase;
+  uint8_t kind;
+};
+
+static constexpr int kRrStarCount = 18;
+static RrStar s_rrStars[kRrStarCount];
 
 enum RRPhase : uint8_t
 {
@@ -1911,6 +1924,8 @@ static void rrResetRunState()
   s_rrHandX = (screenW > 0) ? screenW : 240;
   s_rrHandY = ((screenH > 0) ? screenH : 135) - kRrGroundH - s_rrHandH + 8;
   s_rrPlayerGoalOffsetX = 0;
+
+  rrInitStars();
 }
 
 static void rrFinishRun(bool won)
@@ -1983,6 +1998,85 @@ static void rrResetObstacles()
 {
   for (auto &o : rr_obs)
     o = {0, 0, 0, 0, false, false};
+}
+
+static void rrInitStars()
+{
+  const int gW = (screenW > 0) ? screenW : 240;
+  const int gH = (screenH > 0) ? screenH : 135;
+  const int groundY = gH - kRrGroundH;
+
+  for (int i = 0; i < kRrStarCount; ++i)
+  {
+    s_rrStars[i].x = (int16_t)random(0, gW);
+    s_rrStars[i].y = (int16_t)random(4, groundY - 6);
+    s_rrStars[i].phase = (uint8_t)random(0, 64);
+    s_rrStars[i].kind = (uint8_t)random(0, 4); // 0..3, mostly tiny stars
+  }
+}
+
+static void rrDrawEldritchStars(int groundY, uint32_t now)
+{
+  if (pet.type != PET_ELDRITCH)
+    return;
+
+  const uint32_t tick = now / 90U;
+
+  for (int i = 0; i < kRrStarCount; ++i)
+  {
+    const RrStar &s = s_rrStars[i];
+
+    if (s.y < 0 || s.y >= groundY)
+      continue;
+
+    const uint8_t t = (uint8_t)((tick + s.phase) & 31U);
+    const uint8_t glow = (t < 16U) ? t : (31U - t); // triangle wave: 0..15..0
+
+    if (glow < 2)
+      continue; // fully dim most of the time
+
+    uint16_t c;
+    if (glow < 5)
+      c = spr.color565(90, 90, 110);
+    else if (glow < 9)
+      c = spr.color565(150, 150, 185);
+    else
+      c = spr.color565(230, 230, 255);
+
+    if (s.kind == 0)
+    {
+      spr.drawPixel(s.x, s.y, c);
+    }
+    else if (s.kind == 1)
+    {
+      spr.drawPixel(s.x, s.y, c);
+      if (glow >= 8)
+      {
+        if (s.x > 0) spr.drawPixel(s.x - 1, s.y, c);
+        if (s.x + 1 < ((screenW > 0) ? screenW : 240)) spr.drawPixel(s.x + 1, s.y, c);
+      }
+    }
+    else if (s.kind == 2)
+    {
+      spr.drawPixel(s.x, s.y, c);
+      if (glow >= 8)
+      {
+        if (s.y > 0) spr.drawPixel(s.x, s.y - 1, c);
+        if (s.y + 1 < groundY) spr.drawPixel(s.x, s.y + 1, c);
+      }
+    }
+    else
+    {
+      spr.drawPixel(s.x, s.y, c);
+      if (glow >= 10)
+      {
+        if (s.x > 0) spr.drawPixel(s.x - 1, s.y, c);
+        if (s.x + 1 < ((screenW > 0) ? screenW : 240)) spr.drawPixel(s.x + 1, s.y, c);
+        if (s.y > 0) spr.drawPixel(s.x, s.y - 1, c);
+        if (s.y + 1 < groundY) spr.drawPixel(s.x, s.y + 1, c);
+      }
+    }
+  }
 }
 
 static bool rrAabb(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh)
@@ -2481,19 +2575,22 @@ void drawResurrectionRun()
 
   if (pet.type == PET_ELDRITCH)
   {
-    skyColor = spr.color565(12, 0, 20); // very dark purple
-  }
-  if (pet.type == PET_ELDRITCH)
-  {
+    skyColor = spr.color565(12, 0, 20); // very dark purple/black
+    spr.fillRect(0, 0, gW, groundY, skyColor);
+  
     for (int y = 0; y < groundY; y += 4)
     {
       uint8_t shade = 8 + (y / 8);
       uint16_t c = spr.color565(shade, 0, shade * 2);
       spr.drawFastHLine(0, y, gW, c);
     }
+  
+    rrDrawEldritchStars(groundY, millis());
   }
-
-  spr.fillRect(0, 0, gW, groundY, skyColor);
+  else
+  {
+    spr.fillRect(0, 0, gW, groundY, skyColor);
+  }
 
   if (groundSpr && groundSpr->width() > 0 && groundSpr->height() > 0)
   {
