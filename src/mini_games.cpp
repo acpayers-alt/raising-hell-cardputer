@@ -2627,9 +2627,6 @@ static const int kCrossyTileH = 19;
 static const int kCrossyOriginX = 0;
 static const int kCrossyOriginY = 1;
 
-static int s_crossyCarryPxAccum[kCrossyRows] = {0};
-static uint8_t s_crossyLaneTick[kCrossyRows] = {0};
-
 static uint8_t s_crossyLavaFrame = 0;
 static uint32_t s_crossyLavaAnimMs = 0;
 static uint8_t s_crossyLandingGraceFrames = 0;
@@ -2692,6 +2689,7 @@ static inline int crossyClamp(int v, int lo, int hi)
 
 static M5Canvas *s_crossyLava0 = nullptr;
 static M5Canvas *s_crossyLava1 = nullptr;
+static M5Canvas *s_crossyEldBg = nullptr;
 
 static const char *crossyStoneSmallPathForPet();
 static const char *crossyStoneXSPathForPet();
@@ -2710,7 +2708,53 @@ static bool crossyRowIsGoal(int row) { return row == 0; }
 
 static bool crossyPlayerOverlapsMoverInRow(int row);
 
+static bool crossyPlayerOverlapsMoverInRow(int row)
+{
+  if (row < 0 || row >= kCrossyRows)
+    return false;
+
+  const CrossyLane &L = s_crossyLanes[row];
+  if (L.type != CROSSY_LANE_WATER)
+    return false;
+
+  const int playerLeft = s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
+  const int playerRight = playerLeft + kCrossyTileW - 1;
+  const int playerCenter = playerLeft + (kCrossyTileW / 2);
+
+  const int moverLenPx = (int)L.moverLen * kCrossyTileW;
+  const int periodPx = moverLenPx + (int)L.gapPx;
+  const int laneW = kCrossyCols * kCrossyTileW;
+
+  if (moverLenPx <= 0 || periodPx <= 0)
+    return false;
+
+  int offset = (int)(L.offsetPx % periodPx);
+  if (offset < 0)
+    offset += periodPx;
+
+  for (int x0 = -periodPx * 2; x0 < laneW + periodPx * 2; x0 += periodPx)
+  {
+    const int start = x0 - offset;
+    const int end = start + moverLenPx - 1;
+
+    if (playerCenter >= start && playerCenter <= end)
+      return true;
+
+    if (playerLeft >= start && playerLeft <= end)
+      return true;
+
+    if (playerRight >= start && playerRight <= end)
+      return true;
+
+    if (playerLeft <= start && playerRight >= end)
+      return true;
+  }
+
+  return false;
+}
+
 static bool ensureCrossyGoalZoneSprite()
+
 {
   M5Canvas *sprPtr = nullptr;
   return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "goal_zone", crossyGoalZonePathForPet(), 8, kSpriteKey, sprPtr);
@@ -2726,8 +2770,8 @@ static bool ensureCrossyLavaZoneSprite(uint8_t frame)
   const uint8_t i = frame & 1;
   const char *assetId = (i == 0) ? "lava_zone_0" : "lava_zone_1";
 
-  M5Canvas *sprPtr = nullptr;
-  return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, assetId, crossyLavaZonePathForPet(i), 16, TFT_BLACK, sprPtr);
+  M5Canvas *&target = (i == 0) ? s_crossyLava0 : s_crossyLava1;
+  return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, assetId, crossyLavaZonePathForPet(i), 16, TFT_BLACK, target);
 }
 
 static void crossyInitLanes()
@@ -2822,6 +2866,42 @@ void freeCrossyZoneSprites()
   s_crossyLava1 = nullptr;
 }
 
+static const char *crossyIntroLine1ForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Escape the Moon! Use Arrow Keys";
+  case PET_DEVIL:
+  default:
+    return "Escape Hell! Use Arrow Keys";
+  }
+}
+
+static const char *crossyIntroLine2ForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Cross the cosmos, enter the portal!";
+  case PET_DEVIL:
+  default:
+    return "Avoid Lava, Exit between Torches!";
+  }
+}
+
+static const char *crossyIntroGoalPathForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/mini_games/crossy/eld/intro_goal.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png";
+  }
+}
+
 static const char *crossyStartZonePathForPet()
 {
   switch (pet.type)
@@ -2893,14 +2973,14 @@ static const char *crossyImpPathForPet(CrossyFacing facing)
     switch (facing)
     {
     case CROSSY_FACE_UP:
-      return "/raising_hell/graphics/mini_games/crossy/eld/imp_up.png";
+      return "/raising_hell/graphics/mini_games/crossy/eld/cult_up.png";
     case CROSSY_FACE_LEFT:
-      return "/raising_hell/graphics/mini_games/crossy/eld/imp_left.png";
+      return "/raising_hell/graphics/mini_games/crossy/eld/cult_left.png";
     case CROSSY_FACE_RIGHT:
-      return "/raising_hell/graphics/mini_games/crossy/eld/imp_right.png";
+      return "/raising_hell/graphics/mini_games/crossy/eld/cult_right.png";
     case CROSSY_FACE_DOWN:
     default:
-      return "/raising_hell/graphics/mini_games/crossy/eld/imp_down.png";
+      return "/raising_hell/graphics/mini_games/crossy/eld/cult_down.png";
     }
 
   case PET_DEVIL:
@@ -3038,8 +3118,6 @@ static void crossyReset()
   s_crossyLavaAnimMs = millis();
   s_crossyLandingGraceFrames = 0;
 
-  memset(s_crossyCarryPxAccum, 0, sizeof(s_crossyCarryPxAccum));
-  memset(s_crossyLaneTick, 0, sizeof(s_crossyLaneTick));
   crossyInitLanes();
 }
 
@@ -3066,7 +3144,6 @@ void startCrossyRoad()
   mgmem::logUsage("crossy-start-beginSession");
   logMiniGameHeap("startCrossyRoad");
 
-  // Never allow "return UI" to be MINI_GAME / MG_PAUSE (causes exit->bounce/lock).
   UIState retUi = g_app.uiState;
   if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
     retUi = UIState::PET_SCREEN;
@@ -3082,8 +3159,9 @@ void startCrossyRoad()
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
 
-  mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_0", crossyLavaZonePathForPet(0), 16, TFT_BLACK, s_crossyLava0);
-  mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "lava_zone_1", crossyLavaZonePathForPet(1), 16, TFT_BLACK, s_crossyLava1);
+  s_crossyLava0 = nullptr;
+  s_crossyLava1 = nullptr;
+  s_crossyEldBg = nullptr;
 
   mgmem::logUsage("crossy-after-asset-free");
 
@@ -3093,11 +3171,25 @@ void startCrossyRoad()
   const bool goalOk = ensureCrossyGoalZoneSprite();
   mgmem::logUsage("crossy-after-goal-zone");
 
-  const bool lava0 = ensureCrossyLavaZoneSprite(0);
-  mgmem::logUsage("crossy-after-lava0");
+  bool lava0 = false;
+  bool lava1 = false;
+  bool eldBgOk = false;
 
-  const bool lava1 = ensureCrossyLavaZoneSprite(1);
-  mgmem::logUsage("crossy-after-lava1");
+  if (pet.type == PET_ELDRITCH)
+  {
+    eldBgOk = mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "eld_bg",
+                                  "/raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg.png", 16, TFT_BLACK,
+                                  s_crossyEldBg);
+    mgmem::logUsage("crossy-after-eld-bg");
+  }
+  else
+  {
+    lava0 = ensureCrossyLavaZoneSprite(0);
+    mgmem::logUsage("crossy-after-lava0");
+
+    lava1 = ensureCrossyLavaZoneSprite(1);
+    mgmem::logUsage("crossy-after-lava1");
+  }
 
   const bool stoneOk = ensureCrossyStoneSprite();
   mgmem::logUsage("crossy-after-stone-lg");
@@ -3111,11 +3203,11 @@ void startCrossyRoad()
   const bool impOk = true;
   mgmem::logUsage("crossy-after-imp");
 
-  Serial.printf(
-      "CROSSY preload: start=%d goal=%d lava0=%d lava1=%d stone=%d stoneSm=%d stoneXs=%d imp=%d free=%u largest=%u\n",
-      startOk ? 1 : 0, goalOk ? 1 : 0, lava0 ? 1 : 0, lava1 ? 1 : 0, stoneOk ? 1 : 0, stoneSmOk ? 1 : 0,
-      stoneXsOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
-      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  Serial.printf("CROSSY preload: start=%d goal=%d eldbg=%d lava0=%d lava1=%d stone=%d stoneSm=%d stoneXs=%d imp=%d "
+                "free=%u largest=%u\n",
+                startOk ? 1 : 0, goalOk ? 1 : 0, eldBgOk ? 1 : 0, lava0 ? 1 : 0, lava1 ? 1 : 0, stoneOk ? 1 : 0,
+                stoneSmOk ? 1 : 0, stoneXsOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -3132,10 +3224,13 @@ void startCrossyRoad()
 static void crossyStepLanes(uint32_t now)
 {
   const uint32_t kLaneStepMs = 16;
+  int steps = 0;
+  const int kMaxStepsPerCall = 2;
 
-  while ((uint32_t)(now - s_crossyLastLaneMs) >= kLaneStepMs)
+  while ((uint32_t)(now - s_crossyLastLaneMs) >= kLaneStepMs && steps < kMaxStepsPerCall)
   {
     s_crossyLastLaneMs += kLaneStepMs;
+    steps++;
 
     for (int r = 0; r < kCrossyRows; ++r)
     {
@@ -3143,39 +3238,9 @@ static void crossyStepLanes(uint32_t now)
       if (L.type != CROSSY_LANE_WATER)
         continue;
 
-      // Faster platform movement.
-      // speed 1 = 1 px every 3 ticks
-      // speed 2 = 1 px every 2 ticks
-      // speed 3 = 2 px every 3 ticks
-      uint8_t ticksPerPixel = 3;
-      int movePx = 1;
-
-      if (L.speed <= 1)
-      {
-        ticksPerPixel = 3;
-        movePx = 1;
-      }
-      else if (L.speed == 2)
-      {
-        ticksPerPixel = 2;
-        movePx = 1;
-      }
-      else if (L.speed == 3)
-      {
-        ticksPerPixel = 2;
-        movePx = 2;
-      }
-      else
-      {
-        ticksPerPixel = 1;
-        movePx = 2;
-      }
-
-      s_crossyLaneTick[r]++;
-      if (s_crossyLaneTick[r] < ticksPerPixel)
+      const int movePx = (int)L.speed;
+      if (movePx <= 0)
         continue;
-
-      s_crossyLaneTick[r] = 0;
 
       const bool carryFrog = (s_crossyPy == r) && crossyPlayerOverlapsMoverInRow(r);
 
@@ -3206,53 +3271,9 @@ static void crossyStepLanes(uint32_t now)
       }
     }
   }
-}
 
-static bool crossyPlayerOverlapsMoverInRow(int row)
-{
-  if (row < 0 || row >= kCrossyRows)
-    return false;
-
-  const CrossyLane &L = s_crossyLanes[row];
-  if (L.type != CROSSY_LANE_WATER)
-    return false;
-
-  const int moverLenPx = (int)L.moverLen * kCrossyTileW;
-  const int periodPx = moverLenPx + (int)L.gapPx;
-  const int laneW = kCrossyCols * kCrossyTileW;
-
-  if (moverLenPx <= 0 || periodPx <= 0)
-    return false;
-
-  // Give landings a little forgiveness so edge hops don't randomly fail.
-  const int kEdgeForgivePx = 3;
-
-  const int playerLeft = s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
-  const int playerRight = playerLeft + kCrossyTileW - 1;
-
-  for (int x = -periodPx * 2; x < laneW + periodPx * 2; x += periodPx)
-  {
-    const int platLeft = x - (int)L.offsetPx;
-    const int platRight = platLeft + moverLenPx - 1;
-
-    if ((playerRight >= platLeft - kEdgeForgivePx) && (playerLeft <= platRight + kEdgeForgivePx))
-    {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-static bool crossyOnLog()
-{
-  if (s_crossyPy < 0 || s_crossyPy >= kCrossyRows)
-    return false;
-
-  if (s_crossyLanes[s_crossyPy].type != CROSSY_LANE_WATER)
-    return false;
-
-  return crossyPlayerOverlapsMoverInRow(s_crossyPy);
+  if ((uint32_t)(now - s_crossyLastLaneMs) >= (kLaneStepMs * 8))
+    s_crossyLastLaneMs = now;
 }
 
 void updateCrossyRoad(const InputState &input)
@@ -3260,15 +3281,15 @@ void updateCrossyRoad(const InputState &input)
   const bool enterOnce = miniGameEnterOnce(input);
   const uint32_t now = millis();
 
-  if ((uint32_t)(now - s_crossyLavaAnimMs) >= 180)
+  if (pet.type != PET_ELDRITCH)
   {
-    s_crossyLavaAnimMs = now;
-    s_crossyLavaFrame ^= 1;
+    if ((uint32_t)(now - s_crossyLavaAnimMs) >= 180)
+    {
+      s_crossyLavaAnimMs = now;
+      s_crossyLavaFrame ^= 1;
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // Reward modal
-  // ---------------------------------------------------------------------------
   if (mgRewardShowing())
   {
     if (enterOnce && !mgInputLockedOut())
@@ -3280,9 +3301,6 @@ void updateCrossyRoad(const InputState &input)
     return;
   }
 
-  // ---------------------------------------------------------------------------
-  // Game over -> reward modal
-  // ---------------------------------------------------------------------------
   if (g_app.gameOver)
   {
     mgApplyResultAndShowReward(playerWon);
@@ -3301,12 +3319,11 @@ void updateCrossyRoad(const InputState &input)
 
   if (s_crossyWinPoseActive)
   {
-    // tiny victory bounce while posing
     s_crossyVisualOffsetPx = ((millis() / 120) % 2) ? -2 : 0;
 
     if ((uint32_t)(now - s_crossyWinPoseStart) >= 800)
     {
-      s_crossyVisualOffsetPx = 0; // reset after pose
+      s_crossyVisualOffsetPx = 0;
       s_crossyWinPoseActive = false;
       playerWon = true;
       g_app.gameOver = true;
@@ -3383,7 +3400,6 @@ void updateCrossyRoad(const InputState &input)
     const int newPx = crossyClamp(s_crossyPx + dx, 0, kCrossyCols - 1);
     const int newPy = crossyClamp(s_crossyPy + dy, 0, kCrossyRows - 1);
 
-    // Block entry into the goal row unless the imp is between the two torches.
     if (newPy == 0 && !crossyGoalEntryAllowed(newPx))
     {
       playBeep();
@@ -3394,8 +3410,6 @@ void updateCrossyRoad(const InputState &input)
     s_crossyPy = newPy;
     s_crossyVisualOffsetPx = 0;
 
-    // If we just stepped onto a water row, allow one update tick of landing grace
-    // before declaring a miss. This prevents false deaths on edge-timed hops.
     if (s_crossyPy != oldPy && s_crossyLanes[s_crossyPy].type == CROSSY_LANE_WATER)
       s_crossyLandingGraceFrames = 1;
 
@@ -3416,7 +3430,6 @@ void updateCrossyRoad(const InputState &input)
 
   if (s_crossyLanes[s_crossyPy].type == CROSSY_LANE_WATER)
   {
-    // If the lane step carried us off-screen, we lose.
     if (s_crossyPx < 0 || s_crossyPx >= kCrossyCols)
     {
       playerWon = false;
@@ -3427,7 +3440,7 @@ void updateCrossyRoad(const InputState &input)
       return;
     }
 
-    const bool onPlatform = crossyOnLog();
+    const bool onPlatform = crossyPlayerOverlapsMoverInRow(s_crossyPy);
 
     if (!onPlatform)
     {
@@ -3494,26 +3507,16 @@ void drawCrossyRoad()
     return;
   }
 
-  if (g_app.gameOver)
-  {
-    spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(playerWon ? TFT_GREEN : TFT_RED, TFT_BLACK);
-    spr.drawCentreString(playerWon ? "YOU WIN!" : "YOU BURN!", gW / 2, gH / 2 - 10, 4);
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Press ENTER", gW / 2, gH / 2 + 22, 2);
-    return;
-  }
-
   if (s_crossyShowIntro)
   {
     spr.fillSprite(TFT_BLACK);
     spr.setTextDatum(CC_DATUM);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Escape Hell! Use Arrow Keys", gW / 2, 8, 2);
-    spr.drawCentreString("Avoid Lava, Exit between Torches!", gW / 2, 26, 2);
+    spr.drawCentreString(crossyIntroLine1ForPet(), gW / 2, 8, 2);
+    spr.drawCentreString(crossyIntroLine2ForPet(), gW / 2, 26, 2);
 
-    const char *introPath = "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png";
+    const char *introPath = crossyIntroGoalPathForPet();
 
     int iw = 0, ih = 0;
     const char *useIntroPath = nullptr;
@@ -3584,28 +3587,25 @@ void drawCrossyRoad()
 
     case CROSSY_LANE_WATER:
     {
-      const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
+      M5Canvas *bgSpr = nullptr;
 
-      M5Canvas *lavaSpr = (lavaFrame == 0) ? lavaZoneSpr0 : lavaZoneSpr1;
-
-      if (lavaSpr && lavaSpr->width() > 0 && lavaSpr->height() > 0)
+      if (pet.type == PET_ELDRITCH)
+        bgSpr = s_crossyEldBg;
+      else
       {
-        const int tileW = (int)lavaSpr->width();
-        const int tileH = (int)lavaSpr->height();
+        const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
+        bgSpr = (lavaFrame == 0) ? s_crossyLava0 : s_crossyLava1;
+      }
 
-        if (tileW > 0 && tileH > 0)
-        {
-          for (int x = 0; x < gW; x += tileW)
-            lavaSpr->pushSprite(&spr, x, y);
-        }
-        else
-        {
-          spr.fillRect(0, y, gW, kCrossyTileH, TFT_RED);
-        }
+      if (bgSpr && bgSpr->width() > 0 && bgSpr->height() > 0)
+      {
+        const int tileW = (int)bgSpr->width();
+        for (int x = 0; x < gW; x += tileW)
+          bgSpr->pushSprite(&spr, x, y);
       }
       else
       {
-        spr.fillRect(0, y, gW, kCrossyTileH, TFT_RED);
+        spr.fillRect(0, y, gW, kCrossyTileH, TFT_BLACK);
       }
 
       break;
@@ -3613,6 +3613,7 @@ void drawCrossyRoad()
     }
   }
 
+  // draw movers ONCE, after all lane backgrounds
   for (int r = 0; r < kCrossyRows; ++r)
   {
     const CrossyLane &L = s_crossyLanes[r];
@@ -3645,13 +3646,11 @@ void drawCrossyRoad()
       drawCrossyStoneChunk(drawX, y + 2, moverLenPx - 1, kCrossyTileH - 4, L.platSize);
     }
   }
-
-  const int fx = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
-  const int fy = kCrossyOriginY + s_crossyPy * kCrossyTileH - 8;
-
-  drawCrossyImp(fx, fy, kCrossyTileW, kCrossyTileH, now);
+  const int playerX = kCrossyOriginX + s_crossyPx * kCrossyTileW + s_crossyVisualOffsetPx;
+  const int playerY = kCrossyOriginY + s_crossyPy * kCrossyTileH - 8;
+  
+  drawCrossyImp(playerX, playerY, kCrossyTileW, kCrossyTileH, now);
 }
-
 // -----------------------------------------------------------------------------
 // FIREBALL RUN GLOBALS
 // -----------------------------------------------------------------------------
