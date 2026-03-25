@@ -202,9 +202,9 @@ static uint32_t xpNeededForLevel(uint16_t lvl) {
 static uint16_t evoMinLevelForStage(uint8_t stageNext) {
   // stageNext is the stage you are trying to reach (1..3)
   switch (stageNext) {
-    case 1: return 5;   // teen
-    case 2: return 12;  // adult
-    case 3: return 25;  // elder
+    case 1: return 10;   // teen
+    case 2: return 20;  // adult
+    case 3: return 30;  // elder
     default: return 0;
   }
 }
