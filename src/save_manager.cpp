@@ -720,6 +720,10 @@ static void newPetInternalNoSave(bool resetName)
   SavePayload p = makeDefaultSavePayload();
   unpack(p);
 
+  // New pets always start on Normal decay mode.
+  g_gameopt.decayMode = 2;
+  saveGameOptionsToSD_internal();
+
   if (resetName)
   {
     // Ensure the runtime pet name is blank for a fresh flow.
