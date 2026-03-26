@@ -48,6 +48,7 @@
 #include "ui_settings_menu.h"
 #include "ui_input_common.h"
 #include "ui_actions.h"
+#include "asset_ota.h"
 
 void resetSettingsNav(bool resetTopIndex);
 
@@ -115,8 +116,10 @@ void uiSettingsHandle(InputState& input)
   if (input.upOnce) move = -1;
   if (input.downOnce) move = 1;
 
-  if (UiSettingsMenu::Handle(input, move)) {
-    return;
+  if (assetOtaConfirmActive()) {
+    if (UiSettingsMenu::Handle(input, move)) {
+      return;
+    }
   }
 
   if (input.menuOnce || input.escOnce) {
@@ -129,7 +132,11 @@ void uiSettingsHandle(InputState& input)
     exitSettings();
     return;
   }
-  
+
+  if (UiSettingsMenu::Handle(input, move)) {
+    return;
+  }
+    
   if (g_settingsFlow.settingsPage == SettingsPage::CREDITS) {
     return;
   }
