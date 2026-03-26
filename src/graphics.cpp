@@ -4579,25 +4579,32 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
   // Define the right-side heart anchor first so coin text can avoid it
   const int heartIconX = x0 + panelW - 2 - 16 - 28;
 
-  // Left side: coin + count (count grows left, never into heart area)
+  // Left side: coin + count (count grows left, icon follows it)
   if (showCoin)
   {
-    const int coinIconX = x0 - 26;
-
     char infBuf[20];
     snprintf(infBuf, sizeof(infBuf), "%d", pet.inf);
-
+  
     // Fixed right edge for coin text, safely left of the heart block
     const int coinRightX = heartIconX - 6;
-
-    drawMiniStatIconCached(PATH_INF_COIN, coinIconX, headerIconY);
-
+  
     spr.setTextDatum(TR_DATUM);
-
+  
+    // Measure count width using current font/settings
+    const int coinTextW = spr.textWidth(infBuf);
+  
+    // Keep a small gap between icon and number
+    const int coinGap = 6;
+  
+    // Place icon so it sits just left of the text block
+    const int coinIconX = coinRightX - coinTextW - coinGap - 16;
+  
+    drawMiniStatIconCached(PATH_INF_COIN, coinIconX, headerIconY);
+  
     // fake-bold / slightly larger-looking text
-    spr.drawString(infBuf, coinRightX, topTextY);
+    spr.drawString(infBuf, coinRightX,     topTextY);
     spr.drawString(infBuf, coinRightX - 1, topTextY);
-
+  
     spr.setTextDatum(TL_DATUM);
   }
 
@@ -4632,36 +4639,22 @@ static void drawMiniStatPreviewSleepLeft()
   const int x0 = 4;
   const int panelW = 72;
 
-  const int headerH = 24;
+  // Layout
   const int headerY = PET_AREA_Y + 2;
 
-  const int barW = panelW - 4;
-
+  // Stat block
   const int barH = 14;
-  const int rowGap = 10;
+  const int rowGap = 4;
   const int rowH = barH + rowGap;
 
   const uint16_t colHunger = 0xF800;
   const uint16_t colMood = 0x001F;
-  const uint16_t colEnergy = 0x07E0;
+  const uint16_t colEnergy = 0x03E0;
 
-  const int y0 = headerY + headerH + 8;
+  // Bars near the top
+  const int y0 = headerY + 4;
   const int barX = x0 + 2;
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  const int topTextY = headerY + 6;
-
-  drawMiniStatIconCached(PATH_LIFE_ICON, x0 + 0, headerY + 0);
-
-  spr.setTextDatum(TL_DATUM);
-  {
-    char hpBuf[16];
-    snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
-    spr.drawString(hpBuf, x0 + 16, topTextY);
-  }
-  spr.setTextDatum(TL_DATUM);
+  const int barW = panelW - 4;
 
   const int yHunger = y0 + 0 * rowH;
   const int yMood = y0 + 1 * rowH;
@@ -4670,6 +4663,35 @@ static void drawMiniStatPreviewSleepLeft()
   drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
   drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
   drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
+
+  // Bottom footer: coin/count on left, heart/HP on right
+  // On the left-side cluster, both counts should expand to the right.
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  const int headerY2 = headerY + 64;
+  const int headerIconY = headerY2 + 0;
+  const int topTextY = headerY2 + 1;
+
+  {
+    const int heartIconX = x0 + 2;
+
+    drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
+
+    char hpBuf[16];
+    snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
+
+    const int hpTextX = heartIconX + 18;
+
+    spr.setTextDatum(TL_DATUM);
+
+    // fake-bold
+    spr.drawString(hpBuf, hpTextX, topTextY);
+    spr.drawString(hpBuf, hpTextX + 1, topTextY);
+  }
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 // ============================================================================
