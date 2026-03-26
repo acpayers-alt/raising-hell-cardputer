@@ -440,9 +440,9 @@ static const char *PATH_FOOD_ICON = "/raising_hell/graphics/ui/icons/food_icon.p
 static const char *PATH_MOOD_ICON = "/raising_hell/graphics/ui/icons/mood_icon.png";
 static const char *PATH_REST_ICON = "/raising_hell/graphics/ui/icons/rest_icon.png";
 
-static constexpr int MINI_STAT_ICON_W = 16;
-static constexpr int MINI_STAT_ICON_H = 16;
-static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0x0001;
+static constexpr int MINI_STAT_ICON_W = 18;
+static constexpr int MINI_STAT_ICON_H = 18;
+static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0xF81F;
 
 static M5Canvas s_miniStatLifeIcon(&spr);
 static bool s_miniStatLifeIconReady = false;
@@ -453,7 +453,7 @@ static constexpr int HUD_HEADER_ICON_W = 12;
 static constexpr int HUD_HEADER_ICON_H = 12;
 static constexpr int HUD_STAT_ICON_W = 10;
 static constexpr int HUD_STAT_ICON_H = 10;
-static constexpr uint16_t HUD_ICON_TRANSPARENT = 0x0001;
+static constexpr uint16_t HUD_ICON_TRANSPARENT = 0xF81F;
 
 static M5Canvas s_hudLifeIconSmall(&spr);
 static bool s_hudLifeIconSmallReady = false;
@@ -484,7 +484,7 @@ static bool ensureMiniStatIconCache(M5Canvas &canvas, bool &ready, const char *p
 
   canvas.fillSprite(MINI_STAT_ICON_TRANSPARENT);
 
-  if (!canvasDrawPngFromSD(canvas, path, 0, 0))
+  if (!canvasDrawPngFromSD(canvas, path, 1, 1))
   {
     canvas.deleteSprite();
     ready = false;
@@ -4510,9 +4510,9 @@ static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outl
   {
     spr.setTextFont(1);
     spr.setTextSize(1);
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.setTextColor(TFT_WHITE);
     spr.setTextDatum(MC_DATUM);
-    spr.drawString(label, x + w / 2, y + h / 2 - 3);
+    spr.drawString(label, x + w / 2, y + h / 2);
     spr.setTextDatum(TL_DATUM);
   }
 }
@@ -4538,55 +4538,86 @@ static void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t out
   spr.fillRect(x + 1, fy, innerW, fillH, fill);
 }
 
-  static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
+static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
 {
   const int panelW = 72;
 
-  // Header row
-  const int headerH = 24;
+  // Layout
   const int headerY = PET_AREA_Y + 2;
 
   // Stat block
   const int barH = 14;
-  const int rowGap = 10;
+  const int rowGap = 4;
   const int rowH = barH + rowGap;
 
   const uint16_t colHunger = 0xF800;
   const uint16_t colMood = 0x001F;
-  const uint16_t colEnergy = 0x07E0;
+  const uint16_t colEnergy = 0x03E0;
 
-  // Bars start below the top header
-  const int y0 = headerY + headerH + 6;
+  // Bars first
+  const int y0 = headerY + 4;
   const int barX = x0 + 2;
   const int barW = panelW - 4;
-
-  // --- Top header: heart + HP on right side ---
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  
-  const int headerIconY = headerY + 0;
-  const int topTextY = headerY + 3;
-  
-  char hpBuf[16];
-  snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
-  
-  spr.setTextDatum(TR_DATUM);
-  spr.drawString(hpBuf, x0 + panelW - 2, topTextY);
-  
-  const int heartIconX = x0 + panelW - 2 - 16 - 16;
-  drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
-  
-  spr.setTextDatum(TL_DATUM);
 
   const int yHunger = y0 + 0 * rowH;
   const int yMood = y0 + 1 * rowH;
   const int yRest = y0 + 2 * rowH;
 
-  // --- Taller bars ---
   drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
   drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
   drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
+
+  // Bottom header: coin/count on left, heart/HP on right
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  const int headerY2 = headerY + 74;
+  const int headerIconY = headerY2 + 0;
+  const int topTextY = headerY2 + 1;
+
+  // Define the right-side heart anchor first so coin text can avoid it
+  const int heartIconX = x0 + panelW - 2 - 16 - 28;
+
+  // Left side: coin + count (count grows left, never into heart area)
+  if (showCoin)
+  {
+    const int coinIconX = x0 - 26;
+
+    char infBuf[20];
+    snprintf(infBuf, sizeof(infBuf), "%d", pet.inf);
+
+    // Fixed right edge for coin text, safely left of the heart block
+    const int coinRightX = heartIconX - 6;
+
+    drawMiniStatIconCached(PATH_INF_COIN, coinIconX, headerIconY);
+
+    spr.setTextDatum(TR_DATUM);
+
+    // fake-bold / slightly larger-looking text
+    spr.drawString(infBuf, coinRightX, topTextY);
+    spr.drawString(infBuf, coinRightX - 1, topTextY);
+
+    spr.setTextDatum(TL_DATUM);
+  }
+
+  // Right side: heart + HP
+  {
+    char hpBuf[16];
+    snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
+
+    drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
+
+    spr.setTextDatum(TL_DATUM);
+
+    const int hpTextX = x0 + panelW - 2 - spr.textWidth(hpBuf);
+
+    // fake-bold / slightly larger-looking text
+    spr.drawString(hpBuf, hpTextX, topTextY);
+    spr.drawString(hpBuf, hpTextX + 1, topTextY);
+  }
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawMiniStatPreview()
