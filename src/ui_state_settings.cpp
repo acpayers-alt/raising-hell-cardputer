@@ -111,6 +111,14 @@ void uiSettingsHandle(InputState& input)
     clearInputLatch();
   };
 
+  int move = input.encoderDelta;
+  if (input.upOnce) move = -1;
+  if (input.downOnce) move = 1;
+
+  if (UiSettingsMenu::Handle(input, move)) {
+    return;
+  }
+
   if (input.menuOnce || input.escOnce) {
     if (backToReturnPage())
       return;
@@ -121,15 +129,7 @@ void uiSettingsHandle(InputState& input)
     exitSettings();
     return;
   }
-
-  int move = input.encoderDelta;
-  if (input.upOnce) move = -1;
-  if (input.downOnce) move = 1;
-
-  if (UiSettingsMenu::Handle(input, move)) {
-    return;
-  }
-
+  
   if (g_settingsFlow.settingsPage == SettingsPage::CREDITS) {
     return;
   }

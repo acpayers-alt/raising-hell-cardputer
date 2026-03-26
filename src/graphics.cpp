@@ -2238,8 +2238,7 @@ static void drawFactoryResetConfirmOverlay()
   spr.setTextSize(1);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   spr.setTextDatum(BC_DATUM);
-  spr.drawString("HOLD ENTER: Reset   MENU: Cancel", screenW / 2, y + boxH - 2);
-
+  spr.drawString("ENTER: Continue   MENU/ESC: Cancel", screenW / 2, y + boxH - 6);
   spr.setTextDatum(TL_DATUM);
 }
 
@@ -2347,11 +2346,11 @@ static void drawAssetOtaConfirmOverlay()
 
   spr.setTextFont(1);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("If new assets are downloaded,", screenW / 2, y + 28);
-  spr.drawString("the system will reboot.", screenW / 2, y + 40);
+  spr.drawString("The system will reboot and", screenW / 2, y + 28);
+  spr.drawString("check for new/missing assets.", screenW / 2, y + 40);
 
   spr.setTextDatum(BC_DATUM);
-  spr.drawString("ENTER: Continue   MENU: Cancel", screenW / 2, y + boxH - 6);
+  spr.drawString("ENTER: Continue   MENU/ESC: Cancel", screenW / 2, y + boxH - 6);
 
   spr.setTextDatum(TL_DATUM);
 }
@@ -5171,7 +5170,7 @@ void ui_drawMessageWindow(const char *title, const char *line1, const char *line
     spr.setTextSize(1);
     spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     spr.setTextDatum(BC_DATUM);
-    spr.drawString("ENTER: Next   MENU: Cancel", screenW / 2, y + boxH - 6);
+    spr.drawString("ENTER: Next   MENU/ESC: Cancel", screenW / 2, y + boxH - 6);
   }
   else
   {
@@ -5185,7 +5184,7 @@ void ui_drawMessageWindow(const char *title, const char *line1, const char *line
     spr.setTextSize(1);
     spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     spr.setTextDatum(BC_DATUM);
-    spr.drawString("ENTER: Next   MENU: Cancel", screenW / 2, y + boxH - 6);
+    spr.drawString("ENTER: Next   MENU/ESC: Cancel", screenW / 2, y + boxH - 6);
   }
 
   spr.setTextDatum(TL_DATUM);
