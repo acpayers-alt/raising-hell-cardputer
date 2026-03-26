@@ -13,3 +13,8 @@ void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetM
 
 bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &localManifest, String *outPackVersion,
                                    std::vector<AssetManifestFile> &outChangedFiles);
+
+bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestData &localManifest,
+                                          String *outPackVersion, uint16_t *outChangedCount);
+
+bool assetManifestLoadLocalPackVersion(String *outPackVersion);

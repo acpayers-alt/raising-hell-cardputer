@@ -1,5 +1,7 @@
 #pragma once
 
+#include <FS.h>
+#include <SD.h>
 #include "asset_ota_types.h"
 
 void assetOtaInit();
@@ -27,3 +29,9 @@ void assetOtaSetConfirmActive(bool v);
 
 bool assetOtaRunInWorkerTask(String *outMessage);
 
+bool assetOtaWorklistOpenRead(File *outFile);
+bool assetOtaWorklistReadNext(File &inFile, AssetManifestFile *outFile);
+bool assetOtaWorklistAppend(const AssetManifestFile &f);
+bool assetOtaWorklistClear();
+
+const char *assetOtaWorklistPath();

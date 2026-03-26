@@ -452,7 +452,7 @@ static MenuItem kWifiItems[] = {
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
     {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
-    {"Check Asset OTA", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
+    {"Check/Fix Assets", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
 };
 

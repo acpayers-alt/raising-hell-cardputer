@@ -2111,12 +2111,8 @@ static void drawWifiSettingsMenu()
   char tzLine[36];
   snprintf(tzLine, sizeof(tzLine), "Time Zone: %s", tzName(tzIndex));
 
-  const char *ver = assetOtaInstalledVersion();
   char otaCheckLine[40];
-  if (ver && ver[0])
-    snprintf(otaCheckLine, sizeof(otaCheckLine), "Asset OTA: %s", ver);
-  else
-    snprintf(otaCheckLine, sizeof(otaCheckLine), "Check Asset OTA");
+  snprintf(otaCheckLine, sizeof(otaCheckLine), "Check/Fix Assets");
 
 #if PUBLIC_BUILD
   const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaCheckLine};
@@ -2400,7 +2396,7 @@ static void drawCreditsScreen()
   if (assetVer && assetVer[0])
     snprintf(assetLine, sizeof(assetLine), "Asset OTA: %s", assetVer);
   else
-    snprintf(assetLine, sizeof(assetLine), "Check Asset OTA");
+    snprintf(assetLine, sizeof(assetLine), "Asset OTA: none installed");
 
   spr.drawString(assetLine, SCREEN_W / 2, yAssets);
 
