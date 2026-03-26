@@ -436,15 +436,36 @@ static const char *DEV_FACE_HAPPY_ELDER = "/raising_hell/graphics/pet/face/dev_e
 
 static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
 static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
+static const char *PATH_FOOD_ICON = "/raising_hell/graphics/ui/icons/food_icon.png";
+static const char *PATH_MOOD_ICON = "/raising_hell/graphics/ui/icons/mood_icon.png";
+static const char *PATH_REST_ICON = "/raising_hell/graphics/ui/icons/rest_icon.png";
 
-static constexpr int MINI_STAT_ICON_W = 22;
-static constexpr int MINI_STAT_ICON_H = 22;
+static constexpr int MINI_STAT_ICON_W = 16;
+static constexpr int MINI_STAT_ICON_H = 16;
 static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0x0001;
 
 static M5Canvas s_miniStatLifeIcon(&spr);
 static bool s_miniStatLifeIconReady = false;
 static M5Canvas s_miniStatCoinIcon(&spr);
 static bool s_miniStatCoinIconReady = false;
+
+static constexpr int HUD_HEADER_ICON_W = 12;
+static constexpr int HUD_HEADER_ICON_H = 12;
+static constexpr int HUD_STAT_ICON_W = 10;
+static constexpr int HUD_STAT_ICON_H = 10;
+static constexpr uint16_t HUD_ICON_TRANSPARENT = 0x0001;
+
+static M5Canvas s_hudLifeIconSmall(&spr);
+static bool s_hudLifeIconSmallReady = false;
+static M5Canvas s_hudCoinIconSmall(&spr);
+static bool s_hudCoinIconSmallReady = false;
+
+static M5Canvas s_hudFoodIcon(&spr);
+static bool s_hudFoodIconReady = false;
+static M5Canvas s_hudMoodIcon(&spr);
+static bool s_hudMoodIconReady = false;
+static M5Canvas s_hudRestIcon(&spr);
+static bool s_hudRestIconReady = false;
 
 static bool ensureMiniStatIconCache(M5Canvas &canvas, bool &ready, const char *path)
 {
@@ -493,6 +514,89 @@ static bool drawMiniStatIconCached(const char *path, int x, int y)
   if (canvas && ready && ensureMiniStatIconCache(*canvas, *ready, path))
   {
     canvas->pushSprite(x, y, MINI_STAT_ICON_TRANSPARENT);
+    return true;
+  }
+
+  if (g_sdReady)
+    return sprDrawPngFromSD(path, x, y);
+
+  return false;
+}
+
+static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h)
+{
+  if (ready)
+    return true;
+  if (!g_sdReady || !path || !*path)
+    return false;
+
+  canvas.setColorDepth(16);
+
+  if (!canvas.width() || !canvas.height())
+  {
+    if (!canvas.createSprite(w, h))
+      return false;
+  }
+
+  canvas.fillSprite(HUD_ICON_TRANSPARENT);
+
+  if (!canvasDrawPngFromSD(canvas, path, 0, 0))
+  {
+    canvas.deleteSprite();
+    ready = false;
+    return false;
+  }
+
+  ready = true;
+  return true;
+}
+
+static bool drawHudIconCached(const char *path, int x, int y)
+{
+  M5Canvas *canvas = nullptr;
+  bool *ready = nullptr;
+  int w = 0;
+  int h = 0;
+
+  if (path == PATH_LIFE_ICON)
+  {
+    canvas = &s_hudLifeIconSmall;
+    ready = &s_hudLifeIconSmallReady;
+    w = HUD_HEADER_ICON_W;
+    h = HUD_HEADER_ICON_H;
+  }
+  else if (path == PATH_INF_COIN)
+  {
+    canvas = &s_hudCoinIconSmall;
+    ready = &s_hudCoinIconSmallReady;
+    w = HUD_HEADER_ICON_W;
+    h = HUD_HEADER_ICON_H;
+  }
+  else if (path == PATH_FOOD_ICON)
+  {
+    canvas = &s_hudFoodIcon;
+    ready = &s_hudFoodIconReady;
+    w = HUD_STAT_ICON_W;
+    h = HUD_STAT_ICON_H;
+  }
+  else if (path == PATH_MOOD_ICON)
+  {
+    canvas = &s_hudMoodIcon;
+    ready = &s_hudMoodIconReady;
+    w = HUD_STAT_ICON_W;
+    h = HUD_STAT_ICON_H;
+  }
+  else if (path == PATH_REST_ICON)
+  {
+    canvas = &s_hudRestIcon;
+    ready = &s_hudRestIconReady;
+    w = HUD_STAT_ICON_W;
+    h = HUD_STAT_ICON_H;
+  }
+
+  if (canvas && ready && ensureHudIconCache(*canvas, *ready, path, w, h))
+  {
+    canvas->pushSprite(x, y, HUD_ICON_TRANSPARENT);
     return true;
   }
 
@@ -2465,7 +2569,11 @@ static ItemType shopItemTypeForIndexLocal(int idx)
 }
 
 // ---- tiny bars (decls) ----
+static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100,
+                        const char *label);
+
 static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100);
+
 static void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100);
 
 void drawShopScreen()
@@ -2881,9 +2989,16 @@ static void drawInventoryLeftStatsPanel(int contentY, int contentH, int boxX)
   const uint16_t colMood = 0x001F;
   const uint16_t colEnergy = 0x07E0;
 
-  drawTinyBarV(barX, y0 + 0 * (barH + gapY), barW, barH, colHunger, colHunger, pet.hunger);
-  drawTinyBarV(barX, y0 + 1 * (barH + gapY), barW, barH, colMood, colMood, pet.happiness);
-  drawTinyBarV(barX, y0 + 2 * (barH + gapY), barW, barH, colEnergy, colEnergy, pet.energy);
+  const int rowGap = 10;
+  const int rowH = barH + rowGap;
+
+  const int yHunger = y0 + 0 * rowH;
+  const int yMood = y0 + 1 * rowH;
+  const int yRest = y0 + 2 * rowH;
+
+  drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
+  drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
+  drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
 
   spr.setTextDatum(TL_DATUM);
 }
@@ -4362,18 +4477,49 @@ static void drawSleepScreenImpl(bool redrawBg)
 // ============================================================================
 // Tiny stat preview panel
 // ============================================================================
-static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100)
+static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100, const char *label)
 {
   value01_100 = clampi(value01_100, 0, 100);
 
-  spr.drawRect(x, y, w, h, outline);
+  const int r = h / 2;
+  const int innerX = x + 1;
+  const int innerY = y + 1;
+  const int innerW = w - 2;
+  const int innerH = h - 2;
+  const int fillW = (innerW * value01_100) / 100;
 
-  int innerW = w - 2;
-  int innerH = h - 2;
-  int fillW = (innerW * value01_100) / 100;
+  // Outer pill
+  spr.fillRoundRect(x, y, w, h, r, outline);
 
-  spr.fillRect(x + 1, y + 1, innerW, innerH, TFT_BLACK);
-  spr.fillRect(x + 1, y + 1, fillW, innerH, fill);
+  // Inner dark track
+  spr.fillRoundRect(innerX, innerY, innerW, innerH, (innerH / 2), TFT_BLACK);
+
+  // Fill
+  if (fillW > 0)
+  {
+    int fw = fillW;
+    if (fw < innerH)
+      fw = innerH; // keep tiny values visible as a nub
+    if (fw > innerW)
+      fw = innerW;
+    spr.fillRoundRect(innerX, innerY, fw, innerH, (innerH / 2), fill);
+  }
+
+  // Centered label
+  if (label && label[0])
+  {
+    spr.setTextFont(1);
+    spr.setTextSize(1);
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.setTextDatum(MC_DATUM);
+    spr.drawString(label, x + w / 2, y + h / 2 - 3);
+    spr.setTextDatum(TL_DATUM);
+  }
+}
+
+static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100)
+{
+  drawTinyBar(x, y, w, h, fill, outline, value01_100, nullptr);
 }
 
 static void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100)
@@ -4392,94 +4538,60 @@ static void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t out
   spr.fillRect(x + 1, fy, innerW, fillH, fill);
 }
 
-static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
+  static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
 {
-  const int panelW = 56;
+  const int panelW = 72;
 
-  const int barW = panelW - 10;
-  const int barH = 6;
-  const int lineH = 14;
-  const int gapY = 6;
+  // Header row
+  const int headerH = 24;
+  const int headerY = PET_AREA_Y + 2;
 
-  const int ICON_SIZE = 22;
-  const int ICON_GAP_Y = 3;
-  const int ICON_MOVE_UP = -5;
-
-  const int TEXT_INSET_Y = 4;
+  // Stat block
+  const int barH = 14;
+  const int rowGap = 10;
+  const int rowH = barH + rowGap;
 
   const uint16_t colHunger = 0xF800;
   const uint16_t colMood = 0x001F;
   const uint16_t colEnergy = 0x07E0;
 
-  const int totalH = (3 * lineH) + gapY + (showCoin ? (2 * lineH) : (1 * lineH));
+  // Bars start below the top header
+  const int y0 = headerY + headerH + 6;
+  const int barX = x0 + 2;
+  const int barW = panelW - 4;
 
-  int y0 = PET_AREA_Y + (PET_AREA_H - totalH) / 2;
-  y0 -= 3;
-
-  drawTinyBar(x0 + 4, y0 + 0 * lineH, barW, barH, colHunger, colHunger, pet.hunger);
-  drawTinyBar(x0 + 4, y0 + 1 * lineH, barW, barH, colMood, colMood, pet.happiness);
-  drawTinyBar(x0 + 4, y0 + 2 * lineH, barW, barH, colEnergy, colEnergy, pet.energy);
-
+  // --- Top header: heart + HP on right side ---
   spr.setTextFont(2);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  const int textY = y0 + 3 * lineH + gapY;
-
-  if (alignRight)
-  {
-    const int barsRight = (x0 + 4) + barW;
-    const int ICON_PAD_R = 0;
-    const int ICON_TEXT_GAP = 6;
-
-    const int iconX = barsRight - ICON_SIZE - ICON_PAD_R;
-    const int lifeY = (textY - 4) + ICON_MOVE_UP;
-    const int coinY = lifeY + ICON_SIZE + ICON_GAP_Y;
-
-    const int numRightX = iconX - ICON_TEXT_GAP;
-
-    spr.setTextDatum(TR_DATUM);
-
-    bool okLife = drawMiniStatIconCached(PATH_LIFE_ICON, iconX, lifeY);
-    (void)okLife;
-    drawMiniStatNumberRight(pet.health, numRightX, lifeY + TEXT_INSET_Y);
-
-    if (showCoin)
-    {
-      bool okCoin = drawMiniStatIconCached(PATH_INF_COIN, iconX, coinY);
-      (void)okCoin;
-      drawMiniStatNumberRight(pet.inf, numRightX, coinY + TEXT_INSET_Y);
-    }
-
-    spr.setTextDatum(TL_DATUM);
-    return;
-  }
-
-  // Left-aligned variant (used on sleep screen)
-  const int iconX = x0 + 2;
-  const int lifeY = (textY - 4) + ICON_MOVE_UP;
-  const int coinY = lifeY + ICON_SIZE + ICON_GAP_Y;
-
+  
+  const int headerIconY = headerY + 0;
+  const int topTextY = headerY + 3;
+  
+  char hpBuf[16];
+  snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
+  
   spr.setTextDatum(TR_DATUM);
-  const int numRightX = x0 + panelW - 2;
-
-  bool okLife = drawMiniStatIconCached(PATH_LIFE_ICON, iconX, lifeY);
-  (void)okLife;
-  drawMiniStatNumberRight(pet.health, numRightX, lifeY + TEXT_INSET_Y);
-
-  if (showCoin)
-  {
-    bool okCoin = drawMiniStatIconCached(PATH_INF_COIN, iconX, coinY);
-    (void)okCoin;
-    drawMiniStatNumberRight(pet.inf, numRightX, coinY + TEXT_INSET_Y);
-  }
-
+  spr.drawString(hpBuf, x0 + panelW - 2, topTextY);
+  
+  const int heartIconX = x0 + panelW - 2 - 16 - 16;
+  drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
+  
   spr.setTextDatum(TL_DATUM);
+
+  const int yHunger = y0 + 0 * rowH;
+  const int yMood = y0 + 1 * rowH;
+  const int yRest = y0 + 2 * rowH;
+
+  // --- Taller bars ---
+  drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
+  drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
+  drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
 }
 
 static void drawMiniStatPreview()
 {
-  const int panelW = 56;
+  const int panelW = 72;
   const int x0 = SCREEN_W - panelW - 4;
   drawMiniStatPreviewAt(x0, /*showCoin=*/true, /*alignRight=*/true);
 }
@@ -4487,62 +4599,46 @@ static void drawMiniStatPreview()
 static void drawMiniStatPreviewSleepLeft()
 {
   const int x0 = 4;
-  const int panelW = 56;
+  const int panelW = 72;
 
-  const int barW = panelW - 10;
-  const int barH = 6;
-  const int lineH = 14;
-  const int gapY = 6;
+  const int headerH = 24;
+  const int headerY = PET_AREA_Y + 2;
 
-  const int ICON_SIZE = 22;
-  const int ICON_GAP_Y = 3;
-  const int ICON_MOVE_UP = -5;
-  const int TEXT_INSET_Y = 4;
+  const int barW = panelW - 4;
+
+  const int barH = 14;
+  const int rowGap = 10;
+  const int rowH = barH + rowGap;
 
   const uint16_t colHunger = 0xF800;
   const uint16_t colMood = 0x001F;
   const uint16_t colEnergy = 0x07E0;
 
-  // Add one extra small line for Sleep Quality
-  const int qualityLineH = 10;
-
-  const int totalH = (3 * lineH) + gapY + (1 * lineH) + qualityLineH;
-
-  int y0 = PET_AREA_Y + (PET_AREA_H - totalH) / 2;
-  y0 -= 3;
-
-  drawTinyBar(x0 + 4, y0 + 0 * lineH, barW, barH, colHunger, colHunger, pet.hunger);
-  drawTinyBar(x0 + 4, y0 + 1 * lineH, barW, barH, colMood, colMood, pet.happiness);
-  drawTinyBar(x0 + 4, y0 + 2 * lineH, barW, barH, colEnergy, colEnergy, pet.energy);
-
+  const int y0 = headerY + headerH + 8;
+  const int barX = x0 + 2;
   spr.setTextFont(2);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  const int textY = y0 + 3 * lineH + gapY;
+  const int topTextY = headerY + 6;
 
-  // Left-aligned health readout (same as drawMiniStatPreviewAt left variant)
-  const int iconX = x0 + 2;
-  const int lifeY = (textY - 4) + ICON_MOVE_UP;
-
-  spr.setTextDatum(TR_DATUM);
-  const int numRightX = x0 + panelW - 2;
-
-  bool okLife = drawMiniStatIconCached(PATH_LIFE_ICON, iconX, lifeY);
-  (void)okLife;
-  drawMiniStatNumberRight(pet.health, numRightX, lifeY + TEXT_INSET_Y);
-
-  // Sleep quality line under the health readout
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  const int qY = lifeY + ICON_SIZE + 2;
-  spr.drawString("Sleep:", x0 + 2, qY);
-  spr.drawString(pet.getSleepQualityLabel(), x0 + 40, qY); // aligned under health row
+  drawMiniStatIconCached(PATH_LIFE_ICON, x0 + 0, headerY + 0);
 
   spr.setTextDatum(TL_DATUM);
+  {
+    char hpBuf[16];
+    snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
+    spr.drawString(hpBuf, x0 + 16, topTextY);
+  }
+  spr.setTextDatum(TL_DATUM);
+
+  const int yHunger = y0 + 0 * rowH;
+  const int yMood = y0 + 1 * rowH;
+  const int yRest = y0 + 2 * rowH;
+
+  drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
+  drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
+  drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
 }
 
 // ============================================================================

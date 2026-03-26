@@ -176,8 +176,7 @@ void soundTickNearDeath(bool dangerActive)
     return;
 
   // --- Phase timing (slowing heartbeat) ---
-  static const uint16_t kIntervals[] = {400, 600, 800, 1100};
-
+  static const uint16_t kIntervals[] = {90, 130, 180, 240};
   const uint16_t freq = 2600;
   const uint16_t dur = 40;
 
@@ -197,21 +196,19 @@ void soundTickNearDeath(bool dangerActive)
     s_finalPlayed = true;
 
     // Start long tone
-    M5Cardputer.Speaker.tone(1800, 1200);
+    M5Cardputer.Speaker.tone(1800, 700);
 
-    // Fake fade-out by stepping volume down
     if (soundGetVolumeLevel() != SOUND_VOL_OFF)
     {
       uint8_t baseVol = M5Cardputer.Speaker.getVolume();
 
-      for (int i = 0; i < 6; i++)
+      for (int i = 0; i < 5; i++)
       {
-        uint8_t v = (baseVol * (6 - i)) / 6;
+        uint8_t v = (baseVol * (5 - i)) / 5;
         M5Cardputer.Speaker.setVolume(v);
-        delay(120);
+        delay(80);
       }
 
-      // Restore volume after fade
       applySpeakerVolume();
     }
   }
