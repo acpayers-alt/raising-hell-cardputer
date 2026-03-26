@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "runtime_log.h"
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -64,6 +65,58 @@ static bool g_consoleHadPrevState = false;
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+static bool consoleSaveRuntimeLogToSd(const char *path, String *outErr)
+{
+  if (outErr)
+    *outErr = "";
+
+  if (!g_sdReady)
+  {
+    if (outErr)
+      *outErr = "SD not ready";
+    return false;
+  }
+
+  if (!path || !path[0])
+  {
+    if (outErr)
+      *outErr = "Invalid path";
+    return false;
+  }
+
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+  if (!SD.exists("/raising_hell/logs"))
+    SD.mkdir("/raising_hell/logs");
+
+  if (SD.exists(path))
+    SD.remove(path);
+
+  File f = SD.open(path, FILE_WRITE);
+  if (!f)
+  {
+    if (outErr)
+      *outErr = "Open failed";
+    return false;
+  }
+
+  f.println("--- LOGDUMP BEGIN ---");
+
+  const int count = runtimeLogCount();
+  for (int i = 0; i < count; i++)
+  {
+    char line[160];
+    snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
+    f.println(line);
+  }
+
+  f.println("--- LOGDUMP END ---");
+  f.flush();
+  f.close();
+
+  return true;
+}
+
 static bool consoleParseSemver3(const String &s, int &maj, int &min, int &pat)
 {
   maj = min = pat = 0;
@@ -443,6 +496,10 @@ static void execLine(char *line)
     logLine("  reboot              reboot device");
     logLine("  otach public|dev   set OTA channel");
     logLine("  otadev             switch to DEV OTA + provision + reboot");
+    logLine("  logdump            dump runtime log buffer");
+    logLine("  logtail [n]        dump last n log lines");
+    logLine("  logclear           clear runtime log buffer");
+    logLine("  logsave            save runtime log to /raising_hell/logs/logdump.txt");
 
 #if !PUBLIC_BUILD
     logLine("  giveinf <amount>    add Inferium");
@@ -945,6 +1002,83 @@ static void execLine(char *line)
 
     return;
   }
+
+  if (!strcmp(argv[0], "logclear"))
+{
+  runtimeLogClear();
+  logLine("[OK] runtime log cleared");
+  return;
+}
+
+if (!strcmp(argv[0], "logdump"))
+{
+  const int count = runtimeLogCount();
+
+  logLine("--- LOGDUMP BEGIN ---");
+  if (count <= 0)
+  {
+    logLine("(empty)");
+    logLine("--- LOGDUMP END ---");
+    return;
+  }
+
+  for (int i = 0; i < count; i++)
+  {
+    char line[128];
+    snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
+    logLine(line);
+  }
+
+  logLine("--- LOGDUMP END ---");
+  return;
+}
+
+if (!strcmp(argv[0], "logsave"))
+{
+  static const char *kLogPath = "/raising_hell/logs/logdump.txt";
+
+  String err;
+  if (!consoleSaveRuntimeLogToSd(kLogPath, &err))
+  {
+    logf("logsave failed: %s", err.c_str());
+    return;
+  }
+
+  logf("[OK] runtime log saved: %s", kLogPath);
+  return;
+}
+
+if (!strcmp(argv[0], "logtail"))
+{
+  int n = 20;
+  if (argc >= 2)
+  {
+    n = atoi(argv[1]);
+    if (n <= 0)
+      n = 20;
+  }
+
+  const int count = runtimeLogCount();
+  const int start = (count > n) ? (count - n) : 0;
+
+  logLine("--- LOGTAIL BEGIN ---");
+  if (count <= 0)
+  {
+    logLine("(empty)");
+    logLine("--- LOGTAIL END ---");
+    return;
+  }
+
+  for (int i = start; i < count; i++)
+  {
+    char line[128];
+    snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
+    logLine(line);
+  }
+
+  logLine("--- LOGTAIL END ---");
+  return;
+}
 
   if (!strcmp(argv[0], "assetstatus"))
   {

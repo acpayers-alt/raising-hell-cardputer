@@ -53,6 +53,7 @@
 #include "hatching_flow.h"
 #include "evolution_flow.h"
 #include "asset_ota.h"
+#include "runtime_log.h"
 
 void updateBattery();
 
@@ -77,11 +78,12 @@ static void serialBootHandshake(uint32_t waitMs)
 
 void appSetup() {
   Serial.begin(115200);
+  runtimeLogInit();
 
   // Give USB stack a moment, then do a bounded handshake.
   delay(50);
   serialBootHandshake(2500);
-
+  
   Serial.printf("[PSRAM] size=%u free=%u\n",
     (unsigned)ESP.getPsramSize(),
     (unsigned)ESP.getFreePsram());

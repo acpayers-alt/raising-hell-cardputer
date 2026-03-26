@@ -31,6 +31,7 @@
 #include "inventory.h"
 #include "launcher_wifi_import.h"
 #include "new_pet_flow_state.h"
+#include "runtime_log.h"
 #include "save_manager.h"
 #include "sdcard.h"
 #include "settings_state.h"
@@ -141,10 +142,9 @@ static bool bootAssetPackTooOld()
   const bool tooOld =
       (!haveInstalled || !installedPack.length() || compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0);
 
-  Serial.printf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d\n",
-                RH_MIN_REQUIRED_ASSET_PACK,
-                (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)", haveInstalled ? 1 : 0,
-                tooOld ? 1 : 0);
+  runtimeLogf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d", RH_MIN_REQUIRED_ASSET_PACK,
+              (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)", haveInstalled ? 1 : 0,
+              tooOld ? 1 : 0);
 
   return tooOld;
 }
@@ -471,8 +471,8 @@ static bool runBootAssetProvision()
     ESP.restart();
   }
 
-  Serial.printf("[BOOT][ASSET_PROVISION] failed: %s\n", msg.c_str());
-
+  runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());
+  
   // If assets are still missing, this is a mandatory provisioning failure.
   // Stay blocked on the provisioning/error screen.
   if (g_assetsMissing)
@@ -767,26 +767,26 @@ void postBootInitTick()
     g_bootAssetPackTooOldCached = provisionTooOld;
     const bool assetsPresentNow = sdAssetsPresent();
 
-    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d tooOld=%d assetsPresent=%d minRequired=%s\n",
-                  provisionRequested ? 1 : 0, provisionMandatory ? 1 : 0, provisionTooOld ? 1 : 0,
-                  assetsPresentNow ? 1 : 0, RH_MIN_REQUIRED_ASSET_PACK);
+    runtimeLogf("[BOOT][ASSET] requested=%d mandatory=%d tooOld=%d assetsPresent=%d minRequired=%s",
+                provisionRequested ? 1 : 0, provisionMandatory ? 1 : 0, provisionTooOld ? 1 : 0,
+                assetsPresentNow ? 1 : 0, RH_MIN_REQUIRED_ASSET_PACK);
 
     const bool deferForAssetProvision = provisionRequested || provisionMandatory || provisionTooOld;
 
-    Serial.printf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
-                  settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
-                  (int)afterOk);
+    runtimeLogf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d",
+                settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
+                (int)afterOk);
 
     if (deferForAssetProvision)
-      Serial.println("[BOOT] path=ASSET_PROVISION_PENDING");
+      runtimeLogLine("[BOOT] path=ASSET_PROVISION_PENDING");
     else if (firstBootWizard)
-      Serial.println("[BOOT] path=FIRST_BOOT_WIZARD");
+      runtimeLogLine("[BOOT] path=FIRST_BOOT_WIZARD");
     else if (!timeIsValid())
-      Serial.println("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
+      runtimeLogLine("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
     else if (!loadedFromSD)
-      Serial.println("[BOOT] path=NEW_PET_FLOW");
+      runtimeLogLine("[BOOT] path=NEW_PET_FLOW");
     else
-      Serial.println("[BOOT] path=NORMAL_BOOT");
+      runtimeLogLine("[BOOT] path=NORMAL_BOOT");
 
     if (!loadedFromSD)
     {
@@ -914,18 +914,18 @@ void postBootInitTick()
         {
           if (bootAssetProvisionWaitingAtIntroScreen())
             return;
-        
+
           g_bootProvisionWifiOnboardingStarted = true;
           g_bootAssetProvisionActive = false;
           ui_setBootSplashActive(false);
-        
+
           uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
           requestFullUIRedraw();
           requestUIRedraw();
           clearInputLatch();
           return;
         }
-        
+
         if (bootAssetProvisionWifiOnboardingActive())
           return;
       }
