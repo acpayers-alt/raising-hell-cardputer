@@ -1,6 +1,10 @@
 #include "console.h"
 
 #include "app_state.h"
+#include "asset_manifest.h"
+#include "asset_ota.h"
+#include "asset_ota_config.h"
+#include "asset_provision_request.h"
 #include "build_flags.h"
 #include "currency.h"
 #include "debug.h"
@@ -14,18 +18,17 @@
 #include "settings_state.h"
 #include "ui_runtime.h"
 #include "user_toggles_state.h"
+#include "version.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
 #include <FS.h>
 #include <SD.h>
+#include <esp_system.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "asset_ota.h"
-#include "build_flags.h"
-#include "version.h"
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -54,9 +57,71 @@ static int g_histNav = -1;  // -1 = not navigating; otherwise 0..histCount-1 (re
 static char g_histDraft[CONSOLE_HIST_LINE_MAX]; // what user typed before navigating
 static bool g_histHasDraft = false;
 
+static UIState g_consolePrevUiState{};
+static Tab g_consolePrevTab = Tab::TAB_PET;
+static bool g_consoleHadPrevState = false;
+
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+static bool consoleParseSemver3(const String &s, int &maj, int &min, int &pat)
+{
+  maj = min = pat = 0;
+
+  int firstDot = s.indexOf('.');
+  if (firstDot < 0)
+    return false;
+
+  int secondDot = s.indexOf('.', firstDot + 1);
+  if (secondDot < 0)
+    return false;
+
+  String a = s.substring(0, firstDot);
+  String b = s.substring(firstDot + 1, secondDot);
+  String c = s.substring(secondDot + 1);
+
+  if (!a.length() || !b.length() || !c.length())
+    return false;
+
+  maj = a.toInt();
+  min = b.toInt();
+  pat = c.toInt();
+  return true;
+}
+
+static int consoleCompareSemver3(const String &lhs, const String &rhs)
+{
+  int lMaj = 0, lMin = 0, lPat = 0;
+  int rMaj = 0, rMin = 0, rPat = 0;
+
+  if (!consoleParseSemver3(lhs, lMaj, lMin, lPat))
+    return -1;
+  if (!consoleParseSemver3(rhs, rMaj, rMin, rPat))
+    return 1;
+
+  if (lMaj != rMaj)
+    return (lMaj < rMaj) ? -1 : 1;
+  if (lMin != rMin)
+    return (lMin < rMin) ? -1 : 1;
+  if (lPat != rPat)
+    return (lPat < rPat) ? -1 : 1;
+  return 0;
+}
+
+static bool consoleAssetPackTooOld()
+{
+  if (!g_sdReady)
+    return false;
+
+  String installedPack;
+  const bool haveInstalled = assetManifestLoadLocalPackVersion(&installedPack);
+
+  return (!haveInstalled || !installedPack.length() ||
+          consoleCompareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0);
+}
+
+static const char *assetChannelToString(uint8_t ch) { return (ch == (uint8_t)AssetOtaChannel::DEV) ? "dev" : "public"; }
+
 static void resetLine()
 {
   g_len = 0;
@@ -370,7 +435,14 @@ static void execLine(char *line)
     logLine("  name <pet name>      set pet name");
     logLine("  pet                 show current pet type");
     logLine("  version             show firmware + asset version");
+    logLine("  assetstatus         show asset OTA/debug status");
     logLine("  uptime              show device uptime");
+    logLine("  assetflag           show asset provision boot flag");
+    logLine("  assetflag clear     clear asset provision boot flag");
+    logLine("  assetflag set       set asset provision boot flag");
+    logLine("  reboot              reboot device");
+    logLine("  otach public|dev   set OTA channel");
+    logLine("  otadev             switch to DEV OTA + provision + reboot");
 
 #if !PUBLIC_BUILD
     logLine("  giveinf <amount>    add Inferium");
@@ -862,35 +934,57 @@ static void execLine(char *line)
   if (!strcmp(argv[0], "version"))
   {
     logLine("Raising Hell");
-  
+
     logf("Firmware: %s", RH_VERSION_STRING);
-  
+
     const char *assetVer = assetOtaInstalledVersion();
     if (assetVer && assetVer[0])
       logf("Assets:   %s", assetVer);
     else
       logLine("Assets:   none installed");
-  
+
     return;
   }
 
-if (!strcmp(argv[0], "uptime"))
-{
-  uint32_t ms = millis();
-  uint32_t sec = ms / 1000;
-  uint32_t min = sec / 60;
-  uint32_t hr = min / 60;
+  if (!strcmp(argv[0], "assetstatus"))
+  {
+    const AssetOtaConfig &cfg = assetOtaGetConfig();
+    const char *installed = assetOtaInstalledVersion();
 
-  sec %= 60;
-  min %= 60;
+    logLine("Asset OTA status:");
+    logf("  boot flag:       %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
 
-  logf("Uptime: %lu:%02lu:%02lu",
-       (unsigned long)hr,
-       (unsigned long)min,
-       (unsigned long)sec);
+    logf("  installed:       %s", (installed && installed[0]) ? installed : "(none)");
+    logf("  min required:    %s", RH_MIN_REQUIRED_ASSET_PACK);
+    logf("  too old:         %s", consoleAssetPackTooOld() ? "YES" : "NO");
 
-  return;
-}
+    logf("  channel:         %s", assetChannelToString(cfg.channel));
+    logf("  manifest url:    %s", assetOtaManifestUrlForChannel((AssetOtaChannel)cfg.channel));
+
+    logf("  sd ready:        %s", g_sdReady ? "YES" : "NO");
+    logf("  local manifest:  %s", (g_sdReady && SD.exists(assetOtaLocalManifestPath())) ? "YES" : "NO");
+
+    logf("  ota status:      %s", assetOtaStatusString());
+    logf("  ota error:       %s", assetOtaLastErrorString());
+    logf("  progress:        %u / %u", (unsigned)assetOtaCurrentFileIndex(), (unsigned)assetOtaTotalFileCount());
+
+    return;
+  }
+
+  if (!strcmp(argv[0], "uptime"))
+  {
+    uint32_t ms = millis();
+    uint32_t sec = ms / 1000;
+    uint32_t min = sec / 60;
+    uint32_t hr = min / 60;
+
+    sec %= 60;
+    min %= 60;
+
+    logf("Uptime: %lu:%02lu:%02lu", (unsigned long)hr, (unsigned long)min, (unsigned long)sec);
+
+    return;
+  }
 
   // MONITOR
   if (!strcmp(argv[0], "mon"))
@@ -912,6 +1006,142 @@ if (!strcmp(argv[0], "uptime"))
     return;
   }
 
+  // -------------------------
+  // ASSET / SYSTEM COMMANDS
+  // -------------------------
+  if (!strcmp(argv[0], "otach"))
+  {
+    if (argc < 2)
+    {
+      logLine("Usage: otach public|dev");
+      return;
+    }
+
+    if (!g_sdReady)
+    {
+      logLine("SD not ready");
+      return;
+    }
+
+    AssetOtaConfig cfg{};
+    assetOtaConfigDefaults(cfg);
+
+    // Try to load existing config (optional)
+    assetOtaConfigLoad(&cfg);
+
+    if (!strcmp(argv[1], "dev"))
+    {
+      cfg.channel = (uint8_t)AssetOtaChannel::DEV;
+      logLine("[OK] OTA channel set to DEV");
+    }
+    else if (!strcmp(argv[1], "public"))
+    {
+      cfg.channel = (uint8_t)AssetOtaChannel::PUBLIC;
+      logLine("[OK] OTA channel set to PUBLIC");
+    }
+    else
+    {
+      logLine("Usage: otach public|dev");
+      return;
+    }
+
+    if (!assetOtaConfigSave(cfg))
+    {
+      logLine("FAILED to save config");
+      return;
+    }
+
+    logLine("[OK] config saved");
+    logLine("Reboot required to apply");
+    return;
+  }
+
+  if (!strcmp(argv[0], "otadev"))
+  {
+    if (!g_sdReady)
+    {
+      logLine("SD not ready");
+      return;
+    }
+
+    AssetOtaConfig cfg{};
+    assetOtaConfigDefaults(cfg);
+    assetOtaConfigLoad(&cfg);
+
+    cfg.channel = (uint8_t)AssetOtaChannel::DEV;
+
+    // 👉 ADD THIS LINE RIGHT HERE
+    logf("[OK] manifest: %s", assetOtaManifestUrlForChannel((AssetOtaChannel)cfg.channel));
+
+    if (!assetOtaConfigSave(cfg))
+    {
+      logLine("FAILED to save config");
+      return;
+    }
+
+    requestAssetProvisionOnNextBoot();
+
+    logLine("[OK] switched to DEV channel");
+    logLine("[OK] asset provisioning requested");
+    logLine("[OK] rebooting...");
+
+    delay(100);
+    ESP.restart();
+    return;
+  }
+
+  if (!strcmp(argv[0], "assetflag"))
+  {
+    if (argc == 1)
+    {
+      logf("asset provision boot flag: %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
+      return;
+    }
+
+    if (!strcmp(argv[1], "clear"))
+    {
+      clearAssetProvisionBootRequest();
+      logLine("[OK] asset provision boot flag cleared");
+      return;
+    }
+
+    if (!strcmp(argv[1], "set"))
+    {
+      requestAssetProvisionOnNextBoot();
+      logLine("[OK] asset provision boot flag set");
+      return;
+    }
+
+    logLine("Usage: assetflag [clear|set]");
+    return;
+  }
+
+  if (!strcmp(argv[0], "reboot"))
+  {
+    logLine("[OK] rebooting...");
+    delay(100);
+    ESP.restart();
+    return;
+  }
+
+  if (!strcmp(argv[0], "reboot"))
+  {
+    logLine("[OK] rebooting...");
+    delay(100); // give serial + UI time to flush
+    ESP.restart();
+    return;
+  }
+
+  if (!strcmp(argv[0], "logdump"))
+  {
+    logLine("logdump not implemented yet");
+    return;
+  }
+
+  // -------------------------
+  // FALLBACK (leave last)
+  // -------------------------
+
   logf("Unknown command: %s", argv[0]);
 }
 
@@ -925,6 +1155,9 @@ void consoleOpen()
   g_consoleOpen = true;
   g_consoleJustOpened = true;
 
+  requestFullUIRedraw();
+  requestUIRedraw();
+
   consoleClear();
 
   logLine("");
@@ -935,8 +1168,12 @@ void consoleOpen()
 void consoleClose()
 {
   inputSetTextCapture(false);
-  g_textCaptureMode = false; // <-- MUST be here
+  g_textCaptureMode = false;
   g_consoleOpen = false;
+
+  requestFullUIRedraw();
+  requestUIRedraw();
+
   logLine("[Console closed]");
 }
 

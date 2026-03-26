@@ -281,6 +281,22 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
 
   Serial.printf("[OTA WL] parsing callback manifest len=%u\n", (unsigned)mfLen);
 
+  if (!assetOtaEnsureParentDir(assetOtaWorklistPath()))
+  {
+    Serial.printf("[OTA WL] fail: ensure worklist dir for %s\n", assetOtaWorklistPath());
+    mf.close();
+    SD.remove(tmpManifestPath);
+    return false;
+  }
+
+  if (!assetOtaEnsureParentDir(assetOtaWorklistPath()))
+  {
+    Serial.printf("[OTA WL] fail: ensure worklist dir for %s\n", assetOtaWorklistPath());
+    mf.close();
+    SD.remove(tmpManifestPath);
+    return false;
+  }
+
   File work = SD.open(assetOtaWorklistPath(), FILE_WRITE);
   if (!work)
   {
@@ -804,8 +820,11 @@ static bool parseManifestJsonWithCallback(Stream &input, size_t contentLen, Stri
   Serial.printf("[OTA WL] cb-parse deserialize=%s free=%u largest=%u overflowed=%d\n", err ? err.c_str() : "Ok",
                 (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), doc.overflowed() ? 1 : 0);
 
-  if (err)
+  if (err || doc.overflowed())
+  {
+    Serial.printf("[OTA WL] cb-parse failed: %s overflowed=%d\n", err ? err.c_str() : "Ok", doc.overflowed() ? 1 : 0);
     return false;
+  }
 
   JsonObject root = doc.as<JsonObject>();
   if (root.isNull())
@@ -841,9 +860,23 @@ static bool parseManifestJsonWithCallback(Stream &input, size_t contentLen, Stri
 
     const char *sha = obj["sha256"] | "";
     if (sha && sha[0])
+    {
       strlcpy(f.sha256, sha, sizeof(f.sha256));
+
+      for (size_t j = 0; f.sha256[j]; ++j)
+        f.sha256[j] = (char)tolower((unsigned char)f.sha256[j]);
+
+      if (strlen(f.sha256) != 64)
+      {
+        Serial.printf("[OTA WL] cb-parse bad sha len=%u at index=%u path=%s\n", (unsigned)strlen(f.sha256), fileIndex,
+                      f.path);
+        continue;
+      }
+    }
     else
+    {
       f.sha256[0] = '\0';
+    }
 
     if (onFile)
     {

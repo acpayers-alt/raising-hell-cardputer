@@ -146,6 +146,16 @@ String wantHash(file.sha256);
 wantHash.toLowerCase();
 wantHash.trim();
 
+if (!wantHash.isEmpty() && wantHash.length() != 64)
+{
+  http.end();
+  out.close();
+  SD.remove(stagingPath.c_str());
+  if (outErr)
+    *outErr = "Invalid manifest SHA256";
+  return false;
+}
+
 const bool verifyHash = !wantHash.isEmpty();
 mbedtls_sha256_context ctx;
 uint8_t hash[32];

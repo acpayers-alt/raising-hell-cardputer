@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 // Raising Hell — Cardputer ADV Edition
-// Boot pipeline implementation (moved out of .ino / out of headers)
+// Boot pipeline implementation
 // -----------------------------------------------------------------------------
 #include "boot_pipeline.h"
 
@@ -9,8 +9,9 @@
 #include <SD.h>
 #include <cstring>
 
-// Keep includes broad/safe like you’ve been doing
+#include "app_lifecycle.h"
 #include "app_state.h"
+#include "asset_manifest.h"
 #include "asset_ota.h"
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
@@ -39,12 +40,12 @@
 #include "ui_actions.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
+#include "version.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
 #include <WiFi.h>
 #include <esp_system.h>
-#include "app_lifecycle.h"
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
@@ -80,6 +81,72 @@ void drawAssetsMissingScreen()
   }
 
   spr.pushSprite(0, 0);
+}
+
+static bool parseSemver3(const String &s, int &maj, int &min, int &pat)
+{
+  maj = min = pat = 0;
+
+  int d1 = s.indexOf('.');
+  if (d1 < 0)
+    return false;
+  int d2 = s.indexOf('.', d1 + 1);
+  if (d2 < 0)
+    return false;
+
+  String a = s.substring(0, d1);
+  String b = s.substring(d1 + 1, d2);
+  String c = s.substring(d2 + 1);
+
+  a.trim();
+  b.trim();
+  c.trim();
+
+  if (!a.length() || !b.length() || !c.length())
+    return false;
+
+  maj = a.toInt();
+  min = b.toInt();
+  pat = c.toInt();
+  return true;
+}
+
+static int compareSemver3(const String &lhs, const String &rhs)
+{
+  int lMaj, lMin, lPat;
+  int rMaj, rMin, rPat;
+
+  if (!parseSemver3(lhs, lMaj, lMin, lPat))
+    return -1;
+  if (!parseSemver3(rhs, rMaj, rMin, rPat))
+    return 1;
+
+  if (lMaj != rMaj)
+    return (lMaj < rMaj) ? -1 : 1;
+  if (lMin != rMin)
+    return (lMin < rMin) ? -1 : 1;
+  if (lPat != rPat)
+    return (lPat < rPat) ? -1 : 1;
+  return 0;
+}
+
+static bool bootAssetPackTooOld()
+{
+  if (!g_sdReady)
+    return false;
+
+  String installedPack;
+  const bool haveInstalled = assetManifestLoadLocalPackVersion(&installedPack);
+
+  const bool tooOld =
+      (!haveInstalled || !installedPack.length() || compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0);
+
+  Serial.printf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d\n",
+                RH_MIN_REQUIRED_ASSET_PACK,
+                (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)", haveInstalled ? 1 : 0,
+                tooOld ? 1 : 0);
+
+  return tooOld;
 }
 
 // -----------------------------------------------------------------------------
@@ -189,6 +256,7 @@ static uint32_t g_bootProvisionWifiStartMs = 0;
 bool g_bootAssetProvisionActive = false;
 extern bool g_bootAssetProvisionMustComplete;
 bool g_bootAssetProvisionMustComplete = false;
+static bool g_bootAssetPackTooOldCached = false;
 
 bool g_bootProvisionWifiOnboardingStarted = false;
 static bool g_bootLandingDeferredForAssetProvision = false;
@@ -248,7 +316,8 @@ static bool bootAssetProvisionRequired()
 {
   const bool requested = bootAssetProvisionRequested();
   const bool mandatory = bootAssetProvisionMandatory();
-  return requested || mandatory;
+  const bool tooOld = !mandatory && g_bootAssetPackTooOldCached;
+  return requested || mandatory || tooOld;
 }
 
 void drawBootAssetProvisionScreen(const char *line1, const char *line2)
@@ -323,6 +392,18 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
   spr.pushSprite(0, 0);
 }
 void bootAssetProvisionRedraw(const char *line1, const char *line2) { drawBootAssetProvisionScreen(line1, line2); }
+
+static bool bootAssetProvisionWaitingAtIntroScreen()
+{
+  switch (g_app.uiState)
+  {
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+  case UIState::CONSOLE:
+    return true;
+  default:
+    return false;
+  }
+}
 
 static bool bootAssetProvisionWifiOnboardingActive()
 {
@@ -677,17 +758,20 @@ void postBootInitTick()
     const bool setupPending = appLifecycleHasPendingOnboarding();
     const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;
     const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
-    
+
     const UIState afterOk = appLifecycleResolveBootAfterOkState(saveFileExists);
 
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
+    const bool provisionTooOld = bootAssetPackTooOld();
+    g_bootAssetPackTooOldCached = provisionTooOld;
     const bool assetsPresentNow = sdAssetsPresent();
 
-    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d assetsPresent=%d\n", provisionRequested ? 1 : 0,
-                  provisionMandatory ? 1 : 0, assetsPresentNow ? 1 : 0);
+    Serial.printf("[BOOT][ASSET] requested=%d mandatory=%d tooOld=%d assetsPresent=%d minRequired=%s\n",
+                  provisionRequested ? 1 : 0, provisionMandatory ? 1 : 0, provisionTooOld ? 1 : 0,
+                  assetsPresentNow ? 1 : 0, RH_MIN_REQUIRED_ASSET_PACK);
 
-    const bool deferForAssetProvision = bootAssetProvisionRequired();
+    const bool deferForAssetProvision = provisionRequested || provisionMandatory || provisionTooOld;
 
     Serial.printf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d\n",
                   settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
@@ -717,7 +801,7 @@ void postBootInitTick()
     if (deferForAssetProvision)
     {
       g_bootLandingDeferredForAssetProvision = true;
-      g_bootAssetProvisionMustComplete = bootAssetProvisionMandatory();
+      g_bootAssetProvisionMustComplete = provisionMandatory || provisionTooOld;
       g_bootUiBlockedForAssetProvision = true;
       g_bootProvisionWifiOnboardingStarted = false;
       g_forceControlsHelpAfterProvision = g_bootAssetProvisionMustComplete && !bootSaveFileExists();
@@ -796,7 +880,7 @@ void postBootInitTick()
       extern Tab g_bootWizardAfterOkTab;
       g_bootWizardAfterOkState = afterOk;
       g_bootWizardAfterOkTab = Tab::TAB_PET;
-    
+
       uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
       requestFullUIRedraw();
       invalidateBackgroundCache();
@@ -828,20 +912,20 @@ void postBootInitTick()
         // the user presses ENTER to begin Wi-Fi setup.
         if (g_bootAssetProvisionMustComplete && !g_bootProvisionWifiOnboardingStarted)
         {
-          if (g_app.uiState == UIState::BOOT_ASSET_WIFI_REQUIRED)
+          if (bootAssetProvisionWaitingAtIntroScreen())
             return;
-
+        
           g_bootProvisionWifiOnboardingStarted = true;
           g_bootAssetProvisionActive = false;
           ui_setBootSplashActive(false);
-
+        
           uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
           requestFullUIRedraw();
           requestUIRedraw();
           clearInputLatch();
           return;
         }
-
+        
         if (bootAssetProvisionWifiOnboardingActive())
           return;
       }

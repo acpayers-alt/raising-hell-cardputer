@@ -753,10 +753,14 @@ void drawBootAssetWifiRequiredScreen()
   spr.drawString("download.", 10, 90);
 
   spr.setTextColor(TFT_GREEN, TFT_BLACK);
-  spr.drawString("ENTER: Set up Wi-Fi", 10, 122);
+  spr.drawString("ENTER: Set up Wi-Fi", 10, 118);
+
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString("\\: Console", 10, 136);
 
   spr.pushSprite(0, 0);
 }
+
 // -----------------------------------------------------------------------------
 // Import wifi credentials from HLauncher
 // -----------------------------------------------------------------------------
@@ -5014,13 +5018,13 @@ void renderUI()
     return;
   }
 
-  if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) && !uiIsBootWifiOnboardingState(g_app.uiState))
+  if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) && g_app.uiState != UIState::CONSOLE &&
+      !uiIsBootWifiOnboardingState(g_app.uiState))
   {
     drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
     spr.pushSprite(0, 0);
     return;
   }
-
   static int lastTab = -1;
 
   const int tabNow = (int)g_app.currentTab;
