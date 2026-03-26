@@ -161,12 +161,7 @@ static const char* mgItemName(ItemType t)
 
 static int rollMiniGameInfReward()
 {
-  const int r = (int)random(100);
-
-  if (r < 50) return 25;
-  if (r < 80) return 50;
-  if (r < 95) return 75;
-  return 100;
+  return 25;
 }
 
 static bool tryAwardWinItem_1in4(ItemType* outType)
