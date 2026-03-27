@@ -33,6 +33,7 @@
 #include "ui_settings_actions.h"
 #include "user_toggles_state.h"
 #include <esp_system.h>
+#include "build_flags.h"
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -447,6 +448,24 @@ static void actWifi_AssetOtaChannelToggle(InputState &)
   clearInputLatch();
 }
 
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+#pragma message("\033[42m\033[30m [ PUBLIC BUILD ] \033[0m")
+#else
+#pragma message("\033[41m\033[37m [ DEV BUILD - DO NOT SHIP ] \033[0m")
+#endif
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+
+static MenuItem kWifiItems[] = {
+    {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
+    {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
+    {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
+    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
+    {"Check/Fix Assets", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
+};
+
+#else
+
 static MenuItem kWifiItems[] = {
     {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
@@ -455,6 +474,8 @@ static MenuItem kWifiItems[] = {
     {"Check/Fix Assets", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
 };
+
+#endif
 
 static MenuItem kGameItems[] = {
     {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
@@ -507,14 +528,38 @@ static const MenuPageDef *findPage(SettingsPage page)
 namespace UiSettingsMenu
 {
 
+  static int wifiVisibleItemCount()
+  {
+    int count = 0;
+    for (int i = 0; i < (int)(sizeof(kWifiItems) / sizeof(kWifiItems[0])); ++i)
+    {
+      if (!kWifiItems[i].isEnabled || kWifiItems[i].isEnabled())
+        ++count;
+    }
+    return count;
+  }
+    
+  int WifiItemCount()
+  {
+    return (int)(sizeof(kWifiItems) / sizeof(kWifiItems[0]));
+  }
+  
+  const char *WifiItemLabel(int index)
+  {
+    const int count = WifiItemCount();
+    if (index < 0 || index >= count)
+      return "";
+    return kWifiItems[index].label ? kWifiItems[index].label : "";
+  }
+
 bool Handle(InputState &input, int move)
 {
   const MenuPageDef *def = findPage(g_settingsFlow.settingsPage);
   if (!def)
     return false;
 
-  int &cursor = def->cursor();
-  const int count = (int)def->itemCount;
+int &cursor = def->cursor();
+const int count = (int)def->itemCount;
 
   if (assetOtaConfirmActive())
   {
@@ -558,7 +603,7 @@ bool Handle(InputState &input, int move)
   if (cursor >= count)
     cursor = count - 1;
 
-  MenuItem &item = def->items[cursor];
+    MenuItem &item = def->items[cursor];
 
   // Optional per-page hook (e.g., Factory Reset flow on SYSTEM page)
   if (def->pageHook)

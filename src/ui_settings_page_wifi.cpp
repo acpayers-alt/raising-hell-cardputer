@@ -27,10 +27,10 @@ namespace UiSettingsPages
 void Handle_WIFI(InputState &input, int move)
 {
   #if PUBLIC_BUILD
-  const int totalItems = 6;
+  const int totalItems = 5;
   const int otaChannelRow = -1;
 #else
-  const int totalItems = 7;
+  const int totalItems = 6;
   const int otaChannelRow = 5;
 #endif
 

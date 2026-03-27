@@ -63,6 +63,7 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
+#include "ui_settings_menu.h"
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -2213,27 +2214,7 @@ static void drawWifiSettingsMenu()
 
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
-  char wLine[28];
-  snprintf(wLine, sizeof(wLine), "WiFi: %s", wifiIsEnabled() ? "ON" : "OFF");
-
-  char tzLine[36];
-  snprintf(tzLine, sizeof(tzLine), "Time Zone: %s", tzName(tzIndex));
-
-  char otaCheckLine[40];
-  snprintf(otaCheckLine, sizeof(otaCheckLine), "Check/Fix Assets");
-
-#if PUBLIC_BUILD
-  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaCheckLine};
-  const int totalItems = 5;
-#else
-  char otaChannelLine[32];
-  snprintf(otaChannelLine, sizeof(otaChannelLine), "OTA Channel: %s",
-           ((AssetOtaChannel)assetOtaGetConfig().channel == AssetOtaChannel::DEV) ? "Dev" : "Public");
-
-  const char *labels[] = {wLine, "Set WiFi Network", "Reset WiFi Settings", tzLine, otaCheckLine, otaChannelLine};
-  const int totalItems = 6;
-#endif
-
+  const int totalItems = UiSettingsMenu::WifiItemCount();
   g_wifi.wifiSettingsIndex = clampi(g_wifi.wifiSettingsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
@@ -2270,8 +2251,30 @@ static void drawWifiSettingsMenu()
     const int th = spr.fontHeight();
     const int ty = y + (itemH - th) / 2;
 
+    const char *label = UiSettingsMenu::WifiItemLabel(i);
+
+    char valueBuf[40];
+    valueBuf[0] = '\0';
+
+    if (strcmp(label, "WiFi") == 0)
+    {
+      snprintf(valueBuf, sizeof(valueBuf), "WiFi: %s", wifiIsEnabled() ? "ON" : "OFF");
+      label = valueBuf;
+    }
+    else if (strcmp(label, "Time Zone") == 0)
+    {
+      snprintf(valueBuf, sizeof(valueBuf), "Time Zone: %s", tzName(tzIndex));
+      label = valueBuf;
+    }
+    else if (strcmp(label, "OTA Channel") == 0)
+    {
+      snprintf(valueBuf, sizeof(valueBuf), "OTA Channel: %s",
+               ((AssetOtaChannel)assetOtaGetConfig().channel == AssetOtaChannel::DEV) ? "Dev" : "Public");
+      label = valueBuf;
+    }
+
     spr.setTextColor(textCol, fill);
-    spr.drawString(labels[i], boxX + 10, ty);
+    spr.drawString(label, boxX + 10, ty);
   }
 }
 
@@ -2492,12 +2495,19 @@ static void drawCreditsScreen()
   spr.drawString("Created By:", SCREEN_W / 2, yCreated);
   spr.drawString("Aaron & Finley Ayers", SCREEN_W / 2, yAaron);
 
-  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  uint16_t versionCol = TFT_DARKGREY;
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  versionCol = TFT_GREEN;
+#else
+  versionCol = TFT_RED;
+#endif
+
+  spr.setTextColor(versionCol, TFT_BLACK);
 
   char verLine[48];
   snprintf(verLine, sizeof(verLine), "Version %s", RH_VERSION_STRING);
   spr.drawString(verLine, SCREEN_W / 2, yVersion);
-
+  
   const char *assetVer = assetOtaInstalledVersion();
   char assetLine[48];
   if (assetVer && assetVer[0])
