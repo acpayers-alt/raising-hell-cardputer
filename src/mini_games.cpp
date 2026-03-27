@@ -143,7 +143,6 @@ static void logMiniGameHeap(const char *tag) { mgAssetsLogHeap(tag); }
 
 // START SCREEN
 static bool s_flappyShowIntro = true;
-static bool s_flappyDontShowAgain = false; // visual only for now
 
 // BACKGROUND
 static bool s_flappyBgReady = false;
@@ -645,7 +644,6 @@ void startFlappyFireball()
 
   s_flappyInited = true;
   s_flappyShowIntro = true;
-  s_flappyDontShowAgain = false;
   s_impHit = false;
   s_impBurnDone = false;
   s_impFrame = 0;
@@ -1204,29 +1202,11 @@ void drawFlappyFireball()
     spr.drawCentreString(flappyIntroTargetTextForPet(), gW / 2, 22, 2);
 
     const int impX = (gW - 48) / 2;
-    const int impY = 40;
+    const int impY = 52;
 
     M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
     if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
       impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
-
-    const int cbY = 100;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_flappyDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-    }
-
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
 
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -1369,7 +1349,6 @@ void drawFlappyFireball()
 // Resurrection Run (side-scroller runner) GLOBALS
 // -----------------------------------------------------------------------------
 static bool s_rrShowIntro = true;
-static bool s_rrDontShowAgain = false; // visual only for now
 static uint32_t s_rrIntroAnimMs = 0;
 
 static bool rr_active = false;
@@ -2136,7 +2115,6 @@ void startResurrectionRun()
 
   invalidateBackgroundCache();
   s_rrShowIntro = true;
-  s_rrDontShowAgain = false;
   s_rrIntroAnimMs = millis();
   s_rrAnimMs = millis();
   s_rrAnimFrame = 0;
@@ -2216,27 +2194,12 @@ void updateResurrectionRun(const InputState &input)
 
   if (s_rrShowIntro)
   {
-    if (input.mgSpaceOnce)
-      s_rrDontShowAgain = !s_rrDontShowAgain;
 
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+    const bool startPressed = miniGameEnterOnce(input) || input.mgSelectOnce || input.mgUpOnce;
 
     if (startPressed && !mgInputLockedOut())
-    {
-      s_rrShowIntro = false;
-      rrResetRunState();
-      rr_lastMs = now;
-      s_rrAnimMs = now;
-      s_rrHandAnimMs = now;
-      s_rrLadybugAnimMs = now;
 
-      clearInputLatch();
-      inputForceClear();
-      mgBeginInputLockout(120);
-      requestUIRedraw();
-    }
-
-    return;
+      return;
   }
 
   uint32_t dtMs = now - rr_lastMs;
@@ -2541,27 +2504,9 @@ void drawResurrectionRun()
     if (introSnake && introSnake->width() > 0 && introSnake->height() > 0)
     {
       const int sx = (gW - (int)introSnake->width()) / 2;
-      const int sy = (gH / 2) - ((int)introSnake->height() / 2) + 6;
+      const int sy = (gH / 2) - ((int)introSnake->height() / 2) + 18;
       introSnake->pushSprite(&spr, sx, sy, kResRunKey);
     }
-
-    const int cbY = 102;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_rrDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-    }
-
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
 
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -2720,7 +2665,6 @@ void drawResurrectionRun()
 // CROSSY HELL GLOBALS (Frogger-style)
 // -----------------------------------------------------------------------------
 static bool s_crossyShowIntro = true;
-static bool s_crossyDontShowAgain = false; // visual only for now
 static uint32_t s_crossyIntroImpAnimMs = 0;
 
 static const int kCrossyCols = 15;
@@ -3317,7 +3261,6 @@ void startCrossyRoad()
   s_resultShown = false;
 
   s_crossyShowIntro = true;
-  s_crossyDontShowAgain = false;
   s_crossyIntroImpAnimMs = millis();
 
   mgClearRewardState();
@@ -3515,9 +3458,6 @@ void updateCrossyRoad(const InputState &input)
     if (dt >= 180)
       s_crossyIntroImpAnimMs = now;
 
-    if (input.mgSpaceOnce)
-      s_crossyDontShowAgain = !s_crossyDontShowAgain;
-
     if (input.mgQuitOnce && !mgInputLockedOut())
     {
       miniGameCancelFromIntro();
@@ -3699,31 +3639,13 @@ void drawCrossyRoad()
     if (mgAssetsReadPngDims(introPath, &iw, &ih, &useIntroPath))
     {
       const int ix = (gW - iw) / 2;
-      const int iy = 48;
+      const int iy = 60;
       sprDrawPngFromSD(useIntroPath ? useIntroPath : introPath, ix, iy);
     }
     else
     {
-      sprDrawPngFromSD(introPath, (gW - 68) / 2, 48);
+      sprDrawPngFromSD(introPath, (gW - 68) / 2, 60);
     }
-
-    const int cbY = 102;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_crossyDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-    }
-
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
 
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -3854,7 +3776,6 @@ enum DodgerPhase
 };
 
 static bool s_dodgerShowIntro = true;
-static bool s_dodgerDontShowAgain = false; // visual only for now
 static uint8_t s_dodgerIntroImpFrame = 0;
 static uint32_t s_dodgerIntroImpAnimMs = 0;
 
@@ -4488,7 +4409,6 @@ void startInfernalDodger()
 
   invalidateBackgroundCache();
   s_dodgerShowIntro = true;
-  s_dodgerDontShowAgain = false;
   s_dodgerIntroImpFrame = 0;
   s_dodgerIntroImpAnimMs = millis();
   requestUIRedraw();
@@ -4540,9 +4460,6 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerIntroImpAnimMs = now;
       s_dodgerIntroImpFrame ^= 1;
     }
-
-    if (input.mgSpaceOnce)
-      s_dodgerDontShowAgain = !s_dodgerDontShowAgain;
 
     if (input.mgQuitOnce && !mgInputLockedOut())
     {
@@ -4930,7 +4847,7 @@ void drawInfernalDodger()
     spr.drawCentreString(dodgerIntroLine1(), gW / 2, 8, 2);
     spr.drawCentreString(dodgerIntroLine2(), gW / 2, 26, 2);
     const int impX = (gW - 48) / 2;
-    const int impY = 44;
+    const int impY = 56;
 
     const char *introImp =
         (s_dodgerIntroImpFrame == 0) ? dodgerGoalFrame1ResolvedPath() : dodgerGoalFrame2ResolvedPath();
@@ -4939,24 +4856,6 @@ void drawInfernalDodger()
       sprDrawPngFromSD(introImp, impX, impY);
     else
       spr.fillRect(impX, impY, 48, 48, TFT_RED);
-
-    const int cbY = 102;
-    const int cbSize = 10;
-    const int textOffset = 16;
-    const int lineWidth = 150;
-    const int cbX = (gW - lineWidth) / 2;
-
-    spr.drawRect(cbX, cbY, cbSize, cbSize, TFT_WHITE);
-
-    if (s_dodgerDontShowAgain)
-    {
-      spr.drawLine(cbX + 2, cbY + 5, cbX + 4, cbY + 7, TFT_WHITE);
-      spr.drawLine(cbX + 4, cbY + 7, cbX + 8, cbY + 2, TFT_WHITE);
-    }
-
-    spr.setTextDatum(ML_DATUM);
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Don't show again (Space)", cbX + textOffset, cbY + 5, 2);
 
     spr.setTextDatum(CC_DATUM);
     spr.setTextColor(TFT_GREEN, TFT_BLACK);
