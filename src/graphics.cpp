@@ -4494,7 +4494,7 @@ static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outl
   // Inner dark track
   spr.fillRoundRect(innerX, innerY, innerW, innerH, (innerH / 2), TFT_BLACK);
 
-  // Fill
+  // Fill with flat right edge
   if (fillW > 0)
   {
     int fw = fillW;
@@ -4502,7 +4502,8 @@ static void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outl
       fw = innerH; // keep tiny values visible as a nub
     if (fw > innerW)
       fw = innerW;
-    spr.fillRoundRect(innerX, innerY, fw, innerH, (innerH / 2), fill);
+
+    spr.fillRect(innerX, innerY, fw, innerH, fill);
   }
 
   // Centered label
