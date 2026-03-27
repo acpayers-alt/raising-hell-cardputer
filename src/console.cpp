@@ -13,6 +13,7 @@
 #include "led_status.h"
 #include "pet.h"
 #include "pet_age.h"
+#include "runtime_log.h"
 #include "save_manager.h"
 #include "sdcard.h"
 #include "settings_state.h"
@@ -29,7 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "runtime_log.h"
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -516,6 +516,8 @@ static void execLine(char *line)
     logLine("  setevo <0-3|baby|teen|adult|elder>  force evo stage");
     logLine("  hurtpet            set low stats + HP=25 (test death flow)");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
+    logLine("  healpet             restore HP + all core stats to 100");
+
 #endif
 
     return;
@@ -857,6 +859,10 @@ static void execLine(char *line)
   }
 #endif
 
+// -------------------------------------------------
+// PET TORTURE (For...testing)
+// -------------------------------------------------
+
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "hurtpet"))
   {
@@ -879,9 +885,24 @@ static void execLine(char *line)
   }
 #endif
 
-// -------------------------------------------------
-// KILL PET (force death flow immediately)
-// -------------------------------------------------
+#if !PUBLIC_BUILD
+  if (!strcmp(argv[0], "healpet"))
+  {
+    pet.hunger = 100;
+    pet.energy = 100;
+    pet.happiness = 100;
+    pet.health = 100;
+
+    pet.clampStats();
+
+    saveManagerMarkDirty();
+    requestUIRedraw();
+
+    logLine("[OK] Pet healed (HP/stats restored to 100)");
+    return;
+  }
+#endif
+
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "killpet"))
   {
@@ -1027,81 +1048,81 @@ static void execLine(char *line)
   }
 
   if (!strcmp(argv[0], "logclear"))
-{
-  runtimeLogClear();
-  logLine("[OK] runtime log cleared");
-  return;
-}
-
-if (!strcmp(argv[0], "logdump"))
-{
-  const int count = runtimeLogCount();
-
-  logLine("--- LOGDUMP BEGIN ---");
-  if (count <= 0)
   {
-    logLine("(empty)");
+    runtimeLogClear();
+    logLine("[OK] runtime log cleared");
+    return;
+  }
+
+  if (!strcmp(argv[0], "logdump"))
+  {
+    const int count = runtimeLogCount();
+
+    logLine("--- LOGDUMP BEGIN ---");
+    if (count <= 0)
+    {
+      logLine("(empty)");
+      logLine("--- LOGDUMP END ---");
+      return;
+    }
+
+    for (int i = 0; i < count; i++)
+    {
+      char line[128];
+      snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
+      logLine(line);
+    }
+
     logLine("--- LOGDUMP END ---");
     return;
   }
 
-  for (int i = 0; i < count; i++)
+  if (!strcmp(argv[0], "logsave"))
   {
-    char line[128];
-    snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
-    logLine(line);
-  }
+    static const char *kLogPath = "/raising_hell/logs/logdump.txt";
 
-  logLine("--- LOGDUMP END ---");
-  return;
-}
+    String err;
+    if (!consoleSaveRuntimeLogToSd(kLogPath, &err))
+    {
+      logf("logsave failed: %s", err.c_str());
+      return;
+    }
 
-if (!strcmp(argv[0], "logsave"))
-{
-  static const char *kLogPath = "/raising_hell/logs/logdump.txt";
-
-  String err;
-  if (!consoleSaveRuntimeLogToSd(kLogPath, &err))
-  {
-    logf("logsave failed: %s", err.c_str());
+    logf("[OK] runtime log saved: %s", kLogPath);
     return;
   }
 
-  logf("[OK] runtime log saved: %s", kLogPath);
-  return;
-}
-
-if (!strcmp(argv[0], "logtail"))
-{
-  int n = 20;
-  if (argc >= 2)
+  if (!strcmp(argv[0], "logtail"))
   {
-    n = atoi(argv[1]);
-    if (n <= 0)
-      n = 20;
-  }
+    int n = 20;
+    if (argc >= 2)
+    {
+      n = atoi(argv[1]);
+      if (n <= 0)
+        n = 20;
+    }
 
-  const int count = runtimeLogCount();
-  const int start = (count > n) ? (count - n) : 0;
+    const int count = runtimeLogCount();
+    const int start = (count > n) ? (count - n) : 0;
 
-  logLine("--- LOGTAIL BEGIN ---");
-  if (count <= 0)
-  {
-    logLine("(empty)");
+    logLine("--- LOGTAIL BEGIN ---");
+    if (count <= 0)
+    {
+      logLine("(empty)");
+      logLine("--- LOGTAIL END ---");
+      return;
+    }
+
+    for (int i = start; i < count; i++)
+    {
+      char line[128];
+      snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
+      logLine(line);
+    }
+
     logLine("--- LOGTAIL END ---");
     return;
   }
-
-  for (int i = start; i < count; i++)
-  {
-    char line[128];
-    snprintf(line, sizeof(line), "[%03d] %s", i, runtimeLogGetLine(i));
-    logLine(line);
-  }
-
-  logLine("--- LOGTAIL END ---");
-  return;
-}
 
   if (!strcmp(argv[0], "assetstatus"))
   {

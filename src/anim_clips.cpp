@@ -191,10 +191,10 @@ static const char *kDevAdultTiredChairBlink[] = {
 // Devil adult SICK (laying down)
 // ---------------------------
 static const char *kDevAdultSickLay[] = {
-    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_lay1.png",
-    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_lay2.png",
-    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_lay3.png",
-    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_lay4.png",
+    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf1.png",
+    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf2.png",
+    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf3.png",
+    "/raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf4.png",
 };
 
 // ---------------------------
