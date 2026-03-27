@@ -6123,13 +6123,16 @@ static void drawDeathTransitionStaticPet()
 
   int w = 0;
   int h = 0;
+  
+  static constexpr int kDeathTransitionStaticYNudge = -2;
+
   if (getPngWH(path, w, h) && w > 0 && h > 0)
   {
     const int drawX = centerX - (w / 2);
-    const int drawY = bottomY - h;
+    const int drawY = bottomY - h + kDeathTransitionStaticYNudge;
     sprDrawPngFromSD(path, drawX, drawY);
   }
-  else
+    else
   {
     // Fallback if WH lookup fails.
     sprDrawPngFromSD(path, centerX, bottomY);

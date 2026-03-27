@@ -2075,6 +2075,7 @@ void startResurrectionRun()
 {
   mgPauseReset();
   inputSetTextCapture(false);
+  soundSetVolumeLevel(soundGetVolumeLevel());
 
   currentMiniGame = MiniGame::RESURRECTION;
   mgAssetsBeginSession(currentMiniGame, "startResurrectionRun");

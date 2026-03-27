@@ -66,18 +66,18 @@ void tickDeathTransition(uint32_t now)
   if (g_app.uiState != UIState::DEATH_TRANSITION)
     return;
 
-  if (!s_deathTransitionSoundStarted)
-  {
-    s_deathTransitionSoundStarted = true;
-
-    if (kLogDeathTransition)
-      Serial.println("[DEATHX] flatline start");
-
-    soundDeathFlatline();
-  }
-
-  soundTickFlatlineFade();
-
+    if (!s_deathTransitionSoundStarted)
+    {
+      s_deathTransitionSoundStarted = true;
+  
+      if (kLogDeathTransition)
+        Serial.println("[DEATHX] flatline start");
+  
+      soundDeathFlatline();
+    }
+  
+    soundTickFlatlineFade();
+    
   if ((int32_t)(now - s_deathTransitionStartMs) < 0)
     return;
 
