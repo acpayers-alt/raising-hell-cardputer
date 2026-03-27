@@ -468,6 +468,19 @@ static bool s_hudMoodIconReady = false;
 static M5Canvas s_hudRestIcon(&spr);
 static bool s_hudRestIconReady = false;
 
+static int deathTransitionYNudgeForPet()
+{
+  switch (pet.type)
+  {
+    case PET_ELDRITCH:
+      return -6;
+    case PET_DEVIL:
+      return -2;
+    default:
+      return -2;
+  }
+}
+
 static bool ensureMiniStatIconCache(M5Canvas &canvas, bool &ready, const char *path)
 {
   if (ready)
@@ -5716,7 +5729,7 @@ void drawChoosePetScreen(bool redrawBg)
 
   const int arrowOffsetX = 14;
   const int arrowY = eggY + (eggH / 2) - 4;
-  
+
   spr.setTextDatum(TL_DATUM);
   spr.drawString("<", eggX - arrowOffsetX, arrowY);
   spr.drawString(">", eggX + eggW + arrowOffsetX - 6, arrowY);
@@ -5748,11 +5761,11 @@ void drawChoosePetScreen(bool redrawBg)
 
   const int eggBottomY = eggY + eggH;
   const int EGG_LABEL_Y = eggBottomY + 2;
-  int EGG_PROMPT_Y = screenH - 10;  // push down
-  
+  int EGG_PROMPT_Y = screenH - 10; // push down
+
   // Bigger, more prominent label
   drawCenteredLine(label, EGG_LABEL_Y, 2, 1);
-  
+
   // Keep prompt smaller
   drawCenteredLine("Press ENTER to hatch", EGG_PROMPT_Y, 1, 1);
 
@@ -6123,16 +6136,14 @@ static void drawDeathTransitionStaticPet()
 
   int w = 0;
   int h = 0;
-  
-  static constexpr int kDeathTransitionStaticYNudge = -2;
 
   if (getPngWH(path, w, h) && w > 0 && h > 0)
   {
     const int drawX = centerX - (w / 2);
-    const int drawY = bottomY - h + kDeathTransitionStaticYNudge;
+    const int drawY = bottomY - h + deathTransitionYNudgeForPet();
     sprDrawPngFromSD(path, drawX, drawY);
   }
-    else
+  else
   {
     // Fallback if WH lookup fails.
     sprDrawPngFromSD(path, centerX, bottomY);
