@@ -10,12 +10,6 @@ struct MenuItem {
   void (*onSelect)(InputState&);
 };
 
-static void actSleep(InputState& in)
-{
-  (void)in;
-  powerMenuActSleep();
-}
-
 static void actReboot(InputState& in)
 {
   (void)in;
@@ -29,7 +23,6 @@ static void actShutdown(InputState& in)
 }
 
 static const MenuItem kItems[] = {
-  {"Sleep",     actSleep},
   {"Reboot",    actReboot},
   {"Shut Down", actShutdown},
 };
