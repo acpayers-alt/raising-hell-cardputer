@@ -514,6 +514,7 @@ static void execLine(char *line)
     logLine("  givexp <amount>     give the pet XP (levels up if needed)");
     logLine("  setlevel <level>    set pet level (resets XP progress)");
     logLine("  setevo <0-3|baby|teen|adult|elder>  force evo stage");
+    logLine("  hurtpet            set low stats + HP=25 (test death flow)");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
 #endif
 
@@ -852,6 +853,28 @@ static void execLine(char *line)
     pet.clampStats();
     saveManagerMarkDirty();
     logf("[OK] Health set to %d", pet.health);
+    return;
+  }
+#endif
+
+#if !PUBLIC_BUILD
+  if (!strcmp(argv[0], "hurtpet"))
+  {
+    int hp = 25;
+    if (argc >= 2)
+      hp = constrain(atoi(argv[1]), 0, 100);
+
+    pet.hunger = 0;
+    pet.energy = 0;
+    pet.happiness = 0;
+    pet.health = hp;
+
+    pet.clampStats();
+
+    saveManagerMarkDirty();
+    requestUIRedraw();
+
+    logf("[OK] Pet hurt (HP=%d, other stats=0)", pet.health);
     return;
   }
 #endif

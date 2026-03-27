@@ -8,18 +8,18 @@
 #include "ui_runtime.h"
 #include "ui_state_utils.h"
 
-#include "game_options_state.h"
-#include "death_state.h"
-#include "user_toggles_state.h"
-#include "input.h"
-#include "sleep_state.h"
 #include "console.h"
-#include "save_manager.h"
-#include "graphics.h" 
-#include "mini_games.h"
-#include "pet_state.h"   
+#include "death_state.h"
 #include "feed_actions.h"
+#include "game_options_state.h"
+#include "graphics.h"
+#include "input.h"
+#include "mini_games.h"
+#include "pet_state.h"
+#include "save_manager.h"
+#include "sleep_state.h"
 #include "ui_actions.h"
+#include "user_toggles_state.h"
 
 // -----------------------------------------------------------------------------
 // PRE-BIRTH GUARD
@@ -30,19 +30,21 @@
 //  - NO sleep tick / sleep flags
 // Also: reset accumulators so we don't "catch up" a huge dt on first real frame.
 // -----------------------------------------------------------------------------
-static inline bool isPreBirthUiState(UIState s) {
-  switch (s) {
-    case UIState::CHOOSE_PET:
-    case UIState::HATCHING:
-    case UIState::NAME_PET:
-    case UIState::CONTROLS_HELP:
-    case UIState::BOOT_WIFI_PROMPT:
-    case UIState::BOOT_WIFI_WAIT:
-    case UIState::BOOT_TZ_PICK:
-    case UIState::BOOT_NTP_WAIT:
-      return true;
-    default:
-      return false;
+static inline bool isPreBirthUiState(UIState s)
+{
+  switch (s)
+  {
+  case UIState::CHOOSE_PET:
+  case UIState::HATCHING:
+  case UIState::NAME_PET:
+  case UIState::CONTROLS_HELP:
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_WIFI_WAIT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+    return true;
+  default:
+    return false;
   }
 }
 
@@ -59,40 +61,27 @@ static inline bool isPreBirthUiState(UIState s) {
 static uint32_t s_petLastUpdateMs = 0;
 static uint32_t s_hungerAccMs = 0;
 static uint32_t s_energyAccMs = 0;
-static uint32_t s_moodAccMs   = 0;
-static uint32_t s_hpAccMs     = 0;
-static uint32_t s_regenAccMs  = 0;
+static uint32_t s_moodAccMs = 0;
+static uint32_t s_hpAccMs = 0;
+static uint32_t s_regenAccMs = 0;
 
-void petResetUpdateTimers() {
+void petResetUpdateTimers()
+{
   const uint32_t now = (uint32_t)millis();
   s_petLastUpdateMs = now;
   s_hungerAccMs = 0;
   s_energyAccMs = 0;
-  s_moodAccMs   = 0;
-  s_hpAccMs     = 0;
-  s_regenAccMs  = 0;
+  s_moodAccMs = 0;
+  s_hpAccMs = 0;
+  s_regenAccMs = 0;
 }
 
 // ------------------------------------------------------------
 // Pet-O-Matic
 // ------------------------------------------------------------
 Pet::Pet()
-: type(PET_DEVIL),
-  hunger(0),
-  happiness(100),
-  energy(100),
-  health(100),
-  inf(0),
-  birth_epoch(0),
-  isSleeping(false),
-  lastFedTime(0),
-  x(120),
-  y(80),
-  width(64),
-  height(64),
-  level(1),
-  xp(0),
-  evoStage(0)
+    : type(PET_DEVIL), hunger(0), happiness(100), energy(100), health(100), inf(0), birth_epoch(0), isSleeping(false),
+      lastFedTime(0), x(120), y(80), width(64), height(64), level(1), xp(0), evoStage(0)
 {
   name[0] = '\0';
   strncpy(spritePath, "/graphics/pet/devil_baby_normal.raw", sizeof(spritePath));
@@ -104,80 +93,110 @@ Pet::Pet()
 // ------------------------------------------------------------
 // Thresholds (0..100). Tweak freely.
 // Match STAT tab thresholds so animations/bio/status are consistent.
-static constexpr int MOOD_SICK_HEALTH_MAX   = 60;  // <60 = Sick (STAT tab uses 60)
-static constexpr int MOOD_TIRED_ENERGY_MAX  = 30;  // <=30 = Tired
-static constexpr int MOOD_HUNGRY_HUNGER_MAX = 30;  // <=30 = Hungry
-static constexpr int MOOD_MAD_HAPPY_MAX     = 30;  // <=30 = Angry
+static constexpr int MOOD_SICK_HEALTH_MAX = 60;   // <60 = Sick (STAT tab uses 60)
+static constexpr int MOOD_TIRED_ENERGY_MAX = 30;  // <=30 = Tired
+static constexpr int MOOD_HUNGRY_HUNGER_MAX = 30; // <=30 = Hungry
+static constexpr int MOOD_MAD_HAPPY_MAX = 30;     // <=30 = Angry
 
 // If not sick/tired/hungry/angry:
-static constexpr int MOOD_BORED_HAPPY_MAX   = 59;  // <60 = Bored
+static constexpr int MOOD_BORED_HAPPY_MAX = 59; // <60 = Bored
 
-PetMood petResolveMood(const Pet& p) {
-  if (p.health    <= MOOD_SICK_HEALTH_MAX)   return MOOD_SICK;
-  if (p.energy    <= MOOD_TIRED_ENERGY_MAX)  return MOOD_TIRED;
-  if (p.hunger    <= MOOD_HUNGRY_HUNGER_MAX) return MOOD_HUNGRY;
-  if (p.happiness <= MOOD_MAD_HAPPY_MAX)     return MOOD_MAD;
-  if (p.happiness <  MOOD_BORED_HAPPY_MAX + 1) return MOOD_BORED; // <60 bored
+PetMood petResolveMood(const Pet &p)
+{
+  if (p.health <= MOOD_SICK_HEALTH_MAX)
+    return MOOD_SICK;
+  if (p.energy <= MOOD_TIRED_ENERGY_MAX)
+    return MOOD_TIRED;
+  if (p.hunger <= MOOD_HUNGRY_HUNGER_MAX)
+    return MOOD_HUNGRY;
+  if (p.happiness <= MOOD_MAD_HAPPY_MAX)
+    return MOOD_MAD;
+  if (p.happiness < MOOD_BORED_HAPPY_MAX + 1)
+    return MOOD_BORED; // <60 bored
   return MOOD_HAPPY;
 }
 
-static inline uint32_t applyDecayModeToStep(uint32_t baseMs) {
+static inline uint32_t applyDecayModeToStep(uint32_t baseMs)
+{
   const uint8_t m = saveManagerGetDecayMode(); // 0..5
-  if (baseMs == 0) return 0;
+  if (baseMs == 0)
+    return 0;
 
-  switch (m) {
-    default:
-    case 2: // Normal => same speed as old Fast => steps take half as long
-      return (baseMs <= 1) ? 1 : (baseMs / 2);
+  switch (m)
+  {
+  default:
+  case 2: // Normal => same speed as old Fast => steps take half as long
+    return (baseMs <= 1) ? 1 : (baseMs / 2);
 
-    case 0: // Super Slow => steps take 4x longer
-      return (baseMs > (UINT32_MAX / 4)) ? UINT32_MAX : (baseMs * 4);
+  case 0: // Super Slow => steps take 4x longer
+    return (baseMs > (UINT32_MAX / 4)) ? UINT32_MAX : (baseMs * 4);
 
-    case 1: // Slow => steps take 2x longer
-      return (baseMs > (UINT32_MAX / 2)) ? UINT32_MAX : (baseMs * 2);
+  case 1: // Slow => steps take 2x longer
+    return (baseMs > (UINT32_MAX / 2)) ? UINT32_MAX : (baseMs * 2);
 
-    case 3: // Fast => 4x speed => steps take quarter as long
-      return (baseMs <= 3) ? 1 : (baseMs / 4);
+  case 3: // Fast => 4x speed => steps take quarter as long
+    return (baseMs <= 3) ? 1 : (baseMs / 4);
 
-    case 4: // Super Fast => 8x speed => steps take eighth as long
-      return (baseMs <= 7) ? 1 : (baseMs / 8);
+  case 4: // Super Fast => 8x speed => steps take eighth as long
+    return (baseMs <= 7) ? 1 : (baseMs / 8);
 
-    case 5: // Insane => 32x speed => steps take 1/32 as long (UNCHANGED)
-      return (baseMs <= 31) ? 1 : (baseMs / 32);
+  case 5: // Insane => 32x speed => steps take 1/32 as long (UNCHANGED)
+    return (baseMs <= 31) ? 1 : (baseMs / 32);
   }
 }
 
-uint8_t Pet::getSleepQualityScore() const {
+uint8_t Pet::getSleepQualityScore() const
+{
   int score = 50;
 
   // Hunger influence
-  if (hunger < 25) score -= 20;
-  else if (hunger < 50) score -= 10;
-  else if (hunger > 75) score += 10;
+  if (hunger < 25)
+    score -= 20;
+  else if (hunger < 50)
+    score -= 10;
+  else if (hunger > 75)
+    score += 10;
 
   // Mood influence (priority-based mood resolver)
   const PetMood mood = getMood();
-  switch (mood) {
-    case MOOD_HAPPY: score += 15; break;
-    case MOOD_BORED: score += 5;  break;
+  switch (mood)
+  {
+  case MOOD_HAPPY:
+    score += 15;
+    break;
+  case MOOD_BORED:
+    score += 5;
+    break;
 
-    case MOOD_MAD:    score -= 15; break;
-    case MOOD_HUNGRY: score -= 10; break;
-    case MOOD_TIRED:  score -= 10; break;
+  case MOOD_MAD:
+    score -= 15;
+    break;
+  case MOOD_HUNGRY:
+    score -= 10;
+    break;
+  case MOOD_TIRED:
+    score -= 10;
+    break;
 
-    case MOOD_SICK:  score -= 30; break;
-    default: break;
+  case MOOD_SICK:
+    score -= 30;
+    break;
+  default:
+    break;
   }
 
   // Health influence (gentle)
   score += (health - 50) / 5; // roughly -10..+10
 
-  if (score < 0) score = 0;
-  if (score > 100) score = 100;
+  if (score < 0)
+    score = 0;
+  if (score > 100)
+    score = 100;
   return (uint8_t)score;
 }
 
-uint16_t Pet::getSleepQualityMultQ8() const {
+uint16_t Pet::getSleepQualityMultQ8() const
+{
   // Map score 0..100 to multiplier 0.5x..1.5x in Q8:
   // 0.5x = 128, 1.0x = 256, 1.5x = 384
   const uint8_t score = getSleepQualityScore();
@@ -185,27 +204,38 @@ uint16_t Pet::getSleepQualityMultQ8() const {
   return mult;
 }
 
-const char* Pet::getSleepQualityLabel() const {
+const char *Pet::getSleepQualityLabel() const
+{
   const uint8_t s = getSleepQualityScore();
-  if (s >= 75) return "GREAT";
-  if (s >= 50) return "OK";
-  if (s >= 30) return "POOR";
+  if (s >= 75)
+    return "GREAT";
+  if (s >= 50)
+    return "OK";
+  if (s >= 30)
+    return "POOR";
   return "AWFUL";
 }
 
-static uint32_t xpNeededForLevel(uint16_t lvl) {
+static uint32_t xpNeededForLevel(uint16_t lvl)
+{
   (void)lvl;
   // Unused currently (kept for future curve tuning)
   return 0;
 }
 
-static uint16_t evoMinLevelForStage(uint8_t stageNext) {
+static uint16_t evoMinLevelForStage(uint8_t stageNext)
+{
   // stageNext is the stage you are trying to reach (1..3)
-  switch (stageNext) {
-    case 1: return 10;   // teen
-    case 2: return 20;  // adult
-    case 3: return 30;  // elder
-    default: return 0;
+  switch (stageNext)
+  {
+  case 1:
+    return 10; // teen
+  case 2:
+    return 20; // adult
+  case 3:
+    return 30; // elder
+  default:
+    return 0;
   }
 }
 
@@ -215,8 +245,11 @@ static uint16_t evoMinLevelForStage(uint8_t stageNext) {
 void Pet::petSleepTick()
 {
   // Pre-birth: never allow sleep flags or sleep tick to run.
-  if (isPreBirthUiState(g_app.uiState)) {
-    if (g_app.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested || g_app.sleepUntilAwakened) {
+  if (isPreBirthUiState(g_app.uiState))
+  {
+    if (g_app.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+        g_app.sleepUntilAwakened)
+    {
       g_app.isSleeping = false;
       g_app.isSleeping = false;
       g_app.sleepingByTimer = false;
@@ -233,13 +266,13 @@ void Pet::petSleepTick()
   // Allow sleep tick to continue while the user is in SETTINGS / sub-pages / console
   // AND while the Power Menu is open (GO-hold should not wake the pet).
   const UIState ui = g_app.uiState;
-  const bool allowSleepUi =
-      (ui == UIState::PET_SLEEPING) ||
-      (ui == UIState::POWER_MENU) ||
-      isSettingsState(ui);
+  const bool allowSleepUi = (ui == UIState::PET_SLEEPING) || (ui == UIState::POWER_MENU) || isSettingsState(ui);
 
-  if (!allowSleepUi) {
-    if (g_app.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested || g_app.sleepUntilAwakened) {
+  if (!allowSleepUi)
+  {
+    if (g_app.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+        g_app.sleepUntilAwakened)
+    {
       g_app.isSleeping = false;
       g_app.isSleeping = false;
       g_app.sleepingByTimer = false;
@@ -253,17 +286,19 @@ void Pet::petSleepTick()
     return;
   }
 
-  if (!g_app.isSleeping) return;
+  if (!g_app.isSleeping)
+    return;
 
   static uint32_t lastSleepUpdate = 0;
   static uint32_t sleepAccMs = 0;
-  static uint8_t  sleepSubTick = 0;   // gate small sleep effects
-  static uint8_t  sleepHealTick = 0;  // gate HP regen during sleep
+  static uint8_t sleepSubTick = 0;  // gate small sleep effects
+  static uint8_t sleepHealTick = 0; // gate HP regen during sleep
 
   bool changed = false;
 
   uint32_t now = millis();
-  if (lastSleepUpdate == 0) lastSleepUpdate = now;
+  if (lastSleepUpdate == 0)
+    lastSleepUpdate = now;
 
   uint32_t dt = now - lastSleepUpdate;
   lastSleepUpdate = now;
@@ -275,33 +310,52 @@ void Pet::petSleepTick()
   // ---------------------------------------------------------------------------
   // Baseline: 8 hours -> 100 energy
   const uint32_t baseSleepRateMs = (8UL * 60UL * 60UL * 1000UL) / 100UL;
-  const uint32_t baseRateMs      = applyDecayModeToStep(baseSleepRateMs);
+  const uint32_t baseRateMs = applyDecayModeToStep(baseSleepRateMs);
 
   // Compute sleep quality score 0..100 (simple, tunable)
   int score = 50;
 
   // Hunger influence
-  if (hunger < 25) score -= 20;
-  else if (hunger < 50) score -= 10;
-  else if (hunger > 75) score += 10;
+  if (hunger < 25)
+    score -= 20;
+  else if (hunger < 50)
+    score -= 10;
+  else if (hunger > 75)
+    score += 10;
 
   // Mood influence (priority mood)
   const PetMood mood = getMood();
-  switch (mood) {
-    case MOOD_HAPPY:  score += 15; break;
-    case MOOD_BORED:  score += 5;  break;
-    case MOOD_MAD:    score -= 15; break;
-    case MOOD_HUNGRY: score -= 10; break;
-    case MOOD_TIRED:  score -= 10; break;
-    case MOOD_SICK:   score -= 30; break;
-    default: break;
+  switch (mood)
+  {
+  case MOOD_HAPPY:
+    score += 15;
+    break;
+  case MOOD_BORED:
+    score += 5;
+    break;
+  case MOOD_MAD:
+    score -= 15;
+    break;
+  case MOOD_HUNGRY:
+    score -= 10;
+    break;
+  case MOOD_TIRED:
+    score -= 10;
+    break;
+  case MOOD_SICK:
+    score -= 30;
+    break;
+  default:
+    break;
   }
 
   // Health influence (gentle)
   score += (health - 50) / 5; // about -10..+10
 
-  if (score < 0) score = 0;
-  if (score > 100) score = 100;
+  if (score < 0)
+    score = 0;
+  if (score > 100)
+    score = 100;
 
   // Map score 0..100 -> multiplier 0.5x..1.5x in Q8:
   // 0.5x = 128, 1.0x = 256, 1.5x = 384
@@ -312,49 +366,64 @@ void Pet::petSleepTick()
 
   // Floors: never stall; never go absurdly fast
   const uint32_t minBenefitMs = baseRateMs * 4UL; // no slower than 25% baseline speed
-  if (sleepRateMs > minBenefitMs) sleepRateMs = minBenefitMs;
-  if (sleepRateMs < 250UL) sleepRateMs = 250UL;
+  if (sleepRateMs > minBenefitMs)
+    sleepRateMs = minBenefitMs;
+  if (sleepRateMs < 250UL)
+    sleepRateMs = 250UL;
 
-  while (sleepAccMs >= sleepRateMs) {
+  while (sleepAccMs >= sleepRateMs)
+  {
     sleepAccMs -= sleepRateMs;
 
-    if (energy < 100) {
+    if (energy < 100)
+    {
       energy++;
       changed = true;
     }
 
     // HP regen during sleep (since Pet::update() does not run while sleeping).
     const bool canSleepRegen = (hunger >= 25 && energy >= 10);
-    if (canSleepRegen && health < 100) {
-      if (sleepHealTick < 255) sleepHealTick++;
-      if (sleepHealTick >= 2) {
+    if (canSleepRegen && health < 100)
+    {
+      if (sleepHealTick < 255)
+        sleepHealTick++;
+      if (sleepHealTick >= 2)
+      {
         sleepHealTick = 0;
         health++;
-        if (health > 100) health = 100;
+        if (health > 100)
+          health = 100;
         changed = true;
       }
-    } else {
+    }
+    else
+    {
       sleepHealTick = 0;
     }
 
     // Every 2 sleep energy ticks: +1 happiness, -1 hunger (with hunger floor 25)
-    if (sleepSubTick < 255) sleepSubTick++;
-    if (sleepSubTick >= 2) {
+    if (sleepSubTick < 255)
+      sleepSubTick++;
+    if (sleepSubTick >= 2)
+    {
       sleepSubTick = 0;
 
-      if (happiness < 100) {
+      if (happiness < 100)
+      {
         happiness++;
         changed = true;
       }
 
-      if (hunger > 25) {
+      if (hunger > 25)
+      {
         hunger--;
         changed = true;
       }
     }
 
     // "Until rested" ends at full energy
-    if (g_app.sleepUntilRested && energy >= 100) {
+    if (g_app.sleepUntilRested && energy >= 100)
+    {
       energy = 100;
 
       g_app.isSleeping = false;
@@ -368,17 +437,21 @@ void Pet::petSleepTick()
       saveManagerMarkDirty();
       requestUIRedraw();
 
-      if (g_app.uiState == UIState::PET_SLEEPING) {
+      if (g_app.uiState == UIState::PET_SLEEPING)
+      {
         uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
       }
       return;
     }
 
     // Timer-based sleep ends when time is up
-    if (g_app.sleepingByTimer) {
-      if (g_app.sleepDurationMs > 0) {
+    if (g_app.sleepingByTimer)
+    {
+      if (g_app.sleepDurationMs > 0)
+      {
         uint32_t elapsed = now - g_app.sleepStartTime;
-        if (elapsed >= g_app.sleepDurationMs) {
+        if (elapsed >= g_app.sleepDurationMs)
+        {
           g_app.isSleeping = false;
           g_app.isSleeping = false;
           g_app.sleepingByTimer = false;
@@ -390,7 +463,8 @@ void Pet::petSleepTick()
           saveManagerMarkDirty();
           requestUIRedraw();
 
-          if (g_app.uiState == UIState::PET_SLEEPING) {
+          if (g_app.uiState == UIState::PET_SLEEPING)
+          {
             uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
           }
 
@@ -400,7 +474,8 @@ void Pet::petSleepTick()
     }
   }
 
-  if (changed) {
+  if (changed)
+  {
     saveManagerMarkDirty();
     requestUIRedraw();
   }
@@ -409,32 +484,46 @@ void Pet::petSleepTick()
 // -------------------------------------------
 // Sprite resolver based on pet type
 // -------------------------------------------
-static const char* getSpritePathForTypeAndStage(PetType type, uint8_t stage) {
-  if (type == PET_DEVIL) {
-    switch (stage) {
-      case 0: return "/graphics/pet/devil_baby_normal.jpg";
-      case 1: return "/graphics/pet/devil_teen_normal.jpg";
-      case 2: return "/graphics/pet/devil_adult_normal.jpg";
-      case 3: return "/graphics/pet/devil_elder_normal.jpg";
-      default: return "/graphics/pet/devil_baby_normal.jpg";
+static const char *getSpritePathForTypeAndStage(PetType type, uint8_t stage)
+{
+  if (type == PET_DEVIL)
+  {
+    switch (stage)
+    {
+    case 0:
+      return "/graphics/pet/devil_baby_normal.jpg";
+    case 1:
+      return "/graphics/pet/devil_teen_normal.jpg";
+    case 2:
+      return "/graphics/pet/devil_adult_normal.jpg";
+    case 3:
+      return "/graphics/pet/devil_elder_normal.jpg";
+    default:
+      return "/graphics/pet/devil_baby_normal.jpg";
     }
   }
 
-  switch (type) {
-    case PET_KAIJU:    return "/graphics/pet/kaiju_normal.jpg";
-    case PET_ELDRITCH: return "/graphics/pet/eldritch_normal.jpg";
-    case PET_ALIEN:    return "/graphics/pet/alien_normal.jpg";
-    default:           return "/graphics/pet/devil_baby_normal.jpg";
+  switch (type)
+  {
+  case PET_KAIJU:
+    return "/graphics/pet/kaiju_normal.jpg";
+  case PET_ELDRITCH:
+    return "/graphics/pet/eldritch_normal.jpg";
+  case PET_ALIEN:
+    return "/graphics/pet/alien_normal.jpg";
+  default:
+    return "/graphics/pet/devil_baby_normal.jpg";
   }
 }
 
 // -----------------------------------------------------
 // INIT
 // -----------------------------------------------------
-void Pet::init() {
+void Pet::init()
+{
   load();
 
-  width  = 150;
+  width = 150;
   height = 150;
 
   x = (320 - width) / 2;
@@ -449,11 +538,13 @@ void Pet::init() {
 // -----------------------------------------------------
 // MAIN UPDATE LOOP — called every frame
 // -----------------------------------------------------
-void Pet::update() {
+void Pet::update()
+{
   const uint32_t now = (uint32_t)millis();
 
   // Always-advancing dt
-  if (s_petLastUpdateMs == 0) s_petLastUpdateMs = now;
+  if (s_petLastUpdateMs == 0)
+    s_petLastUpdateMs = now;
   const uint32_t dt = (uint32_t)(now - s_petLastUpdateMs);
   s_petLastUpdateMs = now;
 
@@ -462,14 +553,17 @@ void Pet::update() {
   // -------------------------------------------------
   // PRE-BIRTH: NO DECAY, NO DEATH, NO "CATCH UP"
   // -------------------------------------------------
-  if (isPreBirthUiState(ui)) {
+  if (isPreBirthUiState(ui))
+  {
     s_hungerAccMs = 0;
     s_energyAccMs = 0;
-    s_moodAccMs   = 0;
-    s_hpAccMs     = 0;
-    s_regenAccMs  = 0;
+    s_moodAccMs = 0;
+    s_hpAccMs = 0;
+    s_regenAccMs = 0;
 
-    if (this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested || g_app.sleepUntilAwakened) {
+    if (this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+        g_app.sleepUntilAwakened)
+    {
       this->isSleeping = false;
       g_app.isSleeping = false;
       g_app.sleepingByTimer = false;
@@ -485,19 +579,13 @@ void Pet::update() {
   // SLEEP MODE — continue while sleeping screen OR settings/console
   // AND while the Power Menu is open (GO-hold should not wake the pet).
   // -------------------------------------------------
-  const bool sleepingNow =
-    this->isSleeping ||
-    g_app.isSleeping ||
-    g_app.sleepingByTimer ||
-    g_app.sleepUntilRested ||
-    g_app.sleepUntilAwakened;
+  const bool sleepingNow = this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+                           g_app.sleepUntilAwakened;
 
-  const bool allowSleepUi =
-    (ui == UIState::PET_SLEEPING) ||
-    (ui == UIState::POWER_MENU) ||
-    isSettingsState(ui);
+  const bool allowSleepUi = (ui == UIState::PET_SLEEPING) || (ui == UIState::POWER_MENU) || isSettingsState(ui);
 
-  if (sleepingNow && !allowSleepUi) {
+  if (sleepingNow && !allowSleepUi)
+  {
     this->isSleeping = false;
     g_app.isSleeping = false;
     g_app.sleepingByTimer = false;
@@ -510,11 +598,11 @@ void Pet::update() {
   // -------------------------------------------------
   static constexpr uint32_t HUNGER_STEP_MS = 864000UL;
   static constexpr uint32_t ENERGY_STEP_MS = 576000UL;
-  static constexpr uint32_t HP_STEP_MS     = 216000UL;
+  static constexpr uint32_t HP_STEP_MS = 216000UL;
 
   const uint32_t hungerStep = applyDecayModeToStep(HUNGER_STEP_MS);
   const uint32_t energyStep = applyDecayModeToStep(ENERGY_STEP_MS);
-  const uint32_t hpStep     = applyDecayModeToStep(HP_STEP_MS);
+  const uint32_t hpStep = applyDecayModeToStep(HP_STEP_MS);
 
   bool changed = false;
 
@@ -524,34 +612,40 @@ void Pet::update() {
 
   // While asleep, do not allow hunger to decay below 25.
   const int hungerFloor = sleepingNow ? 25 : 0;
-  while (s_hungerAccMs >= hungerStep) {
+  while (s_hungerAccMs >= hungerStep)
+  {
     s_hungerAccMs -= hungerStep;
     const int old = hunger;
     hunger = constrain(hunger - 1, hungerFloor, 100);
-    if (hunger != old) changed = true;
+    if (hunger != old)
+      changed = true;
 
-    if (sleepingNow && hunger <= hungerFloor) {
+    if (sleepingNow && hunger <= hungerFloor)
+    {
       s_hungerAccMs = 0;
       break;
     }
   }
 
   // If we entered sleep already hungry, bump to the minimum safe floor.
-  if (sleepingNow && hunger < 25) {
+  if (sleepingNow && hunger < 25)
+  {
     hunger = 25;
     changed = true;
   }
 
-  while (s_energyAccMs >= energyStep) {
+  while (s_energyAccMs >= energyStep)
+  {
     s_energyAccMs -= energyStep;
     const int old = energy;
     energy = constrain(energy - 1, 0, 100);
-    if (energy != old) changed = true;
+    if (energy != old)
+      changed = true;
   }
 
   // Mood decay
-  static constexpr uint32_t MOOD_DECAY_OK_STEP_MS  = 300000UL; // 5m
-  static constexpr uint32_t MOOD_DECAY_BAD_STEP_MS = 30000UL;  // 30s
+  static constexpr uint32_t MOOD_DECAY_OK_STEP_MS = 300000UL; // 5m
+  static constexpr uint32_t MOOD_DECAY_BAD_STEP_MS = 30000UL; // 30s
 
   const bool moodBad = (hunger < 25) || (energy < 25);
   s_moodAccMs += dt;
@@ -559,38 +653,48 @@ void Pet::update() {
   const uint32_t moodBase = moodBad ? MOOD_DECAY_BAD_STEP_MS : MOOD_DECAY_OK_STEP_MS;
   const uint32_t moodStep = applyDecayModeToStep(moodBase);
 
-  while (s_moodAccMs >= moodStep) {
+  while (s_moodAccMs >= moodStep)
+  {
     s_moodAccMs -= moodStep;
     const int old = happiness;
     happiness = constrain(happiness - 1, 0, 100);
-    if (happiness != old) changed = true;
+    if (happiness != old)
+      changed = true;
   }
 
   // HP decay: ONLY hunger can kill.
   const bool hungerEmpty = (hunger <= 0);
 
-  if (hungerEmpty) {
+  if (hungerEmpty)
+  {
     s_hpAccMs += dt;
 
-    while (s_hpAccMs >= hpStep) {
+    while (s_hpAccMs >= hpStep)
+    {
       s_hpAccMs -= hpStep;
 
       const int old = health;
       int next = health - 1;
-      if (next < 0) next = 0;
+      if (next < 0)
+        next = 0;
 
       health = constrain(next, 0, 100);
-      if (health != old) changed = true;
+      if (health != old)
+        changed = true;
 
-      if (health <= 0) {
+      if (health <= 0)
+      {
         s_hpAccMs = 0;
         break;
       }
     }
-  } else {
+  }
+  else
+  {
     s_hpAccMs = 0;
 
-    if (health <= 0) {
+    if (health <= 0)
+    {
       health = 1;
       changed = true;
     }
@@ -601,21 +705,27 @@ void Pet::update() {
   const uint32_t regenStep = applyDecayModeToStep(REGEN_STEP_MS);
 
   const bool canRegen = (hunger >= 30 && energy > 15);
-  if (canRegen && health < 100) {
+  if (canRegen && health < 100)
+  {
     s_regenAccMs += dt;
-    while (s_regenAccMs >= regenStep) {
+    while (s_regenAccMs >= regenStep)
+    {
       s_regenAccMs -= regenStep;
       const int old = health;
       health = constrain(health + 1, 0, 100);
-      if (health != old) changed = true;
+      if (health != old)
+        changed = true;
     }
-  } else {
+  }
+  else
+  {
     s_regenAccMs = 0;
   }
 
   clampStats();
 
-  if (changed) {
+  if (changed)
+  {
     saveManagerMarkDirty();
     requestUIRedraw();
   }
@@ -626,29 +736,33 @@ void Pet::update() {
   const bool hungerEmptyNow = (hunger <= 0);
   const bool deadNow = hungerEmptyNow && (health <= 0);
 
-  if (deadNow) {
-    if (petResurrectGraceActive()) {
+  if (deadNow)
+  {
+    if (petResurrectGraceActive())
+    {
       health = 1;
       return;
     }
 
-    if (petDeathEnabled) {
+    if (petDeathEnabled)
+    {
       health = 0;
 
-      if (ui != UIState::DEATH &&
-          ui != UIState::MINI_GAME &&
+      if (ui != UIState::DEATH && ui != UIState::DEATH_TRANSITION && ui != UIState::MINI_GAME &&
           ui != UIState::BURIAL_SCREEN)
       {
         petEnterDeathState();
       }
-
       return;
     }
 
     health = 1;
     saveManagerMarkDirty();
-  } else {
-    if (!hungerEmptyNow && health <= 0) {
+  }
+  else
+  {
+    if (!hungerEmptyNow && health <= 0)
+    {
       health = 1;
       saveManagerMarkDirty();
     }
@@ -658,10 +772,11 @@ void Pet::update() {
 // -----------------------------------------------------
 // FEED
 // -----------------------------------------------------
-void Pet::feed(int amount) {
+void Pet::feed(int amount)
+{
   (void)amount;
-  hunger      = constrain(hunger + 1, 0, 100);
-  happiness   = constrain(happiness + 5, 0, 100);
+  hunger = constrain(hunger + 1, 0, 100);
+  happiness = constrain(happiness + 5, 0, 100);
   lastFedTime = millis();
   clampStats();
   save();
@@ -670,12 +785,14 @@ void Pet::feed(int amount) {
 // -----------------------------------------------------
 // SAVE/LOAD
 // -----------------------------------------------------
-void Pet::save() {
+void Pet::save()
+{
   saveManagerMarkDirty();
 
   static uint32_t lastEepMs = 0;
   uint32_t now = millis();
-  if (now - lastEepMs < 60000) return;
+  if (now - lastEepMs < 60000)
+    return;
   lastEepMs = now;
 
   EEPROM.write(10, (uint8_t)type);
@@ -688,85 +805,93 @@ void Pet::save() {
   EEPROM.commit();
 }
 
-void Pet::load() {
+void Pet::load()
+{
   uint8_t rawType = EEPROM.read(10);
-  if (rawType > PET_ALIEN) rawType = PET_DEVIL;
+  if (rawType > PET_ALIEN)
+    rawType = PET_DEVIL;
 
-  type             = (PetType)rawType;
-  health           = EEPROM.read(11);
-  hunger           = EEPROM.read(12);
-  energy           = EEPROM.read(13);
-  happiness        = EEPROM.read(14);
+  type = (PetType)rawType;
+  health = EEPROM.read(11);
+  hunger = EEPROM.read(12);
+  energy = EEPROM.read(13);
+  happiness = EEPROM.read(14);
   this->isSleeping = (EEPROM.read(15) == 1);
 
   EEPROM.get(16, inf);
   clampStats();
 }
 
-void Pet::toPersist(PetPersist &out) const {
-  out.hunger        = (uint8_t)constrain(hunger, 0, 255);
-  out.happiness     = (uint8_t)constrain(happiness, 0, 255);
-  out.energy        = (uint8_t)constrain(energy, 0, 255);
-  out.health        = (uint8_t)constrain(health, 0, 255);
-  out.petType       = (uint8_t)type;
-  out.isSleeping    = this->isSleeping ? 1 : 0;
+void Pet::toPersist(PetPersist &out) const
+{
+  out.hunger = (uint8_t)constrain(hunger, 0, 255);
+  out.happiness = (uint8_t)constrain(happiness, 0, 255);
+  out.energy = (uint8_t)constrain(energy, 0, 255);
+  out.health = (uint8_t)constrain(health, 0, 255);
+  out.petType = (uint8_t)type;
+  out.isSleeping = this->isSleeping ? 1 : 0;
   out.lastFedTimeMs = (uint32_t)lastFedTime;
-  out.inf           = (int32_t)inf;
-  out.birth_epoch   = birth_epoch;
+  out.inf = (int32_t)inf;
+  out.birth_epoch = birth_epoch;
 
   strncpy(out.name, name, PET_NAME_MAX);
   out.name[PET_NAME_MAX] = '\0';
 
-  out.level    = level;
-  out.xp       = xp;
+  out.level = level;
+  out.xp = xp;
   out.evoStage = evoStage;
 }
 
-void Pet::fromPersist(const PetPersist &in) {
-  hunger      = (int)in.hunger;
-  happiness   = (int)in.happiness;
-  energy      = (int)in.energy;
-  health      = (int)in.health;
+void Pet::fromPersist(const PetPersist &in)
+{
+  hunger = (int)in.hunger;
+  happiness = (int)in.happiness;
+  energy = (int)in.energy;
+  health = (int)in.health;
 
-  type            = (PetType)in.petType;
+  type = (PetType)in.petType;
   this->isSleeping = (in.isSleeping != 0);
 
   lastFedTime = (unsigned long)in.lastFedTimeMs;
-  inf         = (int)in.inf;
+  inf = (int)in.inf;
   birth_epoch = in.birth_epoch;
 
   strncpy(name, in.name, PET_NAME_MAX);
   name[PET_NAME_MAX] = '\0';
 
   level = (in.level == 0) ? 1 : in.level;
-  xp    = in.xp;
+  xp = in.xp;
 
   evoStage = in.evoStage;
-  if (evoStage > 3) evoStage = 3;
+  if (evoStage > 3)
+    evoStage = 3;
 
-  strncpy(spritePath,
-          getSpritePathForTypeAndStage(type, evoStage),
-          sizeof(spritePath));
+  strncpy(spritePath, getSpritePathForTypeAndStage(type, evoStage), sizeof(spritePath));
   spritePath[sizeof(spritePath) - 1] = '\0';
 
   clampStats();
 }
 
-void Pet::clampStats() {
-  health    = constrain(health,    0, 100);
-  hunger    = constrain(hunger,    0, 100);
-  energy    = constrain(energy,    0, 100);
+void Pet::clampStats()
+{
+  health = constrain(health, 0, 100);
+  hunger = constrain(hunger, 0, 100);
+  energy = constrain(energy, 0, 100);
   happiness = constrain(happiness, 0, 100);
 }
 
 // -----------------------------------------------------
 // Name Pet
 // -----------------------------------------------------
-void Pet::setName(const char* n) {
-  if (!n) return;
+void Pet::setName(const char *n)
+{
+  if (!n)
+    return;
 
-  while (*n == ' ') n++;
-  if (!*n) return;
+  while (*n == ' ')
+    n++;
+  if (!*n)
+    return;
 
   strncpy(name, n, PET_NAME_MAX);
   name[PET_NAME_MAX] = '\0';
@@ -786,9 +911,10 @@ void petEnterDeathState()
   inputForceClear();
   clearInputLatch();
 
-  uiActionEnterState(UIState::DEATH, Tab::TAB_PET, true);
-  
-  if (consoleIsOpen()) {
+  beginDeathTransition();
+
+  if (consoleIsOpen())
+  {
     consoleClose();
   }
 
@@ -797,15 +923,21 @@ void petEnterDeathState()
   invalidateBackgroundCache();
 }
 
-void Pet::addXP(uint32_t amount) {
-  if (amount == 0) return;
+void Pet::addXP(uint32_t amount)
+{
+  if (amount == 0)
+    return;
 
-  if (xp > 0xFFFFFFFFu - amount) xp = 0xFFFFFFFFu;
-  else xp += amount;
+  if (xp > 0xFFFFFFFFu - amount)
+    xp = 0xFFFFFFFFu;
+  else
+    xp += amount;
 
-  while (level < 999) {
+  while (level < 999)
+  {
     const uint32_t need = xpForNextLevel();
-    if (xp < need) break;
+    if (xp < need)
+      break;
     xp -= need;
     level++;
   }
@@ -814,29 +946,35 @@ void Pet::addXP(uint32_t amount) {
   requestUIRedraw();
 }
 
-uint16_t Pet::nextEvoMinLevel() const {
-  if (evoStage >= 3) return 0;
+uint16_t Pet::nextEvoMinLevel() const
+{
+  if (evoStage >= 3)
+    return 0;
   return evoMinLevelForStage((uint8_t)(evoStage + 1));
 }
 
-bool Pet::canEvolveNext() const {
-  if (evoStage >= 3) return false;
+bool Pet::canEvolveNext() const
+{
+  if (evoStage >= 3)
+    return false;
   const uint16_t need = nextEvoMinLevel();
   return (need > 0) && (level >= need);
 }
 
-bool Pet::tryEvolveUsingItem(ItemType it) {
-  if (it != ITEM_ELDRITCH_EYE) return false;
+bool Pet::tryEvolveUsingItem(ItemType it)
+{
+  if (it != ITEM_ELDRITCH_EYE)
+    return false;
 
-  if (!canEvolveNext()) return false;
+  if (!canEvolveNext())
+    return false;
   const PetMood mood = getMood();
-  if (mood != MOOD_HAPPY && mood != MOOD_BORED) return false;
+  if (mood != MOOD_HAPPY && mood != MOOD_BORED)
+    return false;
 
   evoStage++;
 
-  strncpy(spritePath,
-          getSpritePathForTypeAndStage(type, evoStage),
-          sizeof(spritePath));
+  strncpy(spritePath, getSpritePathForTypeAndStage(type, evoStage), sizeof(spritePath));
   spritePath[sizeof(spritePath) - 1] = '\0';
 
   saveManagerMarkDirty();
@@ -844,14 +982,14 @@ bool Pet::tryEvolveUsingItem(ItemType it) {
   return true;
 }
 
-void Pet::setEvoStage(uint8_t stage) {
-  if (stage > 3) stage = 3;
+void Pet::setEvoStage(uint8_t stage)
+{
+  if (stage > 3)
+    stage = 3;
 
   evoStage = stage;
 
-  strncpy(spritePath,
-          getSpritePathForTypeAndStage(type, evoStage),
-          sizeof(spritePath));
+  strncpy(spritePath, getSpritePathForTypeAndStage(type, evoStage), sizeof(spritePath));
   spritePath[sizeof(spritePath) - 1] = '\0';
 
   invalidateBackgroundCache();
@@ -860,47 +998,67 @@ void Pet::setEvoStage(uint8_t stage) {
   saveManagerMarkDirty();
 }
 
-static const char* evoStageToDevilDescriptor(uint8_t stage) {
-  switch (stage) {
-    case 0: return "Hellspawn";
-    case 1: return "Infernal Youth";
-    case 2: return "Tormented Adult";
-    case 3: return "Elder Demon";
-    default: return "Hellspawn";
+static const char *evoStageToDevilDescriptor(uint8_t stage)
+{
+  switch (stage)
+  {
+  case 0:
+    return "Hellspawn";
+  case 1:
+    return "Infernal Youth";
+  case 2:
+    return "Tormented Adult";
+  case 3:
+    return "Elder Demon";
+  default:
+    return "Hellspawn";
   }
 }
 
-static const char* evoStageToEldritchDescriptor(uint8_t stage) {
-  switch (stage) {
-    case 0: return "Voidspawn";
-    case 1: return "Warped Youth";
-    case 2: return "Cult Horror";
-    case 3: return "Outer Horror";
-    default: return "Voidspawn";
+static const char *evoStageToEldritchDescriptor(uint8_t stage)
+{
+  switch (stage)
+  {
+  case 0:
+    return "Voidspawn";
+  case 1:
+    return "Warped Youth";
+  case 2:
+    return "Cult Horror";
+  case 3:
+    return "Outer Horror";
+  default:
+    return "Voidspawn";
   }
 }
 
-const char* Pet::getEvolutionDescriptor() const {
-  switch (type) {
-    case PET_DEVIL:
-      return evoStageToDevilDescriptor(evoStage);
-    case PET_ELDRITCH:
-      return evoStageToEldritchDescriptor(evoStage);
-    default:
-      return "";
+const char *Pet::getEvolutionDescriptor() const
+{
+  switch (type)
+  {
+  case PET_DEVIL:
+    return evoStageToDevilDescriptor(evoStage);
+  case PET_ELDRITCH:
+    return evoStageToEldritchDescriptor(evoStage);
+  default:
+    return "";
   }
 }
 
-void Pet::buildDisplayName(char* out, size_t outSize) const {
-  if (!out || outSize == 0) return;
+void Pet::buildDisplayName(char *out, size_t outSize) const
+{
+  if (!out || outSize == 0)
+    return;
   out[0] = '\0';
 
-  const char* nm = getName();
-  if (!nm || !*nm) nm = "Pet";
+  const char *nm = getName();
+  if (!nm || !*nm)
+    nm = "Pet";
 
-  const char* evo = getEvolutionDescriptor();
+  const char *evo = getEvolutionDescriptor();
 
-  if (!evo || !*evo) {
+  if (!evo || !*evo)
+  {
     snprintf(out, outSize, "%s", nm);
     return;
   }

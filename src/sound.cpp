@@ -22,6 +22,11 @@ static uint32_t s_lastFlapMs = 0;
 void soundFuneralDirge();         // longer dirge for death screen
 void soundResetDeathDirgeLatch(); // call when leaving death screen / resurrect
 
+static bool s_flatlineFadeActive = false;
+static uint32_t s_flatlineStartMs = 0;
+static uint32_t s_flatlineDurationMs = 0;
+static uint8_t s_flatlineStartVol = 0;
+
 // -----------------------------------------------------------------------------
 // Speaker volume mapping (0..3 -> driver volume)
 // -----------------------------------------------------------------------------
@@ -196,7 +201,7 @@ void soundTickNearDeath(bool dangerActive)
     s_finalPlayed = true;
 
     // Start long tone
-    M5Cardputer.Speaker.tone(1800, 700);
+    M5Cardputer.Speaker.tone(1800, 1400);
 
     if (soundGetVolumeLevel() != SOUND_VOL_OFF)
     {
@@ -437,33 +442,107 @@ void soundDeath()
 
 void soundLowHealthTick(uint8_t hp, bool sleeping, bool screenOn, bool inDeathScreen)
 {
+  (void)screenOn; // intentionally ignored; warning should work screen-on or screen-off
+
+  static uint32_t s_nextHeartbeatMs = 0;
+
   if (!soundEnabled)
     return;
-
-  // Screen state should NOT affect audio.
-  // (We intentionally ignore screenOn now.)
-
-  if (sleeping)
-    return; // don't nag while sleeping
-  if (inDeathScreen)
+  if (uiMutedNow())
     return;
+
+  if (sleeping || inDeathScreen)
+  {
+    s_lastLowHpMs = 0;
+    s_nextHeartbeatMs = 0;
+    return;
+  }
 
   if (hp > 20)
   {
     s_lastLowHpMs = 0;
+    s_nextHeartbeatMs = 0;
     return;
   }
 
-  const uint32_t now = millis();
-
-  // pulse every ~3s
-  if (s_lastLowHpMs != 0 && (uint32_t)(now - s_lastLowHpMs) < 3000UL)
+  // Don't stomp other currently-playing SFX sequences.
+  if (s_playing)
     return;
 
-  s_lastLowHpMs = now;
+  const uint32_t now = millis();
+  if (s_nextHeartbeatMs != 0 && (int32_t)(now - s_nextHeartbeatMs) < 0)
+    return;
 
-  static const ToneStep k[] = {{900, 28, 0}};
-  startSequence(k, 1);
+  // Heartbeat cadence tightens as HP gets worse.
+  const ToneStep *seq = nullptr;
+  uint8_t seqCount = 0;
+  uint16_t cycleMs = 0;
+
+  static const ToneStep kHeartbeat20[] = {
+      {1500, 22, 55},
+      {1200, 34, 0},
+  };
+
+  static const ToneStep kHeartbeat10[] = {
+      {1600, 24, 45},
+      {1250, 38, 0},
+  };
+
+  static const ToneStep kHeartbeat05[] = {
+      {1700, 26, 35},
+      {1300, 42, 0},
+  };
+
+  if (hp <= 5)
+  {
+    seq = kHeartbeat05;
+    seqCount = (uint8_t)(sizeof(kHeartbeat05) / sizeof(kHeartbeat05[0]));
+    cycleMs = 900;
+  }
+  else if (hp <= 10)
+  {
+    seq = kHeartbeat10;
+    seqCount = (uint8_t)(sizeof(kHeartbeat10) / sizeof(kHeartbeat10[0]));
+    cycleMs = 1400;
+  }
+  else
+  {
+    seq = kHeartbeat20;
+    seqCount = (uint8_t)(sizeof(kHeartbeat20) / sizeof(kHeartbeat20[0]));
+    cycleMs = 2200;
+  }
+
+  s_lastLowHpMs = now;
+  s_nextHeartbeatMs = now + cycleMs;
+  startSequence(seq, seqCount);
+}
+
+void soundDeathFlatline()
+{
+  if (soundGetVolumeLevel() == SOUND_VOL_OFF)
+    return;
+  if (!soundEnabled)
+    return;
+  if (uiMutedNow())
+    return;
+
+  const uint16_t freq = 1800;
+  const uint32_t durMs = 3200; // or whatever final duration you want
+
+  s_playing = false;
+  s_seq = nullptr;
+  s_seqCount = 0;
+  s_seqIdx = 0;
+  s_nextChangeMs = 0;
+
+  s_flatlineFadeActive = true;
+  s_flatlineStartMs = millis();
+  s_flatlineDurationMs = durMs;
+
+  // Capture current speaker volume as the starting point.
+  s_flatlineStartVol = M5Cardputer.Speaker.getVolume();
+
+  M5Cardputer.Speaker.tone(freq, durMs);
 }
 
 void soundResetDeathDirgeLatch() { s_deathDirgePlayed = false; }
@@ -505,6 +584,40 @@ void soundFuneralDirge()
   };
 
   startSequence(k, (uint8_t)(sizeof(k) / sizeof(k[0])));
+}
+
+void soundTickFlatlineFade()
+{
+  if (!s_flatlineFadeActive)
+    return;
+
+  const uint32_t now = millis();
+  const uint32_t elapsed = now - s_flatlineStartMs;
+
+  if (elapsed >= s_flatlineDurationMs)
+  {
+    M5Cardputer.Speaker.setVolume(s_flatlineStartVol);
+    M5Cardputer.Speaker.end();
+    s_flatlineFadeActive = false;
+    return;
+  }
+
+  // Keep full volume for most of the tone, then fade in the last 35%.
+  const uint32_t fadeStartMs = (s_flatlineDurationMs * 60) / 100;
+
+  if (elapsed < fadeStartMs)
+    return;
+
+  const uint32_t fadeElapsed = elapsed - fadeStartMs;
+  const uint32_t fadeLen = s_flatlineDurationMs - fadeStartMs;
+
+  uint8_t v = s_flatlineStartVol;
+  if (fadeLen > 0)
+  {
+    v = (uint8_t)(((uint32_t)s_flatlineStartVol * (fadeLen - fadeElapsed)) / fadeLen);
+  }
+
+  M5Cardputer.Speaker.setVolume(v);
 }
 
 void soundEvoZap()

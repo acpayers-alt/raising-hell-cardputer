@@ -58,12 +58,12 @@
 #include "ui_menu_state.h"
 #include "ui_play_menu.h"
 #include "ui_power_menu.h"
+#include "ui_settings_menu.h"
 #include "ui_sleep_menu.h"
 #include "user_toggles_state.h"
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
-#include "ui_settings_menu.h"
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -1129,6 +1129,7 @@ static void drawMiniStatPreview();
 static void listWindow(int total, int current, int maxVisible, int &start, int &count);
 static void drawCurrentScreen(bool redrawBg);
 static void drawDeathScreen(bool redrawBg);
+static void drawDeathTransitionScreen(bool redrawBg);
 static void drawWifiSetupScreen();
 static void drawNamePetScreen(bool redrawBg);
 static void drawDecayModePickerMenu();
@@ -2507,7 +2508,7 @@ static void drawCreditsScreen()
   char verLine[48];
   snprintf(verLine, sizeof(verLine), "Version %s", RH_VERSION_STRING);
   spr.drawString(verLine, SCREEN_W / 2, yVersion);
-  
+
   const char *assetVer = assetOtaInstalledVersion();
   char assetLine[48];
   if (assetVer && assetVer[0])
@@ -4595,27 +4596,27 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
   {
     char infBuf[20];
     snprintf(infBuf, sizeof(infBuf), "%d", pet.inf);
-  
+
     // Fixed right edge for coin text, safely left of the heart block
     const int coinRightX = heartIconX - 6;
-  
+
     spr.setTextDatum(TR_DATUM);
-  
+
     // Measure count width using current font/settings
     const int coinTextW = spr.textWidth(infBuf);
-  
+
     // Keep a small gap between icon and number
     const int coinGap = 6;
-  
+
     // Place icon so it sits just left of the text block
     const int coinIconX = coinRightX - coinTextW - coinGap - 16;
-  
+
     drawMiniStatIconCached(PATH_INF_COIN, coinIconX, headerIconY);
-  
+
     // fake-bold / slightly larger-looking text
-    spr.drawString(infBuf, coinRightX,     topTextY);
+    spr.drawString(infBuf, coinRightX, topTextY);
     spr.drawString(infBuf, coinRightX - 1, topTextY);
-  
+
     spr.setTextDatum(TL_DATUM);
   }
 
@@ -4979,6 +4980,7 @@ static bool uiStateBlocksOverlays(UIState s)
   switch (s)
   {
   case UIState::DEATH:
+  case UIState::DEATH_TRANSITION:
   case UIState::BURIAL_SCREEN:
   case UIState::PET_SLEEPING:
   case UIState::MINI_GAME:
@@ -5038,6 +5040,10 @@ static void drawCurrentScreen(bool redrawBg)
 
   case UIState::BURIAL_SCREEN:
     drawBurialScreen();
+    return;
+
+  case UIState::DEATH_TRANSITION:
+    drawDeathTransitionScreen(redrawBg);
     return;
 
   case UIState::PET_SLEEPING:
@@ -5910,9 +5916,48 @@ void drawHatchingScreen(bool redrawBg)
 // ============================================================================
 // Death screen
 // ============================================================================
-static void drawDeathScreen(bool /*redrawBg*/)
+static void drawDeathScreen(bool redrawBg)
 {
+  static bool s_deathScreenFadeInActive = false;
+  static uint32_t s_deathScreenFadeInStartMs = 0;
+  static constexpr uint32_t kDeathScreenFadeInMs = 900;
+
+  if (consumeDeathScreenFadeInStart())
+  {
+    s_deathScreenFadeInActive = true;
+    s_deathScreenFadeInStartMs = millis();
+    setBacklight(0);
+  }
+
+  if (s_deathScreenFadeInActive)
+  {
+    const uint32_t now = millis();
+    const uint32_t elapsed = now - s_deathScreenFadeInStartMs;
+    const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
+
+    if (elapsed >= kDeathScreenFadeInMs)
+    {
+      s_deathScreenFadeInActive = false;
+
+      applyBrightnessLevel(brightnessLevel);
+
+      const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
+      setBacklight(targetBrightness);
+    }
+    else
+    {
+      const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kDeathScreenFadeInMs);
+
+      Serial.printf("[DEATHX] death fade-in done targetBrightness=%u level=%d\n",
+                    (unsigned)brightnessValues[brightnessLevel], (int)brightnessLevel);
+
+      setBacklight(fadeBrightness);
+      requestUIRedraw();
+    }
+  }
+
   spr.fillSprite(TFT_BLACK);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
   drawCenteredLine("YOUR PET", 26, 2, 1);
   drawCenteredLine("HAS DIED", 46, 2, 1);
@@ -5985,6 +6030,128 @@ void drawSetTimeScreen()
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   spr.drawString("Enter: next | Arrows: +/-", cx + cw / 2, contentY + ch - 2);
   spr.setTextDatum(TL_DATUM);
+}
+
+static AnimId deathTransitionStaticClipForPet()
+{
+  switch (pet.type)
+  {
+  case PET_DEVIL:
+    switch (pet.evoStage)
+    {
+    case 0:
+      return ANIM_DEV_BABY_SICK_CRAWL;
+    case 1:
+      return ANIM_DEV_TEEN_SICK_BOB;
+    case 2:
+      return ANIM_DEV_ADULT_SICK_LAY;
+    default:
+      return ANIM_DEV_ELDER_SICK_COUGH;
+    }
+
+  case PET_ELDRITCH:
+    switch (pet.evoStage)
+    {
+    case 0:
+      return ANIM_ELD_BABY_SICK_BOB;
+    case 1:
+      return ANIM_ELD_TEEN_SICK_SNEEZE;
+    case 2:
+      return ANIM_ELD_ADULT_SICK_HUNCH;
+    default:
+      return ANIM_ELD_ELDER_SICK_SNEEZE;
+    }
+
+  case PET_KAIJU:
+    return ANIM_KAI_IDLE_1F;
+  case PET_ALIEN:
+    return ANIM_AL_IDLE_1F;
+  case PET_ANUBIS:
+    return ANIM_ANU_IDLE_1F;
+  case PET_AXOLOTL:
+    return ANIM_AXO_IDLE_1F;
+
+  default:
+    return ANIM_NONE;
+  }
+}
+
+static uint8_t deathTransitionStaticFrameIndex(const AnimClip *clip)
+{
+  if (!clip || clip->frameCount == 0)
+    return 0;
+
+  // Cheap, deterministic default: use the last frame of the sick clip.
+  // If any pet looks weird, we can special-case per clip later.
+  return (uint8_t)(clip->frameCount - 1);
+}
+
+static void drawDeathTransitionStaticPet()
+{
+  if (!g_sdReady)
+    return;
+
+  const AnimId id = deathTransitionStaticClipForPet();
+  const AnimClip *clip = animGetClip(id);
+  if (!clip || !clip->frames || clip->frameCount == 0)
+    return;
+
+  const uint8_t idx = deathTransitionStaticFrameIndex(clip);
+  const char *path = clip->frames[idx];
+  if (!path || !*path)
+    return;
+
+  const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
+  const int petAreaX = 0;
+
+  const PetRenderProfile &prof = getPetProfile(pet.type);
+
+  const int centerX = petAreaX + (petAreaW / 2) + prof.xOff;
+  const int bottomY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
+
+  int w = 0;
+  int h = 0;
+  if (getPngWH(path, w, h) && w > 0 && h > 0)
+  {
+    const int drawX = centerX - (w / 2);
+    const int drawY = bottomY - h;
+    sprDrawPngFromSD(path, drawX, drawY);
+  }
+  else
+  {
+    // Fallback if WH lookup fails.
+    sprDrawPngFromSD(path, centerX, bottomY);
+  }
+}
+
+static void drawDeathTransitionScreen(bool redrawBg)
+{
+  if (!isScreenOn())
+    return;
+
+  static PetType s_lastBgPetType = (PetType)255;
+  static uint8_t s_lastBgEvoStage = 255;
+
+  const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
+  const bool cacheMissing = (g_petBgCachedPath == nullptr);
+  const bool needPetBg = redrawBg || petChanged || cacheMissing || g_forcePetBgCache;
+
+  s_lastBgPetType = pet.type;
+  s_lastBgEvoStage = pet.evoStage;
+
+  cachePetAreaBackgroundIfNeeded(needPetBg);
+  g_forcePetBgCache = false;
+
+  if (needPetBg)
+  {
+    restorePetAreaFromCache();
+  }
+
+  drawTopBar();
+  drawDeathTransitionStaticPet();
+  drawMiniStatPreview();
+  drawTabBar();
+  drawPetPerfHud();
 }
 
 // ============================================================================

@@ -2194,12 +2194,26 @@ void updateResurrectionRun(const InputState &input)
 
   if (s_rrShowIntro)
   {
+    if (input.mgQuitOnce && !mgInputLockedOut())
+    {
+      miniGameCancelFromIntro();
+      return;
+    }
 
     const bool startPressed = miniGameEnterOnce(input) || input.mgSelectOnce || input.mgUpOnce;
 
     if (startPressed && !mgInputLockedOut())
+    {
+      s_rrShowIntro = false;
+      rrResetRunState();
+      rr_lastMs = now;
+      clearInputLatch();
+      inputForceClear();
+      mgBeginInputLockout(120);
+      requestUIRedraw();
+    }
 
-      return;
+    return;
   }
 
   uint32_t dtMs = now - rr_lastMs;

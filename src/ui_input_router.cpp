@@ -41,6 +41,7 @@ static inline bool isNoInputState(UIState s)
   switch (s)
   {
     case UIState::BOOT:
+    case UIState::DEATH_TRANSITION:
       return true;
     default:
       return false;

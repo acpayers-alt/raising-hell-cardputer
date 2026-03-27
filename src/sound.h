@@ -54,6 +54,11 @@ void soundMuteUi(uint32_t ms);
 void soundFuneralDirge();            // longer dirge for burial screen (one-shot latched)
 void soundResetDeathDirgeLatch();    // resets one-shot latch for dirge
 
+// Low-health warning pulse (call each loop; will self-rate-limit)
+void soundLowHealthTick(uint8_t hp, bool sleeping, bool screenOn, bool inDeathScreen);
+void soundDeathFlatline();
+void soundTickFlatlineFade();
+
 // -----------------------------------------------------------------------------
 // UI SFX
 // -----------------------------------------------------------------------------
@@ -68,8 +73,6 @@ void soundDeath();          // death sting (short, dramatic, buzzy)
 void soundEvoZap();
 void soundFlap();
 
-// Low-health warning pulse (call each loop; will self-rate-limit)
-void soundLowHealthTick(uint8_t hp, bool sleeping, bool screenOn, bool inDeathScreen);
 
 // -----------------------------------------------------------------------------
 // Backwards-compat wrappers (so old code compiles)
