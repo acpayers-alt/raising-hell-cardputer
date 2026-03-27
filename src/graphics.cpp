@@ -5714,6 +5714,13 @@ void drawChoosePetScreen(bool redrawBg)
     spr.drawEllipse(eggX + eggW / 2, eggY + eggH / 2, eggW / 2, eggH / 2, TFT_RED);
   }
 
+  const int arrowOffsetX = 14;
+  const int arrowY = eggY + (eggH / 2) - 4;
+  
+  spr.setTextDatum(TL_DATUM);
+  spr.drawString("<", eggX - arrowOffsetX, arrowY);
+  spr.drawString(">", eggX + eggW + arrowOffsetX - 6, arrowY);
+
   const char *label = "Unknown Egg";
   switch (pet.type)
   {
@@ -5739,10 +5746,15 @@ void drawChoosePetScreen(bool redrawBg)
     break;
   }
 
-  static constexpr int EGG_TEXT_NUDGE_Y = 4;
-
-  drawCenteredLine(label, (screenH / 2) + 32 + EGG_TEXT_NUDGE_Y, 1, 1);
-  drawCenteredLine("Press ENTER to hatch", screenH - 22 + EGG_TEXT_NUDGE_Y, 1, 1);
+  const int eggBottomY = eggY + eggH;
+  const int EGG_LABEL_Y = eggBottomY + 2;
+  int EGG_PROMPT_Y = screenH - 10;  // push down
+  
+  // Bigger, more prominent label
+  drawCenteredLine(label, EGG_LABEL_Y, 2, 1);
+  
+  // Keep prompt smaller
+  drawCenteredLine("Press ENTER to hatch", EGG_PROMPT_Y, 1, 1);
 
 #if SAVE_DIAG_ENABLED
   {

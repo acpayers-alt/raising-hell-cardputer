@@ -74,8 +74,9 @@ void tickDeathTransition(uint32_t now)
       Serial.println("[DEATHX] flatline start");
 
     soundDeathFlatline();
-    soundTickFlatlineFade();
   }
+
+  soundTickFlatlineFade();
 
   if ((int32_t)(now - s_deathTransitionStartMs) < 0)
     return;
@@ -85,7 +86,8 @@ void tickDeathTransition(uint32_t now)
   const uint32_t fadeElapsed = (elapsed > kDeathFadeMs) ? kDeathFadeMs : elapsed;
 
   const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
-  const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * (kDeathFadeMs - fadeElapsed)) / kDeathFadeMs);
+  const uint8_t fadeBrightness =
+      (uint8_t)(((uint32_t)targetBrightness * (kDeathFadeMs - fadeElapsed)) / kDeathFadeMs);
 
   setBacklight(fadeBrightness);
 
@@ -102,7 +104,7 @@ void tickDeathTransition(uint32_t now)
   s_deathTransitionActive = false;
   s_deathTransitionSoundStarted = false;
   s_startDeathScreenFadeIn = true;
-  
+
   uiActionEnterState(UIState::DEATH, Tab::TAB_PET, true);
   requestUIRedraw();
 }
