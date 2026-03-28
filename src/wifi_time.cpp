@@ -168,11 +168,8 @@ void wifiStartSntpNow()
     return;
   }
 
-  s_wifiConnected = true;
   s_timeSynced = false;
   s_rssi = WiFi.RSSI();
-
-  applyTimezoneIndex(tzIndex);
 
   configTime(0, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
   applyTimezoneIndex(tzIndex);
@@ -181,24 +178,6 @@ void wifiStartSntpNow()
   s_waitSntpBeforeSync = false;
   s_sntpStartAtMs = 0;
   s_sntpStartedAtMs = millis();
-
-  Serial.println("[TIME] SNTP started immediately");
-}
-
-void wifiForceSntpPending()
-{
-  s_wifiConnected = (WiFi.status() == WL_CONNECTED);
-
-  if (!s_wifiConnected)
-    return;
-
-  s_timeSynced = false;
-  s_sntpStartedThisConnect = false;
-  s_waitSntpBeforeSync = true;
-  s_sntpStartAtMs = millis() + 250;
-  s_sntpStartedAtMs = 0;
-
-  DBGLN_ON("[TIME] force SNTP pending");
 }
 
 static char s_consoleIpBuf[32] = {0};
@@ -370,12 +349,7 @@ void wifiTimeInit()
     s_timeSynced = false;
     s_sntpStartedThisConnect = false;
     s_sntpStartAtMs = millis() + 750;
-    DBGLN_ON("[WIFI] init detected already connected → forcing SNTP");
-  }
-  if (s_wifiConnected)
-  {
     s_rssi = WiFi.RSSI();
-    s_sntpStartAtMs = millis() + 750;
   }
   else
   {
@@ -465,7 +439,6 @@ void wifiTimeTick()
 
       s_waitSntpBeforeSync = true;
 
-      DBGLN_ON("[WIFI] status->CONNECTED (event missed?)");
       if (now - s_lastSntpLogMs > 750)
       {
         DBGLN_ON("[TIME] SNTP pending");
@@ -483,8 +456,6 @@ void wifiTimeTick()
       s_sntpStartedAtMs = 0;
 
       s_waitSntpBeforeSync = true;
-
-      DBGLN_ON("[WIFI] status->DISCONNECTED (event missed?)");
     }
   }
 
@@ -524,20 +495,7 @@ void wifiTimeTick()
   {
     s_lastTimeCheckMs = now;
 
-    if (s_waitSntpBeforeSync)
-    {
-      Serial.println("[TIME] waiting: s_waitSntpBeforeSync still true");
-      return;
-    }
-
-    if (s_sntpStartedAtMs != 0 && (now - s_sntpStartedAtMs) < POST_SNTP_QUIET_MS)
-    {
-      Serial.println("[TIME] waiting: post-SNTP quiet window");
-      return;
-    }
-
     time_t t = time(nullptr);
-    Serial.printf("[TIME] poll time=%lld synced=%d wl=%d\n", (long long)t, s_timeSynced ? 1 : 0, (int)WiFi.status());
 
     if (t > 1704067200)
     {
