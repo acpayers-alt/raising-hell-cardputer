@@ -4,6 +4,7 @@
 #include "asset_ota_config.h"
 #include "asset_ota_types.h"
 #include "sdcard.h"
+#include "build_flags.h"
 
 static const char *kCfgPath = "/raising_hell/save/asset_ota_cfg.bin";
 static const char *kCfgTmpPath = "/raising_hell/save/asset_ota_cfg.tmp";
@@ -39,7 +40,7 @@ void assetOtaConfigDefaults(AssetOtaConfig &cfg)
   cfg.magic = 0x41544346UL;
   cfg.version = 1;
   cfg.autoCheckEnabled = 0;
-  cfg.channel = (uint8_t)AssetOtaChannel::PUBLIC;
+  cfg.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
 }
 
 void assetOtaStateDefaults(AssetOtaState &st)
@@ -190,11 +191,13 @@ bool assetOtaConfigLoad(AssetOtaConfig *outCfg)
 
   if (r != (int)sizeof(tmp))
     return false;
-  if (tmp.magic != 0x41544346UL || tmp.version != 1)
+    if (tmp.magic != 0x41544346UL || tmp.version != 1)
     return false;
   if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
-    tmp.channel = (uint8_t)AssetOtaChannel::PUBLIC;
+    tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
 
+  tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
+  
   *outCfg = tmp;
   return true;
 }
