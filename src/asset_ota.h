@@ -31,7 +31,6 @@ bool assetOtaRunInWorkerTask(String *outMessage);
 
 bool assetOtaWorklistOpenRead(File *outFile);
 bool assetOtaWorklistReadNext(File &inFile, AssetManifestFile *outFile);
-bool assetOtaWorklistAppend(const AssetManifestFile &f);
 bool assetOtaWorklistClear();
 
 const char *assetOtaWorklistPath();

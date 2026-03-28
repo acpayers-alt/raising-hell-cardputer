@@ -19,8 +19,8 @@
 #include "sdcard.h"
 
 // --- Forward declarations ---
-static bool parseManifestJsonWithCallback(Stream &input, size_t contentLen, String *outPackVersion, String *outChannel,
-                                          bool (*onFile)(const AssetManifestFile &, void *), void *ctx);
+static bool parseManifestJsonWithCallback(File &input, size_t contentLen, String *outPackVersion, String *outChannel,
+  bool (*onFile)(const AssetManifestFile &, void *), void *ctx);
 
 static bool manifestEntryMatchesLocal(const AssetManifestData &localManifest, const AssetManifestFile &rf);
 
@@ -47,12 +47,27 @@ static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
     Serial.printf("[OTA WL WRITE] size=%lu\n", (unsigned long)f.size);
     Serial.printf("[OTA WL WRITE] sha.len=%u sha='%s'\n", (unsigned)strlen(f.sha256), f.sha256);
 
-    ctx->work->write((const uint8_t *)f.path, strlen(f.path));
-    ctx->work->write('\t');
-    ctx->work->print((unsigned long)f.size);
-    ctx->work->write('\t');
-    ctx->work->write((const uint8_t *)f.sha256, 64);
-    ctx->work->write('\n');
+    char line[512];
+
+    int len = snprintf(line, sizeof(line), "%s\t%lu\t%s\n",
+                       f.path,
+                       (unsigned long)f.size,
+                       f.sha256);
+    
+    if (len <= 0 || len >= (int)sizeof(line))
+    {
+      Serial.printf("[OTA WL WRITE] FAIL format path=%s\n", f.path);
+      return false;
+    }
+    
+    size_t written = ctx->work->write((const uint8_t *)line, len);
+    
+    if (written != (size_t)len)
+    {
+      Serial.printf("[OTA WL WRITE] FAIL partial write path=%s wrote=%u expected=%u\n",
+                    f.path, (unsigned)written, (unsigned)len);
+      return false;
+    }
 
     Serial.printf("[OTA WL WRITE] wrote line for path='%s'\n", f.path);
 
@@ -63,8 +78,19 @@ static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
     }
 
     ctx->changed++;
+    Serial.printf("[OTA WL WRITE] changed=%u processed=%u path=%s sha.len=%u size=%u\n",
+      (unsigned)ctx->changed,
+      (unsigned)ctx->processed,
+      f.path,
+      (unsigned)strlen(f.sha256),
+      (unsigned)f.size);
   }
-
+    else
+  {
+    Serial.printf("[OTA WL WRITE] unchanged processed=%u path=%s\n",
+                  (unsigned)ctx->processed,
+                  f.path);
+  }
   if ((ctx->processed % 25) == 0)
   {
     Serial.printf("[OTA WL] progress processed=%u changed=%u free=%u largest=%u\n", (unsigned)ctx->processed,
@@ -150,6 +176,58 @@ bool assetManifestLoadLocalPackVersion(String *outPackVersion)
 
   if (outPackVersion)
     *outPackVersion = packVersion;
+
+  return true;
+}
+
+static bool assetManifestSelfCheckWorklist(uint16_t expectedCount, uint16_t *outReadableCount)
+{
+  if (outReadableCount)
+    *outReadableCount = 0;
+
+  File in;
+  if (!assetOtaWorklistOpenRead(&in))
+  {
+    Serial.printf("[OTA WL CHECK] open failed path=%s\n", assetOtaWorklistPath());
+    return false;
+  }
+
+  uint16_t readable = 0;
+  while (true)
+  {
+    long beforePos = in.position();
+    
+    AssetManifestFile mf{};
+    if (!assetOtaWorklistReadNext(in, &mf))
+    {
+      Serial.printf("[OTA WL CHECK RAW] failure at record #%u pos=%ld size=%u\n",
+                    (unsigned)(readable + 1),
+                    (long)in.position(),
+                    (unsigned)in.size());
+      break;
+    }
+    ++readable;
+
+    Serial.printf("[OTA WL CHECK] ok #%u path=%s sha.len=%u size=%u pos=%u\n",
+                  (unsigned)readable,
+                  mf.path,
+                  (unsigned)strlen(mf.sha256),
+                  (unsigned)mf.size,
+                  (unsigned)in.position());
+  }
+
+  const uint32_t finalPos = (uint32_t)in.position();
+  const uint32_t fileSize = (uint32_t)in.size();
+  in.close();
+
+  if (outReadableCount)
+    *outReadableCount = readable;
+
+  Serial.printf("[OTA WL CHECK] done readable=%u expected=%u finalPos=%u size=%u\n",
+                (unsigned)readable,
+                (unsigned)expectedCount,
+                (unsigned)finalPos,
+                (unsigned)fileSize);
 
   return true;
 }
@@ -295,6 +373,11 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
     return false;
   }
 
+  if (SD.exists(assetOtaWorklistPath()))
+  {
+    SD.remove(assetOtaWorklistPath());
+  }
+
   if (!assetOtaEnsureParentDir(assetOtaWorklistPath()))
   {
     Serial.printf("[OTA WL] fail: ensure worklist dir for %s\n", assetOtaWorklistPath());
@@ -320,8 +403,56 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
 
   const bool ok = parseManifestJsonWithCallback(mf, mfLen, outPackVersion, &channel, manifestWorklistCallback, &ctx);
 
-  work.flush();
-  work.close();
+  Serial.printf("[OTA WL] final worklist changed=%u processed=%u\n",
+    (unsigned)ctx.changed,
+    (unsigned)ctx.processed);
+
+work.flush();
+work.close();
+
+if (!ok)
+{
+mf.close();
+SD.remove(tmpManifestPath);
+assetOtaWorklistClear();
+return false;
+}
+
+uint16_t readableCount = 0;
+if (!assetManifestSelfCheckWorklist(ctx.changed, &readableCount))
+{
+Serial.printf("[OTA WL] self-check failed expected=%u readable=%u\n",
+      (unsigned)ctx.changed,
+      (unsigned)readableCount);
+mf.close();
+SD.remove(tmpManifestPath);
+assetOtaWorklistClear();
+return false;
+}
+
+mf.close();
+
+Serial.printf("[OTA WL] parse result=%d changed=%u pack=%s channel=%s\n",
+    ok ? 1 : 0,
+    (unsigned)ctx.changed,
+    outPackVersion ? outPackVersion->c_str() : "",
+    channel.c_str());
+
+if (outChangedCount)
+*outChangedCount = ctx.changed;
+
+return true;
+
+if (readableCount != ctx.changed)
+{
+  Serial.printf("[OTA WL] self-check mismatch readable=%u changed=%u\n",
+                (unsigned)readableCount,
+                (unsigned)ctx.changed);
+  mf.close();
+  SD.remove(tmpManifestPath);
+  assetOtaWorklistClear();
+  return false;
+}
 
   mf.close();
 
@@ -809,104 +940,310 @@ static bool manifestEntryMatchesLocal(const AssetManifestData &localManifest, co
   return false;
 }
 
-static bool parseManifestJsonWithCallback(Stream &input, size_t contentLen, String *outPackVersion, String *outChannel,
-                                          bool (*onFile)(const AssetManifestFile &, void *), void *ctx)
+static bool manifestReadTopLevelHeader(File &input, String *outPackVersion, String *outChannel)
 {
-  StaticJsonDocument<512> filter;
+  if (outPackVersion)
+    *outPackVersion = "";
+  if (outChannel)
+    *outChannel = "";
+
+  input.seek(0);
+
+  StaticJsonDocument<128> filter;
   filter["packVersion"] = true;
   filter["pack_version"] = true;
   filter["channel"] = true;
-  filter["files"][0]["path"] = true;
-  filter["files"][0]["size"] = true;
-  filter["files"][0]["sha256"] = true;
 
-  DynamicJsonDocument doc(65536);
-
-  Serial.printf("[OTA WL] cb-parse start len=%u free=%u largest=%u cap=%u\n", (unsigned)contentLen,
-                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), (unsigned)doc.capacity());
-
+  DynamicJsonDocument doc(256);
   DeserializationError err = deserializeJson(doc, input, DeserializationOption::Filter(filter));
-
-  Serial.printf("[OTA WL] cb-parse deserialize=%s free=%u largest=%u overflowed=%d\n", err ? err.c_str() : "Ok",
-                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), doc.overflowed() ? 1 : 0);
-
   if (err || doc.overflowed())
   {
-    Serial.printf("[OTA WL] cb-parse failed: %s overflowed=%d\n", err ? err.c_str() : "Ok", doc.overflowed() ? 1 : 0);
+    Serial.printf("[OTA WL] header parse failed: %s overflowed=%d\n",
+                  err ? err.c_str() : "Ok", doc.overflowed() ? 1 : 0);
     return false;
   }
 
-  JsonObject root = doc.as<JsonObject>();
-  if (root.isNull())
-    return false;
+  const char *packVersion = doc["packVersion"] | doc["pack_version"] | "";
+  const char *channel = doc["channel"] | "";
 
-  const char *packVersion = root["packVersion"] | root["pack_version"] | "";
-  const char *channel = root["channel"] | "";
+  if (!packVersion || !packVersion[0])
+  {
+    Serial.println("[OTA WL] header parse failed: missing packVersion");
+    return false;
+  }
 
   if (outPackVersion)
     *outPackVersion = packVersion;
-
   if (outChannel)
     *outChannel = channel;
 
-  JsonArray files = root["files"].as<JsonArray>();
-  const unsigned totalFiles = files.size();
+  return true;
+}
 
-  Serial.printf("[OTA WL] cb-parse files=%u\n", totalFiles);
+static bool manifestSeekFilesArray(File &input)
+{
+  input.seek(0);
 
-  unsigned fileIndex = 0;
+  const char *needle = "\"files\"";
+  size_t match = 0;
+  bool inString = false;
+  bool escape = false;
 
-  for (JsonObject obj : files)
+  while (input.available())
   {
-    ++fileIndex;
+    int rc = input.read();
+    if (rc < 0)
+      break;
 
-    const char *rel = obj["path"] | "";
-    if (!rel || !rel[0])
-      continue;
+    char c = (char)rc;
 
-    AssetManifestFile f{};
-    strlcpy(f.path, rel, sizeof(f.path));
-    f.size = (uint32_t)(obj["size"] | 0UL);
-
-    const char *sha = obj["sha256"] | "";
-    if (sha && sha[0])
+    if (inString)
     {
-      strlcpy(f.sha256, sha, sizeof(f.sha256));
-
-      for (size_t j = 0; f.sha256[j]; ++j)
-        f.sha256[j] = (char)tolower((unsigned char)f.sha256[j]);
-
-      if (strlen(f.sha256) != 64)
+      if (escape)
       {
-        Serial.printf("[OTA WL] cb-parse bad sha len=%u at index=%u path=%s\n", (unsigned)strlen(f.sha256), fileIndex,
-                      f.path);
-        continue;
+        escape = false;
+      }
+      else if (c == '\\')
+      {
+        escape = true;
+      }
+      else if (c == '"')
+      {
+        inString = false;
       }
     }
     else
     {
-      f.sha256[0] = '\0';
-    }
-
-    if (onFile)
-    {
-      if (!onFile(f, ctx))
+      if (c == '"')
       {
-        Serial.printf("[OTA WL] cb-parse callback failed at %u path=%s\n", fileIndex, f.path);
-        return false;
+        inString = true;
       }
     }
 
-    if ((fileIndex % 25) == 0)
+    if (c == needle[match])
     {
-      Serial.printf("[OTA WL] progress processed=%u/%u free=%u largest=%u\n", fileIndex, totalFiles,
-                    (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+      match++;
+      if (needle[match] == '\0')
+        break;
+    }
+    else
+    {
+      match = (c == needle[0]) ? 1 : 0;
     }
   }
 
-  Serial.printf("[OTA WL] cb-parse complete processed=%u\n", fileIndex);
+  if (needle[match] != '\0')
+  {
+    Serial.println("[OTA WL] files array key not found");
+    return false;
+  }
+
+  while (input.available())
+  {
+    int rc = input.read();
+    if (rc < 0)
+      return false;
+
+    char c = (char)rc;
+    if (c == '[')
+      return true;
+  }
+
+  Serial.println("[OTA WL] files array '[' not found");
+  return false;
+}
+
+static bool manifestReadNextFileObject(File &input, String *outJson, bool *outDone)
+{
+  if (!outJson || !outDone)
+    return false;
+
+  *outJson = "";
+  *outDone = false;
+
+  bool inString = false;
+  bool escape = false;
+
+  while (input.available())
+  {
+    int rc = input.read();
+    if (rc < 0)
+      return false;
+
+    char c = (char)rc;
+
+    if (c == ']')
+    {
+      *outDone = true;
+      return true;
+    }
+
+    if (c == '{')
+    {
+      int depth = 1;
+      outJson->reserve(256);
+      *outJson += c;
+
+      while (input.available())
+      {
+        int rc2 = input.read();
+        if (rc2 < 0)
+          return false;
+
+        char d = (char)rc2;
+        *outJson += d;
+
+        if (inString)
+        {
+          if (escape)
+          {
+            escape = false;
+          }
+          else if (d == '\\')
+          {
+            escape = true;
+          }
+          else if (d == '"')
+          {
+            inString = false;
+          }
+        }
+        else
+        {
+          if (d == '"')
+          {
+            inString = true;
+          }
+          else if (d == '{')
+          {
+            depth++;
+          }
+          else if (d == '}')
+          {
+            depth--;
+            if (depth == 0)
+              return true;
+          }
+        }
+      }
+
+      Serial.println("[OTA WL] unexpected EOF while reading file object");
+      return false;
+    }
+  }
+
+  *outDone = true;
+  return true;
+}
+
+static bool manifestParseFileObjectJson(const String &json, AssetManifestFile *out)
+{
+  if (!out)
+    return false;
+
+  StaticJsonDocument<128> filter;
+  filter["path"] = true;
+  filter["size"] = true;
+  filter["sha256"] = true;
+
+  DynamicJsonDocument doc(256);
+  DeserializationError err = deserializeJson(doc, json, DeserializationOption::Filter(filter));
+  if (err || doc.overflowed())
+  {
+    Serial.printf("[OTA WL] file object parse failed: %s overflowed=%d\n",
+                  err ? err.c_str() : "Ok", doc.overflowed() ? 1 : 0);
+    return false;
+  }
+
+  const char *rel = doc["path"] | "";
+  if (!rel || !rel[0])
+    return false;
+
+  String normPath;
+  if (!assetManifestNormalizePath(rel, &normPath))
+    return false;
+
+  memset(out, 0, sizeof(*out));
+  strlcpy(out->path, normPath.c_str(), sizeof(out->path));
+  out->size = (uint32_t)(doc["size"] | 0UL);
+
+  const char *sha = doc["sha256"] | "";
+  if (sha && sha[0])
+  {
+    strlcpy(out->sha256, sha, sizeof(out->sha256));
+
+    for (size_t i = 0; out->sha256[i]; ++i)
+      out->sha256[i] = (char)tolower((unsigned char)out->sha256[i]);
+
+    if (strlen(out->sha256) != 64)
+    {
+      Serial.printf("[OTA WL] bad sha len=%u path=%s\n", (unsigned)strlen(out->sha256), out->path);
+      return false;
+    }
+  }
+  else
+  {
+    out->sha256[0] = '\0';
+  }
 
   return true;
+}
+
+static bool parseManifestJsonWithCallback(File &input, size_t contentLen, String *outPackVersion, String *outChannel,
+  bool (*onFile)(const AssetManifestFile &, void *), void *ctx)
+{
+Serial.printf("[OTA WL] cb-parse start len=%u free=%u largest=%u\n",
+(unsigned)contentLen, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+
+if (!manifestReadTopLevelHeader(input, outPackVersion, outChannel))
+return false;
+
+Serial.printf("[OTA WL] header pack=%s channel=%s\n",
+outPackVersion ? outPackVersion->c_str() : "",
+outChannel ? outChannel->c_str() : "");
+
+if (!manifestSeekFilesArray(input))
+return false;
+
+unsigned fileIndex = 0;
+
+while (true)
+{
+String objJson;
+bool done = false;
+
+if (!manifestReadNextFileObject(input, &objJson, &done))
+return false;
+
+if (done)
+break;
+
+AssetManifestFile f{};
+if (!manifestParseFileObjectJson(objJson, &f))
+continue;
+
+++fileIndex;
+
+if (onFile)
+{
+if (!onFile(f, ctx))
+{
+Serial.printf("[OTA WL] cb-parse callback failed at %u path=%s\n", fileIndex, f.path);
+return false;
+}
+}
+
+if ((fileIndex % 25) == 0)
+{
+Serial.printf("[OTA WL] progress processed=%u free=%u largest=%u\n",
+fileIndex, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+}
+}
+
+Serial.printf("[OTA WL] cb-parse complete processed=%u free=%u largest=%u\n",
+fileIndex, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+
+return true;
 }
 
 static bool parseManifestJsonDiffOnly(Stream &input, size_t contentLen, const AssetManifestData &localManifest,
@@ -1128,7 +1465,9 @@ bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &loc
   String channel;
   const bool parsed = parseManifestJsonDiffOnly(mf, mfLen, localManifest, outPackVersion, &channel, outChangedFiles);
   mf.close();
-  SD.remove(tmpManifestPath);
+
+  if (!parsed)
+    SD.remove(tmpManifestPath);
 
   Serial.printf("[OTA] diff-only parsed=%d changed=%u\n", parsed ? 1 : 0, (unsigned)outChangedFiles.size());
 

@@ -26,35 +26,6 @@ bool assetOtaWorklistClear()
   return true;
 }
 
-bool assetOtaWorklistAppend(const AssetManifestFile &f)
-{
-  if (!assetOtaEnsureParentDir(assetOtaWorklistPath()))
-  {
-    Serial.printf("[OTA WL] append fail: ensure parent dir for %s\n", assetOtaWorklistPath());
-    return false;
-  }
-
-  File out = SD.open(assetOtaWorklistPath(), FILE_WRITE);
-  if (!out)
-  {
-    Serial.printf("[OTA WL] append fail: open %s\n", assetOtaWorklistPath());
-    return false;
-  }
-
-  out.seek(out.size());
-
-  out.print(f.path);
-  out.print('\t');
-  out.print((unsigned long)f.size);
-  out.print('\t');
-  out.print(f.sha256);
-  out.print('\n');
-
-  out.flush();
-  out.close();
-  return true;
-}
-
 bool assetOtaWorklistOpenRead(File *out)
 {
   if (!out)
@@ -71,65 +42,83 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
     return false;
   }
 
-  char buf[1024];
-  int len = in.readBytesUntil('\n', buf, sizeof(buf) - 1);
-  if (len == (int)sizeof(buf) - 1)
+  String line;
+  line.reserve(256);
+
+  while (true)
   {
-    Serial.printf("[OTA WL READ] ERROR: line too long/truncated len=%d pos=%u size=%u\n", len, (unsigned)in.position(),
-                  (unsigned)in.size());
-    return false;
+    line = "";
+
+    while (true)
+    {
+      int c = in.read();
+      if (c < 0)
+        break;
+      if (c == '\n')
+        break;
+
+      if (line.length() >= 255)
+      {
+        Serial.printf("[OTA WL READ] ERROR: line too long pos=%ld size=%u\n",
+                      (long)in.position(), (unsigned)in.size());
+        return false;
+      }
+
+      line += (char)c;
+    }
+
+    const int len = line.length();
+    if (len == 0)
+    {
+      Serial.printf("[OTA WL READ] stop: empty read pos=%ld size=%u\n",
+                    (long)in.position(), (unsigned)in.size());
+      return false;
+    }
+
+    line.trim();
+    if (line.length() == 0)
+    {
+      Serial.printf("[OTA WL READ] stop: blank line pos=%ld size=%u\n",
+                    (long)in.position(), (unsigned)in.size());
+      return false;
+    }
+
+    const int tab1 = line.indexOf('\t');
+    const int tab2 = (tab1 >= 0) ? line.indexOf('\t', tab1 + 1) : -1;
+
+    if (tab1 <= 0 || tab2 <= tab1)
+    {
+      Serial.printf("[OTA WL READ] stop: malformed line pos=%ld size=%u line='%s'\n",
+                    (long)in.position(), (unsigned)in.size(), line.c_str());
+      return false;
+    }
+
+    String path = line.substring(0, tab1);
+    String sizeStr = line.substring(tab1 + 1, tab2);
+    String sha = line.substring(tab2 + 1);
+
+    path.trim();
+    sizeStr.trim();
+    sha.trim();
+
+    if (sha.length() != 64)
+    {
+      Serial.printf("[OTA WL READ] stop: bad sha len=%u path='%s' sha='%s'\n",
+                    (unsigned)sha.length(), path.c_str(), sha.c_str());
+      return false;
+    }
+
+    memset(out, 0, sizeof(*out));
+    strlcpy(out->path, path.c_str(), sizeof(out->path));
+    out->size = (uint32_t)strtoul(sizeStr.c_str(), nullptr, 10);
+    strlcpy(out->sha256, sha.c_str(), sizeof(out->sha256));
+
+    Serial.printf("[OTA WL READ] path='%s'\n", path.c_str());
+    Serial.printf("[OTA WL READ] size='%s'\n", sizeStr.c_str());
+    Serial.printf("[OTA WL READ] sha.len=%u sha='%s'\n",
+                  (unsigned)sha.length(), sha.c_str());
+    return true;
   }
-
-  if (len <= 0)
-  {
-    Serial.printf("[OTA WL READ] stop: len=%d pos=%u size=%u\n", len, (unsigned)in.position(), (unsigned)in.size());
-    return false;
-  }
-
-  buf[len] = '\0';
-
-  String line(buf);
-  line.trim();
-
-  if (!line.length())
-  {
-    Serial.printf("[OTA WL READ] skip: blank line pos=%u size=%u\n", (unsigned)in.position(), (unsigned)in.size());
-    return assetOtaWorklistReadNext(in, out);
-  }
-
-  int t1 = line.indexOf('\t');
-  int t2 = line.indexOf('\t', t1 + 1);
-  if (t1 < 0 || t2 < 0)
-  {
-    Serial.printf("[OTA WL READ] skip: malformed line pos=%u size=%u line='%s'\n", (unsigned)in.position(),
-                  (unsigned)in.size(), line.c_str());
-    return assetOtaWorklistReadNext(in, out);
-  }
-
-  String path = line.substring(0, t1);
-  String sizeStr = line.substring(t1 + 1, t2);
-  String sha = line.substring(t2 + 1);
-  sha.trim();
-
-  if (sha.length() != 64)
-  {
-    Serial.printf("[OTA WL READ] skip: bad sha len=%u path='%s' sha='%s'\n", (unsigned)sha.length(), path.c_str(),
-                  sha.c_str());
-    return assetOtaWorklistReadNext(in, out);
-  }
-
-  Serial.printf("[OTA WL READ] path='%s'\n", path.c_str());
-  Serial.printf("[OTA WL READ] size='%s'\n", sizeStr.c_str());
-  Serial.printf("[OTA WL READ] sha.len=%u sha='%s'\n", (unsigned)sha.length(), sha.c_str());
-
-  AssetManifestFile f{};
-
-  strlcpy(f.path, path.c_str(), sizeof(f.path));
-  f.size = (uint32_t)sizeStr.toInt();
-  strlcpy(f.sha256, sha.c_str(), sizeof(f.sha256));
-
-  *out = f;
-  return true;
 }
 
 static AssetOtaConfig s_cfg{};
@@ -696,9 +685,9 @@ bool assetOtaCheckNow(String *outMessage)
                 (unsigned)ESP.getMaxAllocHeap());
 
   String remotePackVersion;
-  std::vector<AssetManifestFile> changedFiles;
+  uint16_t changedCount = 0;
 
-  if (!assetManifestDownloadDiffOnly(manifestUrl, localManifest, &remotePackVersion, changedFiles))
+  if (!assetManifestBuildWorklistFromRemote(manifestUrl, localManifest, &remotePackVersion, &changedCount))
   {
     setFailure(AssetOtaError::JSON_FAIL);
     if (outMessage)
@@ -707,7 +696,8 @@ bool assetOtaCheckNow(String *outMessage)
     return false;
   }
 
-  const uint16_t changedCount = (uint16_t)changedFiles.size();
+  Serial.printf("[OTA] plan result: pack=%s changed=%u worklist=%s\n", remotePackVersion.c_str(),
+                (unsigned)changedCount, assetOtaWorklistPath());
 
   strncpy(s_state.targetPackVersion, remotePackVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
@@ -731,6 +721,7 @@ bool assetOtaCheckNow(String *outMessage)
       *outMessage += ")";
     }
 
+    assetOtaWorklistClear();
     restoreMainUiSprite();
     return true;
   }
@@ -738,10 +729,90 @@ bool assetOtaCheckNow(String *outMessage)
   if (changedCount == 0)
   {
     Serial.printf("[OTA] no file changes; adopting version=%s\n", remotePackVersion.c_str());
+
+    const char *tmpManifestPath = "/manifest.remote.tmp";
+    const char *localManifestPath = assetOtaLocalManifestPath();
+
+    Serial.printf("[OTA] pre-promote tmp exists=%d local exists=%d\n", SD.exists("/manifest.remote.tmp") ? 1 : 0,
+                  SD.exists(assetOtaLocalManifestPath()) ? 1 : 0);
+
+    if (!SD.exists(tmpManifestPath))
+    {
+      setFailure(AssetOtaError::WRITE_FAIL);
+      if (outMessage)
+        *outMessage = "Final manifest temp file missing";
+      restoreMainUiSprite();
+      return false;
+    }
+
+    if (!assetOtaEnsureParentDir(localManifestPath))
+    {
+      setFailure(AssetOtaError::WRITE_FAIL);
+      if (outMessage)
+        *outMessage = "Local manifest dir failed";
+      restoreMainUiSprite();
+      return false;
+    }
+
+    if (SD.exists(localManifestPath))
+      SD.remove(localManifestPath);
+
+    bool saveOk = SD.rename(tmpManifestPath, localManifestPath);
+
+    if (!saveOk)
+    {
+      File src = SD.open(tmpManifestPath, FILE_READ);
+      File dst = SD.open(localManifestPath, FILE_WRITE);
+
+      if (src && dst)
+      {
+        uint8_t buf[1024];
+        saveOk = true;
+        while (true)
+        {
+          int n = src.read(buf, sizeof(buf));
+          if (n <= 0)
+            break;
+          if (dst.write(buf, n) != (size_t)n)
+          {
+            saveOk = false;
+            break;
+          }
+        }
+        dst.flush();
+      }
+      else
+      {
+        saveOk = false;
+      }
+
+      if (src)
+        src.close();
+      if (dst)
+        dst.close();
+
+      if (saveOk)
+        SD.remove(tmpManifestPath);
+    }
+
+    if (!saveOk)
+    {
+      setFailure(AssetOtaError::WRITE_FAIL);
+      if (outMessage)
+        *outMessage = "Local manifest write failed";
+      restoreMainUiSprite();
+      return false;
+    }
+
     s_installedVersion = remotePackVersion;
     s_status = AssetOtaStatus::SUCCESS;
     assetOtaStateDefaults(s_state);
     assetOtaStateSave(s_state);
+
+    String installedPack;
+    bool havePack = assetManifestLoadLocalPackVersion(&installedPack);
+    Serial.printf("[OTA] post-promote local pack load=%d version=%s\n", havePack ? 1 : 0,
+                  havePack ? installedPack.c_str() : "(none)");
 
     if (outMessage)
     {
@@ -749,7 +820,8 @@ bool assetOtaCheckNow(String *outMessage)
       *outMessage += remotePackVersion;
       *outMessage += " already installed";
     }
-
+    
+    assetOtaWorklistClear();
     restoreMainUiSprite();
     return true;
   }
@@ -757,18 +829,48 @@ bool assetOtaCheckNow(String *outMessage)
   uint16_t installOkCount = 0;
   uint16_t skipCount = 0;
 
-  for (uint16_t idx = 0; idx < changedCount; ++idx)
+  std::vector<AssetManifestFile> worklist;
+
+  File workIn;
+  if (!assetOtaWorklistOpenRead(&workIn))
   {
-    const AssetManifestFile &mf = changedFiles[idx];
+    Serial.println("[OTA] worklist open failed");
+    return false;
+  }
+  
+  while (true)
+  {
+    AssetManifestFile mf{};
+    if (!assetOtaWorklistReadNext(workIn, &mf))
+      break;
+  
+    worklist.push_back(mf);
+  }
+  
+  workIn.close();
+  
+  Serial.printf("[OTA] worklist loaded count=%u\n", (unsigned)worklist.size());
+
+  if (worklist.size() != changedCount)
+{
+  Serial.printf("[OTA] mismatch worklist=%u changed=%u\n",
+                (unsigned)worklist.size(),
+                (unsigned)changedCount);
+  return false;
+}
+
+  for (size_t idx = 0; idx < worklist.size(); ++idx)
+  {
+    const AssetManifestFile &f = worklist[idx];
 
     s_status = AssetOtaStatus::DOWNLOADING;
     s_state.status = (uint8_t)s_status;
     s_state.currentFileIndex = (uint16_t)(idx + 1);
     assetOtaStateSave(s_state);
 
-    otaRedrawProvisionScreen("Downloading assets...", mf.path);
-
-    String rawPath(mf.path);
+    otaRedrawProvisionScreen("Downloading assets...", f.path);
+    
+    String rawPath(f.path);
     String rel;
     if (!assetManifestNormalizePath(rawPath, &rel))
     {
@@ -776,12 +878,12 @@ bool assetOtaCheckNow(String *outMessage)
       ++skipCount;
       continue;
     }
-
+    
     AssetManifestFile dlFile{};
     strlcpy(dlFile.path, rel.c_str(), sizeof(dlFile.path));
-    strlcpy(dlFile.sha256, mf.sha256, sizeof(dlFile.sha256));
-    dlFile.size = mf.size;
-
+    strlcpy(dlFile.sha256, f.sha256, sizeof(dlFile.sha256));
+    dlFile.size = f.size;
+    
     String stagingPath;
     String dlErr;
     bool dlOk = false;
@@ -836,12 +938,15 @@ bool assetOtaCheckNow(String *outMessage)
     }
 
     ++installOkCount;
-    Serial.printf("[OTA] INSTALL COUNT ok=%u skipped=%u current=%s\n", (unsigned)installOkCount,
-                  (unsigned)skipCount, rel.c_str());
+    Serial.printf("[OTA] INSTALL COUNT ok=%u skipped=%u current=%s\n", (unsigned)installOkCount, (unsigned)skipCount,
+                  rel.c_str());
   }
 
-  Serial.printf("[OTA] INSTALL LOOP DONE ok=%u skipped=%u expected=%u\n", (unsigned)installOkCount,
-                (unsigned)skipCount, (unsigned)changedCount);
+  if (workIn)
+    workIn.close();
+
+  Serial.printf("[OTA] INSTALL LOOP DONE ok=%u skipped=%u expected=%u\n", (unsigned)installOkCount, (unsigned)skipCount,
+                (unsigned)changedCount);
 
   // ===== POST-INSTALL VERIFY =====
   {
@@ -849,9 +954,9 @@ bool assetOtaCheckNow(String *outMessage)
 
     Serial.printf("[OTA] verify pass starting...\n");
 
-    for (size_t idx = 0; idx < changedFiles.size(); ++idx)
+    for (size_t idx = 0; idx < worklist.size(); ++idx)
     {
-      const AssetManifestFile &vf = changedFiles[idx];
+      const AssetManifestFile &vf = worklist[idx];
 
       String rawPath(vf.path);
       String rel;
@@ -900,15 +1005,6 @@ bool assetOtaCheckNow(String *outMessage)
     setFailure(AssetOtaError::WRITE_FAIL);
     if (outMessage)
       *outMessage = "Final manifest temp file missing";
-    restoreMainUiSprite();
-    return false;
-  }
-
-  if (!assetOtaEnsureParentDir(localManifestPath))
-  {
-    setFailure(AssetOtaError::WRITE_FAIL);
-    if (outMessage)
-      *outMessage = "Local manifest dir failed";
     restoreMainUiSprite();
     return false;
   }
