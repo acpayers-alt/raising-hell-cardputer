@@ -1218,7 +1218,15 @@ void drawFlappyFireball()
     const int impX = (gW - 48) / 2;
     const int impY = 52;
 
-    M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+    M5Canvas *impSpr = nullptr;
+
+    if (s_impWave1Spr && s_impWave2Spr)
+      impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+    else if (s_impWave1Spr)
+      impSpr = s_impWave1Spr;
+    else if (s_impWave2Spr)
+      impSpr = s_impWave2Spr;
+
     if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
       impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
 
@@ -1299,7 +1307,15 @@ void drawFlappyFireball()
 
     if (!s_impHit)
     {
-      M5Canvas *impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+      M5Canvas *impSpr = nullptr;
+
+      if (s_impWave1Spr && s_impWave2Spr)
+        impSpr = (s_impFrame == 0) ? s_impWave1Spr : s_impWave2Spr;
+      else if (s_impWave1Spr)
+        impSpr = s_impWave1Spr;
+      else if (s_impWave2Spr)
+        impSpr = s_impWave2Spr;
+
       if (impSpr && impSpr->width() > 0 && impSpr->height() > 0)
         impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
     }
@@ -4467,17 +4483,15 @@ void startInfernalDodger()
   const char *goalFrame1Path = dodgerGoalFrame1ResolvedPath();
   const char *goalFrame2Path = dodgerGoalFrame2ResolvedPath();
   const char *goalGorePath = dodgerGoalGoreResolvedPath();
-  
+
   Serial.printf("DODGER paths: frame1=%s frame2=%s gore=%s\n", goalFrame1Path ? goalFrame1Path : "(null)",
                 goalFrame2Path ? goalFrame2Path : "(null)", goalGorePath ? goalGorePath : "(null)");
-  
-  const bool goalOk =
-      (goalFrame1Path && goalFrame2Path) &&
-      ensureDodgerGoalFrames(goalFrame1Path, goalFrame2Path);
-  
+
+  const bool goalOk = (goalFrame1Path && goalFrame2Path) && ensureDodgerGoalFrames(goalFrame1Path, goalFrame2Path);
+
   // Keep gore deferred.
   const bool goreOk = false;
-  
+
   mgmem::logUsage("dodger-after-goal-ensure");
   mgmem::logUsage("dodger-after-gore-defer");
 
@@ -4580,7 +4594,6 @@ void updateInfernalDodger(const InputState &input)
     mgmem::logUsage("dodger-after-fireball-unload");
 
     // Load goal frames FIRST (bigger, more important)
-
 
     // THEN load gore
     if (!s_dodgerGoreSpr)
