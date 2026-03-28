@@ -9,10 +9,42 @@
 #include "ui_defs.h"
 #include "ui_runtime.h"
 #include "wifi_setup_state.h"
+#include "wifi_store.h"
 #include "wifi_time.h"
 
 // These are defined in flow_boot_wifi.cpp
 extern Tab g_bootWizardAfterOkTab;
+
+void wifiResetConnectUiState()
+{
+  g_wifi.connectResultPending = false;
+  g_wifi.connectResultSuccess = false;
+  g_wifi.connectResultShownAtMs = 0;
+  g_wifi.aborted = false;
+}
+
+static const char *wifiStatusLabel()
+{
+  switch (WiFi.status())
+  {
+  case WL_CONNECTED:
+    return "Connected";
+  case WL_IDLE_STATUS:
+    return "Idle";
+  case WL_NO_SSID_AVAIL:
+    return "SSID not found";
+  case WL_SCAN_COMPLETED:
+    return "Scan complete";
+  case WL_CONNECT_FAILED:
+    return "Connect failed";
+  case WL_CONNECTION_LOST:
+    return "Connection lost";
+  case WL_DISCONNECTED:
+    return "Disconnected";
+  default:
+    return "Connecting...";
+  }
+}
 
 void uiWifiConnectWaitHandle(InputState &in)
 {
@@ -64,21 +96,31 @@ void uiWifiConnectWaitHandle(InputState &in)
 
     g_wifi.aborted = false;
 
-    uiActionEnterState(UIState::WIFI_SETUP, g_wifi.returnTab, true);    requestUIRedraw();
+    uiActionEnterState(UIState::WIFI_SETUP, g_wifi.returnTab, true);
+    requestUIRedraw();
     return;
   }
 
   const int wifiStatus = wifiConsoleStatus();
   const uint32_t connectAgeMs = wifiConsoleConnectAgeMs();
+  const bool reallyConnected = wifiIsConnectedNow();
 
   const bool failedStatus =
       (wifiStatus == WL_CONNECT_FAILED) || (wifiStatus == WL_NO_SSID_AVAIL) || (wifiStatus == WL_CONNECTION_LOST);
 
-  const bool timedOut = (connectAgeMs >= 15000) && !wifiIsConnected();
+  const bool timedOut = (connectAgeMs >= 15000) && !reallyConnected;
 
-  if (wifiIsConnected())
+  if (reallyConnected)
   {
     g_wifi.connectFailCount = 0;
+  
+    if (g_wifi.ssid[0])
+    {
+      wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
+      Serial.printf("[WIFI] saved working creds for SSID: %s\n", g_wifi.ssid);
+    }
+  
+    wifiResetConnectUiState();
     g_wifi.connectResultPending = true;
     g_wifi.connectResultSuccess = true;
     g_wifi.connectResultShownAtMs = millis();
@@ -89,15 +131,16 @@ void uiWifiConnectWaitHandle(InputState &in)
     return;
   }
 
-  if (failedStatus || timedOut)
-  {
-    wifiConsoleDisconnect(false);
+if (failedStatus || timedOut)
+{
+  wifiConsoleDisconnect(false);
 
-    g_wifi.connectFailCount++;
-    g_wifi.connectResultPending = true;
-    g_wifi.connectResultSuccess = false;
-    g_wifi.connectResultShownAtMs = millis();
-
+  g_wifi.connectFailCount++;
+  wifiResetConnectUiState();
+  g_wifi.connectResultPending = true;
+  g_wifi.connectResultSuccess = false;
+  g_wifi.connectResultShownAtMs = millis();
+  
     clearInputLatch();
     inputForceClear();
     requestUIRedraw();

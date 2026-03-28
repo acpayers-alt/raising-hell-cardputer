@@ -30,6 +30,7 @@
 #include "settings_state.h"
 #include "wifi_setup_state.h"
 #include "wifi_store.h"
+#include "ui_state_wifi_connect_wait.h"
 
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
@@ -170,19 +171,20 @@ static bool bootTryDetectTimezoneFromWifi()
 void uiBootWifiImportedHandle(InputState &in)
 {
   if (g_wifi.aborted)
-{
-  Serial.println("[BOOTWIFI] aborted by user");
+  {
+    Serial.println("[BOOTWIFI] aborted by user");
 
-  g_wifi.aborted = false;
+    g_wifi.aborted = false;
 
-  uiActionSwallowAll(in);
-  uiDrainKb(in);
-  clearInputLatch();
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
 
-  uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
-  requestUIRedraw();
-  return;
-}
+    wifiResetConnectUiState();
+    uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+    requestUIRedraw();
+    return;
+  }
 
   const uint32_t kImportedShowMs = 1200;
 
@@ -191,6 +193,7 @@ void uiBootWifiImportedHandle(InputState &in)
 
   if (continueNow)
   {
+    wifiResetConnectUiState();
     uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     uiActionSwallowAll(in);
@@ -215,20 +218,36 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
 
   g_bootProvisionWifiOnboardingStarted = true;
 
+  String storedSsid;
+  String storedPwd;
   String importedSsid;
   String importedPwd;
 
-  if (launcherImportWifiCreds(importedSsid, importedPwd))
+  // Prefer creds we already saved ourselves.
+  if (wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
   {
-    wifiStoreSave(importedSsid, importedPwd);
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+
+    Serial.printf("[BOOTWIZ] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
+    wifiResetConnectUiState();
+    wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
+
+    uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
+  }
+  // If no stored creds exist, try launcher import once.
+  else if (launcherImportWifiCreds(importedSsid, importedPwd))
+  {
     settingsSetWifiEnabled(true);
     saveSettingsToSD();
 
     bootWifiSetImportedInfo(importedSsid.c_str());
+    wifiResetConnectUiState();
     wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
 
     uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
   }
+  // Otherwise go to manual setup.
   else
   {
     g_wifiSetupFromBootWizard = true;
@@ -250,6 +269,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     g_wifi.returnTab = g_bootWizardAfterOkTab;
     g_wifi.aborted = false;
 
+    wifiResetConnectUiState();
     uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   }
 
@@ -284,8 +304,9 @@ static void bootWifiFallBackToManualEntry(InputState &in)
 
   g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
   g_wifi.returnTab = g_bootWizardAfterOkTab;
-        g_wifi.aborted = false;
+  g_wifi.aborted = false;
 
+  wifiResetConnectUiState();
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
   uiActionSwallowAll(in);
@@ -328,6 +349,7 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
   g_wifi.returnTab = g_bootWizardAfterOkTab;
   g_wifi.aborted = false;
 
+  wifiResetConnectUiState();
   uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
   requestUIRedraw();
   uiActionSwallowAll(in);
@@ -342,18 +364,18 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
 // -----------------------------------------------------------------------------
 void uiBootWifiWaitHandle(InputState &in)
 {
-
   if (g_wifi.aborted)
   {
     g_wifi.aborted = false;
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
+    wifiResetConnectUiState();
     uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
   }
-  
+
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
     uiActionSwallowAll(in);
@@ -374,11 +396,12 @@ void uiBootWifiWaitHandle(InputState &in)
 
   const int wifiStatus = wifiConsoleStatus();
   const uint32_t connectAgeMs = wifiConsoleConnectAgeMs();
+  const bool reallyConnected = wifiIsConnectedNow();
 
   const bool failedStatus =
       (wifiStatus == WL_CONNECT_FAILED) || (wifiStatus == WL_NO_SSID_AVAIL) || (wifiStatus == WL_CONNECTION_LOST);
 
-  const bool timedOut = (connectAgeMs >= 15000) && !wifiIsConnected();
+  const bool timedOut = (connectAgeMs >= 15000) && !reallyConnected;
 
   if (failedStatus || timedOut)
   {
@@ -389,7 +412,7 @@ void uiBootWifiWaitHandle(InputState &in)
     return;
   }
 
-  if (wifiIsConnected())
+  if (reallyConnected)
   {
     g_wifi.connectFailCount = 0;
     uiActionSwallowAll(in);
@@ -400,6 +423,7 @@ void uiBootWifiWaitHandle(InputState &in)
 
     if (tzDetected)
     {
+      wifiStartSntpNow();
       uiActionEnterState(UIState::BOOT_NTP_WAIT, g_bootWizardAfterOkTab, true);
       requestUIRedraw();
       return;
@@ -466,11 +490,11 @@ void uiBootNtpWaitHandle(InputState &in)
     {
       bootSetupClearPendingFlag();
     }
-    
+
     uiActionEnterState(nextState, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
-    }
+  }
 
   uiActionSwallowAll(in);
 }

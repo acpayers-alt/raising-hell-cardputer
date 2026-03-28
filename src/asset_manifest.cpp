@@ -43,12 +43,18 @@ static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
 
   if (!manifestLiveAssetMatches(f))
   {
-    ctx->work->print(f.path);
-    ctx->work->print('\t');
+    Serial.printf("[OTA WL WRITE] path='%s'\n", f.path);
+    Serial.printf("[OTA WL WRITE] size=%lu\n", (unsigned long)f.size);
+    Serial.printf("[OTA WL WRITE] sha.len=%u sha='%s'\n", (unsigned)strlen(f.sha256), f.sha256);
+
+    ctx->work->write((const uint8_t *)f.path, strlen(f.path));
+    ctx->work->write('\t');
     ctx->work->print((unsigned long)f.size);
-    ctx->work->print('\t');
-    ctx->work->print(f.sha256);
-    ctx->work->print('\n');
+    ctx->work->write('\t');
+    ctx->work->write((const uint8_t *)f.sha256, 64);
+    ctx->work->write('\n');
+
+    Serial.printf("[OTA WL WRITE] wrote line for path='%s'\n", f.path);
 
     if (!(*ctx->work))
     {
@@ -297,12 +303,16 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
     return false;
   }
 
+  // wipe old worklist safely (ESP32 does not support truncate)
+  if (SD.exists(assetOtaWorklistPath()))
+  {
+    SD.remove(assetOtaWorklistPath());
+  }
+  
   File work = SD.open(assetOtaWorklistPath(), FILE_WRITE);
   if (!work)
   {
-    Serial.printf("[OTA WL] fail: open worklist %s\n", assetOtaWorklistPath());
-    mf.close();
-    SD.remove(tmpManifestPath);
+    Serial.println("[OTA WL] FAIL open");
     return false;
   }
 
@@ -983,7 +993,11 @@ static bool parseManifestJsonDiffOnly(Stream &input, size_t contentLen, const As
         f.sha256[j] = (char)tolower((unsigned char)f.sha256[j]);
 
       if (strlen(f.sha256) != 64)
-        continue;
+      {
+        Serial.printf("[OTA WL WRITE] ERROR bad sha before write len=%u path=%s sha='%s'\n", (unsigned)strlen(f.sha256),
+                      f.path, f.sha256);
+        return false;
+      }
     }
     else
     {
@@ -992,7 +1006,7 @@ static bool parseManifestJsonDiffOnly(Stream &input, size_t contentLen, const As
 
     if (!manifestEntryMatchesLocal(localManifest, f))
       outChangedFiles.push_back(f);
-
+      
     if ((fileIndex % 25) == 0)
     {
       Serial.printf("[OTA] diff-parse progress=%u/%u changed=%u free=%u largest=%u\n", fileIndex, totalFiles,

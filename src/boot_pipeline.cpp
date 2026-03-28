@@ -483,7 +483,7 @@ static bool runBootAssetProvision()
   }
 
   runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());
-  
+
   // If assets are still missing, this is a mandatory provisioning failure.
   // Stay blocked on the provisioning/error screen.
   if (g_assetsMissing)
@@ -858,25 +858,34 @@ void postBootInitTick()
         return;
       }
 
-      String importedSsid;
-      String importedPwd;
+      // First prefer creds we previously saved ourselves.
+      String storedSsid, storedPwd;
+      if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
+      {
+        Serial.printf("[BOOTPIPE] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
+        wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
+        uiActionEnterState(UIState::BOOT_WIFI_WAIT, Tab::TAB_PET, true);
+        return;
+      }
 
+      // If none are stored, try launcher import.
+      String importedSsid, importedPwd;
       if (launcherImportWifiCreds(importedSsid, importedPwd))
       {
-        wifiStoreSave(importedSsid, importedPwd);
-        settingsSetWifiEnabled(true);
-        saveSettingsToSD();
-
-        bootWifiSetImportedInfo(importedSsid.c_str());
+        Serial.printf("[BOOTPIPE] launcher creds found for SSID: %s\n", importedSsid.c_str());
         wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-
+        bootWifiSetImportedInfo(importedSsid.c_str());
         uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
-      }
-      else
-      {
-        uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
+        return;
       }
 
+      Serial.println("[BOOTPIPE] no stored wifi creds and no launcher import; entering BOOT_WIFI_PROMPT");
+      uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
+      requestFullUIRedraw();
+      invalidateBackgroundCache();
+      requestUIRedraw();
+      renderUI();
+      clearInputLatch();
       return;
     }
 

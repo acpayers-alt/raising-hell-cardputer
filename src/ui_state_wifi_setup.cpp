@@ -30,6 +30,14 @@ static inline uint8_t clampU8(uint8_t v, uint8_t lo, uint8_t hi)
 
 static inline uint8_t currentMaxLen() { return (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID) ? 32 : 64; }
 
+static void wifiResetConnectUiState()
+{
+  g_wifi.connectResultPending = false;
+  g_wifi.connectResultSuccess = false;
+  g_wifi.connectResultShownAtMs = 0;
+  g_wifi.aborted = false;
+}
+
 static void wifiSetupResetForStage(uint8_t stage)
 {
   g_wifi.setupStage = clampU8(stage, WIFI_SETUP_STAGE_SCAN, WIFI_SETUP_STAGE_PASS);
@@ -283,6 +291,7 @@ static void wifiSetupSelect()
     saveSettingsToSD();
   }
 
+  wifiResetConnectUiState();
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
   uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_wifi.returnTab, true);
   requestUIRedraw();

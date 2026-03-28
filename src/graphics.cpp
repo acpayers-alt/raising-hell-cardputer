@@ -64,6 +64,7 @@
 #include "version.h"
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
+#include <WiFi.h>
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -981,6 +982,9 @@ static void drawBootWifiImportedScreen()
 // -----------------------------------------------------------------------------
 void drawBootWifiWaitScreen(bool connected, int rssi)
 {
+  (void)connected;
+  (void)rssi;
+
   spr.fillScreen(TFT_BLACK);
   spr.setTextDatum(TL_DATUM);
   spr.setTextFont(2);
@@ -990,7 +994,22 @@ void drawBootWifiWaitScreen(bool connected, int rssi)
   const char *ssid = wifiConsoleSsid();
   const uint32_t ageMs = wifiConsoleConnectAgeMs();
   const uint32_t ageS = ageMs / 1000;
-  const char *st = wifiConsoleStatusString();
+  const int wl = WiFi.status();
+
+  const char *st = nullptr;
+  switch (wl)
+  {
+    case WL_CONNECTED:         st = "Connected"; break;
+    case WL_IDLE_STATUS:       st = "Idle"; break;
+    case WL_NO_SSID_AVAIL:     st = "SSID not found"; break;
+    case WL_CONNECT_FAILED:    st = "Connect failed"; break;
+    case WL_CONNECTION_LOST:   st = "Connection lost"; break;
+    case WL_DISCONNECTED:      st = "Disconnected"; break;
+    default:                   st = "Connecting..."; break;
+  }
+  
+  const bool reallyConnected = (wl == WL_CONNECTED);
+  const int liveRssi = reallyConnected ? WiFi.RSSI() : 0;
 
   spr.drawString("Connecting WiFi...", 10, 10);
 
@@ -1002,15 +1021,14 @@ void drawBootWifiWaitScreen(bool connected, int rssi)
   spr.drawString((String("Status: ") + st).c_str(), 10, 46);
   spr.drawString((String("Elapsed: ") + String(ageS) + "s").c_str(), 10, 64);
 
-  if (connected)
+  if (reallyConnected)
   {
-    spr.drawString("Connected", 10, 86);
-    spr.drawString(("RSSI: " + String(rssi)).c_str(), 10, 104);
+    spr.drawString("WiFi connected", 10, 86);
+    spr.drawString(("RSSI: " + String(liveRssi)).c_str(), 10, 104);
     spr.drawString("Advancing to Timezone...", 10, 126);
   }
   else
   {
-    // Make failure state obvious after a reasonable wait.
     if (ageS >= 20)
     {
       spr.drawString("Still not connected.", 10, 92);
@@ -4923,42 +4941,62 @@ static void drawWifiConnectWaitScreen()
   const int contentH = SCREEN_H - TOP_BAR_H;
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
-  spr.setTextDatum(CC_DATUM);
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  if (g_wifi.connectResultPending)
+  const char *ssid = wifiConsoleSsid();
+  const uint32_t ageMs = wifiConsoleConnectAgeMs();
+  const uint32_t ageS = ageMs / 1000;
+
+  const int wl = WiFi.status();
+  const bool reallyConnected = (wl == WL_CONNECTED);
+  const int liveRssi = reallyConnected ? WiFi.RSSI() : 0;
+
+  const char *st = nullptr;
+  switch (wl)
   {
-    if (g_wifi.connectResultSuccess)
+    case WL_CONNECTED:       st = "Connected"; break;
+    case WL_IDLE_STATUS:     st = "Idle"; break;
+    case WL_NO_SSID_AVAIL:   st = "SSID not found"; break;
+    case WL_CONNECT_FAILED:  st = "Connect failed"; break;
+    case WL_CONNECTION_LOST: st = "Connection lost"; break;
+    case WL_DISCONNECTED:    st = "Disconnected"; break;
+    default:                 st = "Connecting..."; break;
+  }
+
+  spr.drawString("Connecting WiFi...", 10, contentY + 10);
+
+  if (ssid && ssid[0])
+    spr.drawString((String("SSID: ") + ssid).c_str(), 10, contentY + 28);
+  else if (wifiSetupSsid[0])
+    spr.drawString((String("SSID: ") + String(wifiSetupSsid)).c_str(), 10, contentY + 28);
+  else
+    spr.drawString("SSID: (none)", 10, contentY + 28);
+
+  spr.drawString((String("Status: ") + st).c_str(), 10, contentY + 46);
+  spr.drawString((String("Elapsed: ") + String(ageS) + "s").c_str(), 10, contentY + 64);
+
+  if (reallyConnected)
+  {
+    spr.drawString("WiFi connected", 10, contentY + 86);
+    spr.drawString((String("RSSI: ") + String(liveRssi)).c_str(), 10, contentY + 104);
+  }
+  else
+  {
+    if (ageS >= 15)
     {
-      spr.setTextColor(TFT_WHITE, TFT_BLACK);
-      spr.drawString("Connected!", SCREEN_W / 2, contentY + 34, 2);
+      spr.drawString("Still not connected.", 10, contentY + 92);
+      spr.drawString("Check password/signal.", 10, contentY + 110);
     }
     else
     {
-      spr.setTextColor(TFT_WHITE, TFT_BLACK);
-      spr.drawString("Connection failed", SCREEN_W / 2, contentY + 28, 2);
-      spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-      spr.drawString("Please retry", SCREEN_W / 2, contentY + 52, 2);
+      spr.drawString("Not connected yet", 10, contentY + 92);
     }
-
-    spr.setTextDatum(TL_DATUM);
-    return;
   }
 
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("Connecting...", SCREEN_W / 2, contentY + 22, 2);
-
-  if (wifiSetupSsid[0])
-  {
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString(wifiSetupSsid, SCREEN_W / 2, contentY + 46, 2);
-  }
-
-  const uint32_t ageMs = wifiConsoleConnectAgeMs();
-  char line[24];
-  snprintf(line, sizeof(line), "%lus", (unsigned long)(ageMs / 1000));
-  spr.drawString(line, SCREEN_W / 2, contentY + 70, 2);
-
-  spr.setTextDatum(TL_DATUM);
+  spr.setTextDatum(CC_DATUM);
 }
 
 // ============================================================================

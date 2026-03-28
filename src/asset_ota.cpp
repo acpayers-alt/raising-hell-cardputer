@@ -66,12 +66,25 @@ bool assetOtaWorklistOpenRead(File *out)
 bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 {
   if (!out)
+  {
+    Serial.println("[OTA WL READ] fail: null out");
     return false;
+  }
 
-  char buf[256];
+  char buf[1024];
   int len = in.readBytesUntil('\n', buf, sizeof(buf) - 1);
-  if (len <= 0)
+  if (len == (int)sizeof(buf) - 1)
+  {
+    Serial.printf("[OTA WL READ] ERROR: line too long/truncated len=%d pos=%u size=%u\n", len, (unsigned)in.position(),
+                  (unsigned)in.size());
     return false;
+  }
+
+  if (len <= 0)
+  {
+    Serial.printf("[OTA WL READ] stop: len=%d pos=%u size=%u\n", len, (unsigned)in.position(), (unsigned)in.size());
+    return false;
+  }
 
   buf[len] = '\0';
 
@@ -79,19 +92,38 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
   line.trim();
 
   if (!line.length())
-    return false;
+  {
+    Serial.printf("[OTA WL READ] skip: blank line pos=%u size=%u\n", (unsigned)in.position(), (unsigned)in.size());
+    return assetOtaWorklistReadNext(in, out);
+  }
 
   int t1 = line.indexOf('\t');
   int t2 = line.indexOf('\t', t1 + 1);
   if (t1 < 0 || t2 < 0)
-    return false;
+  {
+    Serial.printf("[OTA WL READ] skip: malformed line pos=%u size=%u line='%s'\n", (unsigned)in.position(),
+                  (unsigned)in.size(), line.c_str());
+    return assetOtaWorklistReadNext(in, out);
+  }
 
   String path = line.substring(0, t1);
   String sizeStr = line.substring(t1 + 1, t2);
   String sha = line.substring(t2 + 1);
   sha.trim();
 
+  if (sha.length() != 64)
+  {
+    Serial.printf("[OTA WL READ] skip: bad sha len=%u path='%s' sha='%s'\n", (unsigned)sha.length(), path.c_str(),
+                  sha.c_str());
+    return assetOtaWorklistReadNext(in, out);
+  }
+
+  Serial.printf("[OTA WL READ] path='%s'\n", path.c_str());
+  Serial.printf("[OTA WL READ] size='%s'\n", sizeStr.c_str());
+  Serial.printf("[OTA WL READ] sha.len=%u sha='%s'\n", (unsigned)sha.length(), sha.c_str());
+
   AssetManifestFile f{};
+
   strlcpy(f.path, path.c_str(), sizeof(f.path));
   f.size = (uint32_t)sizeStr.toInt();
   strlcpy(f.sha256, sha.c_str(), sizeof(f.sha256));
@@ -100,9 +132,27 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
   return true;
 }
 
+static AssetOtaConfig s_cfg{};
+static AssetOtaState s_state{};
+static AssetOtaStatus s_status = AssetOtaStatus::IDLE;
+static AssetOtaError s_lastErr = AssetOtaError::NONE;
+static String s_installedVersion;
+static bool s_inited = false;
+static bool s_loadedFromSd = false;
+static bool s_graphicsReleasedForOta = false;
+static bool s_assetOtaConfirmActive = false;
+
 static String assetFileResolvedUrl(const String &packVersion, const AssetManifestFile &f)
 {
-  String url = "https://assets.raisinghellgame.com/assets/";
+  String url;
+
+  const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
+
+  if (ch == AssetOtaChannel::DEV)
+    url = "https://pub-a9c969dd35ff4978af986e2e2b6a0d00.r2.dev/assets/";
+  else
+    url = "https://assets.raisinghellgame.com/assets/";
+
   if (!url.endsWith("/"))
     url += "/";
 
@@ -116,16 +166,6 @@ static String assetFileResolvedUrl(const String &packVersion, const AssetManifes
   url += f.path;
   return url;
 }
-
-static AssetOtaConfig s_cfg{};
-static AssetOtaState s_state{};
-static AssetOtaStatus s_status = AssetOtaStatus::IDLE;
-static AssetOtaError s_lastErr = AssetOtaError::NONE;
-static String s_installedVersion;
-static bool s_inited = false;
-static bool s_loadedFromSd = false;
-static bool s_graphicsReleasedForOta = false;
-static bool s_assetOtaConfirmActive = false;
 
 bool assetOtaConfirmActive() { return s_assetOtaConfirmActive; }
 
@@ -201,15 +241,26 @@ static bool localAssetMatches(const AssetManifestFile &f)
   String livePath = "/";
   livePath += f.path;
 
+  Serial.printf("[VERIFY] checking %s\n", livePath.c_str());
+
   if (!SD.exists(livePath.c_str()))
+  {
+    Serial.printf("[VERIFY] MISSING %s\n", livePath.c_str());
     return false;
+  }
 
   File lf = SD.open(livePath.c_str(), FILE_READ);
   if (!lf)
-    return false;
-
-  if ((uint32_t)lf.size() != f.size)
   {
+    Serial.printf("[VERIFY] OPEN FAIL %s\n", livePath.c_str());
+    return false;
+  }
+
+  const uint32_t actualSize = (uint32_t)lf.size();
+  if (actualSize != f.size)
+  {
+    Serial.printf("[VERIFY] SIZE FAIL %s actual=%u expected=%u\n", livePath.c_str(), (unsigned)actualSize,
+                  (unsigned)f.size);
     lf.close();
     return false;
   }
@@ -219,7 +270,6 @@ static bool localAssetMatches(const AssetManifestFile &f)
   mbedtls_sha256_starts(&ctx, 0);
 
   uint8_t buf[4096];
-
   while (true)
   {
     int r = lf.read(buf, sizeof(buf));
@@ -235,17 +285,30 @@ static bool localAssetMatches(const AssetManifestFile &f)
   mbedtls_sha256_finish(&ctx, hash);
   mbedtls_sha256_free(&ctx);
 
-  String hex;
-  hex.reserve(64);
+  String gotHash;
+  gotHash.reserve(64);
 
   static const char *digits = "0123456789abcdef";
   for (int i = 0; i < 32; ++i)
   {
-    hex += digits[(hash[i] >> 4) & 0x0F];
-    hex += digits[hash[i] & 0x0F];
+    gotHash += digits[(hash[i] >> 4) & 0x0F];
+    gotHash += digits[hash[i] & 0x0F];
   }
 
-  return hex.equalsIgnoreCase(f.sha256);
+  String wantHash(f.sha256);
+  wantHash.toLowerCase();
+  wantHash.trim();
+
+  if (!gotHash.equalsIgnoreCase(wantHash))
+  {
+    Serial.printf("[VERIFY] HASH FAIL %s\n", livePath.c_str());
+    Serial.printf("[VERIFY] got=%s\n", gotHash.c_str());
+    Serial.printf("[VERIFY] want=%s\n", wantHash.c_str());
+    return false;
+  }
+
+  Serial.printf("[VERIFY] OK %s\n", livePath.c_str());
+  return true;
 }
 
 static const char *statusString(AssetOtaStatus st)
@@ -399,16 +462,40 @@ static bool installStagedFile(const String &relPath, const String &stagingPath)
   String livePath = "/";
   livePath += relPath;
 
-  if (!assetOtaEnsureParentDir(livePath.c_str()))
+  Serial.printf("\n[INSTALL] =========\n");
+  Serial.printf("[INSTALL] rel=%s\n", relPath.c_str());
+  Serial.printf("[INSTALL] staging=%s\n", stagingPath.c_str());
+  Serial.printf("[INSTALL] live=%s\n", livePath.c_str());
+
+  if (!SD.exists(stagingPath.c_str()))
+  {
+    Serial.println("[INSTALL] ERROR: staging file missing");
     return false;
+  }
+
+  if (!assetOtaEnsureParentDir(livePath.c_str()))
+  {
+    Serial.println("[INSTALL] ERROR: mkdir failed");
+    return false;
+  }
 
   if (SD.exists(livePath.c_str()))
+  {
+    Serial.println("[INSTALL] removing existing file");
     SD.remove(livePath.c_str());
+  }
 
   if (!SD.rename(stagingPath.c_str(), livePath.c_str()))
+  {
+    Serial.println("[INSTALL] ERROR: rename failed");
     return false;
+  }
 
-  return true;
+  bool exists = SD.exists(livePath.c_str());
+
+  Serial.printf("[INSTALL] DONE exists=%d\n", exists);
+
+  return exists;
 }
 
 static void loadAssetOtaFromSdIfAvailable()
@@ -576,16 +663,15 @@ bool assetOtaCheckNow(String *outMessage)
   s_state.status = (uint8_t)s_status;
   s_state.lastError = (uint8_t)AssetOtaError::NONE;
   s_state.currentFileIndex = 0;
+  s_state.totalFileCount = 0;
   s_state.targetPackVersion[0] = '\0';
   assetOtaStateSave(s_state);
   otaRedrawProvisionScreen("Checking assets...", "Downloading manifest...");
 
-  Serial.printf("[OTA DBG] loadedFromSd=%d channel=%u\n", s_loadedFromSd ? 1 : 0, (unsigned)s_cfg.channel);
-
   const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
 
-  Serial.printf("[OTA DBG] manifestUrl=%s\n", manifestUrl);
+  Serial.printf("[OTA] manifestUrl=%s\n", manifestUrl ? manifestUrl : "(null)");
   if (!manifestUrl || !manifestUrl[0])
   {
     setFailure(AssetOtaError::NO_MANIFEST);
@@ -596,6 +682,7 @@ bool assetOtaCheckNow(String *outMessage)
   }
 
   AssetManifestData localManifest;
+  assetManifestLoadLocal(&localManifest);
 
   Serial.printf("[OTA] before cleanup free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
@@ -609,9 +696,9 @@ bool assetOtaCheckNow(String *outMessage)
                 (unsigned)ESP.getMaxAllocHeap());
 
   String remotePackVersion;
-  uint16_t changedCount = 0;
+  std::vector<AssetManifestFile> changedFiles;
 
-  if (!assetManifestBuildWorklistFromRemote(manifestUrl, localManifest, &remotePackVersion, &changedCount))
+  if (!assetManifestDownloadDiffOnly(manifestUrl, localManifest, &remotePackVersion, changedFiles))
   {
     setFailure(AssetOtaError::JSON_FAIL);
     if (outMessage)
@@ -619,6 +706,8 @@ bool assetOtaCheckNow(String *outMessage)
     restoreMainUiSprite();
     return false;
   }
+
+  const uint16_t changedCount = (uint16_t)changedFiles.size();
 
   strncpy(s_state.targetPackVersion, remotePackVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
@@ -665,26 +754,16 @@ bool assetOtaCheckNow(String *outMessage)
     return true;
   }
 
-  File work;
-  if (!assetOtaWorklistOpenRead(&work))
-  {
-    setFailure(AssetOtaError::STATE_IO);
-    if (outMessage)
-      *outMessage = "Failed to open OTA worklist";
-    restoreMainUiSprite();
-    return false;
-  }
+  uint16_t installOkCount = 0;
+  uint16_t skipCount = 0;
 
-  AssetManifestFile mf{};
-  uint16_t i = 0;
-
-  while (assetOtaWorklistReadNext(work, &mf))
+  for (uint16_t idx = 0; idx < changedCount; ++idx)
   {
-    ++i;
+    const AssetManifestFile &mf = changedFiles[idx];
 
     s_status = AssetOtaStatus::DOWNLOADING;
     s_state.status = (uint8_t)s_status;
-    s_state.currentFileIndex = i;
+    s_state.currentFileIndex = (uint16_t)(idx + 1);
     assetOtaStateSave(s_state);
 
     otaRedrawProvisionScreen("Downloading assets...", mf.path);
@@ -694,11 +773,12 @@ bool assetOtaCheckNow(String *outMessage)
     if (!assetManifestNormalizePath(rawPath, &rel))
     {
       Serial.printf("[OTA] skipping invalid manifest path: %s\n", rawPath.c_str());
+      ++skipCount;
       continue;
     }
 
     AssetManifestFile dlFile{};
-    strlcpy(dlFile.path, rawPath.c_str(), sizeof(dlFile.path));
+    strlcpy(dlFile.path, rel.c_str(), sizeof(dlFile.path));
     strlcpy(dlFile.sha256, mf.sha256, sizeof(dlFile.sha256));
     dlFile.size = mf.size;
 
@@ -711,7 +791,7 @@ bool assetOtaCheckNow(String *outMessage)
       stagingPath = "";
       dlErr = "";
 
-      Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, rawPath.c_str());
+      Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, rel.c_str());
 
       String url = assetFileResolvedUrl(remotePackVersion, dlFile);
       if (assetDownloadToStaging(url, dlFile, &stagingPath, &dlErr))
@@ -731,19 +811,10 @@ bool assetOtaCheckNow(String *outMessage)
 
     if (!dlOk)
     {
-      work.close();
-
-      if (dlErr.indexOf("SHA256") >= 0)
-        setFailure(AssetOtaError::HASH_MISMATCH);
-      else if (dlErr.indexOf("size") >= 0 || dlErr.indexOf("Size") >= 0)
-        setFailure(AssetOtaError::SIZE_MISMATCH);
-      else
-        setFailure(AssetOtaError::HTTP_FAIL);
-
-      if (outMessage)
-        *outMessage = dlErr;
-      restoreMainUiSprite();
-      return false;
+      ++skipCount;
+      Serial.printf("[OTA] SKIP FAILED FILE: rel=%s err=%s\n", rel.c_str(), dlErr.c_str());
+      Serial.printf("[OTA] SKIP FAILED URL: %s\n", assetFileResolvedUrl(remotePackVersion, dlFile).c_str());
+      continue;
     }
 
     s_status = AssetOtaStatus::INSTALLING;
@@ -754,228 +825,72 @@ bool assetOtaCheckNow(String *outMessage)
 
     if (!installStagedFile(rel, stagingPath))
     {
-      work.close();
       setFailure(AssetOtaError::RENAME_FAIL);
       if (outMessage)
-        *outMessage = "Install failed";
+      {
+        *outMessage = "Install failed: ";
+        *outMessage += rel;
+      }
       restoreMainUiSprite();
       return false;
     }
 
-    delay(25);
+    ++installOkCount;
+    Serial.printf("[OTA] INSTALL COUNT ok=%u skipped=%u current=%s\n", (unsigned)installOkCount,
+                  (unsigned)skipCount, rel.c_str());
   }
 
-while (assetOtaWorklistReadNext(work, &mf))
-{
-  ++i;
+  Serial.printf("[OTA] INSTALL LOOP DONE ok=%u skipped=%u expected=%u\n", (unsigned)installOkCount,
+                (unsigned)skipCount, (unsigned)changedCount);
 
-  s_status = AssetOtaStatus::DOWNLOADING;
-  s_state.status = (uint8_t)s_status;
-  s_state.currentFileIndex = i;
-  assetOtaStateSave(s_state);
-
-  otaRedrawProvisionScreen("Downloading assets...", mf.path);
-
-  String rawPath(mf.path);
-  String rel;
-  if (!assetManifestNormalizePath(rawPath, &rel))
+  // ===== POST-INSTALL VERIFY =====
   {
-    Serial.printf("[OTA] skipping invalid manifest path: %s\n", rawPath.c_str());
-    continue;
-  }
+    uint16_t verifyChanged = 0;
 
-  AssetManifestFile dlFile{};
-  strlcpy(dlFile.path, rawPath.c_str(), sizeof(dlFile.path));
-  strlcpy(dlFile.sha256, mf.sha256, sizeof(dlFile.sha256));
-  dlFile.size = mf.size;
+    Serial.printf("[OTA] verify pass starting...\n");
 
-  String stagingPath;
-  String dlErr;
-  bool dlOk = false;
-
-  for (int attempt = 1; attempt <= 3; ++attempt)
-  {
-    stagingPath = "";
-    dlErr = "";
-
-    Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, rawPath.c_str());
-
-    String url = assetFileResolvedUrl(remotePackVersion, dlFile);
-    if (assetDownloadToStaging(url, dlFile, &stagingPath, &dlErr))
+    for (size_t idx = 0; idx < changedFiles.size(); ++idx)
     {
-      dlOk = true;
-      break;
+      const AssetManifestFile &vf = changedFiles[idx];
+
+      String rawPath(vf.path);
+      String rel;
+      if (!assetManifestNormalizePath(rawPath, &rel))
+      {
+        Serial.printf("[OTA VERIFY] skip bad path: %s\n", vf.path);
+        continue;
+      }
+
+      AssetManifestFile check{};
+      strlcpy(check.path, rel.c_str(), sizeof(check.path));
+      check.size = vf.size;
+      strlcpy(check.sha256, vf.sha256, sizeof(check.sha256));
+
+      if (!localAssetMatches(check))
+      {
+        Serial.printf("[OTA VERIFY FAIL] %s\n", rel.c_str());
+        verifyChanged++;
+      }
     }
 
-    Serial.printf("[OTA] file attempt failed: %s\n", dlErr.c_str());
+    Serial.printf("[OTA] verify result: remainingChanged=%u\n", (unsigned)verifyChanged);
 
-    delay(500);
-
-    uint32_t waitStart = millis();
-    while (!wifiIsConnectedNow() && (millis() - waitStart) < 5000)
-      delay(100);
-  }
-
-  if (!dlOk)
-  {
-    work.close();
-
-    if (dlErr.indexOf("SHA256") >= 0)
-      setFailure(AssetOtaError::HASH_MISMATCH);
-    else if (dlErr.indexOf("size") >= 0 || dlErr.indexOf("Size") >= 0)
-      setFailure(AssetOtaError::SIZE_MISMATCH);
-    else
-      setFailure(AssetOtaError::HTTP_FAIL);
-
-    if (outMessage)
-      *outMessage = dlErr;
-    restoreMainUiSprite();
-    return false;
-  }
-
-  s_status = AssetOtaStatus::INSTALLING;
-  s_state.status = (uint8_t)s_status;
-  assetOtaStateSave(s_state);
-
-  otaRedrawProvisionScreen("Installing asset...", rel.c_str());
-
-  if (!installStagedFile(rel, stagingPath))
-  {
-    work.close();
-    setFailure(AssetOtaError::RENAME_FAIL);
-    if (outMessage)
-      *outMessage = "Install failed";
-    restoreMainUiSprite();
-    return false;
-  }
-
-  delay(25);
-}
-
-while (assetOtaWorklistReadNext(work, &mf))
-{
-  ++i;
-
-  s_status = AssetOtaStatus::DOWNLOADING;
-  s_state.status = (uint8_t)s_status;
-  s_state.currentFileIndex = i;
-  assetOtaStateSave(s_state);
-
-  otaRedrawProvisionScreen("Downloading assets...", mf.path);
-
-  String rawPath(mf.path);
-  String rel;
-  if (!assetManifestNormalizePath(rawPath, &rel))
-  {
-    Serial.printf("[OTA] skipping invalid manifest path: %s\n", rawPath.c_str());
-    continue;
-  }
-
-  AssetManifestFile dlFile{};
-  strlcpy(dlFile.path, rawPath.c_str(), sizeof(dlFile.path));
-  strlcpy(dlFile.sha256, mf.sha256, sizeof(dlFile.sha256));
-  dlFile.size = mf.size;
-
-  String stagingPath;
-  String dlErr;
-  bool dlOk = false;
-
-  for (int attempt = 1; attempt <= 3; ++attempt)
-  {
-    stagingPath = "";
-    dlErr = "";
-
-    Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, rawPath.c_str());
-
-    String url = assetFileResolvedUrl(remotePackVersion, dlFile);
-    if (assetDownloadToStaging(url, dlFile, &stagingPath, &dlErr))
+    if (verifyChanged != 0)
     {
-      dlOk = true;
-      break;
+      setFailure(AssetOtaError::WRITE_FAIL);
+      if (outMessage)
+      {
+        *outMessage = "Install incomplete (";
+        *outMessage += (int)verifyChanged;
+        *outMessage += " files remaining)";
+      }
+      Serial.printf("[OTA] VERIFY FAILED - NOT promoting manifest\n");
+      restoreMainUiSprite();
+      return false;
     }
 
-    Serial.printf("[OTA] file attempt failed: %s\n", dlErr.c_str());
-
-    delay(500);
-
-    uint32_t waitStart = millis();
-    while (!wifiIsConnectedNow() && (millis() - waitStart) < 5000)
-      delay(100);
+    Serial.printf("[OTA] verify pass OK\n");
   }
-
-  if (!dlOk)
-  {
-    work.close();
-
-    if (dlErr.indexOf("SHA256") >= 0)
-      setFailure(AssetOtaError::HASH_MISMATCH);
-    else if (dlErr.indexOf("size") >= 0 || dlErr.indexOf("Size") >= 0)
-      setFailure(AssetOtaError::SIZE_MISMATCH);
-    else
-      setFailure(AssetOtaError::HTTP_FAIL);
-
-    if (outMessage)
-      *outMessage = dlErr;
-    restoreMainUiSprite();
-    return false;
-  }
-
-  s_status = AssetOtaStatus::INSTALLING;
-  s_state.status = (uint8_t)s_status;
-  assetOtaStateSave(s_state);
-
-  otaRedrawProvisionScreen("Installing asset...", rel.c_str());
-
-  if (!installStagedFile(rel, stagingPath))
-  {
-    work.close();
-    setFailure(AssetOtaError::RENAME_FAIL);
-    if (outMessage)
-      *outMessage = "Install failed";
-    restoreMainUiSprite();
-    return false;
-  }
-
-  delay(25);
-}
-
-work.close();
-
-// ===== POST-INSTALL VERIFY =====
-{
-  uint16_t verifyChanged = 0;
-  AssetManifestData verifyLocal;
-  String verifyVersion;
-
-  Serial.printf("[OTA] verify pass starting...\n");
-
-  if (!assetManifestBuildWorklistFromRemote(manifestUrl, verifyLocal, &verifyVersion, &verifyChanged))
-  {
-    setFailure(AssetOtaError::JSON_FAIL);
-    if (outMessage)
-      *outMessage = "Verify pass failed";
-    restoreMainUiSprite();
-    return false;
-  }
-
-  Serial.printf("[OTA] verify result: remainingChanged=%u\n", (unsigned)verifyChanged);
-
-  if (verifyChanged != 0)
-  {
-    setFailure(AssetOtaError::WRITE_FAIL);
-    if (outMessage)
-    {
-      *outMessage = "Install incomplete (";
-      *outMessage += (int)verifyChanged;
-      *outMessage += " files remaining)";
-    }
-    Serial.printf("[OTA] VERIFY FAILED - NOT promoting manifest\n");
-    restoreMainUiSprite();
-    return false;
-  }
-
-  Serial.printf("[OTA] verify pass OK\n");
-}
 
   const char *tmpManifestPath = "/manifest.remote.tmp";
   const char *localManifestPath = assetOtaLocalManifestPath();
@@ -1073,5 +988,6 @@ work.close();
     *outMessage += ")";
   }
 
+  restoreMainUiSprite();
   return true;
 }

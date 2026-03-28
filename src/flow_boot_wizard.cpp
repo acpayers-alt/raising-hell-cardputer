@@ -1,13 +1,14 @@
 #include "flow_boot_wizard.h"
 
-#include "ui_actions.h"
-#include "launcher_wifi_import.h"
-#include "wifi_store.h"
 #include "flow_boot_wifi.h"
+#include "launcher_wifi_import.h"
+#include "ui_actions.h"
+#include "wifi_store.h"
 #include "wifi_time.h"
+#include "ui_state_wifi_connect_wait.h"
 
 UIState g_bootWizardAfterOkState = UIState::BOOT;
-Tab     g_bootWizardAfterOkTab   = Tab::TAB_PET;
+Tab g_bootWizardAfterOkTab = Tab::TAB_PET;
 
 void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
 {
@@ -20,34 +21,33 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
   String importedPwd;
 
   const bool imported = launcherImportWifiCreds(importedSsid, importedPwd);
-  Serial.printf("[BOOTWIZ] launcherImportWifiCreds=%d ssid='%s'\n",
-                imported ? 1 : 0,
-                importedSsid.c_str());
+  Serial.printf("[BOOTWIZ] launcherImportWifiCreds=%d ssid='%s'\n", imported ? 1 : 0, importedSsid.c_str());
 
-  if (imported)
+  // Try stored creds first.
   {
-    Serial.println("[BOOTWIZ] importing launcher wifi and entering BOOT_WIFI_IMPORTED");
-
-    wifiStoreSave(importedSsid, importedPwd);
-    bootWifiSetImportedInfo(importedSsid.c_str());
-    wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-
-    uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
-    return;
+    String storedSsid, storedPwd;
+    if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
+    {
+      Serial.printf("[BOOTWIZ] entering BOOT_WIFI_WAIT from stored creds ssid='%s'\n", storedSsid.c_str());
+      wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
+      uiActionEnterState(UIState::BOOT_WIFI_WAIT, Tab::TAB_PET, true);
+      return;
+    }
   }
 
-  const bool hasStored = wifiStoreHasCreds();
-  Serial.printf("[BOOTWIZ] wifiStoreHasCreds=%d\n", hasStored ? 1 : 0);
-
-  if (hasStored)
+  // If no stored creds, try launcher import once.
   {
-    String ssid;
-    String pwd;
-    if (wifiStoreLoad(ssid, pwd))
+    String importedSsid, importedPwd;
+    const bool imported = launcherImportWifiCreds(importedSsid, importedPwd);
+    Serial.printf("[BOOTWIZ] launcherImportWifiCreds=%d ssid='%s'\n", imported ? 1 : 0, importedSsid.c_str());
+
+    if (imported)
     {
-      Serial.printf("[BOOTWIZ] entering BOOT_WIFI_WAIT from stored creds ssid='%s'\n", ssid.c_str());
-      wifiConsoleBeginConnect(ssid.c_str(), pwd.c_str());
-      uiActionEnterState(UIState::BOOT_WIFI_WAIT, Tab::TAB_PET, true);
+      Serial.println("[BOOTWIZ] importing launcher wifi and entering BOOT_WIFI_IMPORTED");
+      wifiResetConnectUiState();
+      wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+      bootWifiSetImportedInfo(importedSsid.c_str());
+      uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
       return;
     }
   }

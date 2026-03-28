@@ -6,6 +6,22 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 
+ALLOWED_EXTS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".json",
+    ".txt",
+    ".csv",
+    ".bin",
+    ".dat",
+    ".wav",
+    ".mp3",
+    ".ogg",
+}
 
 def sha256_file(path: Path):
     h = hashlib.sha256()
@@ -30,6 +46,11 @@ def build_manifest(asset_root: Path, version: str, channel: str):
         if not f.is_file():
             continue
 
+        if f.suffix.lower() not in ALLOWED_EXTS:
+            rel = f.relative_to(asset_root.parent).as_posix()
+            print("Skipping non-runtime asset:", rel)
+            continue
+
         rel = f.relative_to(asset_root.parent).as_posix()
         print("Hashing:", rel)
 
@@ -43,7 +64,7 @@ def build_manifest(asset_root: Path, version: str, channel: str):
 
     manifest = {
         "packVersion": version,
-        "pack_version": version,  # backward compatibility
+        "pack_version": version,
         "channel": channel,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "fileCount": len(files),

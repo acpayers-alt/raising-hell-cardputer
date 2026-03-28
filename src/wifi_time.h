@@ -39,3 +39,6 @@ const char* wifiConsoleIpString();
 uint32_t    wifiConsoleConnectAgeMs();
 int         wifiConsoleStatus();
 const char* wifiConsoleStatusString();
+
+void wifiForceSntpPending();
+void wifiStartSntpNow();
