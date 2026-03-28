@@ -243,7 +243,18 @@ bool sdAssetsPresent()
   if (!g_sdReady)
     return false;
 
-  return SD.exists("/raising_hell/assets/manifest_local.json");
+  const char *localManifestPath = "/raising_hell/assets/manifest_local.json";
+
+  if (!SD.exists(localManifestPath))
+    return false;
+
+  const AssetOtaStatus st = assetOtaStatus();
+
+  // Do not trust local manifest while OTA is actively checking/downloading/installing/failing.
+  if (st != AssetOtaStatus::IDLE && st != AssetOtaStatus::SUCCESS)
+    return false;
+
+  return true;
 }
 
 // -----------------------------------------------------------------------------
