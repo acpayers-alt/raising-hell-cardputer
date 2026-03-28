@@ -70,21 +70,18 @@ static void wifiSetupRunBlockingScan()
 
   applyWifiPower(true);
   WiFi.persistent(false);
-  WiFi.mode(WIFI_MODE_NULL);
-  delay(100);
-
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   WiFi.disconnect(false, true);
   WiFi.scanDelete();
-  delay(300);
+  delay(150);
 
   Serial.printf("[WIFI SETUP] blocking scan begin mode=%d status=%d\n", (int)WiFi.getMode(), (int)WiFi.status());
 
   const int n = WiFi.scanNetworks(false, true);
 
-  Serial.printf("[WIFI SETUP] blocking scan result n=%d mode=%d status=%d\n", n, (int)WiFi.getMode(),
-                (int)WiFi.status());
+  Serial.printf("[WIFI SETUP] blocking scan result n=%d mode=%d status=%d\n",
+                n, (int)WiFi.getMode(), (int)WiFi.status());
 
   g_wifi.scanInProgress = false;
   g_wifi.scanCount = 0;
@@ -270,13 +267,28 @@ static void wifiSetupSelect()
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID)
   {
     wifiSetupCommitBufferToCurrentField();
+
+    if (g_wifi.ssid[0] == '\0')
+    {
+      requestUIRedraw();
+      return;
+    }
+
     wifiSetupBeginPasswordEntry();
     return;
   }
 
+  // PASS stage
   wifiSetupCommitBufferToCurrentField();
 
-  wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
+  if (g_wifi.ssid[0] == '\0')
+  {
+    strncpy(g_wifi.buf, g_wifi.ssid, sizeof(g_wifi.buf) - 1);
+    g_wifi.buf[sizeof(g_wifi.buf) - 1] = '\0';
+    g_wifi.setupStage = WIFI_SETUP_STAGE_SSID;
+    requestUIRedraw();
+    return;
+  }
 
   if (g_wifiSetupFromBootWizard)
   {
@@ -286,8 +298,12 @@ static void wifiSetupSelect()
 
   wifiResetConnectUiState();
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
+
+  clearInputLatch();
+  inputForceClear();
+
+  uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_wifi.returnTab, true);
   requestUIRedraw();
-  return;
 }
 
 static void wifiSetupNavLeft()
@@ -312,7 +328,8 @@ static void wifiSetupNavRight()
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID)
   {
     wifiSetupCommitBufferToCurrentField();
-    wifiSetupBeginPasswordEntry();
+    if (g_wifi.ssid[0] != '\0')
+      wifiSetupBeginPasswordEntry();
   }
 }
 
@@ -351,8 +368,8 @@ static void wifiSetupNavDown()
 // -----------------------------------------------------------------------------
 void uiWifiSetupHandle(InputState &in)
 {
-
   static uint32_t s_lastWifiInputSig = 0;
+  (void)s_lastWifiInputSig;
 
   uint32_t sig = 0;
   sig |= (uint32_t)(in.upOnce ? 1 : 0) << 0;
@@ -408,10 +425,8 @@ void uiWifiSetupHandle(InputState &in)
     }
   }
 
-  // Nav (kept harmless; screen mostly uses left/right stage switching).
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_SCAN)
   {
-    // Cardputer nav cluster can arrive as queued punctuation chars.
     for (int i = 0; i < 8; ++i)
     {
       if (in.kbQHead == in.kbQTail)
@@ -433,7 +448,6 @@ void uiWifiSetupHandle(InputState &in)
       }
     }
 
-    // Confirm/back come from input_cardputer.cpp as edge flags in non-text mode.
     if (in.selectOnce)
       wifiSetupSelect();
 
@@ -453,7 +467,6 @@ void uiWifiSetupHandle(InputState &in)
     }
   }
 
-  // If text changed, swallow remaining queued key events this tick.
   if (didTextChange)
     uiDrainKb(in);
 }

@@ -6,6 +6,7 @@
 #include "timezone.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <cstring>
@@ -14,9 +15,6 @@
 static bool s_waitSntpBeforeSync = true;
 static uint32_t s_consoleConnectStartMs = 0;
 static bool s_wifiEventHooked = false;
-
-void wifiTimeInit();
-void wifiTimeTick();
 
 // Enable toggle
 bool wifiIsEnabled();
@@ -28,10 +26,6 @@ int wifiRssi();
 bool timeIsSynced();
 
 bool wifiIsConnectedNow() { return (WiFi.status() == WL_CONNECTED); }
-
-// -----------------------------------------------------------------------------
-// Serial-pressure-safe debug
-// -----------------------------------------------------------------------------
 
 // ---- State ----
 static bool s_wifiConnected = false;
@@ -58,10 +52,14 @@ static bool s_sntpStartedThisConnect = false;
 static uint32_t s_sntpStartAtMs = 0;
 static uint32_t s_sntpStartedAtMs = 0;
 
-static void tryWiFiConnect();
+static bool s_wifiEnabled = false;
+static char s_consoleSsidBuf[33] = {0};
+static char s_consoleIpBuf[32] = {0};
 
-// IMPORTANT: This must be ABOVE wifiTimeTick (or forward-declared).
-// Also: guard is owned here (do NOT set it before calling).
+// Forward declarations
+static void tryWiFiConnect();
+static void onWiFiEvent(WiFiEvent_t event);
+
 static void startSntpOnce()
 {
   if (s_sntpStartedThisConnect)
@@ -69,7 +67,6 @@ static void startSntpOnce()
 
   applyTimezoneIndex(tzIndex);
 
-  // Heavy: DNS + SNTP setup. Must only run from tick/loop context.
   configTime(0, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
 
   applyTimezoneIndex(tzIndex);
@@ -80,11 +77,8 @@ static void startSntpOnce()
   DBGLN_ON("[TIME] SNTP started");
 }
 
-static bool s_wifiEnabled = false;
-
 bool wifiIsEnabled() { return s_wifiEnabled; }
-
-static char s_consoleSsidBuf[33] = {0};
+bool wifiGetEnabled() { return s_wifiEnabled; }
 
 void wifiConsoleBeginConnect(const char *ssid, const char *pass)
 {
@@ -95,7 +89,6 @@ void wifiConsoleBeginConnect(const char *ssid, const char *pass)
 
   wifiSetEnabled(true);
 
-  // Clear cached runtime state first.
   s_wifiConnected = false;
   s_timeSynced = false;
   s_rssi = -127;
@@ -113,23 +106,24 @@ void wifiConsoleBeginConnect(const char *ssid, const char *pass)
   strncpy(s_consoleSsidBuf, ssid, sizeof(s_consoleSsidBuf) - 1);
   s_consoleSsidBuf[sizeof(s_consoleSsidBuf) - 1] = '\0';
 
-  // Force a clean station session.
+  if (!s_wifiEventHooked)
+  {
+    WiFi.onEvent(onWiFiEvent);
+    s_wifiEventHooked = true;
+  }
+
   WiFi.persistent(false);
-  WiFi.setAutoReconnect(false);
-  WiFi.setSleep(false);
-
-  WiFi.disconnect(true, false);
-  delay(100);
-
-  WiFi.mode(WIFI_OFF);
-  delay(50);
-
-  WiFi.mode(WIFI_STA);
-  delay(50);
-
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);
+  WiFi.mode(WIFI_STA);
+
+  // Keep the driver alive; just clear current association/scan state.
+  WiFi.disconnect(false, false);
   WiFi.scanDelete();
+  delay(50);
+
+  Serial.printf("[WIFI] begin connect ssid='%s' mode=%d status=%d\n",
+                ssid, (int)WiFi.getMode(), (int)WiFi.status());
 
   WiFi.begin(ssid, pass);
   s_lastWifiAttemptMs = millis();
@@ -137,7 +131,8 @@ void wifiConsoleBeginConnect(const char *ssid, const char *pass)
 
 void wifiConsoleDisconnect(bool eraseCreds)
 {
-  WiFi.disconnect(true, eraseCreds);
+  WiFi.disconnect(false, eraseCreds);
+  WiFi.scanDelete();
 
   s_wifiConnected = false;
   s_timeSynced = false;
@@ -180,8 +175,6 @@ void wifiStartSntpNow()
   s_sntpStartedAtMs = millis();
 }
 
-static char s_consoleIpBuf[32] = {0};
-
 const char *wifiConsoleIpString()
 {
   if (!wifiIsConnectedNow())
@@ -197,7 +190,6 @@ const char *wifiConsoleIpString()
 
 const char *wifiConsoleSsid()
 {
-  // Prefer live SSID if connected, else last requested
   if (wifiIsConnectedNow())
   {
     String s = WiFi.SSID();
@@ -239,7 +231,6 @@ void wifiSetEnabled(bool en)
   else
   {
     WiFi.mode(WIFI_STA);
-    // no forced connect here unless credentials exist
   }
 }
 
@@ -276,7 +267,7 @@ const char *wifiConsoleStatusString()
 }
 
 // WiFi event handler (Arduino-ESP32)
-// IMPORTANT: This may run in an event/task context. NEVER do Serial or configTime here.
+// IMPORTANT: no Serial/configTime here.
 static void onWiFiEvent(WiFiEvent_t event)
 {
   switch (event)
@@ -321,7 +312,7 @@ void wifiTimeInit()
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.persistent(false);
-  WiFi.setSleep(false); // responsiveness
+  WiFi.setSleep(false);
 
   if (!s_wifiEventHooked)
   {
@@ -366,20 +357,15 @@ void wifiTimeTick()
     return;
 
   const uint32_t now = millis();
-
-  // Treat very recent input as "interactive time" (keeps tab switching snappy).
   const bool interactive = ((uint32_t)(now - g_lastInputActivityMs) < 250UL);
 
-  // Throttles
   static uint32_t s_lastStatusCheckMs = 0;
   static uint32_t s_lastSntpLogMs = 0;
 
   const uint32_t STATUS_CHECK_MS = 500;
-  const uint32_t POST_SNTP_QUIET_MS = 400;
   const uint32_t TIME_CHECK_MS = 1000;
   const uint32_t SNTP_START_DELAY_MS = 750;
 
-  // ---- Consume events ----
   if (s_evtDisc)
   {
     s_evtDisc = false;
@@ -421,7 +407,6 @@ void wifiTimeTick()
     }
   }
 
-  // ---- Safety net: poll WiFi.status() (throttled, and NEVER while interactive) ----
   if (!interactive && (now - s_lastStatusCheckMs >= STATUS_CHECK_MS))
   {
     s_lastStatusCheckMs = now;
@@ -459,7 +444,6 @@ void wifiTimeTick()
     }
   }
 
-  // ---- Connect retry (non-blocking, and not while interactive) ----
   const bool reallyConnected = (WiFi.status() == WL_CONNECTED);
 
   if (!reallyConnected)
@@ -472,31 +456,24 @@ void wifiTimeTick()
     return;
   }
 
-  // ---- Start SNTP once per connection (never while interactive) ----
   if (!interactive && !s_sntpStartedThisConnect && s_sntpStartAtMs != 0 && (int32_t)(now - s_sntpStartAtMs) >= 0)
   {
-
     startSntpOnce();
     if (s_sntpStartedThisConnect)
-    {
       s_sntpStartedAtMs = now;
-    }
   }
 
-  // ---- RSSI update (skip while interactive) ----
   if (!interactive && (now - s_lastRssiMs >= RSSI_POLL_MS))
   {
     s_lastRssiMs = now;
     s_rssi = WiFi.RSSI();
   }
 
-  // ---- Time sync detection (skip while interactive; quiet window after SNTP) ----
   if (!s_timeSynced && !interactive && (now - s_lastTimeCheckMs >= TIME_CHECK_MS))
   {
     s_lastTimeCheckMs = now;
 
     time_t t = time(nullptr);
-
     if (t > 1704067200)
     {
       s_timeSynced = true;
@@ -506,9 +483,6 @@ void wifiTimeTick()
   }
 }
 
-bool wifiGetEnabled() { return s_wifiEnabled; }
-
-// ---- UI helpers ----
 bool wifiIsConnected() { return WiFi.status() == WL_CONNECTED; }
 int wifiRssi() { return s_rssi; }
 

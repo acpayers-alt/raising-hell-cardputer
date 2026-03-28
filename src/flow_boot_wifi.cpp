@@ -228,50 +228,81 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   {
     settingsSetWifiEnabled(true);
     saveSettingsToSD();
-
-    Serial.printf("[BOOTWIZ] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
-    wifiResetConnectUiState();
-    wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
-
-    uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
-  }
-  // If no stored creds exist, try launcher import once.
-  else if (launcherImportWifiCreds(importedSsid, importedPwd))
-  {
-    settingsSetWifiEnabled(true);
-    saveSettingsToSD();
-
-    bootWifiSetImportedInfo(importedSsid.c_str());
-    wifiResetConnectUiState();
-    wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-
-    uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
-  }
-  // Otherwise go to manual setup.
-  else
-  {
-    g_wifiSetupFromBootWizard = true;
-    wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
-    wifiSetupSsid[0] = 0;
-    wifiSetupPass[0] = 0;
-    wifiSetupBuf[0] = 0;
-
-    g_wifi.scanStarted = false;
-    g_wifi.scanInProgress = false;
-    g_wifi.scanCount = 0;
-    g_wifi.scanIndex = 0;
+  
+    Serial.printf("[BOOTWIFI] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
+  
     g_wifi.connectFailCount = 0;
-
-    settingsSetWifiEnabled(true);
-    saveSettingsToSD();
-
+    g_wifi.aborted = false;
     g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
     g_wifi.returnTab = g_bootWizardAfterOkTab;
-    g_wifi.aborted = false;
-
+  
+    strlcpy(wifiSetupSsid, storedSsid.c_str(), sizeof(wifiSetupSsid));
+    strlcpy(wifiSetupPass, storedPwd.c_str(), sizeof(wifiSetupPass));
+    wifiSetupBuf[0] = 0;
+  
     wifiResetConnectUiState();
-    uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
+    wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
+  
+    uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
+    requestUIRedraw();
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+    return;
   }
+
+  // If no stored creds exist, try launcher import once.
+  if (launcherImportWifiCreds(importedSsid, importedPwd))
+  {
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+  
+    Serial.printf("[BOOTWIFI] using imported wifi creds ssid='%s'\n", importedSsid.c_str());
+  
+    bootWifiSetImportedInfo(importedSsid.c_str());
+  
+    g_wifi.connectFailCount = 0;
+    g_wifi.aborted = false;
+    g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+    g_wifi.returnTab = g_bootWizardAfterOkTab;
+  
+    strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
+    strlcpy(wifiSetupPass, importedPwd.c_str(), sizeof(wifiSetupPass));
+    wifiSetupBuf[0] = 0;
+  
+    wifiResetConnectUiState();
+    wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+  
+    uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
+    requestUIRedraw();
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+    return;
+  }
+  
+  // Otherwise go to manual setup.
+  g_wifiSetupFromBootWizard = true;
+  wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+  wifiSetupSsid[0] = 0;
+  wifiSetupPass[0] = 0;
+  wifiSetupBuf[0] = 0;
+
+  g_wifi.scanStarted = false;
+  g_wifi.scanInProgress = false;
+  g_wifi.scanCount = 0;
+  g_wifi.scanIndex = 0;
+  g_wifi.connectFailCount = 0;
+
+  settingsSetWifiEnabled(true);
+  saveSettingsToSD();
+
+  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnTab = g_bootWizardAfterOkTab;
+  g_wifi.aborted = false;
+
+  wifiResetConnectUiState();
+  uiActionEnterState(UIState::WIFI_SETUP, g_bootWizardAfterOkTab, true);
 
   requestUIRedraw();
   uiActionSwallowAll(in);
@@ -292,8 +323,16 @@ static void bootWifiFallBackToManualEntry(InputState &in)
   g_wifiSetupFromBootWizard = true;
   g_wifi.connectFailCount = 0;
 
-  wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
-  wifiSetupSsid[0] = 0;
+  // If we already know an SSID, start at password entry.
+  if (wifiSetupSsid[0] != 0)
+  {
+    wifiSetupStage = WIFI_SETUP_STAGE_PASS;
+  }
+  else
+  {
+    wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+  }
+
   wifiSetupPass[0] = 0;
   wifiSetupBuf[0] = 0;
 
@@ -328,16 +367,19 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
   wifiSetupPass[0] = 0;
   wifiSetupBuf[0] = 0;
 
-  if (g_wifi.connectFailCount < 2)
+  const bool haveKnownSsid = (wifiSetupSsid[0] != 0);
+
+  if (g_wifi.connectFailCount < 2 && haveKnownSsid)
   {
     // First failure: retry password for same SSID
     wifiSetupStage = WIFI_SETUP_STAGE_PASS;
   }
   else
   {
-    // Second failure: back to scan picker
+    // Second failure, or no SSID known: back to scan picker
     g_wifi.connectFailCount = 0;
     wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+    wifiSetupSsid[0] = 0;
 
     g_wifi.scanStarted = false;
     g_wifi.scanInProgress = false;
