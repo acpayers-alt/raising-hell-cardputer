@@ -67,13 +67,8 @@ static void serialBootHandshake(uint32_t waitMs)
     delay(10);
   }
 
-  // If the port opens slightly later, spam a short banner so you still catch it.
-  // (Harmless if no host; writes are dropped.)
-  const uint32_t t1 = millis();
-  while ((millis() - t1) < 300) {
-    Serial.println("[BOOT] serial up");
-    delay(30);
-  }
+  // One-shot banner only.
+  Serial.println("[BOOT] serial up");
 }
 
 void appSetup() {
