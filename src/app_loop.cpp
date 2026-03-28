@@ -42,7 +42,6 @@
 #include "ui_tabs.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include "ui_actions.h"
 
 #include <Arduino.h>
 #include <cstring>
@@ -154,10 +153,8 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   appServicesTick(now);
 
-  const bool inDeathFlow = (g_app.uiState == UIState::DEATH) ||
-                           (g_app.uiState == UIState::DEATH_TRANSITION) ||
-                           (g_app.uiState == UIState::MINI_GAME) ||
-                           (g_app.uiState == UIState::BURIAL_SCREEN);
+  const bool inDeathFlow = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::DEATH_TRANSITION) ||
+                           (g_app.uiState == UIState::MINI_GAME) || (g_app.uiState == UIState::BURIAL_SCREEN);
 
   const bool screenOnNow = isScreenOn();
 
@@ -194,7 +191,7 @@ void appMainLoopTick()
     {
       pet.update();
     }
-    
+
     // Near-death beep MUST work even with screen off.
     if (g_app.uiState != UIState::DEATH_TRANSITION)
     {
@@ -381,13 +378,31 @@ void appMainLoopTick()
   }
 
   // AUTO SCREEN
-  if (hasUserActivity(input))
+  const bool keepScreenAwakeForProvision = g_bootAssetProvisionActive || g_bootUiBlockedForAssetProvision;
+
+  if (keepScreenAwakeForProvision)
+  {
     noteUserActivity();
 
-  autoScreenTick();
+    if (!isScreenOn() && (uint32_t)(now - screenPowerLastManualToggleMs()) > 250)
+    {
+      SET_SCREEN_POWER(true);
+      invalidateBackgroundCache();
+      requestUIRedraw();
+      clearInputLatch();
+    }
+  }
+  else
+  {
+    if (hasUserActivity(input))
+      noteUserActivity();
+
+    autoScreenTick();
+  }
 
   if (!isScreenOn())
   {
+
 #if LED_STATUS_ENABLED
     ledSetScreenOff(true);
     ledUpdatePetStatus(computeLedMode());
@@ -672,15 +687,15 @@ void appMainLoopTick()
 
   static bool s_prevDbgRedraw = false;
   static int s_prevDbgUiState = -1;
-  
+
   static constexpr bool kLogUiStateTransitions = false;
-  
+
   if (kLogUiStateTransitions && (int)g_app.uiState != s_prevDbgUiState)
   {
     Serial.printf("[UI STATE] uiState=%d screenOn=%d\n", (int)g_app.uiState, (int)isScreenOn());
     s_prevDbgUiState = (int)g_app.uiState;
   }
-  
+
   const bool sleepingNow2 = isPetSleepingNow();
 
   if (!s_prevSleeping && sleepingNow2)
@@ -688,7 +703,7 @@ void appMainLoopTick()
   if (s_prevSleeping && !sleepingNow2)
     soundWake();
   s_prevSleeping = sleepingNow2;
-  
+
   const bool inDeathTransition = (g_app.uiState == UIState::DEATH_TRANSITION);
 
   if (!inDeathTransition)
@@ -696,35 +711,35 @@ void appMainLoopTick()
     soundLowHealthTick((uint8_t)pet.health, sleepingNow2,
                        /*screenOn=*/isScreenOn(),
                        /*inDeathScreen=*/inDeathFlow);
-  
+
     if (g_sdReady)
     {
       animTick();
     }
-  
+
     sleepAnimHeartbeat(now);
     sleepMiniStatsHeartbeat(now);
   }
-    
+
   if (g_app.uiState == UIState::DEATH_TRANSITION)
   {
     tickDeathTransition(millis());
   }
-  
+
   if (consumeUIRedrawRequest())
   {
     renderUI();
   }
-  
+
   wifiTimeTick();
   if (g_timeAnchorAttempted || timeIsSynced())
     updateTime();
   updateBattery();
   saveManagerTick();
   maybePeriodicTimeSave();
-  
-  #if LED_STATUS_ENABLED
+
+#if LED_STATUS_ENABLED
   ledSetScreenOff(false);
   ledUpdatePetStatus(computeLedMode());
-  #endif
-  }
+#endif
+}
