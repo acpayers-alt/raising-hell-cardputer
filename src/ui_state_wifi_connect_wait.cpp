@@ -125,10 +125,16 @@ void uiWifiConnectWaitHandle(InputState &in)
     s_connectWaitStartedAtMs = 0;
     g_wifi.connectFailCount = 0;
 
-    if (g_wifi.ssid[0])
+    if (g_wifi.ssid[0] && g_wifi.pass[0])
     {
       wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
       Serial.printf("[WIFI] saved working creds for SSID: %s\n", g_wifi.ssid);
+    }
+    else
+    {
+      Serial.printf("[WIFI] skip save: ssid='%s' passLen=%u\n",
+                    g_wifi.ssid,
+                    (unsigned)strlen(g_wifi.pass));
     }
 
     wifiResetConnectUiState();

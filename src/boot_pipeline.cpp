@@ -467,19 +467,34 @@ static bool runBootAssetProvision()
   if (ok && !g_assetsMissing)
   {
     s_bootAssetProvisionHandled = true;
-
+  
     if (g_bootAssetProvisionMustComplete)
     {
       writePostProvisionControlsHelpFlag();
       settingsSetWifiEnabled(true);
       saveSettingsToSD();
+  
+      // Persist working Wi-Fi creds before reboot if we have them.
+      if (wifiStoreHasCreds())
+      {
+        String ssidDbg, pwdDbg;
+        const bool loaded = wifiStoreLoad(ssidDbg, pwdDbg);
+        Serial.printf("[WIFI] pre-restart store check: loaded=%d ssid='%s' passLen=%u\n",
+                      loaded ? 1 : 0,
+                      loaded ? ssidDbg.c_str() : "",
+                      loaded ? (unsigned)pwdDbg.length() : 0);
+      }
+      else
+      {
+        Serial.println("[WIFI] pre-restart store check: no stored creds");
+      }
     }
-
+  
     g_bootAssetProvisionActive = false;
     g_bootUiBlockedForAssetProvision = false;
     ESP.restart();
   }
-
+  
   runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());
 
   // Allow retry after failure (for example, after the user fixes Wi-Fi creds).

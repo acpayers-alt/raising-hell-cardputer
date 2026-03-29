@@ -228,21 +228,21 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   {
     settingsSetWifiEnabled(true);
     saveSettingsToSD();
-  
+
     Serial.printf("[BOOTWIFI] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
-  
+
     g_wifi.connectFailCount = 0;
     g_wifi.aborted = false;
     g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
     g_wifi.returnTab = g_bootWizardAfterOkTab;
-  
+
     strlcpy(wifiSetupSsid, storedSsid.c_str(), sizeof(wifiSetupSsid));
     strlcpy(wifiSetupPass, storedPwd.c_str(), sizeof(wifiSetupPass));
     wifiSetupBuf[0] = 0;
-  
+
     wifiResetConnectUiState();
     wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
-  
+
     uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     uiActionSwallowAll(in);
@@ -256,23 +256,23 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   {
     settingsSetWifiEnabled(true);
     saveSettingsToSD();
-  
+
     Serial.printf("[BOOTWIFI] using imported wifi creds ssid='%s'\n", importedSsid.c_str());
-  
+
     bootWifiSetImportedInfo(importedSsid.c_str());
-  
+
     g_wifi.connectFailCount = 0;
     g_wifi.aborted = false;
     g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
     g_wifi.returnTab = g_bootWizardAfterOkTab;
-  
+
     strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
     strlcpy(wifiSetupPass, importedPwd.c_str(), sizeof(wifiSetupPass));
     wifiSetupBuf[0] = 0;
-  
+
     wifiResetConnectUiState();
     wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-  
+
     uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     uiActionSwallowAll(in);
@@ -280,7 +280,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     clearInputLatch();
     return;
   }
-  
+
   // Otherwise go to manual setup.
   g_wifiSetupFromBootWizard = true;
   wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
@@ -460,6 +460,36 @@ void uiBootWifiWaitHandle(InputState &in)
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
+
+    // Persist working creds immediately on boot/provisioning success.
+    // Prefer the live setup buffers if they are populated.
+    const char *ssidToSave = nullptr;
+    const char *passToSave = nullptr;
+
+    if (wifiSetupSsid[0] && wifiSetupPass[0])
+    {
+      ssidToSave = wifiSetupSsid;
+      passToSave = wifiSetupPass;
+    }
+    else if (g_wifi.ssid[0] && g_wifi.pass[0])
+    {
+      ssidToSave = g_wifi.ssid;
+      passToSave = g_wifi.pass;
+    }
+
+    if (ssidToSave && passToSave)
+    {
+      wifiStoreSave(String(ssidToSave), String(passToSave));
+      Serial.printf("[WIFI] boot flow saved creds for SSID: %s\n", ssidToSave);
+    }
+    else
+    {
+      Serial.printf("[WIFI] boot flow skip save: setupPassLen=%u gpassLen=%u setupSsid='%s' gssid='%s'\n",
+                    (unsigned)strlen(wifiSetupPass),
+                    (unsigned)strlen(g_wifi.pass),
+                    wifiSetupSsid,
+                    g_wifi.ssid);
+    }
 
     const bool tzDetected = bootTryDetectTimezoneFromWifi();
 

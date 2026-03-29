@@ -302,6 +302,19 @@ static void wifiSetupSelect()
     saveSettingsToSD();
   }
 
+  // Persist creds immediately on submit while this is still the source-of-truth moment.
+  if (g_wifi.ssid[0] && g_wifi.pass[0])
+  {
+    wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
+    Serial.printf("[WIFI] setup saved creds for SSID: %s\n", g_wifi.ssid);
+  }
+  else
+  {
+    Serial.printf("[WIFI] setup skip save: ssid='%s' passLen=%u\n",
+                  g_wifi.ssid,
+                  (unsigned)strlen(g_wifi.pass));
+  }
+
   wifiResetConnectUiState();
   wifiConsoleBeginConnect(g_wifi.ssid, g_wifi.pass);
 
