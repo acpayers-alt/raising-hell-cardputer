@@ -33,6 +33,7 @@
 #include "user_toggles_state.h"
 #include "app_lifecycle.h"
 #include "ui_actions.h"
+#include "new_pet_flow_state.h"
 
 static bool dirty = false;
 static uint32_t lastSaveMs = 0;
@@ -128,7 +129,7 @@ static void forceChoosePetFlowFromBoot()
   // The pending-name flag must survive until the pet is actually finalized
   // from NAME_PET.
   // clearNamePendingFlag();
-  
+
   g_choosePetInputUnlockMs = millis() + 350;
   g_choosePetBlockHatchUntilRelease = true;
   // Go to Choose Pet flow state
