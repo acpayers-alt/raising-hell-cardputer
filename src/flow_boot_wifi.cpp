@@ -544,30 +544,11 @@ void uiBootNtpWaitHandle(InputState &in)
     uiDrainKb(in);
     clearInputLatch();
 
-    if (g_bootAssetProvisionMustComplete)
-    {
-      uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
-      requestFullUIRedraw();
-      requestUIRedraw();
-      return;
-    }
-
-    UIState nextState = g_bootWizardAfterOkState;
-
-    if (nextState == UIState::CHOOSE_PET)
-    {
-      g_choosePetBlockHatchUntilRelease = true;
-      g_choosePetInputUnlockMs = millis() + 350;
-    }
-    else
-    {
-      bootSetupClearPendingFlag();
-    }
-
-    uiActionEnterState(nextState, g_bootWizardAfterOkTab, true);
+    uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+    requestFullUIRedraw();
     requestUIRedraw();
     return;
   }
-
+  
   uiActionSwallowAll(in);
 }

@@ -7,4 +7,16 @@
 #define RH_VERSION_LABEL "eldritch"
 #define RH_VERSION_STRING "1.1.0"
 
+#ifndef PUBLIC_BUILD
+#define PUBLIC_BUILD 0
+#endif
+
+#if PUBLIC_BUILD
+#define RH_BUILD_FLAVOR_STRING "public"
+#else
+#define RH_BUILD_FLAVOR_STRING "dev"
+#endif
+
+#define RH_BUILD_ID_STRING RH_VERSION_STRING "-" RH_VERSION_LABEL "-" RH_BUILD_FLAVOR_STRING
+
 #define RH_MIN_REQUIRED_ASSET_PACK "1.1.0"

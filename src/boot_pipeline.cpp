@@ -16,6 +16,7 @@
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
 #include "boot_state.h"
+#include "boot_firmware_marker.h"
 #include "brightness_state.h"
 #include "controls_help_state.h"
 #include "debug.h"
@@ -494,7 +495,7 @@ static bool runBootAssetProvision()
     g_bootUiBlockedForAssetProvision = false;
     ESP.restart();
   }
-  
+
   runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());
 
   // Allow retry after failure (for example, after the user fixes Wi-Fi creds).
@@ -803,6 +804,8 @@ void postBootInitTick()
 
     const UIState afterOk = appLifecycleResolveBootAfterOkState(saveFileExists);
 
+    bootMarkFirmwareSeenAndRequestProvisionIfChanged();
+    
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool provisionTooOld = bootAssetPackTooOld();

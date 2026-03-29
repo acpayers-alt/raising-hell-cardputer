@@ -5,6 +5,7 @@
 #include "asset_ota.h"
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
+#include "boot_firmware_marker.h"
 #include "build_flags.h"
 #include "currency.h"
 #include "debug.h"
@@ -493,6 +494,11 @@ static void execLine(char *line)
     logLine("  assetflag           show asset provision boot flag");
     logLine("  assetflag clear     clear asset provision boot flag");
     logLine("  assetflag set       set asset provision boot flag");
+    logLine("  fwmark              show firmware marker status");
+    logLine("  fwmark show         show stored/current build id");
+    logLine("  fwmark clear        clear stored build id");
+    logLine("  fwmark set <id>     set stored build id");
+    logLine("  fwmark reprovision  clear marker + set asset flag");
     logLine("  reboot              reboot device");
     logLine("  otach public|dev   set OTA channel");
     logLine("  otadev             switch to DEV OTA + provision + reboot");
@@ -859,9 +865,9 @@ static void execLine(char *line)
   }
 #endif
 
-// -------------------------------------------------
-// PET TORTURE (For...testing)
-// -------------------------------------------------
+  // -------------------------------------------------
+  // PET TORTURE (For...testing)
+  // -------------------------------------------------
 
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "hurtpet"))
@@ -1037,8 +1043,10 @@ static void execLine(char *line)
     logLine("Raising Hell");
 
     logf("Firmware: %s", RH_VERSION_STRING);
+    logf("Build ID:  %s", bootCurrentBuildId());
 
     const char *assetVer = assetOtaInstalledVersion();
+
     if (assetVer && assetVer[0])
       logf("Assets:   %s", assetVer);
     else
@@ -1128,9 +1136,14 @@ static void execLine(char *line)
   {
     const AssetOtaConfig &cfg = assetOtaGetConfig();
     const char *installed = assetOtaInstalledVersion();
+    String storedFwId;
+    const bool haveStoredFwId = bootFirmwareMarkerRead(storedFwId);
 
     logLine("Asset OTA status:");
     logf("  boot flag:       %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
+    logf("  build current:   %s", bootCurrentBuildId());
+    logf("  build stored:    %s",
+         haveStoredFwId ? (storedFwId.length() ? storedFwId.c_str() : "(none)") : "(read failed)");
 
     logf("  installed:       %s", (installed && installed[0]) ? installed : "(none)");
     logf("  min required:    %s", RH_MIN_REQUIRED_ASSET_PACK);
@@ -1294,18 +1307,92 @@ static void execLine(char *line)
     return;
   }
 
-  if (!strcmp(argv[0], "reboot"))
+  if (!strcmp(argv[0], "fwmark"))
   {
-    logLine("[OK] rebooting...");
-    delay(100);
-    ESP.restart();
+    if (argc == 1 || !strcmp(argv[1], "show"))
+    {
+      String stored;
+      const bool ok = bootFirmwareMarkerRead(stored);
+
+      logf("fw current: %s", bootCurrentBuildId());
+      logf("fw stored:  %s", ok ? (stored.length() ? stored.c_str() : "(none)") : "(read failed)");
+      logf("asset flag: %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
+      return;
+    }
+
+    if (!strcmp(argv[1], "clear"))
+    {
+      if (!bootFirmwareMarkerClear())
+      {
+        logLine("FAILED to clear firmware marker");
+        return;
+      }
+
+      logLine("[OK] firmware marker cleared");
+      logLine("[OK] reboot to simulate fresh flash");
+      return;
+    }
+
+    if (!strcmp(argv[1], "set"))
+    {
+      if (argc < 3)
+      {
+        logLine("Usage: fwmark set <id>");
+        return;
+      }
+
+      char idBuf[64];
+      idBuf[0] = '\0';
+
+      int pos = 0;
+      for (int i = 2; i < argc && pos < (int)sizeof(idBuf) - 1; i++)
+      {
+        if (i > 2 && pos < (int)sizeof(idBuf) - 1)
+          idBuf[pos++] = ' ';
+
+        for (const char *p = argv[i]; *p && pos < (int)sizeof(idBuf) - 1; ++p)
+          idBuf[pos++] = *p;
+      }
+      idBuf[pos] = '\0';
+
+      if (!bootFirmwareMarkerWrite(idBuf))
+      {
+        logLine("FAILED to write firmware marker");
+        return;
+      }
+
+      logf("[OK] firmware marker set: %s", idBuf);
+      return;
+    }
+
+    if (!strcmp(argv[1], "reprovision"))
+    {
+      if (!bootFirmwareMarkerClear())
+      {
+        logLine("FAILED to clear firmware marker");
+        return;
+      }
+
+      requestAssetProvisionOnNextBoot();
+      logLine("[OK] firmware marker cleared");
+      logLine("[OK] asset provision boot flag set");
+      logLine("[OK] reboot to test fresh-flash provisioning");
+      return;
+    }
+
+    logLine("Usage:");
+    logLine("  fwmark");
+    logLine("  fwmark show");
+    logLine("  fwmark clear");
+    logLine("  fwmark set <id>");
+    logLine("  fwmark reprovision");
     return;
   }
 
   if (!strcmp(argv[0], "reboot"))
   {
     logLine("[OK] rebooting...");
-    delay(100); // give serial + UI time to flush
+    delay(100);
     ESP.restart();
     return;
   }
