@@ -193,11 +193,9 @@ bool assetOtaConfigLoad(AssetOtaConfig *outCfg)
     return false;
   if (tmp.magic != 0x41544346UL || tmp.version != 1)
     return false;
-  if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
+    if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
     tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
-
-  tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
-
+    
   *outCfg = tmp;
   return true;
 }
