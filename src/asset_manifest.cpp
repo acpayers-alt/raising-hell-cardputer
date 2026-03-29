@@ -20,7 +20,7 @@
 
 // --- Forward declarations ---
 static bool parseManifestJsonWithCallback(File &input, size_t contentLen, String *outPackVersion, String *outChannel,
-  bool (*onFile)(const AssetManifestFile &, void *), void *ctx);
+                                          bool (*onFile)(const AssetManifestFile &, void *), void *ctx);
 
 static bool manifestEntryMatchesLocal(const AssetManifestData &localManifest, const AssetManifestFile &rf);
 
@@ -33,6 +33,8 @@ struct WorklistCtx
   uint16_t processed;
 };
 
+const char *assetManifestTempPath() { return "/manifest.remote.tmp"; }
+
 static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
 {
   WorklistCtx *ctx = (WorklistCtx *)ctxVoid;
@@ -43,33 +45,29 @@ static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
 
   if (!manifestLiveAssetMatches(f))
   {
-    Serial.printf("[OTA WL WRITE] path='%s'\n", f.path);
-    Serial.printf("[OTA WL WRITE] size=%lu\n", (unsigned long)f.size);
-    Serial.printf("[OTA WL WRITE] sha.len=%u sha='%s'\n", (unsigned)strlen(f.sha256), f.sha256);
-
-    char line[512];
+    char line[256];
 
     int len = snprintf(line, sizeof(line), "%s\t%lu\t%s\n",
                        f.path,
                        (unsigned long)f.size,
                        f.sha256);
-    
+
     if (len <= 0 || len >= (int)sizeof(line))
     {
       Serial.printf("[OTA WL WRITE] FAIL format path=%s\n", f.path);
       return false;
     }
-    
+
     size_t written = ctx->work->write((const uint8_t *)line, len);
-    
+
     if (written != (size_t)len)
     {
       Serial.printf("[OTA WL WRITE] FAIL partial write path=%s wrote=%u expected=%u\n",
-                    f.path, (unsigned)written, (unsigned)len);
+                    f.path,
+                    (unsigned)written,
+                    (unsigned)len);
       return false;
     }
-
-    Serial.printf("[OTA WL WRITE] wrote line for path='%s'\n", f.path);
 
     if (!(*ctx->work))
     {
@@ -78,23 +76,25 @@ static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
     }
 
     ctx->changed++;
-    Serial.printf("[OTA WL WRITE] changed=%u processed=%u path=%s sha.len=%u size=%u\n",
-      (unsigned)ctx->changed,
-      (unsigned)ctx->processed,
-      f.path,
-      (unsigned)strlen(f.sha256),
-      (unsigned)f.size);
+
+    if ((ctx->changed % 25) == 0)
+    {
+      Serial.printf("[OTA WL WRITE] changed=%u processed=%u free=%u largest=%u\n",
+                    (unsigned)ctx->changed,
+                    (unsigned)ctx->processed,
+                    (unsigned)ESP.getFreeHeap(),
+                    (unsigned)ESP.getMaxAllocHeap());
+    }
   }
-    else
-  {
-    Serial.printf("[OTA WL WRITE] unchanged processed=%u path=%s\n",
-                  (unsigned)ctx->processed,
-                  f.path);
-  }
+
+  // unified progress logging (outside branch)
   if ((ctx->processed % 25) == 0)
   {
-    Serial.printf("[OTA WL] progress processed=%u changed=%u free=%u largest=%u\n", (unsigned)ctx->processed,
-                  (unsigned)ctx->changed, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+    Serial.printf("[OTA WL] progress processed=%u changed=%u free=%u largest=%u\n",
+                  (unsigned)ctx->processed,
+                  (unsigned)ctx->changed,
+                  (unsigned)ESP.getFreeHeap(),
+                  (unsigned)ESP.getMaxAllocHeap());
   }
 
   return true;
@@ -185,6 +185,13 @@ static bool assetManifestSelfCheckWorklist(uint16_t expectedCount, uint16_t *out
   if (outReadableCount)
     *outReadableCount = 0;
 
+  // ✅ EARLY EXIT: empty worklist is valid
+  if (expectedCount == 0)
+  {
+    Serial.println("[OTA WL CHECK] empty worklist OK (expected=0)");
+    return true;
+  }
+
   File in;
   if (!assetOtaWorklistOpenRead(&in))
   {
@@ -193,47 +200,32 @@ static bool assetManifestSelfCheckWorklist(uint16_t expectedCount, uint16_t *out
   }
 
   uint16_t readable = 0;
+
   while (true)
   {
-    long beforePos = in.position();
-    
     AssetManifestFile mf{};
     if (!assetOtaWorklistReadNext(in, &mf))
     {
-      Serial.printf("[OTA WL CHECK RAW] failure at record #%u pos=%ld size=%u\n",
-                    (unsigned)(readable + 1),
-                    (long)in.position(),
-                    (unsigned)in.size());
+      // Only log as failure if we EXPECTED data
+      Serial.printf("[OTA WL CHECK RAW] stop at record #%u pos=%ld size=%u\n", (unsigned)(readable + 1),
+                    (long)in.position(), (unsigned)in.size());
       break;
     }
-    ++readable;
 
-    Serial.printf("[OTA WL CHECK] ok #%u path=%s sha.len=%u size=%u pos=%u\n",
-                  (unsigned)readable,
-                  mf.path,
-                  (unsigned)strlen(mf.sha256),
-                  (unsigned)mf.size,
-                  (unsigned)in.position());
+    ++readable;
   }
 
-  const uint32_t finalPos = (uint32_t)in.position();
-  const uint32_t fileSize = (uint32_t)in.size();
   in.close();
 
   if (outReadableCount)
     *outReadableCount = readable;
 
-  Serial.printf("[OTA WL CHECK] done readable=%u expected=%u finalPos=%u size=%u\n",
-                (unsigned)readable,
-                (unsigned)expectedCount,
-                (unsigned)finalPos,
-                (unsigned)fileSize);
+  Serial.printf("[OTA WL CHECK] done readable=%u expected=%u\n", (unsigned)readable, (unsigned)expectedCount);
 
   return true;
 }
 
-bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestData &localManifest,
-                                          String *outPackVersion, uint16_t *outChangedCount)
+bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersion, uint16_t *outChangedCount)
 {
   Serial.printf("[OTA WL] begin url=%s free=%u largest=%u\n", url ? url : "(null)", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
@@ -261,7 +253,7 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
     return false;
   }
 
-  const char *tmpManifestPath = "/manifest.remote.tmp";
+  const char *tmpManifestPath = assetManifestTempPath();
 
   if (SD.exists(tmpManifestPath))
     SD.remove(tmpManifestPath);
@@ -378,6 +370,7 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
     SD.remove(assetOtaWorklistPath());
   }
 
+  // ensure worklist directory exists
   if (!assetOtaEnsureParentDir(assetOtaWorklistPath()))
   {
     Serial.printf("[OTA WL] fail: ensure worklist dir for %s\n", assetOtaWorklistPath());
@@ -385,74 +378,61 @@ bool assetManifestBuildWorklistFromRemote(const char *url, const AssetManifestDa
     SD.remove(tmpManifestPath);
     return false;
   }
-
-  // wipe old worklist safely (ESP32 does not support truncate)
+  
+  // wipe old worklist safely
   if (SD.exists(assetOtaWorklistPath()))
   {
     SD.remove(assetOtaWorklistPath());
   }
   
+  // open fresh worklist
   File work = SD.open(assetOtaWorklistPath(), FILE_WRITE);
   if (!work)
   {
     Serial.println("[OTA WL] FAIL open");
+    mf.close();
+    SD.remove(tmpManifestPath);
+    return false;
+  }
+  
+  // create context ONCE
+  WorklistCtx ctx{&work, 0, 0};
+    
+  const bool ok = parseManifestJsonWithCallback(mf, mfLen, outPackVersion, &channel, manifestWorklistCallback, &ctx);
+
+  Serial.printf("[OTA WL] final worklist changed=%u processed=%u\n", (unsigned)ctx.changed, (unsigned)ctx.processed);
+
+  work.flush();
+  work.close();
+
+  if (!ok)
+  {
+    mf.close();
+    SD.remove(tmpManifestPath);
+    assetOtaWorklistClear();
     return false;
   }
 
-  WorklistCtx ctx{&work, 0, 0};
+  uint16_t readableCount = 0;
+  if (!assetManifestSelfCheckWorklist(ctx.changed, &readableCount))
+  {
+    Serial.printf("[OTA WL] self-check failed expected=%u readable=%u\n", (unsigned)ctx.changed,
+                  (unsigned)readableCount);
+    mf.close();
+    SD.remove(tmpManifestPath);
+    assetOtaWorklistClear();
+    return false;
+  }
 
-  const bool ok = parseManifestJsonWithCallback(mf, mfLen, outPackVersion, &channel, manifestWorklistCallback, &ctx);
-
-  Serial.printf("[OTA WL] final worklist changed=%u processed=%u\n",
-    (unsigned)ctx.changed,
-    (unsigned)ctx.processed);
-
-work.flush();
-work.close();
-
-if (!ok)
-{
-mf.close();
-SD.remove(tmpManifestPath);
-assetOtaWorklistClear();
-return false;
-}
-
-uint16_t readableCount = 0;
-if (!assetManifestSelfCheckWorklist(ctx.changed, &readableCount))
-{
-Serial.printf("[OTA WL] self-check failed expected=%u readable=%u\n",
-      (unsigned)ctx.changed,
-      (unsigned)readableCount);
-mf.close();
-SD.remove(tmpManifestPath);
-assetOtaWorklistClear();
-return false;
-}
-
-mf.close();
-
-Serial.printf("[OTA WL] parse result=%d changed=%u pack=%s channel=%s\n",
-    ok ? 1 : 0,
-    (unsigned)ctx.changed,
-    outPackVersion ? outPackVersion->c_str() : "",
-    channel.c_str());
-
-if (outChangedCount)
-*outChangedCount = ctx.changed;
-
-return true;
-
-if (readableCount != ctx.changed)
-{
-  Serial.printf("[OTA WL] self-check mismatch readable=%u changed=%u\n",
-                (unsigned)readableCount,
-                (unsigned)ctx.changed);
-  mf.close();
-  SD.remove(tmpManifestPath);
-  assetOtaWorklistClear();
-  return false;
-}
+  if (readableCount != ctx.changed)
+  {
+    Serial.printf("[OTA WL] self-check mismatch readable=%u changed=%u\n", (unsigned)readableCount,
+                  (unsigned)ctx.changed);
+    mf.close();
+    SD.remove(tmpManifestPath);
+    assetOtaWorklistClear();
+    return false;
+  }
 
   mf.close();
 
@@ -462,7 +442,7 @@ if (readableCount != ctx.changed)
   if (outChangedCount)
     *outChangedCount = ctx.changed;
 
-  return ok;
+  return true;
 }
 
 static bool saveStreamToFile(Stream &input, const char *path, size_t contentLen)
@@ -825,7 +805,7 @@ bool assetManifestDownloadRemote(const char *url, AssetManifestData *out)
     return false;
   }
 
-  const char *tmpManifestPath = "/manifest.remote.tmp";
+  const char *tmpManifestPath = assetManifestTempPath();
 
   if (SD.exists(tmpManifestPath))
     SD.remove(tmpManifestPath);
@@ -958,8 +938,8 @@ static bool manifestReadTopLevelHeader(File &input, String *outPackVersion, Stri
   DeserializationError err = deserializeJson(doc, input, DeserializationOption::Filter(filter));
   if (err || doc.overflowed())
   {
-    Serial.printf("[OTA WL] header parse failed: %s overflowed=%d\n",
-                  err ? err.c_str() : "Ok", doc.overflowed() ? 1 : 0);
+    Serial.printf("[OTA WL] header parse failed: %s overflowed=%d\n", err ? err.c_str() : "Ok",
+                  doc.overflowed() ? 1 : 0);
     return false;
   }
 
@@ -1150,8 +1130,8 @@ static bool manifestParseFileObjectJson(const String &json, AssetManifestFile *o
   DeserializationError err = deserializeJson(doc, json, DeserializationOption::Filter(filter));
   if (err || doc.overflowed())
   {
-    Serial.printf("[OTA WL] file object parse failed: %s overflowed=%d\n",
-                  err ? err.c_str() : "Ok", doc.overflowed() ? 1 : 0);
+    Serial.printf("[OTA WL] file object parse failed: %s overflowed=%d\n", err ? err.c_str() : "Ok",
+                  doc.overflowed() ? 1 : 0);
     return false;
   }
 
@@ -1190,60 +1170,59 @@ static bool manifestParseFileObjectJson(const String &json, AssetManifestFile *o
 }
 
 static bool parseManifestJsonWithCallback(File &input, size_t contentLen, String *outPackVersion, String *outChannel,
-  bool (*onFile)(const AssetManifestFile &, void *), void *ctx)
+                                          bool (*onFile)(const AssetManifestFile &, void *), void *ctx)
 {
-Serial.printf("[OTA WL] cb-parse start len=%u free=%u largest=%u\n",
-(unsigned)contentLen, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA WL] cb-parse start len=%u free=%u largest=%u\n", (unsigned)contentLen,
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-if (!manifestReadTopLevelHeader(input, outPackVersion, outChannel))
-return false;
+  if (!manifestReadTopLevelHeader(input, outPackVersion, outChannel))
+    return false;
 
-Serial.printf("[OTA WL] header pack=%s channel=%s\n",
-outPackVersion ? outPackVersion->c_str() : "",
-outChannel ? outChannel->c_str() : "");
+  Serial.printf("[OTA WL] header pack=%s channel=%s\n", outPackVersion ? outPackVersion->c_str() : "",
+                outChannel ? outChannel->c_str() : "");
 
-if (!manifestSeekFilesArray(input))
-return false;
+  if (!manifestSeekFilesArray(input))
+    return false;
 
-unsigned fileIndex = 0;
+  unsigned fileIndex = 0;
 
-while (true)
-{
-String objJson;
-bool done = false;
+  while (true)
+  {
+    String objJson;
+    bool done = false;
 
-if (!manifestReadNextFileObject(input, &objJson, &done))
-return false;
+    if (!manifestReadNextFileObject(input, &objJson, &done))
+      return false;
 
-if (done)
-break;
+    if (done)
+      break;
 
-AssetManifestFile f{};
-if (!manifestParseFileObjectJson(objJson, &f))
-continue;
+    AssetManifestFile f{};
+    if (!manifestParseFileObjectJson(objJson, &f))
+      continue;
 
-++fileIndex;
+    ++fileIndex;
 
-if (onFile)
-{
-if (!onFile(f, ctx))
-{
-Serial.printf("[OTA WL] cb-parse callback failed at %u path=%s\n", fileIndex, f.path);
-return false;
-}
-}
+    if (onFile)
+    {
+      if (!onFile(f, ctx))
+      {
+        Serial.printf("[OTA WL] cb-parse callback failed at %u path=%s\n", fileIndex, f.path);
+        return false;
+      }
+    }
 
-if ((fileIndex % 25) == 0)
-{
-Serial.printf("[OTA WL] progress processed=%u free=%u largest=%u\n",
-fileIndex, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
-}
-}
+    if ((fileIndex % 25) == 0)
+    {
+      Serial.printf("[OTA WL] progress processed=%u free=%u largest=%u\n", fileIndex, (unsigned)ESP.getFreeHeap(),
+                    (unsigned)ESP.getMaxAllocHeap());
+    }
+  }
 
-Serial.printf("[OTA WL] cb-parse complete processed=%u free=%u largest=%u\n",
-fileIndex, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  Serial.printf("[OTA WL] cb-parse complete processed=%u free=%u largest=%u\n", fileIndex, (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getMaxAllocHeap());
 
-return true;
+  return true;
 }
 
 static bool parseManifestJsonDiffOnly(Stream &input, size_t contentLen, const AssetManifestData &localManifest,
@@ -1343,7 +1322,7 @@ static bool parseManifestJsonDiffOnly(Stream &input, size_t contentLen, const As
 
     if (!manifestEntryMatchesLocal(localManifest, f))
       outChangedFiles.push_back(f);
-      
+
     if ((fileIndex % 25) == 0)
     {
       Serial.printf("[OTA] diff-parse progress=%u/%u changed=%u free=%u largest=%u\n", fileIndex, totalFiles,
@@ -1437,7 +1416,7 @@ bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &loc
     return false;
   }
 
-  const char *tmpManifestPath = "/manifest.remote.tmp";
+  const char *tmpManifestPath = assetManifestTempPath();
 
   if (SD.exists(tmpManifestPath))
     SD.remove(tmpManifestPath);
