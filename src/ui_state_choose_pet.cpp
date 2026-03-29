@@ -1,4 +1,5 @@
 #include "ui_state_choose_pet.h"
+#include <Arduino.h>
 
 #include <string.h>
 #include "build_flags.h"
@@ -21,6 +22,23 @@ void uiChoosePetHandle(InputState& in)
   static bool s_prevSelectHeld = false;
 
   // ---------------------------------------------------------------------------
+  // Time gate to prevent instant hatch on first draw/entry
+  // ---------------------------------------------------------------------------
+  const uint32_t now = millis();
+  if (g_choosePetInputUnlockMs != 0)
+  {
+    if ((int32_t)(g_choosePetInputUnlockMs - now) > 0)
+    {
+      while (in.kbHasEvent()) (void)in.kbPop();
+      in.clearEdges();
+      clearInputLatch();
+      return;
+    }
+
+    g_choosePetInputUnlockMs = 0;
+  }
+
+  // ---------------------------------------------------------------------------
   // Entry gate to prevent instant hatch
   // ---------------------------------------------------------------------------
   if (g_choosePetBlockHatchUntilRelease)
@@ -34,6 +52,7 @@ void uiChoosePetHandle(InputState& in)
       // swallow everything while held
       while (in.kbHasEvent()) (void)in.kbPop();
       in.clearEdges();
+      inputForceClear();
       clearInputLatch();
       return;
     }

@@ -527,6 +527,7 @@ void uiBootNtpWaitHandle(InputState &in)
     if (nextState == UIState::CHOOSE_PET)
     {
       g_choosePetBlockHatchUntilRelease = true;
+      g_choosePetInputUnlockMs = millis() + 350;
     }
     else
     {

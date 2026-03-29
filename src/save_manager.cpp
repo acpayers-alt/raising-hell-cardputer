@@ -128,7 +128,9 @@ static void forceChoosePetFlowFromBoot()
   // The pending-name flag must survive until the pet is actually finalized
   // from NAME_PET.
   // clearNamePendingFlag();
-
+  
+  g_choosePetInputUnlockMs = millis() + 350;
+  g_choosePetBlockHatchUntilRelease = true;
   // Go to Choose Pet flow state
   uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
   g_app.uiNeedsRedraw = true;

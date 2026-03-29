@@ -277,7 +277,6 @@ static bool g_sdTriedLoad = false;
 static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
 static bool g_bootProvisionWifiStarted = false;
-static bool g_forceControlsHelpAfterProvision = false;
 static bool g_postProvisionControlsHelpPending = false;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
@@ -438,12 +437,13 @@ static bool runBootAssetProvision()
   static bool s_bootAssetProvisionHandled = false;
 
   if (!bootAssetProvisionRequired())
+  {
+    s_bootAssetProvisionHandled = false;
     return false;
+  }
 
   if (s_bootAssetProvisionHandled)
     return true;
-
-  s_bootAssetProvisionHandled = true;
 
   ui_setBootSplashActive(false);
   clearInputLatch();
@@ -466,13 +466,11 @@ static bool runBootAssetProvision()
   // Success only counts if assets are actually present afterward.
   if (ok && !g_assetsMissing)
   {
-    if (g_bootAssetProvisionMustComplete && !bootSaveFileExists())
-    {
-      writePostProvisionControlsHelpFlag();
-    }
+    s_bootAssetProvisionHandled = true;
 
     if (g_bootAssetProvisionMustComplete)
     {
+      writePostProvisionControlsHelpFlag();
       settingsSetWifiEnabled(true);
       saveSettingsToSD();
     }
@@ -484,8 +482,11 @@ static bool runBootAssetProvision()
 
   runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());
 
+  // Allow retry after failure (for example, after the user fixes Wi-Fi creds).
+  s_bootAssetProvisionHandled = false;
+
   // If assets are still missing, this is a mandatory provisioning failure.
-  // Stay blocked on the provisioning/error screen.
+  // Stay blocked on the provisioning/error screen, but do not permanently latch failure.
   if (g_assetsMissing)
   {
     return true;
@@ -554,6 +555,27 @@ static void finalizeBootLanding()
   g_bootLandingDone = true;
   g_bootAssetProvisionMustComplete = false;
   g_bootProvisionWifiOnboardingStarted = false;
+
+  if (g_postProvisionControlsHelpPending)
+  {
+    g_postProvisionControlsHelpPending = false;
+    g_controlsHelpSeen = 0;
+    clearInputLatch();
+    inputForceClear();
+    g_choosePetInputUnlockMs = millis() + 350;
+    controlsHelpBegin(UIState::CHOOSE_PET, Tab::TAB_PET);
+    return;
+  }
+
+  if (!g_controlsHelpSeen)
+  {
+    clearInputLatch();
+    inputForceClear();
+    g_choosePetInputUnlockMs = millis() + 350;
+    controlsHelpBegin(UIState::CHOOSE_PET, Tab::TAB_PET);
+    return;
+  }
+
   const bool saveFileExists = bootSaveFileExists();
   const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
 
@@ -568,22 +590,7 @@ static void finalizeBootLanding()
     g_app.inventory.resetToDefaults();
     ui_setBootSplashActive(false);
 
-    if (g_postProvisionControlsHelpPending)
-    {
-      g_postProvisionControlsHelpPending = false;
-      g_controlsHelpSeen = 0;
-      beginForcedSetTimeBootGate(UIState::CHOOSE_PET, Tab::TAB_PET);
-      controlsHelpBegin(UIState::SET_TIME, Tab::TAB_PET);
-      return;
-    }
-
-    if (!g_controlsHelpSeen)
-    {
-      beginForcedSetTimeBootGate(UIState::CHOOSE_PET, Tab::TAB_PET);
-      controlsHelpBegin(UIState::SET_TIME, Tab::TAB_PET);
-      return;
-    }
-
+    g_choosePetInputUnlockMs = millis() + 350;
     enterState(UIState::CHOOSE_PET, Tab::TAB_PET, false);
     uiInitLevelPopupTracker();
 
@@ -761,6 +768,9 @@ void postBootInitTick()
     if (g_sdReady)
       loadedFromSD = saveManagerLoad();
 
+    const bool saveFileExistsNow = bootSaveFileExists();
+    runtimeLogf("[BOOT][SAVECHK] loadedFromSD=%d saveFileExists=%d", loadedFromSD ? 1 : 0, saveFileExistsNow ? 1 : 0);
+
     DBG_ON("[LOAD] saveManagerLoad -> %d\n", (int)loadedFromSD);
 
     updateTime();
@@ -768,7 +778,13 @@ void postBootInitTick()
 
     const bool setupPending = appLifecycleHasPendingOnboarding();
     const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;
-    const bool saveFileExists = forcedFirstRun ? false : bootSaveFileExists();
+    bool saveFileExists = forcedFirstRun ? false : saveFileExistsNow;
+
+    if (g_postProvisionControlsHelpPending)
+    {
+      loadedFromSD = false;
+      saveFileExists = false;
+    }
 
     const UIState afterOk = appLifecycleResolveBootAfterOkState(saveFileExists);
 
@@ -815,7 +831,6 @@ void postBootInitTick()
       g_bootAssetProvisionMustComplete = provisionMandatory || provisionTooOld;
       g_bootUiBlockedForAssetProvision = true;
       g_bootProvisionWifiOnboardingStarted = false;
-      g_forceControlsHelpAfterProvision = g_bootAssetProvisionMustComplete && !bootSaveFileExists();
 
       ui_setBootSplashActive(false);
 
@@ -901,6 +916,19 @@ void postBootInitTick()
       g_bootWizardAfterOkState = afterOk;
       g_bootWizardAfterOkTab = Tab::TAB_PET;
 
+      // 🔥 Try stored creds first (same as first boot wizard)
+      String storedSsid, storedPwd;
+      if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
+      {
+        Serial.printf("[BOOTPIPE] (time recovery) using stored wifi creds ssid='%s'\n", storedSsid.c_str());
+        wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
+        uiActionEnterState(UIState::BOOT_WIFI_WAIT, Tab::TAB_PET, true);
+        return;
+      }
+
+      // fallback → prompt
+      Serial.println("[BOOTPIPE] (time recovery) no stored creds; entering BOOT_WIFI_PROMPT");
+
       uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
       requestFullUIRedraw();
       invalidateBackgroundCache();
@@ -978,6 +1006,14 @@ void postBootInitTick()
   // ---------------------------------------------------------------------------
   if (bootAssetProvisionRequired())
   {
+    // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
+    if (bootAssetProvisionWifiOnboardingActive())
+      return;
+
+    // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
+    if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
+      return;
+
     if (runBootAssetProvision())
       return;
   }
