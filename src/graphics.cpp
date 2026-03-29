@@ -1000,7 +1000,7 @@ void drawBootWifiWaitScreen(bool connected, int rssi)
   switch (wl)
   {
     case WL_CONNECTED:         st = "Connected"; break;
-    case WL_IDLE_STATUS:       st = "Idle"; break;
+    case WL_IDLE_STATUS:       st = "Authorizing..."; break;
     case WL_NO_SSID_AVAIL:     st = "SSID not found"; break;
     case WL_CONNECT_FAILED:    st = "Connect failed"; break;
     case WL_CONNECTION_LOST:   st = "Connection lost"; break;

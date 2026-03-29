@@ -134,6 +134,12 @@ static void wifiSetupBeginPasswordEntry()
   g_wifi.pass[0] = '\0';
   g_wifi.buf[0] = '\0';
   g_wifi.setupStage = WIFI_SETUP_STAGE_PASS;
+
+  // Prevent the ENTER used to pick the SSID from immediately submitting
+  // the password screen on the next frame.
+  clearInputLatch();
+  inputForceClear();
+
   requestUIRedraw();
 }
 
