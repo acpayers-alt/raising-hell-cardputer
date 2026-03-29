@@ -1,10 +1,10 @@
+#include "asset_ota_config.h"
+#include "asset_ota_types.h"
+#include "build_flags.h"
+#include "sdcard.h"
 #include <Arduino.h>
 #include <SD.h>
 #include <string.h>
-#include "asset_ota_config.h"
-#include "asset_ota_types.h"
-#include "sdcard.h"
-#include "build_flags.h"
 
 static const char *kCfgPath = "/raising_hell/save/asset_ota_cfg.bin";
 static const char *kCfgTmpPath = "/raising_hell/save/asset_ota_cfg.tmp";
@@ -15,11 +15,9 @@ static const char *kLocalManifestPath = "/raising_hell/assets/manifest_local.jso
 static const char *kLocalManifestTmpPath = "/raising_hell/assets/manifest_local.tmp";
 static const char *kStagingRoot = "/raising_hell/assets_staging";
 
-static const char *kPublicManifestUrl =
-"https://assets.raisinghellgame.com/manifest-public.json";
+static const char *kPublicManifestUrl = "https://assets.raisinghellgame.com/manifest-public.json";
 
-static const char *kDevManifestUrl =
-"https://assets.raisinghellgame.com/manifest-dev.json";
+static const char *kDevManifestUrl = "https://assets.raisinghellgame.com/manifest-dev.json";
 
 const char *assetOtaConfigPath() { return kCfgPath; }
 const char *assetOtaConfigTmpPath() { return kCfgTmpPath; }
@@ -73,6 +71,8 @@ bool assetOtaEnsureCoreDirs()
   if (!ensureDir("/raising_hell/save"))
     return false;
   if (!ensureDir("/raising_hell/assets"))
+    return false;
+  if (!ensureDir("/raising_hell/ota"))
     return false;
   if (!ensureDir(kStagingRoot))
     return false;
@@ -191,13 +191,13 @@ bool assetOtaConfigLoad(AssetOtaConfig *outCfg)
 
   if (r != (int)sizeof(tmp))
     return false;
-    if (tmp.magic != 0x41544346UL || tmp.version != 1)
+  if (tmp.magic != 0x41544346UL || tmp.version != 1)
     return false;
   if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
     tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
 
   tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
-  
+
   *outCfg = tmp;
   return true;
 }
