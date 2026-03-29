@@ -223,6 +223,20 @@ static void logLine(const char *s)
   }
 }
 
+static void consoleArmReprovisionRecovery()
+{
+  if (!bootFirmwareMarkerClear())
+  {
+    logLine("FAILED to clear firmware marker");
+    return;
+  }
+
+  requestAssetProvisionOnNextBoot();
+  logLine("[OK] firmware marker cleared");
+  logLine("[OK] asset provision boot flag set");
+  logLine("[OK] reboot to retry asset provisioning");
+}
+
 static void logf(const char *fmt, ...)
 {
   char buf[96];
@@ -494,14 +508,22 @@ static void execLine(char *line)
     logLine("  assetflag           show asset provision boot flag");
     logLine("  assetflag clear     clear asset provision boot flag");
     logLine("  assetflag set       set asset provision boot flag");
+    logLine("  reboot              reboot device");
+
+#if !PUBLIC_BUILD
     logLine("  fwmark              show firmware marker status");
     logLine("  fwmark show         show stored/current build id");
     logLine("  fwmark clear        clear stored build id");
     logLine("  fwmark set <id>     set stored build id");
     logLine("  fwmark reprovision  clear marker + set asset flag");
-    logLine("  reboot              reboot device");
-    logLine("  otach public|dev   set OTA channel");
-    logLine("  otadev             switch to DEV OTA + provision + reboot");
+    logLine("  repair              alias for fwmark reprovision");
+    logLine("  repair assets       alias for fwmark reprovision");
+    logLine("  rescue              alias for fwmark reprovision");
+    logLine("  rescue ota          alias for fwmark reprovision");
+    logLine("  otach public|dev    set OTA channel");
+    logLine("  otadev              switch to DEV OTA + provision + reboot");
+#endif
+
     logLine("  logdump            dump runtime log buffer");
     logLine("  logtail [n]        dump last n log lines");
     logLine("  logclear           clear runtime log buffer");
@@ -1159,6 +1181,18 @@ static void execLine(char *line)
     logf("  ota error:       %s", assetOtaLastErrorString());
     logf("  progress:        %u / %u", (unsigned)assetOtaCurrentFileIndex(), (unsigned)assetOtaTotalFileCount());
 
+    const bool needsRepair =
+        consoleAssetPackTooOld() ||
+        assetProvisionBootRequested() ||
+        (g_sdReady && !SD.exists(assetOtaLocalManifestPath())) ||
+        (strcmp(assetOtaLastErrorString(), "None") != 0);
+
+        if (needsRepair)
+        {
+          logLine("  suggestion:      asset recovery available");
+          logLine("  suggestion:      run 'repair' then reboot");
+        }
+
     return;
   }
 
@@ -1307,6 +1341,34 @@ static void execLine(char *line)
     return;
   }
 
+  if (!strcmp(argv[0], "repair") || !strcmp(argv[0], "rescue"))
+  {
+    // Accept:
+    //   repair
+    //   repair assets
+    //   rescue
+    //   rescue ota
+    // Silently ignore extra args (support-friendly)
+
+    if (argc >= 2)
+    {
+      if (strcmp(argv[0], "repair") == 0 && strcmp(argv[1], "assets") != 0)
+      {
+        logLine("Usage: repair [assets]");
+        return;
+      }
+
+      if (strcmp(argv[0], "rescue") == 0 && strcmp(argv[1], "ota") != 0)
+      {
+        logLine("Usage: rescue [ota]");
+        return;
+      }
+    }
+
+    consoleArmReprovisionRecovery();
+    return;
+  }
+
   if (!strcmp(argv[0], "fwmark"))
   {
     if (argc == 1 || !strcmp(argv[1], "show"))
@@ -1333,6 +1395,13 @@ static void execLine(char *line)
       return;
     }
 
+    if (!strcmp(argv[1], "reprovision"))
+    {
+      consoleArmReprovisionRecovery();
+      return;
+    }
+
+#if !PUBLIC_BUILD
     if (!strcmp(argv[1], "set"))
     {
       if (argc < 3)
@@ -1364,28 +1433,16 @@ static void execLine(char *line)
       logf("[OK] firmware marker set: %s", idBuf);
       return;
     }
-
-    if (!strcmp(argv[1], "reprovision"))
-    {
-      if (!bootFirmwareMarkerClear())
-      {
-        logLine("FAILED to clear firmware marker");
-        return;
-      }
-
-      requestAssetProvisionOnNextBoot();
-      logLine("[OK] firmware marker cleared");
-      logLine("[OK] asset provision boot flag set");
-      logLine("[OK] reboot to test fresh-flash provisioning");
-      return;
-    }
+#endif
 
     logLine("Usage:");
     logLine("  fwmark");
     logLine("  fwmark show");
     logLine("  fwmark clear");
-    logLine("  fwmark set <id>");
     logLine("  fwmark reprovision");
+#if !PUBLIC_BUILD
+    logLine("  fwmark set <id>");
+#endif
     return;
   }
 
@@ -1396,16 +1453,6 @@ static void execLine(char *line)
     ESP.restart();
     return;
   }
-
-  if (!strcmp(argv[0], "logdump"))
-  {
-    logLine("logdump not implemented yet");
-    return;
-  }
-
-  // -------------------------
-  // FALLBACK (leave last)
-  // -------------------------
 
   logf("Unknown command: %s", argv[0]);
 }

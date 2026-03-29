@@ -33,7 +33,10 @@ struct WorklistCtx
   uint16_t processed;
 };
 
-const char *assetManifestTempPath() { return "/manifest.remote.tmp"; }
+const char *assetManifestTempPath()
+{
+  return "/raising_hell/ota/manifest.remote.tmp";
+}
 
 static bool manifestWorklistCallback(const AssetManifestFile &f, void *ctxVoid)
 {
@@ -397,7 +400,7 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
   
   // create context ONCE
   WorklistCtx ctx{&work, 0, 0};
-    
+
   const bool ok = parseManifestJsonWithCallback(mf, mfLen, outPackVersion, &channel, manifestWorklistCallback, &ctx);
 
   Serial.printf("[OTA WL] final worklist changed=%u processed=%u\n", (unsigned)ctx.changed, (unsigned)ctx.processed);
@@ -447,13 +450,25 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
 
 static bool saveStreamToFile(Stream &input, const char *path, size_t contentLen)
 {
+  if (!path || !path[0])
+  {
+    Serial.println("[OTA] temp manifest path missing");
+    return false;
+  }
+
+  if (!assetOtaEnsureParentDir(path))
+  {
+    Serial.printf("[OTA] failed to ensure temp manifest parent dir: %s\n", path);
+    return false;
+  }
+
   File f = SD.open(path, FILE_WRITE);
   if (!f)
   {
     Serial.printf("[OTA] failed to open temp manifest file: %s\n", path);
     return false;
   }
-
+  
   const size_t kBufSize = 1024;
   uint8_t buf[kBufSize];
   size_t total = 0;
