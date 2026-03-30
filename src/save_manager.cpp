@@ -17,6 +17,7 @@
 #include "ui_invalidate.h"
 #include "ui_runtime.h"
 
+#include "app_lifecycle.h"
 #include "app_state.h"
 #include "brightness_state.h"
 #include "controls_help_state.h"
@@ -24,16 +25,15 @@
 #include "graphics.h"
 #include "input.h"
 #include "inventory_state.h"
+#include "new_pet_flow_state.h"
 #include "runtime_flags_state.h"
 #include "settings_state.h"
 #include "settings_toggles_state.h" // wifiEnabled, g_app.autoScreenOffEnabled
 #include "sleep_state.h"
 #include "time_persist.h"
 #include "time_state.h"
-#include "user_toggles_state.h"
-#include "app_lifecycle.h"
 #include "ui_actions.h"
-#include "new_pet_flow_state.h"
+#include "user_toggles_state.h"
 
 static bool dirty = false;
 static uint32_t lastSaveMs = 0;
@@ -57,6 +57,9 @@ static uint32_t g_birthEpoch = 0;
 static uint8_t g_lastLoadErr = SLE_OK;
 static uint32_t g_lastLoadSize = 0;
 
+static bool g_lastLoadUsedBackup = false;
+static const char *g_lastLoadPath = nullptr;
+
 uint8_t saveManagerLastLoadErr() { return g_lastLoadErr; }
 uint32_t saveManagerLastLoadSize() { return g_lastLoadSize; }
 
@@ -73,6 +76,10 @@ static const char *SET_TMP_PATH = "/raising_hell/save/settings.tmp";
 static const char *GAMEOPT_PATH = "/raising_hell/save/gameopt.bin";
 static const char *GAMEOPT_TMP_PATH = "/raising_hell/save/gameopt.tmp";
 static const char *LEGACY_SAVE_PATH = "/raising_hell/save/raising_hell.sav";
+static const char *SAVE_BAK1_PATH = "/raising_hell/save/save.bak1";
+static const char *SAVE_BAK2_PATH = "/raising_hell/save/save.bak2";
+static const char *SAVE_BAK3_PATH = "/raising_hell/save/save.bak3";
+static const char *AUTO_HEAL_FALLBACK_PET_NAME = "Bub";
 
 // ------------------------------------------------------------
 // NEW PET FLOW BOOT RESUME FLAG
@@ -111,6 +118,21 @@ static void writeNamePendingFlag()
     f.print("1");
     f.close();
   }
+}
+
+static void rotateSaveBackups()
+{
+  if (!g_sdReady)
+    return;
+
+  if (SD.exists(SAVE_BAK3_PATH))
+    SD.remove(SAVE_BAK3_PATH);
+  if (SD.exists(SAVE_BAK2_PATH))
+    SD.rename(SAVE_BAK2_PATH, SAVE_BAK3_PATH);
+  if (SD.exists(SAVE_BAK1_PATH))
+    SD.rename(SAVE_BAK1_PATH, SAVE_BAK2_PATH);
+  if (SD.exists(SAVE_PATH))
+    SD.rename(SAVE_PATH, SAVE_BAK1_PATH);
 }
 
 static void forceChoosePetFlowFromBoot()
@@ -155,6 +177,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld = nullptr);
 static bool saveSettingsToSD_internal();
 static bool saveGameOptionsToSD_internal();
 
+static bool loadSaveFileInternal(const char *path);
 static bool loadSaveFromSD_internal();
 static bool saveSaveToSD_internal();
 
@@ -747,26 +770,32 @@ static void clearNamePendingFlag()
 // ------------------------------------------------------------
 // SAVEGAME IO (SavePayload)
 // ------------------------------------------------------------
-static bool loadSaveFromSD_internal()
+static bool loadSaveFileInternal(const char *path)
 {
   g_lastLoadErr = SLE_OK;
   g_lastLoadSize = 0;
+  g_lastLoadPath = nullptr;
+  g_lastLoadUsedBackup = false;
 
   if (!g_sdReady)
   {
     g_lastLoadErr = SLE_SD_NOT_READY;
-    return false;
-  }
-  if (!ensureSaveDir())
-  {
-    g_lastLoadErr = SLE_DIR_FAIL;
+    Serial.printf("[SAVE] FAIL path=%s reason=sd_not_ready\n", path);
     return false;
   }
 
-  File f = SD.open(SAVE_PATH, FILE_READ);
+  if (!ensureSaveDir())
+  {
+    g_lastLoadErr = SLE_DIR_FAIL;
+    Serial.printf("[SAVE] FAIL path=%s reason=dir_fail\n", path);
+    return false;
+  }
+
+  File f = SD.open(path, FILE_READ);
   if (!f)
   {
     g_lastLoadErr = SLE_OPEN_FAIL;
+    Serial.printf("[SAVE] FAIL path=%s reason=open_fail\n", path);
     return false;
   }
 
@@ -776,6 +805,10 @@ static bool loadSaveFromSD_internal()
   if (sz < sizeof(uint32_t) + sizeof(uint16_t))
   {
     g_lastLoadErr = SLE_READ_FAIL;
+    Serial.printf("[SAVE] FAIL path=%s reason=too_small size=%lu min=%u\n",
+                  path,
+                  (unsigned long)sz,
+                  (unsigned)(sizeof(uint32_t) + sizeof(uint16_t)));
     f.close();
     return false;
   }
@@ -790,33 +823,109 @@ static bool loadSaveFromSD_internal()
   if (r != (int)want)
   {
     g_lastLoadErr = SLE_READ_FAIL;
+    Serial.printf("[SAVE] FAIL path=%s reason=read_fail got=%d want=%u size=%lu\n",
+                  path,
+                  r,
+                  (unsigned)want,
+                  (unsigned long)sz);
     return false;
   }
+
   if (p.magic != SAVE_MAGIC)
   {
     g_lastLoadErr = SLE_MAGIC_BAD;
+    Serial.printf("[SAVE] FAIL path=%s reason=magic_bad got=0x%08lx want=0x%08lx size=%lu\n",
+                  path,
+                  (unsigned long)p.magic,
+                  (unsigned long)SAVE_MAGIC,
+                  (unsigned long)sz);
     return false;
   }
 
   if (p.version != SAVE_VERSION && p.version != 0)
   {
     g_lastLoadErr = SLE_VERSION_BAD;
+    Serial.printf("[SAVE] FAIL path=%s reason=version_bad got=%u want=%u size=%lu\n",
+                  path,
+                  (unsigned)p.version,
+                  (unsigned)SAVE_VERSION,
+                  (unsigned long)sz);
     return false;
   }
 
-  p.magic = SAVE_MAGIC;
-  p.version = SAVE_VERSION;
-
-  if (p.version == SAVE_VERSION && sz < sizeof(SavePayload))
+  if (sz < sizeof(SavePayload))
   {
     g_lastLoadErr = SLE_READ_FAIL;
+    Serial.printf("[SAVE] FAIL path=%s reason=short_payload size=%lu need=%u\n",
+                  path,
+                  (unsigned long)sz,
+                  (unsigned)sizeof(SavePayload));
     return false;
   }
 
   unpack(p);
 
-  //  (void)saveSaveToSD_internal();
+  g_lastLoadPath = path;
+  g_lastLoadUsedBackup = (strcmp(path, SAVE_PATH) != 0);
+
+  Serial.printf("[SAVE] load OK path=%s size=%lu backup=%d\n",
+                path,
+                (unsigned long)g_lastLoadSize,
+                g_lastLoadUsedBackup ? 1 : 0);
+
   return true;
+}
+
+static bool loadSaveFromSD_internal()
+{
+  Serial.printf("[SAVE] trying primary path=%s\n", SAVE_PATH);
+  if (loadSaveFileInternal(SAVE_PATH))
+  {
+    Serial.println("[SAVE] primary load OK");
+    return true;
+  }
+
+  Serial.printf("[SAVE] primary load failed err=%u size=%lu\n",
+                (unsigned)g_lastLoadErr,
+                (unsigned long)g_lastLoadSize);
+
+  Serial.printf("[SAVE] trying backup 1 path=%s\n", SAVE_BAK1_PATH);
+  if (loadSaveFileInternal(SAVE_BAK1_PATH))
+  {
+    Serial.println("[SAVE] backup 1 load OK");
+    return true;
+  }
+
+  Serial.printf("[SAVE] backup 1 failed err=%u size=%lu\n",
+                (unsigned)g_lastLoadErr,
+                (unsigned long)g_lastLoadSize);
+
+  Serial.printf("[SAVE] trying backup 2 path=%s\n", SAVE_BAK2_PATH);
+  if (loadSaveFileInternal(SAVE_BAK2_PATH))
+  {
+    Serial.println("[SAVE] backup 2 load OK");
+    return true;
+  }
+
+  Serial.printf("[SAVE] backup 2 failed err=%u size=%lu\n",
+                (unsigned)g_lastLoadErr,
+                (unsigned long)g_lastLoadSize);
+
+  Serial.printf("[SAVE] trying backup 3 path=%s\n", SAVE_BAK3_PATH);
+  if (loadSaveFileInternal(SAVE_BAK3_PATH))
+  {
+    Serial.println("[SAVE] backup 3 load OK");
+    return true;
+  }
+
+  Serial.printf("[SAVE] backup 3 failed err=%u size=%lu\n",
+                (unsigned)g_lastLoadErr,
+                (unsigned long)g_lastLoadSize);
+
+  Serial.printf("[SAVE] all save candidates failed final err=%u size=%lu\n",
+                (unsigned)g_lastLoadErr,
+                (unsigned long)g_lastLoadSize);
+  return false;
 }
 
 static bool saveSaveToSD_internal()
@@ -845,13 +954,16 @@ static bool saveSaveToSD_internal()
     return false;
   }
 
-  tryRemove(SAVE_PATH);
+  rotateSaveBackups();
+
   if (!SD.rename(SAVE_TMP_PATH, SAVE_PATH))
   {
     DBG_ON("[SAVE] rename failed: %s -> %s\n", SAVE_TMP_PATH, SAVE_PATH);
     tryRemove(SAVE_TMP_PATH);
     return false;
   }
+
+  DBG_ON("[SAVE] wrote primary save path=%s\n", SAVE_PATH);
 
   return true;
 }
@@ -889,6 +1001,55 @@ static bool isBlankName(const char *s)
   return true;
 }
 
+static void autoHealLoadedSaveIfNeeded()
+{
+  const bool hadNamePending = namePendingFlagExists();
+  const bool hadBlankPetName = isBlankName(pet.name);
+
+  if (!hadNamePending && !hadBlankPetName)
+    return;
+
+  bool changed = false;
+
+  Serial.printf("[SAVE][AUTOHEAL] begin namePending=%d blankPetName=%d name='%s'\n",
+                hadNamePending ? 1 : 0,
+                hadBlankPetName ? 1 : 0,
+                pet.name);
+
+  if (hadBlankPetName)
+  {
+    pet.setName(AUTO_HEAL_FALLBACK_PET_NAME);
+
+    if (!isBlankName(pet.name))
+    {
+      Serial.printf("[SAVE][AUTOHEAL] repaired blank pet name -> '%s'\n", pet.name);
+      changed = true;
+    }
+    else
+    {
+      Serial.println("[SAVE][AUTOHEAL] failed to apply fallback pet name");
+    }
+  }
+
+  if (namePendingFlagExists() && !isBlankName(pet.name))
+  {
+    Serial.println("[SAVE][AUTOHEAL] clearing stale name_pending.flag");
+    clearNamePendingFlag();
+    changed = true;
+  }
+
+  if (changed)
+  {
+    saveManagerMarkDirty();
+    saveManagerForce();
+  }
+
+  Serial.printf("[SAVE][AUTOHEAL] end namePending=%d blankPetName=%d name='%s'\n",
+                namePendingFlagExists() ? 1 : 0,
+                isBlankName(pet.name) ? 1 : 0,
+                pet.name);
+}
+
 static void forceNamePetFlowFromBoot()
 {
   inputSetTextCapture(true);
@@ -924,42 +1085,59 @@ bool saveManagerLoad()
   }
   const bool saveOk = loadSaveFromSD_internal();
 
+  Serial.printf("[SAVE] load result=%d err=%u size=%lu\n",
+    saveOk ? 1 : 0,
+    (unsigned)g_lastLoadErr,
+    (unsigned long)g_lastLoadSize);
+  
   if (saveOk)
   {
+    // If we loaded from backup, re-promote to primary
+    if (g_lastLoadUsedBackup)
+    {
+      DBG_ON("[SAVE] recovered from backup path=%s -> re-promoting primary save\n",
+             g_lastLoadPath ? g_lastLoadPath : "(unknown)");
+  
+      saveManagerMarkDirty();
+      saveManagerForce();
+    }
+  
+    // ---- Auto-heal + lifecycle handling ----
+    autoHealLoadedSaveIfNeeded();
 
     const bool namePending = namePendingFlagExists();
     const bool blankPetName = isBlankName(pet.name);
-    
+
+    Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n",
+                  namePending ? 1 : 0,
+                  blankPetName ? 1 : 0,
+                  pet.name);
+
     if (appLifecycleLoadedSaveRequiresChoosePet(namePending, blankPetName))
     {
       if (namePending)
-        DBGLN_ON("[SAVE] lifecycle: name_pending.flag present -> forcing CHOOSE_PET flow");
+        Serial.println("[SAVE] lifecycle forcing CHOOSE_PET (name_pending.flag remains)");
       else
-        DBGLN_ON("[SAVE] lifecycle: blank pet name -> forcing CHOOSE_PET");
-    
+        Serial.println("[SAVE] lifecycle forcing CHOOSE_PET (blank name remains after auto-heal)");
+
       forceChoosePetFlowFromBoot();
-    }
-        
+    }  
     return true;
   }
-
+  
   // -----------------------------------------------------------------------
-  // NEW: No valid save found (factory reset / first boot / corruption)
-  //      Initialize a clean default payload so inventory and pet state
-  //      are reset properly.
+  // No valid save found → initialize fresh state
   // -----------------------------------------------------------------------
-
+  
   DBGLN_ON("[SAVE] No valid save found -> applying default payload");
-
+  
   SavePayload def = makeDefaultSavePayload();
   unpack(def);
-
-  // Ensure a fresh save gets written soon so we don't re-default every boot.
+  
   saveManagerMarkDirty();
-
-  // Force new pet flow on fresh boot.
+  
   forceChoosePetFlowFromBoot();
-
+  
   return false;
 }
 
@@ -973,6 +1151,7 @@ void saveManagerStampBirthNow()
 
 bool saveManagerSave()
 {
+  DBG_ON("[SAVE] SAVE begin dirty=%d sd=%d\n", dirty ? 1 : 0, g_sdReady ? 1 : 0);
   if (!g_sdReady)
     return false;
 
@@ -999,19 +1178,37 @@ bool saveManagerSave()
   return ok;
 }
 
-void saveManagerMarkDirty() { dirty = true; }
+void saveManagerMarkDirty()
+{
+  dirty = true;
+  DBG_ON("[SAVE] DIRTY now=%lu ui=%d tab=%d\n",
+         (unsigned long)millis(),
+         (int)g_app.uiState,
+         (int)g_app.currentTab);
+}
 
 void saveManagerTick()
 {
   if (!dirty)
     return;
+
   if (!g_sdReady)
+  {
+    DBG_ON("[SAVE] TICK dirty but SD not ready\n");
     return;
+  }
 
   const uint32_t now = millis();
   if (now - lastSaveMs < DEBOUNCE_MS)
+  {
+    DBG_ON("[SAVE] TICK debounce now=%lu last=%lu delta=%lu\n",
+           (unsigned long)now,
+           (unsigned long)lastSaveMs,
+           (unsigned long)(now - lastSaveMs));
     return;
+  }
 
+  DBG_ON("[SAVE] TICK firing save now=%lu\n", (unsigned long)now);
   (void)saveManagerSave();
 }
 
@@ -1135,8 +1332,11 @@ void saveManagerFactoryReset()
   tryRemove("/raising_hell/save/pet.bin");
   tryRemove("/raising_hell/save/inventory.bin");
   tryRemove("/raising_hell/save/settings.bin");
-  tryRemove("/raising_hell/save/save.bin");
-  tryRemove("/raising_hell/save/save.tmp");
+  tryRemove(SAVE_PATH);
+  tryRemove(SAVE_TMP_PATH);
+  tryRemove(SAVE_BAK1_PATH);
+  tryRemove(SAVE_BAK2_PATH);
+  tryRemove(SAVE_BAK3_PATH);
   tryRemove("/raising_hell/save/gameopt.bin");
   tryRemove("/raising_hell/save/gameopt.tmp");
   tryRemove("/raising_hell/save/settings.tmp");
@@ -1172,6 +1372,9 @@ void saveManagerDeleteAll()
   SD.remove(SAVE_PATH); // /raising_hell/save/save.bin
   SD.remove("/raising_hell/save/pet.bin");
   SD.remove("/raising_hell/save/inventory.bin");
+  SD.remove(SAVE_BAK1_PATH);
+  SD.remove(SAVE_BAK2_PATH);
+  SD.remove(SAVE_BAK3_PATH);
 
   // Also wipe the EEPROM-backed inventory mirror so the next pet starts clean.
   g_app.inventory.wipePersistedEeprom();
@@ -1186,6 +1389,9 @@ void saveManagerDeletePetOnly()
   SD.remove("/raising_hell/save/pet.bin");
   SD.remove("/raising_hell/save/inventory.bin");
   SD.remove(SAVE_PATH); // if you still store some pet-state here
+  SD.remove(SAVE_BAK1_PATH);
+  SD.remove(SAVE_BAK2_PATH);
+  SD.remove(SAVE_BAK3_PATH);
 
   // Also wipe the EEPROM-backed inventory mirror so the next pet starts clean.
   g_app.inventory.wipePersistedEeprom();

@@ -12,6 +12,8 @@
 #include <esp_system.h>
 #include "esp_log.h"
 #include <esp_heap_caps.h>
+#include "esp_core_dump.h"
+#include "esp_err.h"
 
 // --- Hardware / platform ------------------------------------------------------
 #include "M5Cardputer.h"
@@ -85,6 +87,29 @@
 
 void updateBattery();
 
+static void clearStaleCoreDumpIfNeeded()
+{
+  esp_err_t chk = esp_core_dump_image_check();
+
+  if (chk == ESP_OK)
+  {
+    Serial.println("[BOOT][COREDUMP] valid coredump present; erasing stale dump");
+    esp_err_t er = esp_core_dump_image_erase();
+    Serial.printf("[BOOT][COREDUMP] erase result=%d\n", (int)er);
+    return;
+  }
+
+  if (chk == ESP_ERR_NOT_FOUND)
+  {
+    return;
+  }
+
+  Serial.printf("[BOOT][COREDUMP] corrupt/invalid coredump detected err=%d; erasing\n", (int)chk);
+  esp_err_t er = esp_core_dump_image_erase();
+  Serial.printf("[BOOT][COREDUMP] erase result=%d\n", (int)er);
+}
+
+
 static void serialBootHandshake(uint32_t waitMs)
 {
   // CDC can take a moment; don't hang forever (battery / no host).
@@ -97,6 +122,7 @@ static void serialBootHandshake(uint32_t waitMs)
 
   // One-shot banner only.
   Serial.println("[BOOT] serial up");
+  clearStaleCoreDumpIfNeeded();
 }
 
 void appSetup() {

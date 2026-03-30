@@ -15,8 +15,8 @@
 #include "asset_ota.h"
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
-#include "boot_state.h"
 #include "boot_firmware_marker.h"
+#include "boot_state.h"
 #include "brightness_state.h"
 #include "controls_help_state.h"
 #include "debug.h"
@@ -468,29 +468,21 @@ static bool runBootAssetProvision()
   if (ok && !g_assetsMissing)
   {
     s_bootAssetProvisionHandled = true;
-  
+
     if (g_bootAssetProvisionMustComplete)
     {
-      writePostProvisionControlsHelpFlag();
+      // Only route through post-provision controls help when this is effectively
+      // a no-save / onboarding situation. Existing pets should resume normally.
+      const bool saveExistsNow = bootSaveFileExists();
+      if (!saveExistsNow)
+      {
+        writePostProvisionControlsHelpFlag();
+      }
+
       settingsSetWifiEnabled(true);
       saveSettingsToSD();
-  
-      // Persist working Wi-Fi creds before reboot if we have them.
-      if (wifiStoreHasCreds())
-      {
-        String ssidDbg, pwdDbg;
-        const bool loaded = wifiStoreLoad(ssidDbg, pwdDbg);
-        Serial.printf("[WIFI] pre-restart store check: loaded=%d ssid='%s' passLen=%u\n",
-                      loaded ? 1 : 0,
-                      loaded ? ssidDbg.c_str() : "",
-                      loaded ? (unsigned)pwdDbg.length() : 0);
-      }
-      else
-      {
-        Serial.println("[WIFI] pre-restart store check: no stored creds");
-      }
     }
-  
+
     g_bootAssetProvisionActive = false;
     g_bootUiBlockedForAssetProvision = false;
     ESP.restart();
@@ -578,10 +570,18 @@ static void finalizeBootLanding()
     g_controlsHelpSeen = 0;
     clearInputLatch();
     inputForceClear();
-    g_choosePetInputUnlockMs = millis() + 350;
-    g_choosePetBlockHatchUntilRelease = true;
-    controlsHelpBegin(UIState::CHOOSE_PET, Tab::TAB_PET);
-        return;
+
+    const bool saveFileExists = bootSaveFileExists();
+    const UIState returnState = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+
+    if (returnState == UIState::CHOOSE_PET)
+    {
+      g_choosePetInputUnlockMs = millis() + 350;
+      g_choosePetBlockHatchUntilRelease = true;
+    }
+
+    controlsHelpBegin(returnState, Tab::TAB_PET);
+    return;
   }
 
   if (!g_controlsHelpSeen)
@@ -593,11 +593,11 @@ static void finalizeBootLanding()
     return;
   }
 
-  const bool saveFileExists = bootSaveFileExists();
-  const UIState afterOk = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
-
-  bool loadedFromSD = saveFileExists;
-  uint16_t seedMarkNow = 0;
+  const bool saveLoaded = saveManagerLoad();  // OR pass it in if you prefer
+  const UIState afterOk = saveLoaded ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+  
+  bool loadedFromSD = saveLoaded;
+    uint16_t seedMarkNow = 0;
   EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
 
   if (!loadedFromSD)
@@ -610,7 +610,7 @@ static void finalizeBootLanding()
     g_choosePetInputUnlockMs = millis() + 350;
     g_choosePetBlockHatchUntilRelease = true;
     enterState(UIState::CHOOSE_PET, Tab::TAB_PET, false);
-        uiInitLevelPopupTracker();
+    uiInitLevelPopupTracker();
 
     invalidateBackgroundCache();
     requestUIRedraw();
@@ -798,16 +798,14 @@ void postBootInitTick()
     const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;
     bool saveFileExists = forcedFirstRun ? false : saveFileExistsNow;
 
-    if (g_postProvisionControlsHelpPending)
-    {
-      loadedFromSD = false;
-      saveFileExists = false;
-    }
+    // Post-provision help is a UI detour only.
+    // It must never erase the fact that a valid save was loaded.
+    const bool loadedSaveExists = loadedFromSD;
 
-    const UIState afterOk = appLifecycleResolveBootAfterOkState(saveFileExists);
+    const UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
 
     bootMarkFirmwareSeenAndRequestProvisionIfChanged();
-    
+
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool provisionTooOld = bootAssetPackTooOld();
@@ -830,16 +828,16 @@ void postBootInitTick()
       runtimeLogLine("[BOOT] path=FIRST_BOOT_WIZARD");
     else if (!timeIsValid())
       runtimeLogLine("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
-    else if (!loadedFromSD)
+    else if (!loadedSaveExists)
       runtimeLogLine("[BOOT] path=NEW_PET_FLOW");
     else
       runtimeLogLine("[BOOT] path=NORMAL_BOOT");
 
-    if (!loadedFromSD)
-    {
-      g_app.inventory.init();
-    }
-
+      if (!loadedFromSD)
+      {
+        g_app.inventory.init();
+      }    
+  
     if (forcedFirstRun)
     {
       g_app.inventory.resetToDefaults();
