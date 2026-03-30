@@ -373,25 +373,41 @@ void updateBattery()
 
   // --- quiet logging ---------------------------------------------------------
   const bool usbChanged = (usb != s_lastLoggedUsb);
-  const bool pctChanged = (pct != s_lastLoggedPct);
+  const int pctDelta = pct - s_lastLoggedPct;
+  const int mvDelta = mvFilt - s_lastLoggedMv;
 
-  if (usbChanged || pctChanged) {
+  const bool pctChangedOnBattery = (!usb && (pctDelta >= 1 || pctDelta <= -1));
+  const bool pctChangedOnUsb = (usb && pct < 95 && (pctDelta >= 2 || pctDelta <= -2));
+  const bool meaningfulMvChange = (mvDelta >= 12 || mvDelta <= -12);
+
+  bool shouldLog = false;
+  const char *reason = "";
+
+  if (usbChanged) {
+    shouldLog = true;
+    reason = "usb";
+  } else if (pctChangedOnBattery) {
+    shouldLog = true;
+    reason = "pct";
+  } else if (pctChangedOnUsb) {
+    shouldLog = true;
+    reason = "pct";
+  } else if (meaningfulMvChange) {
+    shouldLog = true;
+    reason = "mv";
+  }
+
+  if (shouldLog) {
     if (Serial.availableForWrite() >= 160) {
-      Serial.printf("[BAT] change raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d",
+      Serial.printf("[BAT] change raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d reason=%s\n",
                     rawMv, mvMed, mvFilt, dv, pct, (int)usb,
-                    s_attachEvidence, s_detachEvidence);
-
-      if (usbChanged) Serial.print(" reason=usb");
-      else if (pctChanged) Serial.print(" reason=pct");
-
-      Serial.println();
+                    s_attachEvidence, s_detachEvidence, reason);
     }
 
     s_lastLoggedPct = pct;
     s_lastLoggedMv = mvFilt;
     s_lastLoggedUsb = usb;
-  }
-}
+  }}
 
 void batteryProtectionTick(uint32_t now)
 {

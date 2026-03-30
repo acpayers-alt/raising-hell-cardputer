@@ -492,66 +492,71 @@ static void execLine(char *line)
   {
     logLine("Commands:");
     logLine("  help | ?            show this");
-    logLine("  mon                 show stats");
     logLine("  clear               clear console");
     logLine("  exit                close console");
-    logLine("  wifi                 show wifi status + saved ssid");
-    logLine("  wifi off|on           toggle wifi power");
-    logLine("  wifi <ssid> <pass>    save + connect");
-    logLine("  wifi clear            clear saved creds");
+
+    logLine("Status / info:");
+    logLine("  mon                 show stats");
     logLine("  age                 show birth epoch + age string");
-    logLine("  name <pet name>      set pet name");
     logLine("  pet                 show current pet type");
     logLine("  version             show firmware + asset version");
-    logLine("  assetstatus         show asset OTA/debug status");
     logLine("  uptime              show device uptime");
+
+    logLine("WiFi:");
+    logLine("  wifi                show wifi status + saved ssid");
+    logLine("  wifi off|on         toggle wifi power");
+    logLine("  wifi <ssid> <pass>  save + connect");
+    logLine("  wifi clear          clear saved creds");
+
+    logLine("Recovery / repair:");
+    logLine("  name <pet name>     set pet name");
+    logLine("  saveheal            repair save name/pending-flag issues");
+    logLine("  assetstatus         show asset OTA/debug status");
     logLine("  assetflag           show asset provision boot flag");
     logLine("  assetflag clear     clear asset provision boot flag");
     logLine("  assetflag set       set asset provision boot flag");
-    logLine("  reboot              reboot device");
-
-#if !PUBLIC_BUILD
-    logLine("  fwmark              show firmware marker status");
-    logLine("  fwmark show         show stored/current build id");
-    logLine("  fwmark clear        clear stored build id");
-    logLine("  fwmark set <id>     set stored build id");
-    logLine("  fwmark reprovision  clear marker + set asset flag");
     logLine("  repair              alias for fwmark reprovision");
     logLine("  repair assets       alias for fwmark reprovision");
     logLine("  rescue              alias for fwmark reprovision");
     logLine("  rescue ota          alias for fwmark reprovision");
-    logLine("  otach public|dev    set OTA channel");
-    logLine("  otadev              switch to DEV OTA + provision + reboot");
-#endif
+    logLine("  fwmark              show firmware marker status");
+    logLine("  fwmark show         show stored/current build id");
+    logLine("  fwmark clear        clear stored build id");
+    logLine("  fwmark reprovision  clear marker + set asset flag");
+    logLine("  reboot              reboot device");
 
-    logLine("  logdump            dump runtime log buffer");
-    logLine("  logtail [n]        dump last n log lines");
-    logLine("  logclear           clear runtime log buffer");
-    logLine("  logsave            save runtime log to /raising_hell/logs/logdump.txt");
+    logLine("Logs:");
+    logLine("  logdump             dump runtime log buffer");
+    logLine("  logtail [n]         dump last n log lines");
+    logLine("  logclear            clear runtime log buffer");
+    logLine("  logsave             save runtime log to /raising_hell/logs/logdump.txt");
 
 #if !PUBLIC_BUILD
+    logLine("Dev / test:");
+    logLine("  fwmark set <id>     set stored build id");
+    logLine("  otach public|dev    set OTA channel");
+    logLine("  otadev              switch to DEV OTA + provision + reboot");
     logLine("  giveinf <amount>    add Inferium");
     logLine("  sethunger <0-100>   set hunger");
-    logLine("  setmood   <0-100>   set mood");
-    logLine("  setrest   <0-100>   set energy");
+    logLine("  setmood <0-100>     set mood");
+    logLine("  setrest <0-100>     set energy");
     logLine("  sethealth <0-100>   set health");
     logLine("  ledtest             cycle LED colors (~5s)");
     logLine("  reset_settings      delete settings.bin");
     logLine("  newpet!             OVERWRITE save + start a new pet");
-    logLine("  pet cycle|devil|kaiju|eldritch|alien   set pet type");
+    logLine("  pet cycle|devil|eldritch  set pet type");
     logLine("  givexp <amount>     give the pet XP (levels up if needed)");
     logLine("  setlevel <level>    set pet level (resets XP progress)");
     logLine("  setevo <0-3|baby|teen|adult|elder>  force evo stage");
-    logLine("  hurtpet            set low stats + HP=25 (test death flow)");
+    logLine("  hurtpet             set low stats + HP=25 (test death flow)");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
     logLine("  healpet             restore HP + all core stats to 100");
-
 #endif
 
     return;
   }
 
-// NEW PET (destructive)
+  // NEW PET (destructive)
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "newpet"))
   {
@@ -568,14 +573,14 @@ static void execLine(char *line)
   }
 #endif
 
-// CLEAR
-#if !PUBLIC_BUILD
+  // CLEAR
   if (!strcmp(argv[0], "clear"))
   {
     consoleClear();
     return;
   }
 
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "reset_settings"))
   {
     if (!g_sdReady)
@@ -606,7 +611,7 @@ static void execLine(char *line)
   }
 #endif
 
-// GIVE INF
+  // GIVE INF
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "giveinf"))
   {
@@ -627,7 +632,7 @@ static void execLine(char *line)
   }
 #endif
 
-// GIVE XP
+  // GIVE XP
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "givexp"))
   {
@@ -653,7 +658,7 @@ static void execLine(char *line)
   }
 #endif
 
-// SET LEVEL
+  // SET LEVEL
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setlevel"))
   {
@@ -678,10 +683,10 @@ static void execLine(char *line)
   }
 #endif
 
-// -------------------------------------------------
-// SET EVO STAGE
-// Usage: setevo <0-3|baby|teen|adult|elder>
-// -------------------------------------------------
+  // -------------------------------------------------
+  // SET EVO STAGE
+  // Usage: setevo <0-3|baby|teen|adult|elder>
+  // -------------------------------------------------
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setevo"))
   {
@@ -807,9 +812,9 @@ static void execLine(char *line)
 #endif
   }
 
-// -------------------------------------------------
-// SET HUNGER
-// -------------------------------------------------
+  // -------------------------------------------------
+  // SET HUNGER
+  // -------------------------------------------------
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "sethunger"))
   {
@@ -827,9 +832,9 @@ static void execLine(char *line)
   }
 #endif
 
-// -------------------------------------------------
-// SET MOOD (happiness)
-// -------------------------------------------------
+  // -------------------------------------------------
+  // SET MOOD (happiness)
+  // -------------------------------------------------
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setmood"))
   {
@@ -847,9 +852,9 @@ static void execLine(char *line)
   }
 #endif
 
-// -------------------------------------------------
-// SET REST (energy)
-// -------------------------------------------------
+  // -------------------------------------------------
+  // SET REST (energy)
+  // -------------------------------------------------
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "setrest"))
   {
@@ -867,9 +872,9 @@ static void execLine(char *line)
   }
 #endif
 
-// -------------------------------------------------
-// SET HEALTH
-// -------------------------------------------------
+  // -------------------------------------------------
+  // SET HEALTH
+  // -------------------------------------------------
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "sethealth"))
   {
@@ -930,6 +935,30 @@ static void execLine(char *line)
     return;
   }
 #endif
+
+  if (!strcmp(argv[0], "saveheal"))
+  {
+    const bool hadBlankName = (pet.getName() == nullptr || pet.getName()[0] == '\0');
+    const bool changed = saveManagerAutoHeal();
+
+    requestUIRedraw();
+
+    if (changed)
+    {
+      logf("[OK] Save healed. name='%s'", pet.getName());
+    }
+    else
+    {
+      logf("[OK] No save heal needed. name='%s'", pet.getName());
+    }
+
+    if (hadBlankName && pet.getName() && pet.getName()[0] != '\0')
+    {
+      logLine("[OK] Blank pet name was repaired.");
+    }
+
+    return;
+  }
 
 #if !PUBLIC_BUILD
   if (!strcmp(argv[0], "killpet"))
@@ -1048,7 +1077,7 @@ static void execLine(char *line)
   {
     time_t now = time(nullptr);
 
-    uint32_t birth = saveManagerGetBirthEpoch(); // you'll add this getter
+    uint32_t birth = saveManagerGetBirthEpoch();
 
     logf("now:   %lu", (unsigned long)now);
     logf("birth: %lu", (unsigned long)birth);
@@ -1187,11 +1216,11 @@ static void execLine(char *line)
         (g_sdReady && !SD.exists(assetOtaLocalManifestPath())) ||
         (strcmp(assetOtaLastErrorString(), "None") != 0);
 
-        if (needsRepair)
-        {
-          logLine("  suggestion:      asset recovery available");
-          logLine("  suggestion:      run 'repair' then reboot");
-        }
+    if (needsRepair)
+    {
+      logLine("  suggestion:      asset recovery available");
+      logLine("  suggestion:      run 'repair' then reboot");
+    }
 
     return;
   }
@@ -1234,6 +1263,7 @@ static void execLine(char *line)
   // -------------------------
   // ASSET / SYSTEM COMMANDS
   // -------------------------
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "otach"))
   {
     if (argc < 2)
@@ -1295,7 +1325,6 @@ static void execLine(char *line)
 
     cfg.channel = (uint8_t)AssetOtaChannel::DEV;
 
-    // 👉 ADD THIS LINE RIGHT HERE
     logf("[OK] manifest: %s", assetOtaManifestUrlForChannel((AssetOtaChannel)cfg.channel));
 
     if (!assetOtaConfigSave(cfg))
@@ -1314,6 +1343,7 @@ static void execLine(char *line)
     ESP.restart();
     return;
   }
+#endif
 
   if (!strcmp(argv[0], "assetflag"))
   {

@@ -1001,15 +1001,14 @@ static bool isBlankName(const char *s)
   return true;
 }
 
-static void autoHealLoadedSaveIfNeeded()
+static bool autoHealLoadedSaveIfNeeded()
 {
   const bool hadNamePending = namePendingFlagExists();
   const bool hadBlankPetName = isBlankName(pet.name);
+  bool changed = false;
 
   if (!hadNamePending && !hadBlankPetName)
-    return;
-
-  bool changed = false;
+    return false;
 
   Serial.printf("[SAVE][AUTOHEAL] begin namePending=%d blankPetName=%d name='%s'\n",
                 hadNamePending ? 1 : 0,
@@ -1044,10 +1043,13 @@ static void autoHealLoadedSaveIfNeeded()
     saveManagerForce();
   }
 
-  Serial.printf("[SAVE][AUTOHEAL] end namePending=%d blankPetName=%d name='%s'\n",
+  Serial.printf("[SAVE][AUTOHEAL] end namePending=%d blankPetName=%d name='%s' changed=%d\n",
                 namePendingFlagExists() ? 1 : 0,
                 isBlankName(pet.name) ? 1 : 0,
-                pet.name);
+                pet.name,
+                changed ? 1 : 0);
+
+  return changed;
 }
 
 static void forceNamePetFlowFromBoot()
@@ -1147,6 +1149,17 @@ void saveManagerStampBirthNow()
   g_birthEpoch = now;
   pet.birth_epoch = now;
   saveManagerMarkDirty();
+}
+
+bool saveManagerAutoHeal()
+{
+  if (!g_sdReady)
+  {
+    Serial.println("[SAVE][AUTOHEAL] skipped: SD not ready");
+    return false;
+  }
+
+  return autoHealLoadedSaveIfNeeded();
 }
 
 bool saveManagerSave()

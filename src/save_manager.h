@@ -14,6 +14,7 @@ void saveManagerBegin();     // optional init hook (safe to call)
 void saveManagerMarkDirty(); // call when anything changes
 void saveManagerTick();      // call in loop()
 void saveManagerForce();     // force a save (and settings), used before reboot/sleep
+bool saveManagerAutoHeal();
 void saveManagerNewPet();
 uint32_t saveManagerGetBirthEpoch();   // handy for stats screen later
 void saveManagerNewPetNoSave();
