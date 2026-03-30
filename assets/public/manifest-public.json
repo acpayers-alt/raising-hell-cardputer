@@ -1,9 +1,9 @@
 {
-  "packVersion": "0.1.7",
-  "pack_version": "0.1.7",
+  "packVersion": "1.1.5",
+  "pack_version": "1.1.5",
   "channel": "public",
-  "generatedAt": "2026-03-15T21:41:07.102728+00:00",
-  "fileCount": 381,
+  "generatedAt": "2026-03-30T00:13:39.573572+00:00",
+  "fileCount": 431,
   "files": [
     {
       "path": "raising_hell/graphics/background/al/al_bg.jpg",
@@ -146,14 +146,79 @@
       "sha256": "6e6d4181383cedaa5827e45913dca435ded21295b232ef6a5ebee3fb23ae0f1c"
     },
     {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg.png",
+      "size": 1731,
+      "sha256": "f0a7fe2d086237eb4e66f46d6e681c1e63331849ac536b4d9bbb451c67a2d892"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/cult_down.png",
+      "size": 1541,
+      "sha256": "20758015b353ca4863269b5728ca030adc7b642a95bf8800bd589b05f03ebb0e"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/cult_left.png",
+      "size": 1289,
+      "sha256": "db988664bba1b8053b4f33a1f79e3250175664562c53c1fd1925c0702449a49e"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/cult_right.png",
+      "size": 1262,
+      "sha256": "266313f5f6cd8c76b1733f5fe7fe9efb9f59654b15b08650689a8b0cd1418687"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/cult_up.png",
+      "size": 1401,
+      "sha256": "e367cde08b389d7d6ae5a64edad9ef852e5415bd3f40ff1b84263932766660ee"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/eld_goal_zone.png",
+      "size": 15190,
+      "sha256": "ee619eb86d251e59678880225c7d1162e7b4b4f53ee50f09fc77ee3fdd75ca06"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/eld_start_zone.png",
+      "size": 12700,
+      "sha256": "fdd181581084c3854c2e656348b5e66a675ab9335e9b430318e51add6f4584ab"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/intro_goal.png",
+      "size": 18881,
+      "sha256": "ac80300aa5ed19a7058f03723b5bc8109d5bf11dc5da941cf8e462ae3f3a9839"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/stone_chunk.png",
+      "size": 2019,
+      "sha256": "b7f158f3de98ce9cde5cd0c38e882f57c629141ac9fd38a02103a851d45643bb"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/stone_chunk_sm.png",
+      "size": 1446,
+      "sha256": "50a7fa5ae3f0da266fdcc5ce771b74959d0b3c6356493e362fec0a2a99569f26"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/crossy/eld/stone_chunk_xs.png",
+      "size": 1115,
+      "sha256": "484a0c1a2c9bff064a74bd172e020c239693c1d30bb51b85b664d7d105520df1"
+    },
+    {
       "path": "raising_hell/graphics/mini_games/fbrun/dev/car.png",
-      "size": 4517,
-      "sha256": "ae6019553ab7e8fc9b90d2a547e04981e652c7ecfe4e5dd2bcecae7d19b2f6e8"
+      "size": 3722,
+      "sha256": "4aab0f5ba70e84e370d1e6da1153874240d70f7faa00aa85c11d3973e3518baa"
     },
     {
       "path": "raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bg.png",
       "size": 38637,
       "sha256": "6d7fd8bfdca7ffea4466d5ac5df9cc5684e9887d6f53fc985a86270b91447f70"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgl.png",
+      "size": 18813,
+      "sha256": "4b0d98fe1f29b4f7d33e42700e65650c23ac77d764d3bbb2c859d98c46229402"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgr.png",
+      "size": 18999,
+      "sha256": "a44fa4dba21f600934357c12cff086a88524da2abed9a44926346de749bf225a"
     },
     {
       "path": "raising_hell/graphics/mini_games/fbrun/dev/fireball1.png",
@@ -172,23 +237,68 @@
     },
     {
       "path": "raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png",
-      "size": 11757,
-      "sha256": "9bc013f7a1f09f7a0b739c15b99f98bac969a4f76bf0793b7e4cc91d5f5cc919"
+      "size": 5277,
+      "sha256": "ffe529f047d374de6a0197737946ffd5b631ead377d81fa5892a1614a2c131a0"
     },
     {
       "path": "raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png",
-      "size": 5971,
-      "sha256": "e01693833b298234e8d1f96de0890834aa39f6570b28f8d028bdac4f695e5aa7"
+      "size": 4565,
+      "sha256": "8faf325a7f0844163dacb317ba063f9496d5d4ca04a81a5264f2c4036a71f922"
     },
     {
       "path": "raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png",
-      "size": 6526,
-      "sha256": "16b028d7d1733e166758970d49763d70a5fb5796e9ff852aa612e6d2fe49b2f9"
+      "size": 5750,
+      "sha256": "f1eb416382cae9f081bd1077249d353b2a306e282645d491d0b6a6048594423b"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgl.png",
+      "size": 20746,
+      "sha256": "8a50dcea5df06bf021bbb4ce10a4c3a57067a00c2279bc6b373d445d6ce0d8f7"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgr.png",
+      "size": 20482,
+      "sha256": "026c8345cee1ba44e24f51478e9c209b4ddd34ab7549d216cfa195940ad698bc"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/mer_gore.png",
+      "size": 5277,
+      "sha256": "ffe529f047d374de6a0197737946ffd5b631ead377d81fa5892a1614a2c131a0"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/mertaunt1.png",
+      "size": 5425,
+      "sha256": "ad998aac1b1f3fe1731d234b4ba8567a2befdfcda1f2ffa4101b7ff8ae873400"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/mertaunt2.png",
+      "size": 5811,
+      "sha256": "4218450c4d3cdf603493284d1e385ed1a85257d439e3986432fab1f2a32c59fe"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/sub_sprite.png",
+      "size": 3496,
+      "sha256": "2fc1a9619a77ecef8f90faa8048a5fc82bed855eb60b64d4890efaee6128e317"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/trident1.png",
+      "size": 2275,
+      "sha256": "f33edaf4b30052a4471364bcd9d18ce5b250d4e84e3b2321722576c24a988e48"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/trident2.png",
+      "size": 2849,
+      "sha256": "3abd837548605c1da25464f6be62863c23973b982ffd4b0aa354526fe0ae1359"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/fbrun/eld/trident3.png",
+      "size": 3169,
+      "sha256": "5cfc6d34ec18658fb591e1e70fe392a1f901c61c329ddaa4b74fbcd04183ccfb"
     },
     {
       "path": "raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.jpg",
-      "size": 7315,
-      "sha256": "00277251a77e869f659c984f511cd840cb97eed485a2befaeb41562eb58db581"
+      "size": 7270,
+      "sha256": "7989762b026f050e69c2d493eac1ce2d02c268f9238245bb1b52ecea538d95f5"
     },
     {
       "path": "raising_hell/graphics/mini_games/flappy/dev/fireball1.png",
@@ -251,6 +361,71 @@
       "sha256": "f99e3a050ddce89c985839fa8fe61aad6c8a584087383e40547077ad62fc1afb"
     },
     {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/column_down.png",
+      "size": 7741,
+      "sha256": "db63322156ea96924da848a94c7206b6579d099fc230938ede80697bbc1ddbb0"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/column_up.png",
+      "size": 7650,
+      "sha256": "3f0aeaa295ccf0e3783f3a179e2abd6e98a25d27a11ba94eb5f8d25ba620bfda"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.jpg",
+      "size": 8236,
+      "sha256": "63e8c9f2debad5899759d9892d3b6daf7552067d4a85c2ddf773903253fd9371"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse1.png",
+      "size": 8268,
+      "sha256": "12d981570d247b3d56492e4efeef649fc5985dee23164333237b1659c0ee2b41"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse2.png",
+      "size": 7652,
+      "sha256": "17128dab6fcb91c59ea18ac7bc1eca7567bb825013105f36ee04195ca2134aba"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse3.png",
+      "size": 5615,
+      "sha256": "da95a50d925c56e82c27cc34a55f1003012b4979d3f2e68c4f9758661e5ea8cf"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse4.png",
+      "size": 4964,
+      "sha256": "479ee3db1680e189207196f53986a216a12544489cb5a5cc7b6e06cf716e7988"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse5.png",
+      "size": 4725,
+      "sha256": "ab64fb56db1e9e3b065713034e6e2aee38721141330e146de4e0b5f0286920fe"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_taunt1.png",
+      "size": 7297,
+      "sha256": "39e5baa7e6cd82f28e5ce90ba2c7fdf3eac7e13b8dfb691ea8390b96e0b0aa76"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_taunt2.png",
+      "size": 7174,
+      "sha256": "d61b7b8c86d0e33f51be4c68008792628fb9a5612e8d4100cce5358287aaa2a5"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/starfish1.png",
+      "size": 2365,
+      "sha256": "702bae3b0f7dc45ce15393f2f58f5f0d3c785ec4cbca2b0835db5340f9999732"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/starfish2.png",
+      "size": 2507,
+      "sha256": "e8f4279963dd498c995f573bedd79371e75beb9566c7b2a02f5e4ba83cc0b332"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/flappy/eld/starfish3.png",
+      "size": 2484,
+      "sha256": "2e8fd8e42eefe498c78139de9963ac3290c6073ce881f62caa5f4a0095b63cc7"
+    },
+    {
       "path": "raising_hell/graphics/mini_games/resrun/dev/branch_ground.png",
       "size": 17667,
       "sha256": "1816114e17bbef2154feeef637198bf7843dea8ee65ec61e34f11bbd075e0677"
@@ -309,6 +484,61 @@
       "path": "raising_hell/graphics/mini_games/resrun/dev/snake_win2.png",
       "size": 4120,
       "sha256": "cf300f6e872d9112dfbcd1c3e90aeca52dda4275af954a05d7a52eddd9b04a9a"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/bat_fly1.png",
+      "size": 727,
+      "sha256": "a5742e0cc2c843458d1b07a5a5147bf9ebeb5344abcedc29bfd1108df7328117"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/bat_fly2.png",
+      "size": 1032,
+      "sha256": "da8a779d322266e656fa12293577397a8332a6cd23abcbbb2995751d0bbb112a"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/cult_hand1.png",
+      "size": 3801,
+      "sha256": "f1fb89626a3e90e38bc2fcf79b6f8f87d12dd62c291d8581cc8e576e1dc22ea6"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/cult_hand2.png",
+      "size": 4686,
+      "sha256": "08934508c230f8d2538db27fcb9f3e0e4fd9ba1f6b29b32824fe7c75a946e8e1"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/dock_ground.png",
+      "size": 15009,
+      "sha256": "6bd59baa18722d34d19cf8202e235ac410a2df1940982e13f62db39481b128a4"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/rat_ground.png",
+      "size": 1325,
+      "sha256": "d30ed09a2a00e8556e59084be2b7bd8ea42b1e16c79671c9ae8b8a14d08b0fdd"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/spider_ground.png",
+      "size": 2360,
+      "sha256": "b6d5cf01ea47b9060ae71b5bdcca36d1f4f7f3cdb83054b8daa81c71189bed35"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_crouch.png",
+      "size": 3608,
+      "sha256": "85a238e8f09d503e01b26b5b0123955a2e029fd27b4ef777c0466313fe80c356"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_jump.png",
+      "size": 2553,
+      "sha256": "cb29bc4441bd781f920d0858dfe25bb333da9c112c569c7f7517f7e6d7bd0b74"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_run1.png",
+      "size": 4190,
+      "sha256": "31e8e2e1b4d747511a16f2a59b0bc99d90c71e0e34aecfa1d0b8b83a5801876d"
+    },
+    {
+      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_run2.png",
+      "size": 4505,
+      "sha256": "81a726f074aa7ae33f04c321cd3bb9fe16c5273dee24d7615e45123a98279c1e"
     },
     {
       "path": "raising_hell/graphics/pet/anim/al/al_blink1.png",
@@ -439,6 +669,26 @@
       "path": "raising_hell/graphics/pet/anim/dev/ad/hpy/dev_ad_hpy_tail3.png",
       "size": 10194,
       "sha256": "f2082113a28671fc6b4806cac7957878912d6beb9614e62833b8f47c2e7d039e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf1.png",
+      "size": 11355,
+      "sha256": "e641c2a1bc621b414c543e62a48070350f5b073b0bc78abccf2606754790b723"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf2.png",
+      "size": 11900,
+      "sha256": "9e7400e1b13c0bc26e7097547d8e7944738b1349bb1d0cce0484aead386bbde6"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf3.png",
+      "size": 11272,
+      "sha256": "027fcc71ec4520116fc47e0ee74c84aecb61b5e489d2b7f37373b68a824ecddd"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_barf4.png",
+      "size": 11900,
+      "sha256": "9e7400e1b13c0bc26e7097547d8e7944738b1349bb1d0cce0484aead386bbde6"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/ad/sck/dev_ad_sck_lay1.png",
@@ -1852,13 +2102,13 @@
     },
     {
       "path": "raising_hell/graphics/ui/icons/inf_coin.png",
-      "size": 1564,
-      "sha256": "4f36f60f9b0a8b871466d69fd51c82a72ff0210be77c7e9ecc699fc580f1f174"
+      "size": 1186,
+      "sha256": "1434c69ea68a0c9a2ac644104daaa7a719b5dc5c10fbaa7ab89717e00e59bf11"
     },
     {
       "path": "raising_hell/graphics/ui/icons/life_icon.png",
-      "size": 1513,
-      "sha256": "3e326186a1d97c4bc25a7f9fa758399dba4173ffb05e228a0aff4751f3871785"
+      "size": 1032,
+      "sha256": "62ca49f119725f061c40f938e31965a5272b6674c54fcc92da5d7b306beff03a"
     },
     {
       "path": "raising_hell/graphics/ui/shop_items/dev/dev_evo.png",
