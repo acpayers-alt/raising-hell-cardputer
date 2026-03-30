@@ -14,12 +14,29 @@
 #include "graphics.h"
 #include "ui_actions.h"
 
+static bool s_prevSelectHeld = false;
+
+void uiChoosePetOnEnter(InputState& in)
+{
+  // Reset derived Enter-edge state so we do not create a fake edge
+  // from whatever the previous state was doing.
+  s_prevSelectHeld = in.selectHeld;
+
+  // Any fresh entry into CHOOSE_PET should require a clean release first.
+  g_choosePetBlockHatchUntilRelease = true;
+
+  // Give the state a clean input surface.
+  while (in.kbHasEvent()) (void)in.kbPop();
+  in.clearEdges();
+  inputForceClear();
+  clearInputLatch();
+}
+
 void uiChoosePetHandle(InputState& in)
 {
   // Reliable Enter edge (press-level -> edge) for Cardputer:
   // Sometimes selectOnce is missed depending on keyboard change detection.
   g_app.newPetFlowActive = true;
-  static bool s_prevSelectHeld = false;
 
   // ---------------------------------------------------------------------------
   // Time gate to prevent instant hatch on first draw/entry

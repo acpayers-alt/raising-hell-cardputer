@@ -579,8 +579,9 @@ static void finalizeBootLanding()
     clearInputLatch();
     inputForceClear();
     g_choosePetInputUnlockMs = millis() + 350;
+    g_choosePetBlockHatchUntilRelease = true;
     controlsHelpBegin(UIState::CHOOSE_PET, Tab::TAB_PET);
-    return;
+        return;
   }
 
   if (!g_controlsHelpSeen)
@@ -607,8 +608,9 @@ static void finalizeBootLanding()
     ui_setBootSplashActive(false);
 
     g_choosePetInputUnlockMs = millis() + 350;
+    g_choosePetBlockHatchUntilRelease = true;
     enterState(UIState::CHOOSE_PET, Tab::TAB_PET, false);
-    uiInitLevelPopupTracker();
+        uiInitLevelPopupTracker();
 
     invalidateBackgroundCache();
     requestUIRedraw();

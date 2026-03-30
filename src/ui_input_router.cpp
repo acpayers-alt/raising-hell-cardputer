@@ -2,11 +2,12 @@
 
 #include "app_state.h"
 #include "input.h"
-#include "wifi_setup_state.h"
 #include "ui_actions.h"
 #include "ui_input_interceptors.h"
+#include "ui_state_choose_pet.h"
 #include "ui_state_handlers.h"
 #include "ui_state_pet_sleeping.h"
+#include "wifi_setup_state.h"
 
 // ----------------------------------------------------------------------------
 // Text capture policy
@@ -15,23 +16,19 @@ bool uiWantsTextCaptureForState(UIState s)
 {
   switch (s)
   {
-    case UIState::CONSOLE:
-    case UIState::NAME_PET:
-      return true;
+  case UIState::CONSOLE:
+  case UIState::NAME_PET:
+    return true;
 
-    case UIState::WIFI_SETUP:
-      return (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID) ||
-             (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS);
+  case UIState::WIFI_SETUP:
+    return (g_wifi.setupStage == WIFI_SETUP_STAGE_SSID) || (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS);
 
-    default:
-      return false;
+  default:
+    return false;
   }
 }
 
-bool uiWantsTextCaptureNow()
-{
-  return uiWantsTextCaptureForState(g_app.uiState);
-}
+bool uiWantsTextCaptureNow() { return uiWantsTextCaptureForState(g_app.uiState); }
 
 // ----------------------------------------------------------------------------
 // No-input states (swallow edges)
@@ -40,20 +37,17 @@ static inline bool isNoInputState(UIState s)
 {
   switch (s)
   {
-    case UIState::BOOT:
-    case UIState::DEATH_TRANSITION:
-      return true;
-    default:
-      return false;
+  case UIState::BOOT:
+  case UIState::DEATH_TRANSITION:
+    return true;
+  default:
+    return false;
   }
 }
 
-static bool dispatchToHandler(UIState s, InputState& in)
-{
-  return uiDispatchToStateHandler(s, in);
-}
+static bool dispatchToHandler(UIState s, InputState &in) { return uiDispatchToStateHandler(s, in); }
 
-bool uiHandleInput(InputState& in)
+bool uiHandleInput(InputState &in)
 {
   static bool s_lastTextCapture = false;
   const bool desiredTextCapture = uiWantsTextCaptureNow();
@@ -74,8 +68,12 @@ bool uiHandleInput(InputState& in)
     if (g_app.uiState == UIState::PET_SLEEPING)
       uiPetSleepingOnEnter(in);
 
+    if (g_app.uiState == UIState::CHOOSE_PET)
+      uiChoosePetOnEnter(in);
+
     s_prevState = g_app.uiState;
   }
+
   // ---------------------------------------------------------------
 
   if (isNoInputState(g_app.uiState))

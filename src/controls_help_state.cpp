@@ -1,15 +1,27 @@
 #include "controls_help_state.h"
 
-#include "app_state.h"     // uiState (extern) or accessors
-#include "display_state.h" // uiNeedsRedraw (extern)
+// --- Core app / state ---------------------------------------------------------
+#include "app_state.h"
+#include "display_state.h"
+#include "ui_menu_state.h"
+
+// --- Flow / navigation --------------------------------------------------------
 #include "flow_boot_wizard.h"
-#include "graphics.h"
-#include "input.h"
 #include "return_target.h"
+#include "ui_actions.h"
+
+// --- New pet flow -------------------------------------------------------------
+#include "new_pet_flow_state.h"
+
+// --- Input / rendering --------------------------------------------------------
+#include "input.h"
+#include "graphics.h"
+
+// --- Persistence / storage ----------------------------------------------------
 #include "save_manager.h"
 #include "sdcard.h"
-#include "ui_actions.h"
-#include "ui_menu_state.h" // currentTab (extern) or accessors
+
+// --- End of includes
 
 uint8_t g_controlsHelpSeen = 0;
 
@@ -64,6 +76,12 @@ void controlsHelpDismiss()
     requestFullUIRedraw();
     return;
   }
+
+  if (s_controlsHelpReturn.state == UIState::CHOOSE_PET)
+{
+  g_choosePetInputUnlockMs = millis() + 350;
+  g_choosePetBlockHatchUntilRelease = true;
+}
 
   uiActionEnterState(s_controlsHelpReturn.state, s_controlsHelpReturn.tab, true);
   requestFullUIRedraw();
