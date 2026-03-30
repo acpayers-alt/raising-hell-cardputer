@@ -30,6 +30,11 @@ void uiChoosePetOnEnter(InputState& in)
   in.clearEdges();
   inputForceClear();
   clearInputLatch();
+
+  Serial.printf("[EGG] onEnter selectHeld=%d unlockMs=%lu blockUntilRelease=%d\n",
+    (int)in.selectHeld,
+    (unsigned long)g_choosePetInputUnlockMs,
+    (int)g_choosePetBlockHatchUntilRelease);
 }
 
 void uiChoosePetHandle(InputState& in)
@@ -49,6 +54,9 @@ void uiChoosePetHandle(InputState& in)
       while (in.kbHasEvent()) (void)in.kbPop();
       in.clearEdges();
       clearInputLatch();
+      Serial.printf("[EGG] BLOCKED unlockMs still active now=%lu unlockMs=%lu\n",
+        (unsigned long)now,
+        (unsigned long)g_choosePetInputUnlockMs);
       return;
     }
 
@@ -71,12 +79,19 @@ void uiChoosePetHandle(InputState& in)
       in.clearEdges();
       inputForceClear();
       clearInputLatch();
+      Serial.println("[EGG] BLOCKED waiting for release");
       return;
     }
   }
 
   // Enter edge derived from held state (more reliable than selectOnce)
   const bool enterEdge = (in.selectHeld && !s_prevSelectHeld);
+  if (enterEdge) {
+    Serial.printf("[EGG] enterEdge DETECTED selectHeld=%d prev=%d\n",
+                  (int)in.selectHeld,
+                  (int)s_prevSelectHeld);
+  }
+
   s_prevSelectHeld = in.selectHeld;
 
   int move = 0;
@@ -146,7 +161,7 @@ void uiChoosePetHandle(InputState& in)
   }
 
   // Select to proceed to HATCHING (NOT directly to name)
-  if (enterEdge || in.selectOnce || in.encoderPressOnce)
+  if (enterEdge)
   {
     // Ensure text capture is off while hatching (name flow enables it later)
     inputSetTextCapture(false);
