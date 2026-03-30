@@ -62,7 +62,7 @@ void powerMenuActReboot()
   ESP.restart();
 }
 
-void powerMenuActShutdown()
+void emergencyBatteryShutdown()
 {
   saveManagerForce();
   applyWifiPower(false);
@@ -78,6 +78,11 @@ void powerMenuActShutdown()
 
   delay(60);
   esp_deep_sleep_start();
+}
+
+void powerMenuActShutdown()
+{
+  emergencyBatteryShutdown();
 }
 
 void powerMenuClose()

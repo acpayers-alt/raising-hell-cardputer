@@ -177,6 +177,7 @@ void appMainLoopTick()
     assetOtaTick();
     updateTime();
     updateBattery();
+    batteryProtectionTick(now);
     saveManagerTick();
     maybePeriodicTimeSave();
 
@@ -328,6 +329,7 @@ void appMainLoopTick()
       if (g_timeAnchorAttempted || timeIsSynced())
         updateTime();
       updateBattery();
+      batteryProtectionTick(now);
       saveManagerTick();
       maybePeriodicTimeSave();
 
@@ -616,6 +618,7 @@ void appMainLoopTick()
     if (g_timeAnchorAttempted || timeIsSynced())
       updateTime();
     updateBattery();
+    batteryProtectionTick(now);
     saveManagerTick();
     maybePeriodicTimeSave();
 
@@ -644,6 +647,7 @@ void appMainLoopTick()
     if (g_timeAnchorAttempted || timeIsSynced())
       updateTime();
     updateBattery();
+    batteryProtectionTick(now);
     saveManagerTick();
     maybePeriodicTimeSave();
 
@@ -735,6 +739,7 @@ void appMainLoopTick()
   if (g_timeAnchorAttempted || timeIsSynced())
     updateTime();
   updateBattery();
+  batteryProtectionTick(now);
   saveManagerTick();
   maybePeriodicTimeSave();
 

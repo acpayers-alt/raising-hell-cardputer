@@ -36,6 +36,8 @@ void setBacklightTagged(uint8_t level, const char* file, int line);
 void setScreenPowerTagged(bool on, const char* file, int line);
 #define SET_SCREEN_POWER(on) setScreenPowerTagged((on), __FILE__, __LINE__)
 
+void batteryProtectionTick(uint32_t now);
+
 // Cardputer canvas framebuffer
 extern M5Canvas spr;
 

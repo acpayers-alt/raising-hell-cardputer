@@ -1,68 +1,134 @@
 #include "display.h"
 
+// --- Standard / core ----------------------------------------------------------
 #include <Arduino.h>
+
+// --- Hardware / platform ------------------------------------------------------
 #include "M5Cardputer.h"
-#include "feed.h"          
-#include "pet.h"           
-#include "input.h"         
-#include "sound.h"         
-#include "graphics.h"      
-#include "ui_runtime.h"    
-#include "ui_menu_state.h" 
-#include "display_state.h"
-#include "debug_state.h"
-#include "brightness_state.h"
-#include "app_state.h"           
+
+// --- Core app systems ---------------------------------------------------------
 #include "app_state.h"
-#include "system_status_state.h" 
-#include "display_dims_state.h" 
+#include "system_status_state.h"
+
+// --- Display / UI -------------------------------------------------------------
+#include "display_state.h"
+#include "display_dims_state.h"
+#include "ui_runtime.h"
+#include "ui_menu_state.h"
+
+// --- Rendering / animation ----------------------------------------------------
+#include "graphics.h"
 #include "anim_engine.h"
+
+// --- Input / interaction ------------------------------------------------------
+#include "input.h"
+
+// --- Gameplay -----------------------------------------------------------------
+#include "pet.h"
+#include "feed.h"
+
+// --- Audio / feedback ---------------------------------------------------------
+#include "sound.h"
+
+// --- Power / system control ---------------------------------------------------
+#include "brightness_state.h"
+#include "flow_power_menu.h"
+#include "wifi_power.h"
+
+// --- Debug --------------------------------------------------------------------
+#include "debug_state.h"
+
+// end of includes
+
+
+// --- Battery smoothing + curve helpers --------------------------------------
+
+static int voltageToPercent(int mv)
+{
+  struct Point
+  {
+    int mv;
+    int pct;
+  };
+  static const Point kCurve[] = {
+      {4200, 100}, {4160, 95}, {4110, 88}, {4060, 80}, {4010, 72}, {3960, 64}, {3910, 56}, {3870, 48}, {3830, 40},
+      {3790, 32},  {3750, 24}, {3710, 17}, {3670, 11}, {3630, 6},  {3590, 3},  {3550, 1},  {3500, 0},
+  };
+
+  if (mv >= kCurve[0].mv)
+    return 100;
+  const int last = (int)(sizeof(kCurve) / sizeof(kCurve[0])) - 1;
+  if (mv <= kCurve[last].mv)
+    return 0;
+
+  for (int i = 0; i < last; ++i)
+  {
+    if (mv <= kCurve[i].mv && mv >= kCurve[i + 1].mv)
+    {
+      const int x0 = kCurve[i].mv, y0 = kCurve[i].pct;
+      const int x1 = kCurve[i + 1].mv, y1 = kCurve[i + 1].pct;
+      return y0 + (mv - x0) * (y1 - y0) / (x1 - x0);
+    }
+  }
+  return 0;
+}
+
+static int median5(int a, int b, int c, int d, int e)
+{
+  int v[5] = {a, b, c, d, e};
+  for (int i = 0; i < 5; ++i)
+    for (int j = i + 1; j < 5; ++j)
+      if (v[j] < v[i])
+      {
+        int t = v[i];
+        v[i] = v[j];
+        v[j] = t;
+      }
+  return v[2];
+}
 
 static uint32_t s_lastManualScreenToggleMs = 0;
 
 // Canvas framebuffer
 M5Canvas spr(&M5Cardputer.Display);
 
-void toggleScreenPower() {
-  SET_SCREEN_POWER(!isScreenOn());
-}
+void toggleScreenPower() { SET_SCREEN_POWER(!isScreenOn()); }
 
-bool isScreenOn() {
-  return g_app.screenOn;
-}
+bool isScreenOn() { return g_app.screenOn; }
 
-uint32_t screenPowerLastManualToggleMs() {
-  return s_lastManualScreenToggleMs;
-}
+uint32_t screenPowerLastManualToggleMs() { return s_lastManualScreenToggleMs; }
 
-void markScreenPowerManualToggle(uint32_t now) {
-  s_lastManualScreenToggleMs = now;
-}
+void markScreenPowerManualToggle(uint32_t now) { s_lastManualScreenToggleMs = now; }
 
-static inline uint8_t clampU8(int v) {
-  if (v < 0) return 0;
-  if (v > 255) return 255;
+static inline uint8_t clampU8(int v)
+{
+  if (v < 0)
+    return 0;
+  if (v > 255)
+    return 255;
   return (uint8_t)v;
 }
 
-void initBacklight() {
+void initBacklight()
+{
   // Cardputer backlight is handled by M5GFX; no pin init needed.
 }
 
-void setBacklight(uint8_t level) {
-  M5Cardputer.Display.setBrightness(level);
-}
+void setBacklight(uint8_t level) { M5Cardputer.Display.setBrightness(level); }
 
-void setScreenPower(bool on) {
+void setScreenPower(bool on)
+{
   const bool wasOn = g_app.screenOn;
-  if (wasOn == on) {
+  if (wasOn == on)
+  {
     return;
   }
 
   // Update the single source of truth FIRST.
   g_app.screenOn = on;
 
-  if (!on) {
+  if (!on)
+  {
     // --- going OFF ---
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     SET_BACKLIGHT(0);
@@ -76,8 +142,10 @@ void setScreenPower(bool on) {
 
   // Apply brightness immediately
   int b = brightnessValues[brightnessLevel];
-  if (b < 0) b = 0;
-  if (b > 255) b = 255;
+  if (b < 0)
+    b = 0;
+  if (b > 255)
+    b = 255;
   setBacklight((uint16_t)b);
 
   // Force redraw after wake
@@ -92,25 +160,27 @@ void setScreenPower(bool on) {
   sleepBgNotifyScreenWake();
 }
 
-void setScreenPowerTagged(bool on, const char* file, int line) {
-  if (Serial && Serial.availableForWrite() >= 120) {
-    Serial.printf("[PWR] setScreenPower(%d) @ %s:%d t=%lu ui=%d tab=%d\n",
-                  (int)on, file, line, (unsigned long)millis(),
+void setScreenPowerTagged(bool on, const char *file, int line)
+{
+  if (Serial && Serial.availableForWrite() >= 120)
+  {
+    Serial.printf("[PWR] setScreenPower(%d) @ %s:%d t=%lu ui=%d tab=%d\n", (int)on, file, line, (unsigned long)millis(),
                   (int)g_app.uiState, (int)g_app.currentTab);
   }
   setScreenPower(on); // IMPORTANT: call the real function, not the macro
 }
 
-static inline bool bootCanPrint(size_t need) {
-  return g_debugEnabled && (Serial.availableForWrite() >= (int)need);
-}
+static inline bool bootCanPrint(size_t need) { return g_debugEnabled && (Serial.availableForWrite() >= (int)need); }
 
-void displayInit() {
+void displayInit()
+{
   static bool s_inited = false;
-  if (s_inited) return;
+  if (s_inited)
+    return;
   s_inited = true;
 
-  if (bootCanPrint(60)) Serial.println("[displayInit] Cardputer backend start");
+  if (bootCanPrint(60))
+    Serial.println("[displayInit] Cardputer backend start");
 
   int w = M5Cardputer.Display.width();
   int h = M5Cardputer.Display.height();
@@ -129,221 +199,248 @@ void displayInit() {
   SET_SCREEN_POWER(true);
   requestUIRedraw();
 
-  if (bootCanPrint(80)) Serial.printf("[displayInit] Cardputer backend done (%dx%d)\n", w, h);
+  if (bootCanPrint(80))
+    Serial.printf("[displayInit] Cardputer backend done (%dx%d)\n", w, h);
 }
 
 static bool g_backlightPulseActive = false;
 
-void backlightPulseBegin(uint8_t level) {
+void backlightPulseBegin(uint8_t level)
+{
   // Pulse only when screen is OFF (rail-power hack for LED)
-  if (isScreenOn()) return;
+  if (isScreenOn())
+    return;
 
-  if (g_backlightPulseActive) return;
+  if (g_backlightPulseActive)
+    return;
   g_backlightPulseActive = true;
 
   M5Cardputer.Display.wakeup();
   setBacklight(level);
 }
 
-void backlightPulseEnd() {
-  if (!g_backlightPulseActive) return;
+void backlightPulseEnd()
+{
+  if (!g_backlightPulseActive)
+    return;
   g_backlightPulseActive = false;
 
-// Only end pulse / sleep LCD when screen is OFF
-if (isScreenOn()) return;
+  // Only end pulse / sleep LCD when screen is OFF
+  if (isScreenOn())
+    return;
 
-setBacklight(0);
-M5Cardputer.Display.sleep();
+  setBacklight(0);
+  M5Cardputer.Display.sleep();
 }
 
 // ============================================================================
 // Battery polling (Cardputer) - robust (voltage -> percent)
 // ============================================================================
-void updateBattery() {
+
+// --- Battery filter state ----------------------------------------------------
+static bool s_batLogPrintedOnce = false;
+static int  s_lastLoggedPct = -999;
+static int  s_lastLoggedMv = -999;
+static bool s_lastLoggedUsb = false;
+
+static int s_hist[5] = {0};
+static uint8_t s_histN = 0;
+static uint8_t s_histIdx = 0;
+static float s_mvEma = 0.0f;
+
+// USB heuristic (fast, non-sticky)
+static int s_prevMv = 0;
+static bool s_havePrevMv = false;
+static int  s_attachEvidence = 0;
+static int  s_detachEvidence = 0;
+static uint32_t s_lastUsbFlipMs = 0;
+
+void updateBattery()
+{
   static uint32_t nextMs = 0;
   const uint32_t now = millis();
   if (now < nextMs) return;
-  nextMs = now + 1000; // 1 Hz
+  nextMs = now + 250; // 4 Hz
 
-  int rawPct = (int)M5Cardputer.Power.getBatteryLevel();
-  int rawMv  = (int)M5Cardputer.Power.getBatteryVoltage();
-
+  const int rawMv = (int)M5Cardputer.Power.getBatteryVoltage();
   const bool mvValid = (rawMv >= 2500 && rawMv <= 5000);
+  if (!mvValid) return;
 
-  int pct = batteryPercent;
+  // --- smoothing pipeline ----------------------------------------------------
+  s_hist[s_histIdx] = rawMv;
+  s_histIdx = (s_histIdx + 1) % 5;
+  if (s_histN < 5) s_histN++;
 
-  if (rawPct > 0 && rawPct <= 100) {
-    pct = rawPct;
-  } else if (mvValid) {
-    int mapped = (int)((rawMv - 3300) * 100L / (4200 - 3300));
-    if (mapped < 0) mapped = 0;
-    if (mapped > 100) mapped = 100;
-    pct = mapped;
-  } else {
-    if (pct < 0 || pct > 100) pct = -1;
+  int mvMed = rawMv;
+  if (s_histN == 5) {
+    mvMed = median5(s_hist[0], s_hist[1], s_hist[2], s_hist[3], s_hist[4]);
   }
 
-  if (pct > 100) pct = 100;
+  if (s_mvEma <= 0.0f) s_mvEma = (float)mvMed;
+  s_mvEma = s_mvEma * 0.75f + (float)mvMed * 0.25f;
 
-  // ---------------------------------------------------------------------------
-  // USB heuristic via voltage trend (smoothed + debounced)
-  // ---------------------------------------------------------------------------
-  // Note: Cardputer's power API doesn't expose a stable "USB present" flag,
-  // so we infer it from battery voltage behavior. Raw voltage can be noisy,
-  // so we smooth it and require sustained evidence before toggling the icon.
+  const int mvFilt = (int)(s_mvEma + 0.5f);
 
-  // Exponential moving average to tame 1 Hz noise.
-  static float mvEma = 0.0f;
-  int mvFilt = rawMv;
-  if (mvValid) {
-    if (mvEma <= 0.0f) mvEma = (float)rawMv;
-    mvEma = mvEma * 0.85f + (float)rawMv * 0.15f;   // ~6–7s time constant at 1 Hz
-    mvFilt = (int)(mvEma + 0.5f);
+  // --- publish voltage -------------------------------------------------------
+  batteryVoltageMv = mvFilt;
+
+  // --- percent from curve ----------------------------------------------------
+  const int pct = voltageToPercent(mvFilt);
+
+  // --- USB / external power heuristic ---------------------------------------
+  if (!s_havePrevMv) {
+    s_prevMv = mvFilt;
+    s_havePrevMv = true;
   }
 
-  // 10-sample ring buffer (10 seconds at 1 Hz)
-  static int mvHist[10] = {0};
-  static uint8_t mvHistN = 0;
-  static uint8_t mvHistIdx = 0;
+  const int dv = mvFilt - s_prevMv;
+  s_prevMv = mvFilt;
 
-  static bool usb = false;
-  static uint32_t usbHoldUntilMs = 0;
-  static uint32_t usbLastFlipMs  = 0;
+  bool usb = usbPowered;
 
-  static uint8_t riseCount = 0;
-  static uint8_t fallCount = 0;
+  const bool nearTop     = (mvFilt >= 4140);
+  const bool risingHard  = (dv >= 6);
+  const bool risingSoft  = (dv >= 3);
+  const bool fallingHard = (dv <= -8);
+  const bool fallingSoft = (dv <= -4);
 
-  const uint32_t MIN_ON_MS  = 15000;   // don't drop icon immediately after it appears
-  const uint32_t MIN_OFF_MS = 5000;    // don't re-assert instantly after clearing
+  if (nearTop || risingHard) {
+    if (s_attachEvidence < 8) s_attachEvidence += 2;
+  } else if (risingSoft) {
+    if (s_attachEvidence < 8) s_attachEvidence += 1;
+  } else if (s_attachEvidence > 0) {
+    s_attachEvidence -= 1;
+  }
 
-  if (mvValid) {
-    mvHist[mvHistIdx] = mvFilt;
-    mvHistIdx = (uint8_t)((mvHistIdx + 1) % 10);
-    if (mvHistN < 10) mvHistN++;
+  if (fallingHard) {
+    if (s_detachEvidence < 8) s_detachEvidence += 2;
+  } else if (fallingSoft) {
+    if (s_detachEvidence < 8) s_detachEvidence += 1;
+  } else if (s_detachEvidence > 0) {
+    s_detachEvidence -= 1;
+  }
 
-    if (mvHistN >= 10) {
-      const int oldest = mvHist[mvHistIdx];
-      const int newest = mvFilt;
-      const int delta  = newest - oldest; // mV over ~10s
-
-      // Thresholds (with hysteresis + debounce)
-      const int RISE_HARD_MV = +25;  // immediate "USB present"
-      const int RISE_SOFT_MV = +15;  // count-up evidence
-
-      const int FALL_HARD_MV = -70;  // immediate "USB absent" evidence
-      const int FALL_SOFT_MV = -45;  // count-up evidence
-
-      const uint8_t NEED_COUNT = 3;  // 3 consecutive checks
-
-      // --- detect insert / keep ---
-      if (!usb) {
-        // avoid flicker on quick re-assert after a clear
-        if (now - usbLastFlipMs < MIN_OFF_MS) {
-          riseCount = 0;
-        } else if (delta >= RISE_HARD_MV) {
-          usb = true;
-          usbHoldUntilMs = now + 180000; // 3 minutes
-          usbLastFlipMs = now;
-          riseCount = 0;
-          fallCount = 0;
-        } else {
-          if (delta >= RISE_SOFT_MV) riseCount++;
-          else riseCount = 0;
-
-          if (riseCount >= NEED_COUNT) {
-            usb = true;
-            usbHoldUntilMs = now + 180000;
-            usbLastFlipMs = now;
-            riseCount = 0;
-            fallCount = 0;
-          }
-        }
-      } else {
-        // usb currently true: extend hold while stable/slightly rising
-        const int KEEP_DROP_MV = -10;
-        if (delta > KEEP_DROP_MV) {
-          usbHoldUntilMs = now + 180000;
-          fallCount = 0;
-        } else {
-          // consider clearing only after minimum on-time
-          const bool minOnSatisfied = (now - usbLastFlipMs) >= MIN_ON_MS;
-
-          if (delta <= FALL_HARD_MV && minOnSatisfied) {
-            usb = false;
-            usbLastFlipMs = now;
-            riseCount = 0;
-            fallCount = 0;
-          } else {
-            if (delta <= FALL_SOFT_MV) fallCount++;
-            else fallCount = 0;
-
-            // sustained fall + hold expired => clear
-            if (minOnSatisfied && now >= usbHoldUntilMs && fallCount >= NEED_COUNT) {
-              usb = false;
-              usbLastFlipMs = now;
-              riseCount = 0;
-              fallCount = 0;
-            }
-          }
-        }
-      }
+  if (!usb) {
+    if (s_attachEvidence >= 4) {
+      usb = true;
+      s_lastUsbFlipMs = now;
+      s_attachEvidence = 0;
+      s_detachEvidence = 0;
     }
   } else {
-    // invalid voltage -> don't assert usb; let it expire
-    if (usb && now >= usbHoldUntilMs) {
+    const bool holdElapsed = (now - s_lastUsbFlipMs) >= 1500;
+    if (holdElapsed && s_detachEvidence >= 4 && !nearTop) {
       usb = false;
-      usbLastFlipMs = now;
-      riseCount = 0;
-      fallCount = 0;
+      s_lastUsbFlipMs = now;
+      s_attachEvidence = 0;
+      s_detachEvidence = 0;
     }
   }
 
-  // ---- commit changes / redraw ----
-  static int  lastPct = -999;
-  static int  lastMv  = -999;
+  // boot-time guess so first reading is sane
+  if (!s_batLogPrintedOnce) {
+    usb = (mvFilt >= 4140);
+    usbPowered = usb;
+
+    if (Serial.availableForWrite() >= 160) {
+      Serial.printf("[BAT] init raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d\n",
+                    rawMv, mvMed, mvFilt, dv, pct, (int)usb,
+                    s_attachEvidence, s_detachEvidence);
+    }
+
+    s_batLogPrintedOnce = true;
+    s_lastLoggedPct = pct;
+    s_lastLoggedMv = mvFilt;
+    s_lastLoggedUsb = usb;
+  }
+
+  // --- commit changes / redraw ----------------------------------------------
+  static int lastPct = -999;
+  static int lastMv = -999;
   static bool lastUsb = false;
 
-  int mvForState = mvValid ? rawMv : lastMv;
-
-  const bool changed = (pct != lastPct) || (mvForState != lastMv) || (usb != lastUsb);
+  const bool changed = (pct != lastPct) || (mvFilt != lastMv) || (usb != lastUsb);
   if (changed) {
     batteryPercent = pct;
-    usbPowered     = usb;
+    usbPowered = usb;
 
     requestUIRedraw();
 
     lastPct = pct;
-    lastMv  = mvForState;
+    lastMv = mvFilt;
     lastUsb = usb;
   }
 
-  // ---- periodic diag ----
-  static uint32_t nextDiag = 0;
-  if (now >= nextDiag) {
-    nextDiag = now + 5000;
-    if (Serial.availableForWrite() >= 110) {
-      int d = 0;
-      if (mvHistN >= 10) {
-        const int oldest = mvHist[mvHistIdx];
-        d = rawMv - oldest;
-      }
-      //Serial.printf("[BAT] rawPct=%d rawMv=%d pct=%d usb=%d mv10sDelta=%d\n",
-      //              rawPct, rawMv, batteryPercent, (int)usbPowered, d);
+  // --- quiet logging ---------------------------------------------------------
+  const bool usbChanged = (usb != s_lastLoggedUsb);
+  const bool pctChanged = (pct != s_lastLoggedPct);
+
+  if (usbChanged || pctChanged) {
+    if (Serial.availableForWrite() >= 160) {
+      Serial.printf("[BAT] change raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d",
+                    rawMv, mvMed, mvFilt, dv, pct, (int)usb,
+                    s_attachEvidence, s_detachEvidence);
+
+      if (usbChanged) Serial.print(" reason=usb");
+      else if (pctChanged) Serial.print(" reason=pct");
+
+      Serial.println();
     }
+
+    s_lastLoggedPct = pct;
+    s_lastLoggedMv = mvFilt;
+    s_lastLoggedUsb = usb;
   }
 }
 
-void setBacklightTagged(uint8_t level, const char* file, int line) {
+void batteryProtectionTick(uint32_t now)
+{
+  static uint32_t lowSinceMs = 0;
+  static uint32_t critSinceMs = 0;
+
+  const int mv = batteryVoltageMv;
+
+  const bool lowNow  = (!usbPowered && mv > 0 && mv <= 3550);
+  const bool critNow = (!usbPowered && mv > 0 && mv <= 3475);
+
+  if (lowNow) {
+    if (!lowSinceMs) lowSinceMs = now;
+  } else {
+    lowSinceMs = 0;
+  }
+
+  if (critNow) {
+    if (!critSinceMs) critSinceMs = now;
+  } else {
+    critSinceMs = 0;
+  }
+
+  batteryLow = lowSinceMs && (now - lowSinceMs >= 5000);
+  batteryCritical = critSinceMs && (now - critSinceMs >= 2000);
+
+  if (batteryLow) {
+    applyWifiPower(false);
+    applyBrightnessLevel(0);
+  }
+
+  if (batteryCritical) {
+    emergencyBatteryShutdown();
+  }
+}
+
+void setBacklightTagged(uint8_t level, const char *file, int line)
+{
   static uint8_t s_lastLevel = 255; // impossible value so first call always applies
 
   // If we’re already at this brightness, do nothing (prevents spam + extra work).
-  if (level == s_lastLevel) return;
+  if (level == s_lastLevel)
+    return;
   s_lastLevel = level;
 
-  if (Serial && Serial.availableForWrite() >= 120) {
-    Serial.printf("[BL] setBacklight(%u) @ %s:%d t=%lu ui=%d tab=%d\n",
-                  (unsigned)level, file, line, (unsigned long)millis(),
-                  (int)g_app.uiState, (int)g_app.currentTab);
+  if (Serial && Serial.availableForWrite() >= 120)
+  {
+    Serial.printf("[BL] setBacklight(%u) @ %s:%d t=%lu ui=%d tab=%d\n", (unsigned)level, file, line,
+                  (unsigned long)millis(), (int)g_app.uiState, (int)g_app.currentTab);
   }
 
   setBacklight(level);

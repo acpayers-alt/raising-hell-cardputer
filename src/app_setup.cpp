@@ -3,59 +3,85 @@
 // -----------------------------------------------------------------------------
 // Raising Hell — Cardputer ADV Edition
 // -----------------------------------------------------------------------------
+
+// --- Standard / core ----------------------------------------------------------
 #include <Arduino.h>
 #include <stdint.h>
+
+// --- ESP / system -------------------------------------------------------------
+#include <esp_system.h>
+#include "esp_log.h"
+#include <esp_heap_caps.h>
+
+// --- Hardware / platform ------------------------------------------------------
 #include "M5Cardputer.h"
 #include <WiFi.h>
 #include <EEPROM.h>
 #include <SD.h>
-#include "esp_system.h"
-#include "esp_log.h"
-#include <esp_heap_caps.h>
 
-#include "motion.h"
-#include "ui_runtime.h"
-#include "settings_state.h"
-#include "display_state.h"
-#include "eeprom_addrs.h"
-#include "activity.h"
-#include "sleep_state.h"
-#include "time_state.h"
-#include "display.h"
-#include "input.h"
-#include "pet.h"
-#include "inventory.h"
-#include "menu_actions.h"
-#include "sound.h"
-#include "sdcard.h"
-#include "graphics.h"
-#include "wifi_time.h"
-#include "save_manager.h"
-#include "time_persist.h"
-#include "console.h"
-#include "wifi_power.h"
-#include "timezone.h"
-#include "pet_defs.h"
-#include "led_status.h"
-#include "anim_engine.h"
+// --- Core app systems ---------------------------------------------------------
 #include "app_state.h"
-#include "debug.h"
-#include "brightness_state.h"
-#include "auto_screen.h"
-#include "input_activity_state.h"
-#include "inventory_state.h"
-#include "name_entry_state.h"
-#include "controls_help_state.h"
-#include "mini_games.h"
 #include "boot_pipeline.h"
 #include "system_status_state.h"
-#include "power_button.h"
+#include "runtime_log.h"
+#include "version.h"
+
+// --- Display / input / UX -----------------------------------------------------
+#include "display.h"
+#include "display_state.h"
+#include "input.h"
+#include "input_activity_state.h"
+#include "auto_screen.h"
+#include "brightness_state.h"
+#include "controls_help_state.h"
+
+// --- UI / flow ----------------------------------------------------------------
+#include "ui_runtime.h"
+#include "menu_actions.h"
+#include "flow_power_menu.h"
 #include "hatching_flow.h"
 #include "evolution_flow.h"
+
+// --- Gameplay / pet systems ---------------------------------------------------
+#include "pet.h"
+#include "pet_defs.h"
+#include "inventory.h"
+#include "inventory_state.h"
+#include "activity.h"
+#include "mini_games.h"
+#include "motion.h"
+
+// --- Save / persistence -------------------------------------------------------
+#include "save_manager.h"
+#include "time_persist.h"
+#include "eeprom_addrs.h"
+
+// --- Time / networking --------------------------------------------------------
+#include "wifi_time.h"
+#include "wifi_power.h"
+#include "timezone.h"
+#include "time_state.h"
+
+// --- Storage / assets ---------------------------------------------------------
+#include "sdcard.h"
 #include "asset_ota.h"
-#include "runtime_log.h"
 #include "asset_ota_config.h"
-#include "version.h"
+
+// --- Rendering / animation ----------------------------------------------------
+#include "graphics.h"
+#include "anim_engine.h"
+
+// --- Audio / feedback ---------------------------------------------------------
+#include "sound.h"
+#include "led_status.h"
+
+// --- Misc states --------------------------------------------------------------
+#include "settings_state.h"
+#include "sleep_state.h"
+#include "name_entry_state.h"
+#include "debug.h"
+#include "console.h"
+#include "power_button.h"
 
 void updateBattery();
 
@@ -144,6 +170,13 @@ void appSetup() {
   M5Cardputer.update();
   updateBattery();
 
+  {
+    const esp_reset_reason_t rr = esp_reset_reason();
+    if (rr == ESP_RST_BROWNOUT || batteryVoltageMv <= 3475) {
+      emergencyBatteryShutdown();
+    }
+  }
+
   inputForceClear();
   clearInputLatch();
 
@@ -200,6 +233,6 @@ void appSetup() {
                   (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC",
                   manifestUrl ? manifestUrl : "(null)");
   }
-  
+
   bootPrintln("[BOOT] setup complete");
 }

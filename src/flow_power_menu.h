@@ -12,3 +12,4 @@ void powerMenuClose();
 void powerMenuActSleep();
 void powerMenuActReboot();
 void powerMenuActShutdown();
+void emergencyBatteryShutdown();
