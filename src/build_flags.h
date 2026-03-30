@@ -25,3 +25,18 @@
     #define RH_BUILD_DEFAULT_OTA_CHANNEL ((uint8_t)AssetOtaChannel::DEV)
   #endif
 #endif
+
+// -----------------------------------------------------------------------------
+// Manifest endpoints
+//
+// Legacy public firmware must keep using the old manifest-public.json endpoint.
+// Newer firmware should use v2 manifest endpoints.
+// These can be overridden from platformio.ini if needed.
+// -----------------------------------------------------------------------------
+#ifndef RH_PUBLIC_MANIFEST_URL
+#define RH_PUBLIC_MANIFEST_URL "https://assets.raisinghellgame.com/manifest-public-v2.json"
+#endif
+
+#ifndef RH_DEV_MANIFEST_URL
+#define RH_DEV_MANIFEST_URL "https://assets.raisinghellgame.com/manifest-dev-v2.json"
+#endif

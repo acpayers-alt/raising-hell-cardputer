@@ -19,7 +19,7 @@ namespace UiSettingsPages {
 
 void Handle_TOP(InputState& input, int move) {
   if (move != 0) {
-    const int totalItems = 7;
+    const int totalItems = 8;
     g_app.settingsIndex += move;
     if (g_app.settingsIndex < 0) g_app.settingsIndex = totalItems - 1;
     if (g_app.settingsIndex > totalItems - 1) g_app.settingsIndex = 0;
@@ -96,7 +96,16 @@ void Handle_TOP(InputState& input, int move) {
         return;
       }
 
-      case 6: { // Credits
+      case 6: { // System Status
+        g_settingsFlow.settingsPage = SettingsPage::STATUS;
+        g_app.statusScreenIndex = 0;
+        requestUIRedraw();
+        playBeep();
+        clearInputLatch();
+        return;
+      }
+
+      case 7: { // Credits
         g_settingsFlow.settingsPage = SettingsPage::CREDITS;
         requestUIRedraw();
         playBeep();

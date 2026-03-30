@@ -54,6 +54,8 @@
 #include "evolution_flow.h"
 #include "asset_ota.h"
 #include "runtime_log.h"
+#include "asset_ota_config.h"
+#include "version.h"
 
 void updateBattery();
 
@@ -74,6 +76,7 @@ static void serialBootHandshake(uint32_t waitMs)
 void appSetup() {
   Serial.begin(115200);
   runtimeLogInit();
+  bootTime = millis();
 
   // Give USB stack a moment, then do a bounded handshake.
   delay(50);
@@ -177,5 +180,26 @@ void appSetup() {
   
   assetOtaInit();
 
+  {
+    const AssetOtaConfig &cfg = assetOtaGetConfig();
+    const AssetOtaChannel ch = (AssetOtaChannel)cfg.channel;
+    const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
+
+    Serial.printf("[BUILD] flavor=%s fw=%s defaultOta=%s selectedOta=%s manifest=%s\n",
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+                  "PUBLIC",
+#else
+                  "DEV",
+#endif
+                  RH_VERSION_STRING,
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+                  "PUBLIC",
+#else
+                  "DEV",
+#endif
+                  (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC",
+                  manifestUrl ? manifestUrl : "(null)");
+  }
+  
   bootPrintln("[BOOT] setup complete");
 }

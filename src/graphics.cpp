@@ -65,6 +65,7 @@
 #include "wifi_setup_state.h"
 #include <lgfx/v1/misc/DataWrapper.hpp>
 #include <WiFi.h>
+#include "asset_ota_config.h"
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -1908,10 +1909,15 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {nullptr, // 0 => volumeLine
-                                       "Controls",       "Screen Settings >", "System Settings >",
-                                       "Game Options >", "Console >",         "Credits"};
+    "Controls",
+    "Screen Settings >",
+    "System Settings >",
+    "Game Options >",
+    "Console >",
+    "System Status >",
+    "Credits"};
 
-  const int totalItems = 7;
+const int totalItems = 8;
 
   g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
@@ -2552,6 +2558,124 @@ static void drawCreditsScreen()
   spr.setTextDatum(TL_DATUM);
 }
 
+static const char *basenameFromUrl(const char *url)
+{
+  if (!url || !url[0]) return "(none)";
+  const char *slash = strrchr(url, '/');
+  return (slash && slash[1]) ? slash + 1 : url;
+}
+
+static void drawSystemStatusMenu()
+{
+  drawTopBar();
+
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H;
+
+  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+  const AssetOtaConfig &cfg = assetOtaGetConfig();
+  const AssetOtaChannel ch = (AssetOtaChannel)cfg.channel;
+  const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
+  const char *assetVer = assetOtaInstalledVersion();
+  const char *ssid = wifiConsoleSsid();
+  const char *ip = wifiConsoleIpString();
+
+  char uptimeBuf[32];
+  const uint32_t upMs = millis() - bootTime;
+  const uint32_t upSec = upMs / 1000UL;
+  const uint32_t upMin = upSec / 60UL;
+  const uint32_t remSec = upSec % 60UL;
+  snprintf(uptimeBuf, sizeof(uptimeBuf), "%lum %lus",
+           (unsigned long)upMin, (unsigned long)remSec);
+
+  char batteryBuf[32];
+  snprintf(batteryBuf, sizeof(batteryBuf), "%d%% %s",
+           batteryPercent, usbPowered ? "(USB)" : "");
+
+  char buildBuf[16];
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  snprintf(buildBuf, sizeof(buildBuf), "PUBLIC");
+#else
+  snprintf(buildBuf, sizeof(buildBuf), "DEV");
+#endif
+
+  char otaChannelBuf[16];
+  snprintf(otaChannelBuf, sizeof(otaChannelBuf), "%s",
+           (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
+
+  char wifiStateBuf[24];
+  snprintf(wifiStateBuf, sizeof(wifiStateBuf), "%s/%s",
+           wifiIsEnabled() ? "ON" : "OFF",
+           wifiIsConnectedNow() ? "LINK" : "NO-LINK");
+
+  char assetBuf[24];
+  snprintf(assetBuf, sizeof(assetBuf), "%s",
+           (assetVer && assetVer[0]) ? assetVer : "none");
+
+  char localManifestBuf[8];
+  snprintf(localManifestBuf, sizeof(localManifestBuf), "%s",
+           SD.exists("/raising_hell/assets/manifest_local.json") ? "YES" : "NO");
+
+  char sdBuf[16];
+  snprintf(sdBuf, sizeof(sdBuf), "%s", g_sdReady ? "READY" : "MISSING");
+
+  const char *lines[] = {
+    "Build", buildBuf,
+    "Firmware", RH_VERSION_STRING,
+    "Uptime", uptimeBuf,
+    "Battery", batteryBuf,
+    "SD", sdBuf,
+    "WiFi", wifiStateBuf,
+    "SSID", (ssid && ssid[0]) ? ssid : "(none)",
+    "IP", (ip && ip[0]) ? ip : "(none)",
+    "OTA Channel", otaChannelBuf,
+    "Manifest", basenameFromUrl(manifestUrl),
+    "Assets", assetBuf,
+    "Local Manifest", localManifestBuf,
+    "OTA Status", assetOtaStatusString(),
+    "OTA Error", assetOtaLastErrorString(),
+  };
+
+  const int totalLines = (int)(sizeof(lines) / sizeof(lines[0]));
+  const int visibleLines = 10;
+  g_app.statusScreenIndex = clampi(g_app.statusScreenIndex, 0, totalLines - visibleLines);
+
+  const int start = g_app.statusScreenIndex;
+  const int leftX = 8;
+  const int valX = 110;
+  const int lineH = 18;
+  int y = contentY + 6;
+
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  const int pairCount = totalLines / 2;
+
+  for (int i = 0; i < visibleLines && (start + i) < pairCount; ++i)
+  {
+    const int pairIdx = start + i;
+  
+    const char *key = lines[pairIdx * 2];
+    const char *val = lines[pairIdx * 2 + 1];
+  
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawString(key, leftX, y);
+  
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString(val, valX, y);
+  
+    y += lineH;
+  }
+
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  if (start > 0)
+    spr.drawString("^", SCREEN_W - 10, contentY + 2);
+  if ((start + visibleLines) < totalLines)
+    spr.drawString("v", SCREEN_W - 10, SCREEN_H - 14);
+}
+
 void drawSettingsMenu()
 {
   switch (g_settingsFlow.settingsPage)
@@ -2575,13 +2699,15 @@ void drawSettingsMenu()
   case SettingsPage::WIFI:
     drawWifiSettingsMenu();
     break;
-  case SettingsPage::CONSOLE:
+    case SettingsPage::CONSOLE:
     drawPlaceholderMenu("Console");
+    break;
+  case SettingsPage::STATUS:
+    drawSystemStatusMenu();
     break;
   case SettingsPage::CREDITS:
     drawCreditsScreen();
-    break;
-  case SettingsPage::AUTO_SCREEN:
+    break;  case SettingsPage::AUTO_SCREEN:
     drawAutoScreenPickerMenu();
     break;
   }

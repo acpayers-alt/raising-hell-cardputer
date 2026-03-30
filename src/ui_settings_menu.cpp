@@ -175,6 +175,15 @@ static void actTop_Console(InputState &input)
   clearInputLatch();
 }
 
+static void actTop_OpenStatus(InputState &)
+{
+  g_settingsFlow.settingsPage = SettingsPage::STATUS;
+  g_app.statusScreenIndex = 0;
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 static void actTop_Credits(InputState &)
 {
   g_settingsFlow.settingsPage = SettingsPage::CREDITS;
@@ -424,13 +433,14 @@ static MenuItem kSystemItems[] = {
 // Menu definitions
 // ------------------------------------------------------------
 static MenuItem kTopItems[] = {
-    {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
-    {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
-    {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
-    {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
-    {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
-    {"Console", actTop_Console, nullptr, nullptr, enConsole},
-    {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
+  {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
+  {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
+  {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
+  {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
+  {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
+  {"Console", actTop_Console, nullptr, nullptr, enConsole},
+  {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
+  {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kScreenItems[] = {

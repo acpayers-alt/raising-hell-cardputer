@@ -10,4 +10,5 @@ namespace UiSettingsPages {
   void Handle_GAME(InputState& input, int move);
   void Handle_AUTO_SCREEN(InputState& input, int move);
   void Handle_DECAY_MODE(InputState& input, int move);
+  void Handle_STATUS(InputState& input, int move);
 }

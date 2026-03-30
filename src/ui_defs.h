@@ -76,6 +76,7 @@ enum class SettingsPage : uint8_t {
   DECAY_MODE,
   WIFI,
   CONSOLE,
+  STATUS,
   CREDITS,
   AUTO_SCREEN
 };

@@ -15,9 +15,9 @@ static const char *kLocalManifestPath = "/raising_hell/assets/manifest_local.jso
 static const char *kLocalManifestTmpPath = "/raising_hell/assets/manifest_local.tmp";
 static const char *kStagingRoot = "/raising_hell/assets_staging";
 
-static const char *kPublicManifestUrl = "https://assets.raisinghellgame.com/manifest-public.json";
+static const char *kPublicManifestUrl = RH_PUBLIC_MANIFEST_URL;
 
-static const char *kDevManifestUrl = "https://assets.raisinghellgame.com/manifest-dev.json";
+static const char *kDevManifestUrl = RH_DEV_MANIFEST_URL;
 
 const char *assetOtaConfigPath() { return kCfgPath; }
 const char *assetOtaConfigTmpPath() { return kCfgTmpPath; }
@@ -27,9 +27,17 @@ const char *assetOtaLocalManifestPath() { return kLocalManifestPath; }
 const char *assetOtaLocalManifestTmpPath() { return kLocalManifestTmpPath; }
 const char *assetOtaStagingRoot() { return kStagingRoot; }
 
-const char *assetOtaManifestUrlForChannel(AssetOtaChannel ch)
+const char* assetOtaManifestUrlForChannel(AssetOtaChannel ch)
 {
-  return (ch == AssetOtaChannel::DEV) ? kDevManifestUrl : kPublicManifestUrl;
+  switch (ch)
+  {
+    case AssetOtaChannel::DEV:
+      return kDevManifestUrl;
+
+    case AssetOtaChannel::PUBLIC:
+    default:
+      return kPublicManifestUrl;
+  }
 }
 
 void assetOtaConfigDefaults(AssetOtaConfig &cfg)
@@ -195,7 +203,7 @@ bool assetOtaConfigLoad(AssetOtaConfig *outCfg)
     return false;
     if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
     tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
-    
+
   *outCfg = tmp;
   return true;
 }

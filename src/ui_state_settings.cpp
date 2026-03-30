@@ -116,6 +116,21 @@ void uiSettingsHandle(InputState& input)
   if (input.upOnce) move = -1;
   if (input.downOnce) move = 1;
 
+  if (g_settingsFlow.settingsPage == SettingsPage::STATUS)
+  {
+    if (input.menuOnce || input.escOnce)
+    {
+      g_settingsFlow.settingsPage = SettingsPage::TOP;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return;
+    }
+  
+    UiSettingsPages::Handle_STATUS(input, move);
+    return;
+  }
+    
   if (assetOtaConfirmActive()) {
     if (UiSettingsMenu::Handle(input, move)) {
       return;

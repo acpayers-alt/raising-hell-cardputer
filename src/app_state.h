@@ -29,7 +29,8 @@ struct AppState {
   int shopIndex = 0;
   int feedMenuIndex = 0;
   int powerMenuIndex = 0;
-
+  int statusScreenIndex   = 0;
+  
   // Legacy menu cursors (migrated from ui_menu_state.cpp)
   int sleepMenuIndex = 0;
   int playMenuIndex  = 0;
