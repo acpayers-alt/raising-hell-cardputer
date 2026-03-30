@@ -2,52 +2,91 @@
 // Raising Hell — Cardputer ADV Edition
 // Boot pipeline implementation
 // -----------------------------------------------------------------------------
+
 #include "boot_pipeline.h"
 
-#include <Arduino.h>
-#include <EEPROM.h>
-#include <SD.h>
+// -----------------------------------------------------------------------------
+// Standard / C
+// -----------------------------------------------------------------------------
 #include <cstring>
 
+// -----------------------------------------------------------------------------
+// Arduino / ESP / Platform
+// -----------------------------------------------------------------------------
+#include <Arduino.h>
+#include <EEPROM.h>
+#include <esp_system.h>
+
+// -----------------------------------------------------------------------------
+// External libraries
+// -----------------------------------------------------------------------------
+#include <SD.h>
+#include <WiFi.h>
+
+// -----------------------------------------------------------------------------
+// Project headers
+// -----------------------------------------------------------------------------
+
+// App / lifecycle
 #include "app_lifecycle.h"
 #include "app_state.h"
+
+// Asset / OTA
 #include "asset_manifest.h"
 #include "asset_ota.h"
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
+
+// Boot / system
 #include "boot_firmware_marker.h"
 #include "boot_state.h"
+
+// Display / graphics
 #include "brightness_state.h"
-#include "controls_help_state.h"
-#include "debug.h"
 #include "display.h"
 #include "display_dims_state.h"
 #include "display_state.h"
-#include "eeprom_addrs.h"
-#include "flow_boot_wifi.h"
-#include "flow_boot_wizard.h"
-#include "flow_time_editor.h"
 #include "graphics.h"
+
+// Input / UI
+#include "controls_help_state.h"
 #include "input.h"
-#include "inventory.h"
-#include "launcher_wifi_import.h"
-#include "new_pet_flow_state.h"
-#include "runtime_log.h"
-#include "save_manager.h"
-#include "sdcard.h"
-#include "settings_state.h"
-#include "time_persist.h"
-#include "time_state.h"
-#include "timezone.h"
 #include "ui_actions.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
-#include "version.h"
+
+// Flow / boot UX
+#include "flow_boot_wifi.h"
+#include "flow_boot_wizard.h"
+#include "flow_time_editor.h"
+#include "launcher_wifi_import.h"
+#include "new_pet_flow_state.h"
+
+// Game systems
+#include "inventory.h"
+#include "save_manager.h"
+#include "settings_state.h"
+
+// Storage / SD
+#include "eeprom_addrs.h"
+#include "sdcard.h"
+
+// Time
+#include "time_persist.h"
+#include "time_state.h"
+#include "timezone.h"
+
+// WiFi
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include <WiFi.h>
-#include <esp_system.h>
+
+// Misc
+#include "debug.h"
+#include "runtime_log.h"
+#include "version.h"
+
+// End of includes
 
 // -----------------------------------------------------------------------------
 // SD Asset Check (all builds)
@@ -279,6 +318,7 @@ static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
 static bool g_bootProvisionWifiStarted = false;
 static bool g_postProvisionControlsHelpPending = false;
+static UIState s_bootFinalLandingState = UIState::PET_SCREEN;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -564,6 +604,11 @@ static void finalizeBootLanding()
   g_bootAssetProvisionMustComplete = false;
   g_bootProvisionWifiOnboardingStarted = false;
 
+  Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n",
+    (int)s_bootFinalLandingState,
+    g_controlsHelpSeen ? 1 : 0,
+    g_postProvisionControlsHelpPending ? 1 : 0);
+
   if (g_postProvisionControlsHelpPending)
   {
     g_postProvisionControlsHelpPending = false;
@@ -588,16 +633,24 @@ static void finalizeBootLanding()
   {
     clearInputLatch();
     inputForceClear();
-    g_choosePetInputUnlockMs = millis() + 350;
-    controlsHelpBegin(UIState::CHOOSE_PET, Tab::TAB_PET);
+  
+    if (s_bootFinalLandingState == UIState::CHOOSE_PET)
+    {
+      g_choosePetInputUnlockMs = millis() + 350;
+      g_choosePetBlockHatchUntilRelease = true;
+    }
+  
+    Serial.printf("[BOOT][LAND] controlsHelpBegin returnState=%d\n",
+      (int)s_bootFinalLandingState);
+      
+    controlsHelpBegin(s_bootFinalLandingState, Tab::TAB_PET);
     return;
   }
 
-  const bool saveLoaded = saveManagerLoad();  // OR pass it in if you prefer
-  const UIState afterOk = saveLoaded ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+  const UIState afterOk = s_bootFinalLandingState;
+  const bool loadedFromSD = (afterOk != UIState::CHOOSE_PET);
   
-  bool loadedFromSD = saveLoaded;
-    uint16_t seedMarkNow = 0;
+  uint16_t seedMarkNow = 0;
   EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
 
   if (!loadedFromSD)
@@ -803,9 +856,9 @@ void postBootInitTick()
     const bool loadedSaveExists = loadedFromSD;
 
     const UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
-
+    s_bootFinalLandingState = afterOk;
+    
     bootMarkFirmwareSeenAndRequestProvisionIfChanged();
-
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool provisionTooOld = bootAssetPackTooOld();
