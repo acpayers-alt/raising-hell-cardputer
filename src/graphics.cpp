@@ -1,47 +1,70 @@
+// -----------------------------------------------------------------------------
+// Primary
+// -----------------------------------------------------------------------------
 #include "graphics.h"
 
+// -----------------------------------------------------------------------------
+// Core System / Platform
+// -----------------------------------------------------------------------------
 #include "app_state.h"
 #include "boot_pipeline.h"
 #include "display.h"
 #include "display_dims_state.h"
+#include "sdcard.h"
 #include "tft_compat.h"
+
+// -----------------------------------------------------------------------------
+// Arduino / Std Libs
+// -----------------------------------------------------------------------------
 #include <Arduino.h>
 #include <FS.h>
 #include <SD.h>
 #include <cstring>
 #include <time.h>
 
-#include "console.h"
-#include "death_state.h"
-#include "game_options_state.h"
+// -----------------------------------------------------------------------------
+// External Libraries
+// -----------------------------------------------------------------------------
+#include <WiFi.h>
+#include <esp_heap_caps.h>
+#include <lgfx/v1/misc/DataWrapper.hpp>
+
+// -----------------------------------------------------------------------------
+// Core Runtime / Engine
+// -----------------------------------------------------------------------------
+#include "auto_screen.h"
+#include "brightness_state.h"
 #include "input.h"
 #include "sound.h"
+#include "ui_runtime.h"
 
-#include "save_manager.h"
-#include "savegame.h"
-#include "sdcard.h"
-
-#include "settings_state.h"
-#include "timezone.h"
-#include "wifi_time.h"
-
-#include "anim_engine.h"
+// -----------------------------------------------------------------------------
+// Game Systems
+// -----------------------------------------------------------------------------
 #include "inventory.h"
 #include "pet.h"
 #include "pet_age.h"
+#include "save_manager.h"
+#include "savegame.h"
+#include "shop_items.h"
+#include "timezone.h"
+#include "wifi_time.h"
 
-#include "auto_screen.h"
-#include "graphics_assets.h"
-#include "ui_runtime.h"
-
+// -----------------------------------------------------------------------------
+// Animation / Assets
+// -----------------------------------------------------------------------------
 #include "anim_clips.h"
-#include "asset_ota.h"
+#include "anim_engine.h"
+#include "graphics_assets.h"
+
+// -----------------------------------------------------------------------------
+// UI / State System
+// -----------------------------------------------------------------------------
 #include "boot_state.h"
-#include "brightness_state.h"
-#include "build_flags.h"
 #include "death_state.h"
 #include "factory_reset_state.h"
 #include "flow_boot_wifi.h"
+#include "game_options_state.h"
 #include "inventory_state.h"
 #include "mg_pause_menu.h"
 #include "mini_game_pause_menu.h"
@@ -50,9 +73,12 @@
 #include "new_pet_flow_state.h"
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
-#include "shop_items.h"
+#include "settings_state.h"
 #include "system_status_state.h"
 #include "time_state.h"
+#include "user_toggles_state.h"
+#include "wifi_setup_state.h"
+
 #include "ui_death_menu.h"
 #include "ui_feed_menu.h"
 #include "ui_menu_state.h"
@@ -60,12 +86,21 @@
 #include "ui_power_menu.h"
 #include "ui_settings_menu.h"
 #include "ui_sleep_menu.h"
-#include "user_toggles_state.h"
-#include "version.h"
-#include "wifi_setup_state.h"
-#include <lgfx/v1/misc/DataWrapper.hpp>
-#include <WiFi.h>
+
+// -----------------------------------------------------------------------------
+// OTA / Build / Config
+// -----------------------------------------------------------------------------
+#include "asset_ota.h"
 #include "asset_ota_config.h"
+#include "build_flags.h"
+#include "version.h"
+
+// -----------------------------------------------------------------------------
+// Misc / Tools
+// -----------------------------------------------------------------------------
+#include "console.h"
+
+// END of includes
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -474,12 +509,12 @@ static int deathTransitionYNudgeForPet()
 {
   switch (pet.type)
   {
-    case PET_ELDRITCH:
-      return -6;
-    case PET_DEVIL:
-      return -2;
-    default:
-      return -2;
+  case PET_ELDRITCH:
+    return -6;
+  case PET_DEVIL:
+    return -2;
+  default:
+    return -2;
   }
 }
 
@@ -1000,15 +1035,29 @@ void drawBootWifiWaitScreen(bool connected, int rssi)
   const char *st = nullptr;
   switch (wl)
   {
-    case WL_CONNECTED:         st = "Connected"; break;
-    case WL_IDLE_STATUS:       st = "Authorizing..."; break;
-    case WL_NO_SSID_AVAIL:     st = "SSID not found"; break;
-    case WL_CONNECT_FAILED:    st = "Connect failed"; break;
-    case WL_CONNECTION_LOST:   st = "Connection lost"; break;
-    case WL_DISCONNECTED:      st = "Disconnected"; break;
-    default:                   st = "Connecting..."; break;
+  case WL_CONNECTED:
+    st = "Connected";
+    break;
+  case WL_IDLE_STATUS:
+    st = "Authorizing...";
+    break;
+  case WL_NO_SSID_AVAIL:
+    st = "SSID not found";
+    break;
+  case WL_CONNECT_FAILED:
+    st = "Connect failed";
+    break;
+  case WL_CONNECTION_LOST:
+    st = "Connection lost";
+    break;
+  case WL_DISCONNECTED:
+    st = "Disconnected";
+    break;
+  default:
+    st = "Connecting...";
+    break;
   }
-  
+
   const bool reallyConnected = (wl == WL_CONNECTED);
   const int liveRssi = reallyConnected ? WiFi.RSSI() : 0;
 
@@ -1909,15 +1958,11 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {nullptr, // 0 => volumeLine
-    "Controls",
-    "Screen Settings >",
-    "System Settings >",
-    "Game Options >",
-    "Console >",
-    "System Status >",
-    "Credits"};
+                                       "Controls",       "Screen Settings >", "System Settings >",
+                                       "Game Options >", "Console >",         "System Status >",
+                                       "Credits"};
 
-const int totalItems = 8;
+  const int totalItems = 8;
 
   g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
@@ -2560,7 +2605,8 @@ static void drawCreditsScreen()
 
 static const char *basenameFromUrl(const char *url)
 {
-  if (!url || !url[0]) return "(none)";
+  if (!url || !url[0])
+    return "(none)";
   const char *slash = strrchr(url, '/');
   return (slash && slash[1]) ? slash + 1 : url;
 }
@@ -2586,12 +2632,10 @@ static void drawSystemStatusMenu()
   const uint32_t upSec = upMs / 1000UL;
   const uint32_t upMin = upSec / 60UL;
   const uint32_t remSec = upSec % 60UL;
-  snprintf(uptimeBuf, sizeof(uptimeBuf), "%lum %lus",
-           (unsigned long)upMin, (unsigned long)remSec);
+  snprintf(uptimeBuf, sizeof(uptimeBuf), "%lum %lus", (unsigned long)upMin, (unsigned long)remSec);
 
   char batteryBuf[32];
-  snprintf(batteryBuf, sizeof(batteryBuf), "%d%% %s",
-           batteryPercent, usbPowered ? "(USB)" : "");
+  snprintf(batteryBuf, sizeof(batteryBuf), "%d%% %s", batteryPercent, usbPowered ? "(USB)" : "");
 
   char buildBuf[16];
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
@@ -2601,17 +2645,27 @@ static void drawSystemStatusMenu()
 #endif
 
   char otaChannelBuf[16];
-  snprintf(otaChannelBuf, sizeof(otaChannelBuf), "%s",
-           (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
+  snprintf(otaChannelBuf, sizeof(otaChannelBuf), "%s", (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
 
   char wifiStateBuf[24];
-  snprintf(wifiStateBuf, sizeof(wifiStateBuf), "%s/%s",
-           wifiIsEnabled() ? "ON" : "OFF",
+  snprintf(wifiStateBuf, sizeof(wifiStateBuf), "%s/%s", wifiIsEnabled() ? "ON" : "OFF",
            wifiIsConnectedNow() ? "LINK" : "NO-LINK");
 
   char assetBuf[24];
-  snprintf(assetBuf, sizeof(assetBuf), "%s",
-           (assetVer && assetVer[0]) ? assetVer : "none");
+  snprintf(assetBuf, sizeof(assetBuf), "%s", (assetVer && assetVer[0]) ? assetVer : "none");
+
+  char heapFreeBuf[24];
+  char heapLargestBuf[24];
+  char psramSizeBuf[24];
+  char psramFreeBuf[24];
+
+  snprintf(heapFreeBuf, sizeof(heapFreeBuf), "%u", (unsigned)ESP.getFreeHeap());
+
+  snprintf(heapLargestBuf, sizeof(heapLargestBuf), "%u", (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  snprintf(psramSizeBuf, sizeof(psramSizeBuf), "%u", (unsigned)ESP.getPsramSize());
+
+  snprintf(psramFreeBuf, sizeof(psramFreeBuf), "%u", (unsigned)ESP.getFreePsram());
 
   char localManifestBuf[8];
   snprintf(localManifestBuf, sizeof(localManifestBuf), "%s",
@@ -2621,20 +2675,42 @@ static void drawSystemStatusMenu()
   snprintf(sdBuf, sizeof(sdBuf), "%s", g_sdReady ? "READY" : "MISSING");
 
   const char *lines[] = {
-    "Build", buildBuf,
-    "Firmware", RH_VERSION_STRING,
-    "Uptime", uptimeBuf,
-    "Battery", batteryBuf,
-    "SD", sdBuf,
-    "WiFi", wifiStateBuf,
-    "SSID", (ssid && ssid[0]) ? ssid : "(none)",
-    "IP", (ip && ip[0]) ? ip : "(none)",
-    "OTA Channel", otaChannelBuf,
-    "Manifest", basenameFromUrl(manifestUrl),
-    "Assets", assetBuf,
-    "Local Manifest", localManifestBuf,
-    "OTA Status", assetOtaStatusString(),
-    "OTA Error", assetOtaLastErrorString(),
+      "Build",
+      buildBuf,
+      "Firmware",
+      RH_VERSION_STRING,
+      "Uptime",
+      uptimeBuf,
+      "Battery",
+      batteryBuf,
+      "Heap Free",
+      heapFreeBuf,
+      "Heap Largest",
+      heapLargestBuf,
+      "PSRAM Size",
+      psramSizeBuf,
+      "PSRAM Free",
+      psramFreeBuf,
+      "SD",
+      sdBuf,
+      "WiFi",
+      wifiStateBuf,
+      "SSID",
+      (ssid && ssid[0]) ? ssid : "(none)",
+      "IP",
+      (ip && ip[0]) ? ip : "(none)",
+      "OTA Channel",
+      otaChannelBuf,
+      "Manifest",
+      basenameFromUrl(manifestUrl),
+      "Assets",
+      assetBuf,
+      "Local Manifest",
+      localManifestBuf,
+      "OTA Status",
+      assetOtaStatusString(),
+      "OTA Error",
+      assetOtaLastErrorString(),
   };
 
   const int totalLines = (int)(sizeof(lines) / sizeof(lines[0]));
@@ -2656,16 +2732,16 @@ static void drawSystemStatusMenu()
   for (int i = 0; i < visibleLines && (start + i) < pairCount; ++i)
   {
     const int pairIdx = start + i;
-  
+
     const char *key = lines[pairIdx * 2];
     const char *val = lines[pairIdx * 2 + 1];
-  
+
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawString(key, leftX, y);
-  
+
     spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     spr.drawString(val, valX, y);
-  
+
     y += lineH;
   }
 
@@ -2699,7 +2775,7 @@ void drawSettingsMenu()
   case SettingsPage::WIFI:
     drawWifiSettingsMenu();
     break;
-    case SettingsPage::CONSOLE:
+  case SettingsPage::CONSOLE:
     drawPlaceholderMenu("Console");
     break;
   case SettingsPage::STATUS:
@@ -2707,7 +2783,8 @@ void drawSettingsMenu()
     break;
   case SettingsPage::CREDITS:
     drawCreditsScreen();
-    break;  case SettingsPage::AUTO_SCREEN:
+    break;
+  case SettingsPage::AUTO_SCREEN:
     drawAutoScreenPickerMenu();
     break;
   }
@@ -5083,13 +5160,27 @@ static void drawWifiConnectWaitScreen()
   const char *st = nullptr;
   switch (wl)
   {
-    case WL_CONNECTED:       st = "Connected"; break;
-    case WL_IDLE_STATUS:     st = "Idle"; break;
-    case WL_NO_SSID_AVAIL:   st = "SSID not found"; break;
-    case WL_CONNECT_FAILED:  st = "Connect failed"; break;
-    case WL_CONNECTION_LOST: st = "Connection lost"; break;
-    case WL_DISCONNECTED:    st = "Disconnected"; break;
-    default:                 st = "Connecting..."; break;
+  case WL_CONNECTED:
+    st = "Connected";
+    break;
+  case WL_IDLE_STATUS:
+    st = "Idle";
+    break;
+  case WL_NO_SSID_AVAIL:
+    st = "SSID not found";
+    break;
+  case WL_CONNECT_FAILED:
+    st = "Connect failed";
+    break;
+  case WL_CONNECTION_LOST:
+    st = "Connection lost";
+    break;
+  case WL_DISCONNECTED:
+    st = "Disconnected";
+    break;
+  default:
+    st = "Connecting...";
+    break;
   }
 
   spr.drawString("Connecting WiFi...", 10, contentY + 10);

@@ -2,13 +2,14 @@
 
 #include "app_state.h"
 #include "asset_ota.h"
-#include "ui_runtime.h"
-#include "sound.h"
 #include "input.h"
+#include "sound.h"
+#include "ui_runtime.h"
 
-namespace UiSettingsPages {
+namespace UiSettingsPages
+{
 
-void Handle_STATUS(InputState& input, int move)
+void Handle_STATUS(InputState &input, int move)
 {
   (void)input;
 
@@ -16,7 +17,7 @@ void Handle_STATUS(InputState& input, int move)
     return;
 
   // Keep this in sync with drawSystemStatusMenu().
-  const int totalLines = 26;   // 13 key/value pairs
+  const int totalLines = 34; // 17 key/value pairs
   const int pairCount = totalLines / 2;
   const int visibleLines = 6;
   const int maxIndex = (pairCount > visibleLines) ? (pairCount - visibleLines) : 0;

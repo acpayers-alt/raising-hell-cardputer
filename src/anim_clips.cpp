@@ -558,7 +558,7 @@ static const AnimClip kClips[] = {
     {ANIM_ELD_ELDER_HUNGRY_EAT, kEldElderHungryEat, 4, 110, true},
     {ANIM_ELD_ELDER_ANGRY_SHAKE, kEldElderAngryShake, 2, 110, true},
     {ANIM_ELD_ELDER_BORED_YOYO, kEldElderBoredYoyo, 4, 110, true},
-    {ANIM_ELD_ELDER_SICK_SNEEZE, kEldElderSickSneeze, 6, 90, false},
+    {ANIM_ELD_ELDER_SICK_SNEEZE, kEldElderSickSneeze, 6, 90, true},
     {ANIM_ELD_ELDER_SLEEPY_HOLD, kEldElderSleepyHold, 4, 130, true},
 
 };
