@@ -1,39 +1,57 @@
 #include "ui_settings_menu.h"
 
+// --- Standard / Platform ---
+#include <esp_system.h>
+
+// --- Core App ---
 #include "app_loop.h"
 #include "app_state.h"
-#include "menu_actions.h"
+#include "build_flags.h"
+
+// --- Core Systems ---
 #include "save_manager.h"
 #include "sdcard.h"
-#include "settings_flow_state.h"
 #include "sound.h"
-#include "ui_input_common.h"
-#include "ui_runtime.h"
-
 #include "auto_screen.h"
 #include "brightness_state.h"
 #include "display.h"
 
+// --- UI Core ---
+#include "ui_actions.h"
+#include "ui_runtime.h"
+#include "ui_input_common.h"
+#include "ui_input_utils.h"   // uiDrainKb
+#include "ui_settings_actions.h"
+
+// --- UI / Flow ---
+#include "settings_flow_state.h"
+#include "menu_actions.h"
+#include "name_entry_state.h"
+
+// --- Networking / Time ---
 #include "wifi_power.h"
 #include "wifi_setup_state.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
 
+// --- Asset / Provisioning ---
 #include "asset_ota.h"
 #include "asset_provision_request.h"
+
+// --- Feature Flows ---
 #include "flow_console.h"
 #include "flow_controls_help.h"
 #include "flow_factory_reset.h"
 #include "flow_time_editor.h"
+
+// --- Game / User Systems ---
 #include "game_options_state.h"
-#include "graphics.h" // ui_showMessage
-#include "name_entry_state.h"
-#include "ui_actions.h"
-#include "ui_input_utils.h" // uiDrainKb
-#include "ui_settings_actions.h"
 #include "user_toggles_state.h"
-#include <esp_system.h>
-#include "build_flags.h"
+
+// --- Graphics ---
+#include "graphics.h" // ui_showMessage
+
+//End of Evangelincludes
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -365,6 +383,44 @@ static void actGame_RenamePet(InputState &input)
   playBeep();
 }
 
+static void actGame_ExportBub(InputState &)
+{
+  char path[128];
+  if (saveManagerExportCurrentBubJson(path, sizeof(path)))
+  {
+    ui_showMessage("Bub exported");
+    Serial.printf("[UI] Export Bub OK path=%s\n", path);
+  }
+  else
+  {
+    ui_showMessage("Export failed");
+    Serial.println("[UI] Export Bub FAILED");
+  }
+
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actGame_ImportBub(InputState &)
+{
+  char path[128];
+  if (saveManagerImportLatestBubJson(path, sizeof(path)))
+  {
+    ui_showMessage("Bub imported");
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    Serial.printf("[UI] Import Bub OK path=%s\n", path);
+  }
+  else
+  {
+    ui_showMessage("No valid export");
+    Serial.println("[UI] Import Bub FAILED");
+  }
+
+  playBeep();
+  clearInputLatch();
+}
 static void actGame_DecayMode(InputState &)
 {
   g_app.decayModeIndex = (int)saveManagerGetDecayMode();
@@ -471,7 +527,6 @@ static MenuItem kWifiItems[] = {
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
     {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
-    {"Check/Fix Assets", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
 };
 
 #else
@@ -481,18 +536,18 @@ static MenuItem kWifiItems[] = {
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
     {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
-    {"Check/Fix Assets", actWifi_CheckAssetOta, nullptr, nullptr, nullptr},
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
 };
 
 #endif
 
 static MenuItem kGameItems[] = {
-    {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
-    {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
-    {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
-    {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
-    {"Pet Perf HUD", actGame_TogglePetPerfHud, nullptr, nullptr, nullptr},
+  {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
+  {"Export Bub", actGame_ExportBub, nullptr, nullptr, nullptr},
+  {"Import Bub", actGame_ImportBub, nullptr, nullptr, nullptr},
+  {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
+  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+  {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {

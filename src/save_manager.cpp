@@ -14,6 +14,8 @@
 // -----------------------------------------------------------------------------
 // External libraries
 // -----------------------------------------------------------------------------
+#include <ArduinoJson.h>
+#include <FS.h>
 #include <Preferences.h>
 #include <SD.h>
 
@@ -62,10 +64,22 @@
 #include "user_toggles_state.h"
 
 // Misc
+#include "asset_ota.h"
 #include "brightness_state.h"
 #include "input.h"
+#include "version.h"
 
 // Include End Here
+static const char* getFirmwareVersionString()
+{
+#ifdef FW_VERSION
+  return FW_VERSION;
+#elif defined(VERSION_STRING)
+  return VERSION_STRING;
+#else
+  return "unknown";
+#endif
+}
 
 static bool dirty = false;
 static uint32_t lastSaveMs = 0;
@@ -115,6 +129,9 @@ static const char *AUTO_HEAL_FALLBACK_PET_NAME = "Bub";
 
 bool saveManagerAutoHeal();
 static const char *NAME_PENDING_FLAG_PATH = "/raising_hell/save/name_pending.flag";
+static const char *EXPORTS_DIR = "/raising_hell/exports";
+static const char *EXPORT_MAGIC = "raising_hell_bub_export";
+static const uint16_t EXPORT_VERSION = 1;
 
 static void wipeSdRecursive(const char *path)
 {
@@ -160,6 +177,219 @@ static void tryRemove(const char *path)
 
   if (SD.exists(path))
     SD.remove(path);
+}
+
+static bool ensureExportsDir()
+{
+  if (!g_sdReady)
+    return false;
+
+  if (!SD.exists("/raising_hell"))
+  {
+    if (!SD.mkdir("/raising_hell"))
+      return false;
+  }
+
+  if (!SD.exists(EXPORTS_DIR))
+  {
+    if (!SD.mkdir(EXPORTS_DIR))
+      return false;
+  }
+
+  return true;
+}
+
+static const char *petTypeToStringForExport(PetType t)
+{
+  switch (t)
+  {
+  case PET_DEVIL:
+    return "devil";
+  case PET_ELDRITCH:
+    return "eldritch";
+  case PET_ALIEN:
+    return "alien";
+  case PET_KAIJU:
+    return "kaiju";
+  case PET_ANUBIS:
+    return "anubis";
+  case PET_AXOLOTL:
+    return "axolotl";
+  default:
+    return "devil";
+  }
+}
+
+static bool petTypeFromStringForImport(const char *s, PetType &out)
+{
+  if (!s || !*s)
+    return false;
+  if (!strcmp(s, "devil"))
+  {
+    out = PET_DEVIL;
+    return true;
+  }
+  if (!strcmp(s, "eldritch"))
+  {
+    out = PET_ELDRITCH;
+    return true;
+  }
+  if (!strcmp(s, "alien"))
+  {
+    out = PET_ALIEN;
+    return true;
+  }
+  if (!strcmp(s, "kaiju"))
+  {
+    out = PET_KAIJU;
+    return true;
+  }
+  if (!strcmp(s, "anubis"))
+  {
+    out = PET_ANUBIS;
+    return true;
+  }
+  if (!strcmp(s, "axolotl"))
+  {
+    out = PET_AXOLOTL;
+    return true;
+  }
+  return false;
+}
+
+static const char *itemTypeToStringForExport(ItemType t)
+{
+  switch (t)
+  {
+  case ITEM_SOUL_FOOD:
+    return "SOUL_FOOD";
+  case ITEM_CURSED_RELIC:
+    return "CURSED_RELIC";
+  case ITEM_DEMON_BONE:
+    return "DEMON_BONE";
+  case ITEM_RITUAL_CHALK:
+    return "RITUAL_CHALK";
+  case ITEM_ELDRITCH_EYE:
+    return "ELDRITCH_EYE";
+  default:
+    return "ITEM_NONE";
+  }
+}
+
+static bool itemTypeFromStringForImport(const char *s, ItemType &out)
+{
+  if (!s || !*s)
+    return false;
+  if (!strcmp(s, "SOUL_FOOD"))
+  {
+    out = ITEM_SOUL_FOOD;
+    return true;
+  }
+  if (!strcmp(s, "CURSED_RELIC"))
+  {
+    out = ITEM_CURSED_RELIC;
+    return true;
+  }
+  if (!strcmp(s, "DEMON_BONE"))
+  {
+    out = ITEM_DEMON_BONE;
+    return true;
+  }
+  if (!strcmp(s, "RITUAL_CHALK"))
+  {
+    out = ITEM_RITUAL_CHALK;
+    return true;
+  }
+  if (!strcmp(s, "ELDRITCH_EYE"))
+  {
+    out = ITEM_ELDRITCH_EYE;
+    return true;
+  }
+  if (!strcmp(s, "ITEM_NONE"))
+  {
+    out = ITEM_NONE;
+    return true;
+  }
+  return false;
+}
+
+static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)
+{
+  if (!dst || dstSize == 0)
+    return;
+
+  size_t j = 0;
+  if (!src || !src[0])
+    src = "Bub";
+
+  for (size_t i = 0; src[i] && j + 1 < dstSize; ++i)
+  {
+    const char c = src[i];
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+    {
+      dst[j++] = c;
+    }
+    else if (c == ' ' || c == '-' || c == '_')
+    {
+      dst[j++] = '_';
+    }
+  }
+
+  if (j == 0)
+    dst[j++] = 'B';
+
+  dst[j] = '\0';
+}
+
+static bool findLatestExportPath(char *outPath, size_t outPathSize)
+{
+  if (!outPath || outPathSize == 0)
+    return false;
+
+  outPath[0] = '\0';
+
+  if (!g_sdReady || !SD.exists(EXPORTS_DIR))
+    return false;
+
+  File dir = SD.open(EXPORTS_DIR);
+  if (!dir || !dir.isDirectory())
+    return false;
+
+  uint32_t bestTime = 0;
+  char bestPath[128] = {0};
+
+  File file = dir.openNextFile();
+  while (file)
+  {
+    if (!file.isDirectory())
+    {
+      const char *nm = file.name();
+      const size_t len = strlen(nm);
+      if (len >= 5 && !strcmp(nm + len - 5, ".json"))
+      {
+        char full[128];
+        snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
+
+        const uint32_t t = (uint32_t)file.getLastWrite();
+        if (bestPath[0] == '\0' || t >= bestTime)
+        {
+          bestTime = t;
+          strncpy(bestPath, full, sizeof(bestPath) - 1);
+          bestPath[sizeof(bestPath) - 1] = '\0';
+        }
+      }
+    }
+
+    file.close();
+    file = dir.openNextFile();
+  }
+
+  if (!bestPath[0])
+    return false;
+
+  strncpy(outPath, bestPath, outPathSize - 1);
+  outPath[outPathSize - 1] = '\0';
+  return true;
 }
 
 void saveManagerFullWipe()
@@ -788,9 +1018,6 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
 
-  // ---- Perf HUD toggle ----
-  g_petPerfHudEnabled = (g_settings.petPerfHudEnabled != 0);
-
   uint8_t nvsTz;
   if (loadTzIndexFromNVS(&nvsTz))
   {
@@ -824,9 +1051,6 @@ static bool saveSettingsToSD_internal()
   g_settings.petDeathEnabled = petDeathEnabled ? 1 : 0;
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
-
-  // ---- Perf HUD toggle ----
-  g_settings.petPerfHudEnabled = g_petPerfHudEnabled ? 1 : 0;
 
   tryRemove(SET_TMP_PATH);
 
@@ -1601,6 +1825,184 @@ void saveManagerFactoryReset()
 
   delay(50);
   ESP.restart();
+}
+
+bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
+{
+  if (outPath && outPathSize > 0)
+    outPath[0] = '\0';
+
+  if (!g_sdReady)
+    return false;
+  if (!ensureExportsDir())
+    return false;
+
+  char safeName[32];
+  sanitizeExportFilename(pet.getName(), safeName, sizeof(safeName));
+
+  char path[128];
+  const uint32_t nowEpoch = getNowEpochOrZero();
+  snprintf(path, sizeof(path), "%s/bub_%s_%lu.json", EXPORTS_DIR, safeName, (unsigned long)nowEpoch);
+
+  DynamicJsonDocument doc(4096);
+
+  doc["format"] = EXPORT_MAGIC;
+  doc["exportVersion"] = EXPORT_VERSION;
+  doc["createdAtEpoch"] = nowEpoch;
+  doc["gameVersion"] = getFirmwareVersionString();
+  doc["assetPackVersion"] = assetOtaInstalledVersion();
+
+  JsonObject profile = doc.createNestedObject("profile");
+  profile["name"] = pet.getName();
+  profile["petType"] = petTypeToStringForExport(pet.type);
+  profile["level"] = pet.level;
+  profile["xp"] = pet.xp;
+  profile["evoStage"] = pet.evoStage;
+  profile["birthEpoch"] = g_birthEpoch;
+
+  JsonObject stats = profile.createNestedObject("stats");
+  stats["hunger"] = pet.hunger;
+  stats["happiness"] = pet.happiness;
+  stats["energy"] = pet.energy;
+  stats["health"] = pet.health;
+  stats["inf"] = pet.inf;
+
+  JsonObject gameOptions = doc.createNestedObject("gameOptions");
+  gameOptions["decayMode"] = saveManagerGetDecayMode();
+
+  JsonObject inventory = doc.createNestedObject("inventory");
+  inventory["selectedIndex"] = g_app.inventory.selectedIndex;
+  JsonArray slots = inventory.createNestedArray("slots");
+
+  for (int i = 0; i < Inventory::MAX_ITEMS; ++i)
+  {
+    const Item &it = g_app.inventory.items[i];
+    if (it.type == ITEM_NONE || it.quantity <= 0)
+      continue;
+
+    JsonObject row = slots.createNestedObject();
+    row["item"] = itemTypeToStringForExport(it.type);
+    row["qty"] = it.quantity;
+  }
+
+  File f = SD.open(path, FILE_WRITE);
+  if (!f)
+    return false;
+
+  if (serializeJsonPretty(doc, f) == 0)
+  {
+    f.close();
+    SD.remove(path);
+    return false;
+  }
+
+  f.flush();
+  f.close();
+
+  if (outPath && outPathSize > 0)
+  {
+    strncpy(outPath, path, outPathSize - 1);
+    outPath[outPathSize - 1] = '\0';
+  }
+
+  Serial.printf("[EXPORT] wrote '%s' pet='%s'\n", path, pet.getName());
+  return true;
+}
+
+bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
+{
+  char path[128];
+  if (!findLatestExportPath(path, sizeof(path)))
+    return false;
+
+  File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  DynamicJsonDocument doc(4096);
+  const DeserializationError err = deserializeJson(doc, f);
+  f.close();
+
+  if (err)
+  {
+    Serial.printf("[IMPORT] failed '%s' reason=json_parse\n", path);
+    return false;
+  }
+
+  const char *format = doc["format"] | "";
+  const uint16_t exportVersion = doc["exportVersion"] | 0;
+  if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
+  {
+    Serial.printf("[IMPORT] failed '%s' reason=format/version\n", path);
+    return false;
+  }
+
+  JsonObject profile = doc["profile"];
+  JsonObject stats = profile["stats"];
+  JsonObject inventory = doc["inventory"];
+  JsonArray slots = inventory["slots"];
+
+  const char *name = profile["name"] | "";
+  const char *petTypeStr = profile["petType"] | "";
+  PetType importedType = PET_DEVIL;
+  if (!petTypeFromStringForImport(petTypeStr, importedType))
+    importedType = PET_DEVIL;
+
+  // Apply pet
+  pet.setName((name && name[0]) ? name : "Bub");
+  pet.type = importedType;
+  pet.level = (uint16_t)constrain((int)(profile["level"] | 1), 1, 999);
+  pet.xp = (uint32_t)(profile["xp"] | 0);
+  pet.evoStage = (uint8_t)constrain((int)(profile["evoStage"] | 0), 0, 3);
+
+  pet.hunger = constrain((int)(stats["hunger"] | 50), 0, 100);
+  pet.happiness = constrain((int)(stats["happiness"] | 50), 0, 100);
+  pet.energy = constrain((int)(stats["energy"] | 50), 0, 100);
+  pet.health = constrain((int)(stats["health"] | 100), 0, 100);
+  pet.inf = (int)(stats["inf"] | 0);
+  pet.isSleeping = false;
+
+  g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
+  pet.birth_epoch = g_birthEpoch;
+
+  // Apply inventory
+  g_app.inventory.clear();
+  for (JsonObject row : slots)
+  {
+    const char *itemStr = row["item"] | "";
+    const int qty = (int)(row["qty"] | 0);
+    if (qty <= 0)
+      continue;
+
+    ItemType t = ITEM_NONE;
+    if (!itemTypeFromStringForImport(itemStr, t))
+      continue;
+
+    if (t != ITEM_NONE)
+      g_app.inventory.addItem(t, qty);
+  }
+
+  g_app.inventory.selectedIndex =
+      constrain((int)(inventory["selectedIndex"] | 0), 0, max(0, g_app.inventory.countItems() - 1));
+
+  // Apply game options
+  saveManagerSetDecayMode((uint8_t)constrain((int)(doc["gameOptions"]["decayMode"] | 2), 0, 5));
+
+  // Final cleanup + persist
+  pet.clampStats();
+  clearNamePendingFlag();
+  g_app.inventory.syncEepromNoDirty();
+  saveManagerMarkDirty();
+  saveManagerForce();
+
+  if (outPath && outPathSize > 0)
+  {
+    strncpy(outPath, path, outPathSize - 1);
+    outPath[outPathSize - 1] = '\0';
+  }
+
+  Serial.printf("[IMPORT] restored '%s' pet='%s'\n", path, pet.getName());
+  return true;
 }
 
 // ------------------------------------------------------------

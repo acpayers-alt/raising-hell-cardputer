@@ -2,6 +2,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 // Game Options persistence (stored in /raising_hell/save/gameopt.bin)
 uint8_t saveManagerGetDecayMode();            // 0=Normal, 1=Slow, 2=Off (example)
@@ -59,3 +60,6 @@ void saveManagerDeletePetOnly();
 void saveManagerStampBirthNow();
 
 void saveManagerClearNamePendingFlag();
+
+bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize);
+bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize);

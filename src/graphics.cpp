@@ -2047,6 +2047,8 @@ static void drawGameOptionsMenu()
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const char *renameLine = "Rename Pet";
+  const char *exportLine = "Export Bub";
+  const char *importLine = "Import Bub";
 
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
@@ -2057,12 +2059,9 @@ static void drawGameOptionsMenu()
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  char perfLine[32];
-  snprintf(perfLine, sizeof(perfLine), "Pet Perf HUD: %s", g_petPerfHudEnabled ? "ON" : "OFF");
-
-  const char *labels[] = {renameLine, decayLine, deathLine, ledLine, perfLine};
-  const int totalItems = 5;
-
+  const char *labels[] = {renameLine, exportLine, importLine, decayLine, deathLine, ledLine};
+  const int totalItems = 6;
+  
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
