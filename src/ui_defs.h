@@ -50,6 +50,7 @@ enum class UIState : uint8_t {
   MG_PAUSE         = 26,
   BOOT_WIFI_IMPORTED = 27,
   BOOT_ASSET_WIFI_REQUIRED = 28,
+  TITLE_MENU       = 29,
 };
 
 // --------------------

@@ -318,7 +318,7 @@ static bool g_ntpSaved = false;
 static bool g_wifiApplied = false;
 static bool g_bootProvisionWifiStarted = false;
 static bool g_postProvisionControlsHelpPending = false;
-static UIState s_bootFinalLandingState = UIState::PET_SCREEN;
+static UIState s_bootFinalLandingState = UIState::TITLE_MENU;
 
 // ---- Early TZ/anchor latches (Stage 0) ----
 static bool g_tzAppliedEarly = false;
@@ -331,13 +331,7 @@ bool g_timeAnchorRestored = false;
 // -----------------------------------------------------------------------------
 // See if a save file already exists
 // -----------------------------------------------------------------------------
-static bool bootSaveFileExists()
-{
-  if (!g_sdReady)
-    return false;
-
-  return SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin");
-}
+static bool bootSaveFileExists() { return saveManagerSaveFileExists(); }
 
 // -----------------------------------------------------------------------------
 // Small helper: centralized state enter + redraw (keeps transitions consistent)
@@ -629,16 +623,7 @@ static void finalizeBootLanding()
     clearInputLatch();
     inputForceClear();
 
-    const bool saveFileExists = bootSaveFileExists();
-    const UIState returnState = saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
-
-    if (returnState == UIState::CHOOSE_PET)
-    {
-      g_choosePetInputUnlockMs = millis() + 350;
-      g_choosePetBlockHatchUntilRelease = true;
-    }
-
-    controlsHelpBegin(returnState, Tab::TAB_PET);
+    controlsHelpBegin(UIState::TITLE_MENU, Tab::TAB_PET);
     return;
   }
 
@@ -659,29 +644,8 @@ static void finalizeBootLanding()
     return;
   }
 
-  const UIState afterOk = s_bootFinalLandingState;
-  const bool loadedFromSD = (afterOk != UIState::CHOOSE_PET);
-
   uint16_t seedMarkNow = 0;
   EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
-
-  if (!loadedFromSD)
-  {
-    DBG_ON("[BOOT] No SD save -> UIState::CHOOSE_PET\n");
-
-    g_app.inventory.resetToDefaults();
-    ui_setBootSplashActive(false);
-
-    g_choosePetInputUnlockMs = millis() + 350;
-    g_choosePetBlockHatchUntilRelease = true;
-    enterState(UIState::CHOOSE_PET, Tab::TAB_PET, false);
-    uiInitLevelPopupTracker();
-
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    renderUI();
-    return;
-  }
 
   if (seedMarkNow != SEED_MARK)
   {
@@ -691,7 +655,7 @@ static void finalizeBootLanding()
 
   if (g_app.uiState == UIState::BOOT)
   {
-    enterState(UIState::PET_SCREEN, Tab::TAB_PET, false);
+    enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
   }
 
   ui_setBootSplashActive(false);
@@ -713,9 +677,7 @@ void postBootInitTick()
   // never let the boot pipeline re-enter provisioning. Hand off to the runtime
   // assets-missing flow instead.
   // ---------------------------------------------------------------------------
-  if (!g_bootLandingDeferredForAssetProvision &&
-      g_app.uiState == UIState::PET_SCREEN &&
-      g_sdReady &&
+  if (!g_bootLandingDeferredForAssetProvision && g_app.uiState == UIState::PET_SCREEN && g_sdReady &&
       !sdAssetsPresent())
   {
     g_assetsChecked = true;
@@ -728,7 +690,7 @@ void postBootInitTick()
 
     return;
   }
-   
+
   // ---------------------------------------------------------------------------
   // Stage 0: Apply TZ + anchor early (so localtime_r() is sane ASAP)
   // ---------------------------------------------------------------------------
@@ -915,10 +877,10 @@ void postBootInitTick()
     else if (!timeIsValid())
       runtimeLogLine("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
     else if (!loadedSaveExists)
-      runtimeLogLine("[BOOT] path=NEW_PET_FLOW");
+      runtimeLogLine("[BOOT] path=TITLE_MENU_NO_SAVE");
     else
-      runtimeLogLine("[BOOT] path=NORMAL_BOOT");
-
+      runtimeLogLine("[BOOT] path=TITLE_MENU_NORMAL");
+      
     if (!loadedFromSD)
     {
       g_app.inventory.init();
@@ -941,13 +903,10 @@ void postBootInitTick()
       if (g_bootAssetProvisionMustComplete)
       {
         g_bootAssetProvisionActive = false;
-        Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED sdReady=%d assetsMissing=%d must=%d active=%d requested=%d ui=%d\n",
-                      g_sdReady ? 1 : 0,
-                      g_assetsMissing ? 1 : 0,
-                      g_bootAssetProvisionMustComplete ? 1 : 0,
-                      g_bootAssetProvisionActive ? 1 : 0,
-                      bootAssetProvisionRequested() ? 1 : 0,
-                      (int)g_app.uiState);
+        Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED sdReady=%d assetsMissing=%d must=%d "
+                      "active=%d requested=%d ui=%d\n",
+                      g_sdReady ? 1 : 0, g_assetsMissing ? 1 : 0, g_bootAssetProvisionMustComplete ? 1 : 0,
+                      g_bootAssetProvisionActive ? 1 : 0, bootAssetProvisionRequested() ? 1 : 0, (int)g_app.uiState);
         uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();
@@ -955,7 +914,7 @@ void postBootInitTick()
         clearInputLatch();
         return;
       }
-      
+
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
       g_bootAssetProvisionActive = true;
       requestUIRedraw();
@@ -1115,7 +1074,7 @@ void postBootInitTick()
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------
-  
+
   // 🔥 HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
   if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
   {
@@ -1124,17 +1083,17 @@ void postBootInitTick()
     g_bootAssetProvisionMustComplete = false;
     return;
   }
-  
+
   if (bootAssetProvisionRequired())
   {
     // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
     if (bootAssetProvisionWifiOnboardingActive())
       return;
-  
+
     // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
     if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
       return;
-  
+
     if (runBootAssetProvision())
       return;
   }
@@ -1158,12 +1117,9 @@ void postBootInitTick()
     // If boot was paused for time recovery, time is now valid and we may still
     // be sitting on the splash/BOOT state without ever completing the normal
     // post-boot landing. Finish that handoff now.
-    if (!g_bootLandingDeferredForAssetProvision &&
-        !g_bootLandingDone &&
-        g_app.uiState == UIState::BOOT)
+    if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
     {
-      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n",
-                    (int)s_bootFinalLandingState);
+      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
       finalizeBootLanding();
       return;
     }

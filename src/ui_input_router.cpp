@@ -8,6 +8,7 @@
 #include "ui_state_handlers.h"
 #include "ui_state_pet_sleeping.h"
 #include "wifi_setup_state.h"
+#include "ui_state_title_menu.h"
 
 // ----------------------------------------------------------------------------
 // Text capture policy
@@ -67,6 +68,9 @@ bool uiHandleInput(InputState &in)
   {
     if (g_app.uiState == UIState::PET_SLEEPING)
       uiPetSleepingOnEnter(in);
+
+    if (g_app.uiState == UIState::TITLE_MENU)
+      uiTitleMenuOnEnter(in);
 
     if (g_app.uiState == UIState::CHOOSE_PET)
       uiChoosePetOnEnter(in);

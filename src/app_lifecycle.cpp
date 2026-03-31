@@ -27,14 +27,11 @@ bool appLifecycleCanEnterNormalUi()
 
 UIState appLifecycleResolveBootAfterOkState(bool saveFileExists)
 {
-  // If onboarding/setup is still pending → must go to CHOOSE_PET
-  if (appLifecycleHasPendingOnboarding())
-    return UIState::CHOOSE_PET;
+  (void)saveFileExists;
 
-  // Otherwise normal behavior:
-  // - if save exists → go to pet
-  // - else → choose pet
-  return saveFileExists ? UIState::PET_SCREEN : UIState::CHOOSE_PET;
+  // We now normalize post-boot handoff through a single title/menu state.
+  // The title screen decides whether Continue/New Pet/Import are available.
+  return UIState::TITLE_MENU;
 }
 
 bool appLifecycleLoadedSaveRequiresChoosePet(bool namePending, bool blankPetName)

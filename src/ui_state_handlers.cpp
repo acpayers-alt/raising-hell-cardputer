@@ -24,10 +24,11 @@
 #include "ui_state_shop.h"        // uiShopHandle
 #include "ui_state_sleep_menu.h"  // uiSleepMenuHandle
 #include "ui_state_tab_driven.h"  // uiTabDrivenHandle
+#include "ui_state_title_menu.h"  // uiTitleMenuHandle
 #include "ui_state_wifi_setup.h"  // uiWifiSetupHandle
 #include "ui_state_wifi_connect_wait.h"
 
-static constexpr int kUiStateCount = 29; // UIState is 0..26 in ui_defs.h
+static constexpr int kUiStateCount = 30; // UIState is 0..26 in ui_defs.h
 
 static inline int toIndex(UIState s) { return (int)s; }
 
@@ -61,6 +62,7 @@ static StateHandlerFn kHandlers[kUiStateCount] = {
   /* 26 MG_PAUSE                   */ uiMgPauseHandle,
   /* 27 BOOT_WIFI_IMPORTED         */ uiBootWifiImportedHandle,
   /* 28 BOOT_ASSET_WIFI_REQUIRED   */ uiBootAssetWifiRequiredHandle,
+  /* 29 TITLE_MENU                 */ uiTitleMenuHandle,
 };
 
 StateHandlerFn uiGetStateHandler(UIState state)

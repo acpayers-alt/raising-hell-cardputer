@@ -64,6 +64,7 @@ void drawInventoryMenu();
 void drawPowerMenu();
 void drawFeedMenu();
 void drawHatchingScreen(bool redrawBg);
+void drawTitleMenuScreen(bool redrawBg);
 
 // Console
 void drawConsoleMenu();

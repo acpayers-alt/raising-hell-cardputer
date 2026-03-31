@@ -18,6 +18,9 @@ void saveManagerForce();     // force a save (and settings), used before reboot/
 bool saveManagerAutoHeal();
 void saveManagerNewPet();
 void saveManagerNewPetNoSave();
+bool saveManagerSaveFileExists();
+bool saveManagerHasImportableBubJson();
+void saveManagerStartFreshPetFlow();
 bool saveManagerAutoHeal();
 void saveManagerFullWipe();
 

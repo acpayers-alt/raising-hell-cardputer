@@ -392,6 +392,12 @@ static bool findLatestExportPath(char *outPath, size_t outPathSize)
   return true;
 }
 
+bool saveManagerHasImportableBubJson()
+{
+  char path[128];
+  return findLatestExportPath(path, sizeof(path));
+}
+
 void saveManagerFullWipe()
 {
   Serial.println("[DEV] FULL WIPE BEGIN");
@@ -504,6 +510,11 @@ static void forceChoosePetFlowFromBoot()
 
   // Clear latches
   clearInputLatch();
+}
+
+void saveManagerStartFreshPetFlow()
+{
+  forceChoosePetFlowFromBoot();
 }
 
 // ------------------------------------------------------------
@@ -1754,6 +1765,15 @@ bool loadSettingsFromSD()
 }
 
 void saveSettingsToSD() { saveSettingsToSD_internal(); }
+
+bool saveManagerSaveFileExists()
+{
+  if (!g_sdReady)
+    return false;
+
+  return SD.exists("/raising_hell/save/save.bin") ||
+         SD.exists("raising_hell/save/save.bin");
+}
 
 void saveManagerNewPet()
 {
