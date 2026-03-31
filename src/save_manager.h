@@ -18,6 +18,7 @@ bool saveManagerAutoHeal();
 void saveManagerNewPet();
 void saveManagerNewPetNoSave();
 bool saveManagerAutoHeal();
+void saveManagerFullWipe();
 
 uint32_t saveManagerGetBirthEpoch();   // handy for stats screen later
 

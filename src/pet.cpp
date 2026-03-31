@@ -933,15 +933,20 @@ void Pet::addXP(uint32_t amount)
   else
     xp += amount;
 
-  while (level < 999)
-  {
-    const uint32_t need = xpForNextLevel();
-    if (xp < need)
-      break;
-    xp -= need;
-    level++;
-  }
-
+    while (level < 999)
+    {
+      const uint32_t need = xpForNextLevel();
+      if (xp < need)
+        break;
+    
+      xp -= need;
+      level++;
+    
+      Serial.printf("[XP] LEVEL UP → level=%u next=%lu\n",
+                    level,
+                    xpForNextLevel());
+    }
+    
   saveManagerMarkDirty();
   requestUIRedraw();
 }
@@ -1068,9 +1073,10 @@ void Pet::buildDisplayName(char *out, size_t outSize) const
 
 uint32_t Pet::xpForNextLevel() const
 {
-  const uint32_t base = 100;
-  const uint32_t step = 25;
-
   const uint32_t L = (level < 1) ? 1 : level;
-  return base + (L - 1) * step;
+  const uint32_t n = L - 1;
+
+  const uint32_t xp = 120 + 20 * n + 12 * n * n;
+
+  return xp;
 }

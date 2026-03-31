@@ -1,36 +1,70 @@
 #include "console.h"
 
+// -----------------------------------------------------------------------------
+// Project: Core App / State
+// -----------------------------------------------------------------------------
 #include "app_state.h"
+#include "settings_state.h"
+#include "user_toggles_state.h"
+
+// -----------------------------------------------------------------------------
+// Project: Systems
+// -----------------------------------------------------------------------------
 #include "asset_manifest.h"
 #include "asset_ota.h"
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
 #include "boot_firmware_marker.h"
-#include "build_flags.h"
-#include "currency.h"
-#include "debug.h"
-#include "graphics.h"
-#include "input.h"
-#include "led_status.h"
-#include "pet.h"
-#include "pet_age.h"
-#include "runtime_log.h"
 #include "save_manager.h"
 #include "sdcard.h"
-#include "settings_state.h"
-#include "ui_runtime.h"
-#include "user_toggles_state.h"
-#include "version.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
+
+// -----------------------------------------------------------------------------
+// Project: Gameplay / Domain
+// -----------------------------------------------------------------------------
+#include "currency.h"
+#include "pet.h"
+#include "pet_age.h"
+
+// -----------------------------------------------------------------------------
+// Project: UI / Rendering
+// -----------------------------------------------------------------------------
+#include "graphics.h"
+#include "ui_runtime.h"
+#include "led_status.h"
+
+// -----------------------------------------------------------------------------
+// Project: Input / Debug
+// -----------------------------------------------------------------------------
+#include "input.h"
+#include "debug.h"
+#include "runtime_log.h"
+
+// -----------------------------------------------------------------------------
+// Project: Build / Version
+// -----------------------------------------------------------------------------
+#include "build_flags.h"
+#include "version.h"
+
+// -----------------------------------------------------------------------------
+// External / Framework
+// -----------------------------------------------------------------------------
+#include <Preferences.h>
 #include <FS.h>
 #include <SD.h>
 #include <esp_system.h>
+
+// -----------------------------------------------------------------------------
+// Standard Library
+// -----------------------------------------------------------------------------
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+// End of Includesvangelion
 
 // -----------------------------------------------------------------------------
 // Console state
@@ -536,6 +570,7 @@ static void execLine(char *line)
     logLine("  fwmark set <id>     set stored build id");
     logLine("  otach public|dev    set OTA channel");
     logLine("  otadev              switch to DEV OTA + provision + reboot");
+    logLine("  nuke                FULL WIPE (SD + NVS + reboot)");
     logLine("  giveinf <amount>    add Inferium");
     logLine("  sethunger <0-100>   set hunger");
     logLine("  setmood <0-100>     set mood");
@@ -569,6 +604,21 @@ static void execLine(char *line)
     logLine("[OK] Creating new pet...");
     saveManagerNewPet();
     logLine("[OK] New pet created (save overwritten).");
+    return;
+  }
+#endif
+
+#if !PUBLIC_BUILD
+  if (!strcmp(argv[0], "nuke"))
+  {
+    logLine("Type 'nuke!' to confirm (THIS WILL ERASE EVERYTHING).");
+    return;
+  }
+
+  if (!strcmp(argv[0], "nuke!"))
+  {
+    logLine("[DEV] FULL WIPE REQUESTED");
+    saveManagerFullWipe();
     return;
   }
 #endif
