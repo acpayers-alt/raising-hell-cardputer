@@ -40,6 +40,18 @@ void settingsSetWifiEnabled(bool en);
 
 void saveManagerFactoryReset();
 
+struct PetExportEntry
+{
+  char path[128];
+  char name[24];
+  char petType[16];
+  uint32_t createdAtEpoch;
+  bool valid;
+};
+
+int saveManagerListPetExports(PetExportEntry* outEntries, int maxEntries);
+bool saveManagerImportBubAtPath(const char* path, char* outPath, size_t outPathSize, bool backupCurrentFirst = true);
+
 enum SaveLoadErr : uint8_t {
   SLE_OK = 0,
   SLE_SD_NOT_READY,

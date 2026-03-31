@@ -87,6 +87,7 @@
 #include "ui_power_menu.h"
 #include "ui_settings_menu.h"
 #include "ui_sleep_menu.h"
+#include "ui_state_import_pet_list.h"
 
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
@@ -102,6 +103,8 @@
 #include "console.h"
 
 // END of includes
+
+static void drawImportPetListScreen(bool redrawBg);
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
@@ -5339,6 +5342,10 @@ static void drawCurrentScreen(bool redrawBg)
     drawTitleMenuScreen(redrawBg);
     return;
 
+  case UIState::IMPORT_PET_LIST:
+    drawImportPetListScreen(redrawBg);
+    return;
+
   case UIState::CHOOSE_PET:
     drawChoosePetScreen(redrawBg);
     return;
@@ -5934,6 +5941,50 @@ static void drawCenteredLine(const char *s, int y, int font = 2, int size = 1)
   spr.setTextSize(size);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString(s ? s : "", screenW / 2, y);
+}
+
+void drawImportPetListScreen(bool redrawBg)
+{
+  if (!isScreenOn())
+    return;
+
+  if (redrawBg)
+    spr.fillSprite(TFT_BLACK);
+
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextColor(TFT_WHITE);
+  spr.drawString("Pet Exports", SCREEN_W / 2, 4, 2);
+
+  const int rowH = 18;
+  const int startY = 20;
+
+  const int count = uiImportPetListCount();
+  const int selectedIdx = uiImportPetListSelected();
+
+  for (int i = 0; i < count && i < 5; ++i)
+  {
+    const int y = startY + (i * rowH);
+    const bool selected = (i == selectedIdx);
+
+    const auto &e = uiImportPetListGet(i);
+
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(selected ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString(e.name, 6, y, 2);
+
+    char meta[48];
+    snprintf(meta, sizeof(meta), "%s  %lu", e.petType, (unsigned long)e.createdAtEpoch);
+
+    spr.setTextColor(selected ? TFT_YELLOW : TFT_LIGHTGREY);
+    spr.drawString(meta, 10, y + 9, 1);
+  }
+
+  if (uiImportPetListCount() == 0)
+  {
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_DARKGREY);
+    spr.drawString("No exports found", SCREEN_W / 2, SCREEN_H / 2, 2);
+  }
 }
 
 void drawTitleMenuScreen(bool redrawBg)

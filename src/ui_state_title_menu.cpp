@@ -125,25 +125,12 @@ void uiTitleMenuHandle(InputState& in)
 
     case TITLE_IMPORT:
     {
-      char path[128];
-      if (saveManagerImportLatestBubJson(path, sizeof(path)))
-      {
-        playBeep();
-        ui_showMessage("Pet imported");
-        g_titleMenuIndex = TITLE_CONTINUE;
-        requestFullUIRedraw();
-      }
-      else
-      {
-        playBeep();
-        ui_showMessage("No valid export");
-        requestUIRedraw();
-      }
-
+      playBeep();
+      uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
       swallowTitleInput(in);
       return;
     }
-
+    
     case TITLE_SETTINGS:
     {
       playBeep();

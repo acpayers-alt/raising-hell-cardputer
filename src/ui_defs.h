@@ -51,6 +51,7 @@ enum class UIState : uint8_t {
   BOOT_WIFI_IMPORTED = 27,
   BOOT_ASSET_WIFI_REQUIRED = 28,
   TITLE_MENU       = 29,
+  IMPORT_PET_LIST  = 30,
 };
 
 // --------------------

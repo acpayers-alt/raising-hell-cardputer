@@ -71,7 +71,7 @@
 #include "version.h"
 
 // Include End Here
-static const char* getFirmwareVersionString()
+static const char *getFirmwareVersionString()
 {
 #ifdef FW_VERSION
   return FW_VERSION;
@@ -314,6 +314,104 @@ static bool itemTypeFromStringForImport(const char *s, ItemType &out)
   return false;
 }
 
+static bool readExportMetadata(const char* path, PetExportEntry& out)
+{
+  out.valid = false;
+  out.path[0] = '\0';
+  out.name[0] = '\0';
+  out.petType[0] = '\0';
+  out.createdAtEpoch = 0;
+
+  File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  DynamicJsonDocument doc(2048);
+  const DeserializationError err = deserializeJson(doc, f);
+  f.close();
+  if (err)
+    return false;
+
+  const char* format = doc["format"] | "";
+  const uint16_t exportVersion = doc["exportVersion"] | 0;
+  if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
+    return false;
+
+  const char* name = doc["profile"]["name"] | "";
+  const char* petType = doc["profile"]["petType"] | "";
+  const uint32_t createdAtEpoch = (uint32_t)(doc["createdAtEpoch"] | 0);
+
+  strncpy(out.path, path, sizeof(out.path) - 1);
+  out.path[sizeof(out.path) - 1] = '\0';
+
+  strncpy(out.name, (name && name[0]) ? name : "Bub", sizeof(out.name) - 1);
+  out.name[sizeof(out.name) - 1] = '\0';
+
+  strncpy(out.petType, (petType && petType[0]) ? petType : "DEVIL", sizeof(out.petType) - 1);
+  out.petType[sizeof(out.petType) - 1] = '\0';
+
+  out.createdAtEpoch = createdAtEpoch;
+  out.valid = true;
+  return true;
+}
+
+static void sortPetExportsNewestFirst(PetExportEntry* entries, int count)
+{
+  for (int i = 0; i < count - 1; ++i)
+  {
+    for (int j = i + 1; j < count; ++j)
+    {
+      if (entries[j].createdAtEpoch > entries[i].createdAtEpoch)
+      {
+        PetExportEntry tmp = entries[i];
+        entries[i] = entries[j];
+        entries[j] = tmp;
+      }
+    }
+  }
+}
+
+int saveManagerListPetExports(PetExportEntry* outEntries, int maxEntries)
+{
+  if (!outEntries || maxEntries <= 0)
+    return 0;
+
+  if (!g_sdReady || !SD.exists(EXPORTS_DIR))
+    return 0;
+
+  File dir = SD.open(EXPORTS_DIR);
+  if (!dir || !dir.isDirectory())
+    return 0;
+
+  int count = 0;
+  File file = dir.openNextFile();
+  while (file && count < maxEntries)
+  {
+    if (!file.isDirectory())
+    {
+      const char* nm = file.name();
+      const size_t len = strlen(nm);
+      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
+      {
+        char full[128];
+        snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
+
+        PetExportEntry entry{};
+        if (readExportMetadata(full, entry))
+        {
+          outEntries[count++] = entry;
+        }
+      }
+    }
+
+    file.close();
+    file = dir.openNextFile();
+  }
+
+  sortPetExportsNewestFirst(outEntries, count);
+  return count;
+}
+
 static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)
 {
   if (!dst || dstSize == 0)
@@ -366,7 +464,7 @@ static bool findLatestExportPath(char *outPath, size_t outPathSize)
     {
       const char *nm = file.name();
       const size_t len = strlen(nm);
-      if (len >= 5 && !strcmp(nm + len - 5, ".json"))
+      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
       {
         char full[128];
         snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
@@ -513,10 +611,7 @@ static void forceChoosePetFlowFromBoot()
   clearInputLatch();
 }
 
-void saveManagerStartFreshPetFlow()
-{
-  forceChoosePetFlowFromBoot();
-}
+void saveManagerStartFreshPetFlow() { forceChoosePetFlowFromBoot(); }
 
 // ------------------------------------------------------------
 // Forward decls
@@ -1773,8 +1868,7 @@ bool saveManagerSaveFileExists()
   if (!g_sdReady)
     return false;
 
-  return SD.exists("/raising_hell/save/save.bin") ||
-         SD.exists("raising_hell/save/save.bin");
+  return SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin");
 }
 
 void saveManagerNewPet()
@@ -1869,7 +1963,7 @@ bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
 
   char path[128];
   const uint32_t nowEpoch = getNowEpochOrZero();
-  snprintf(path, sizeof(path), "%s/bub_%s_%lu.json", EXPORTS_DIR, safeName, (unsigned long)nowEpoch);
+  snprintf(path, sizeof(path), "%s/bub_%s_%lu.bub", EXPORTS_DIR, safeName, (unsigned long)nowEpoch);
 
   DynamicJsonDocument doc(4096);
 
@@ -1942,6 +2036,27 @@ bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
   if (!findLatestExportPath(path, sizeof(path)))
     return false;
 
+  return saveManagerImportBubAtPath(path, outPath, outPathSize, true);
+}
+
+bool saveManagerImportBubAtPath(const char* path, char* outPath, size_t outPathSize, bool backupCurrentFirst)
+{
+  if (outPath && outPathSize > 0)
+    outPath[0] = '\0';
+
+  if (!path || !path[0])
+    return false;
+
+  if (backupCurrentFirst && saveManagerSaveFileExists())
+  {
+    char backupPath[128];
+    if (!saveManagerExportCurrentBubJson(backupPath, sizeof(backupPath)))
+    {
+      Serial.println("[IMPORT] backup-current failed");
+      return false;
+    }
+  }
+
   File f = SD.open(path, FILE_READ);
   if (!f)
     return false;
@@ -1975,7 +2090,6 @@ bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
   if (!petTypeFromStringForImport(petTypeStr, importedType))
     importedType = PET_DEVIL;
 
-  // Apply pet
   pet.setName((name && name[0]) ? name : "Bub");
   pet.type = importedType;
   pet.level = (uint16_t)constrain((int)(profile["level"] | 1), 1, 999);
@@ -1992,7 +2106,6 @@ bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
   g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
   pet.birth_epoch = g_birthEpoch;
 
-  // Apply inventory
   g_app.inventory.clear();
   for (JsonObject row : slots)
   {
@@ -2012,10 +2125,8 @@ bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
   g_app.inventory.selectedIndex =
       constrain((int)(inventory["selectedIndex"] | 0), 0, max(0, g_app.inventory.countItems() - 1));
 
-  // Apply game options
   saveManagerSetDecayMode((uint8_t)constrain((int)(doc["gameOptions"]["decayMode"] | 2), 0, 5));
 
-  // Final cleanup + persist
   pet.clampStats();
   clearNamePendingFlag();
   g_app.inventory.syncEepromNoDirty();
@@ -2028,7 +2139,7 @@ bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
     outPath[outPathSize - 1] = '\0';
   }
 
-  Serial.printf("[IMPORT] restored '%s' pet='%s'\n", path, pet.getName());
+  Serial.printf("[IMPORT] applied '%s' pet='%s'\n", path, pet.getName());
   return true;
 }
 
