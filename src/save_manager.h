@@ -16,8 +16,10 @@ void saveManagerTick();      // call in loop()
 void saveManagerForce();     // force a save (and settings), used before reboot/sleep
 bool saveManagerAutoHeal();
 void saveManagerNewPet();
-uint32_t saveManagerGetBirthEpoch();   // handy for stats screen later
 void saveManagerNewPetNoSave();
+bool saveManagerAutoHeal();
+
+uint32_t saveManagerGetBirthEpoch();   // handy for stats screen later
 
 // Settings persistence (settings.bin under /raising_hell/save/)
 bool loadSettingsFromSD();

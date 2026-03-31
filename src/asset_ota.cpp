@@ -1,4 +1,15 @@
+// -----------------------------------------------------------------------------
+// asset_ota.cpp
+// Asset OTA implementation
+// -----------------------------------------------------------------------------
+
 #include "asset_ota.h"
+
+#include <Arduino.h>
+#include <SD.h>
+#include <mbedtls/sha256.h>
+#include <string.h>
+#include <vector>
 
 #include "asset_downloader.h"
 #include "asset_manifest.h"
@@ -11,13 +22,14 @@
 #include "ui_runtime.h"
 #include "wifi_time.h"
 
-#include <Arduino.h>
-#include <SD.h>
-#include <mbedtls/sha256.h>
-#include <string.h>
-#include <vector>
+// -----------------------------------------------------------------------------
+// Worklist helpers
+// -----------------------------------------------------------------------------
 
-const char *assetOtaWorklistPath() { return "/raising_hell/ota/worklist.txt"; }
+const char *assetOtaWorklistPath()
+{
+  return "/raising_hell/ota/worklist.txt";
+}
 
 bool assetOtaWorklistClear()
 {
@@ -28,11 +40,14 @@ bool assetOtaWorklistClear()
 
 bool assetOtaWorklistOpenRead(File *out)
 {
-  if (!out)
-    return false;
+  if (!out) return false;
   *out = SD.open(assetOtaWorklistPath(), FILE_READ);
   return (bool)(*out);
 }
+
+// -----------------------------------------------------------------------------
+// Worklist parsing
+// -----------------------------------------------------------------------------
 
 bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 {
@@ -49,34 +64,35 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
   {
     line = "";
 
+    // read line
     while (true)
     {
       int c = in.read();
-      if (c < 0)
-        break;
-      if (c == '\n')
-        break;
+      if (c < 0) break;
+      if (c == '\n') break;
 
       if (line.length() >= 255)
       {
-        Serial.printf("[OTA WL READ] ERROR: line too long pos=%ld size=%u\n", (long)in.position(), (unsigned)in.size());
+        Serial.printf("[OTA WL READ] ERROR: line too long pos=%ld size=%u\n",
+                      (long)in.position(), (unsigned)in.size());
         return false;
       }
 
       line += (char)c;
     }
 
-    const int len = line.length();
-    if (len == 0)
+    if (line.length() == 0)
     {
-      Serial.printf("[OTA WL READ] stop: empty read pos=%ld size=%u\n", (long)in.position(), (unsigned)in.size());
+      Serial.printf("[OTA WL READ] stop: empty read pos=%ld size=%u\n",
+                    (long)in.position(), (unsigned)in.size());
       return false;
     }
 
     line.trim();
     if (line.length() == 0)
     {
-      Serial.printf("[OTA WL READ] stop: blank line pos=%ld size=%u\n", (long)in.position(), (unsigned)in.size());
+      Serial.printf("[OTA WL READ] stop: blank line pos=%ld size=%u\n",
+                    (long)in.position(), (unsigned)in.size());
       return false;
     }
 
@@ -85,14 +101,14 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 
     if (tab1 <= 0 || tab2 <= tab1)
     {
-      Serial.printf("[OTA WL READ] stop: malformed line pos=%ld size=%u line='%s'\n", (long)in.position(),
-                    (unsigned)in.size(), line.c_str());
+      Serial.printf("[OTA WL READ] malformed line pos=%ld size=%u line='%s'\n",
+                    (long)in.position(), (unsigned)in.size(), line.c_str());
       return false;
     }
 
-    String path = line.substring(0, tab1);
+    String path    = line.substring(0, tab1);
     String sizeStr = line.substring(tab1 + 1, tab2);
-    String sha = line.substring(tab2 + 1);
+    String sha     = line.substring(tab2 + 1);
 
     path.trim();
     sizeStr.trim();
@@ -100,8 +116,8 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 
     if (sha.length() != 64)
     {
-      Serial.printf("[OTA WL READ] stop: bad sha len=%u path='%s' sha='%s'\n", (unsigned)sha.length(), path.c_str(),
-                    sha.c_str());
+      Serial.printf("[OTA WL READ] bad sha len=%u path='%s'\n",
+                    (unsigned)sha.length(), path.c_str());
       return false;
     }
 
@@ -110,24 +126,33 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
     out->size = (uint32_t)strtoul(sizeStr.c_str(), nullptr, 10);
     strlcpy(out->sha256, sha.c_str(), sizeof(out->sha256));
 
-    Serial.printf("[OTA WL READ] path='%s'\n", path.c_str());
-    Serial.printf("[OTA WL READ] size='%s'\n", sizeStr.c_str());
-    Serial.printf("[OTA WL READ] sha.len=%u sha='%s'\n", (unsigned)sha.length(), sha.c_str());
     return true;
   }
 }
 
+// -----------------------------------------------------------------------------
+// Internal state
+// -----------------------------------------------------------------------------
+
 static AssetOtaConfig s_cfg{};
-static AssetOtaState s_state{};
+static AssetOtaState  s_state{};
+
 static AssetOtaStatus s_status = AssetOtaStatus::IDLE;
-static AssetOtaError s_lastErr = AssetOtaError::NONE;
+static AssetOtaError  s_lastErr = AssetOtaError::NONE;
+
 static String s_installedVersion;
+
 static bool s_inited = false;
 static bool s_loadedFromSd = false;
 static bool s_graphicsReleasedForOta = false;
 static bool s_assetOtaConfirmActive = false;
 
-static String assetFileResolvedUrl(const String &packVersion, const AssetManifestFile &f)
+// -----------------------------------------------------------------------------
+// URL resolution
+// -----------------------------------------------------------------------------
+
+static String assetFileResolvedUrl(const String &packVersion,
+                                   const AssetManifestFile &f)
 {
   String url;
 
@@ -138,25 +163,44 @@ static String assetFileResolvedUrl(const String &packVersion, const AssetManifes
   else
     url = "https://assets.raisinghellgame.com/assets/";
 
-  if (!url.endsWith("/"))
-    url += "/";
+  if (!url.endsWith("/")) url += "/";
 
   if (packVersion.length())
   {
     url += packVersion;
-    if (!url.endsWith("/"))
-      url += "/";
+    if (!url.endsWith("/")) url += "/";
   }
 
   url += f.path;
   return url;
 }
 
+// -----------------------------------------------------------------------------
+// Public flags
+// -----------------------------------------------------------------------------
+
 bool assetOtaConfirmActive() { return s_assetOtaConfirmActive; }
 
 void assetOtaSetConfirmActive(bool v) { s_assetOtaConfirmActive = v; }
 
 bool assetOtaDidReleaseGraphics() { return s_graphicsReleasedForOta; }
+
+// -----------------------------------------------------------------------------
+// Worker task
+// -----------------------------------------------------------------------------
+void assetOtaResetState()
+{
+  Serial.println("[OTA] RESET STATE");
+
+  s_status = AssetOtaStatus::IDLE;
+  s_lastErr = AssetOtaError::NONE;
+
+  assetOtaStateDefaults(s_state);
+  assetOtaStateSave(s_state);
+
+  s_graphicsReleasedForOta = false;
+  s_assetOtaConfirmActive = false;
+}
 
 struct AssetOtaTaskResult
 {

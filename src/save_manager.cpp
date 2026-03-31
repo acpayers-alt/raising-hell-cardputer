@@ -1,39 +1,71 @@
 #include "save_manager.h"
-#include <Arduino.h>
-#include <SD.h>
+
+// -----------------------------------------------------------------------------
+// Standard / C
+// -----------------------------------------------------------------------------
 #include <stdint.h>
 
-#include "debug.h"
-#include "inventory.h"
-#include "pet.h"
-#include "savegame.h"
-#include "sdcard.h"
-#include "timezone.h"
-#include <Preferences.h>
+// -----------------------------------------------------------------------------
+// Arduino / ESP / platform
+// -----------------------------------------------------------------------------
+#include <Arduino.h>
 #include <esp_system.h>
 
-#include "wifi_store.h"
+// -----------------------------------------------------------------------------
+// External libraries
+// -----------------------------------------------------------------------------
+#include <SD.h>
+#include <Preferences.h>
 
-#include "ui_invalidate.h"
-#include "ui_runtime.h"
+// -----------------------------------------------------------------------------
+// Project headers
+// -----------------------------------------------------------------------------
 
+// Core systems
+#include "debug.h"
+#include "savegame.h"
+
+// Game systems
+#include "pet.h"
+#include "inventory.h"
+
+// App / lifecycle
 #include "app_lifecycle.h"
 #include "app_state.h"
-#include "brightness_state.h"
-#include "controls_help_state.h"
+
+// Storage / SD
+#include "sdcard.h"
+
+// Time
+#include "time_persist.h"
+#include "time_state.h"
+#include "timezone.h"
+
+// WiFi
+#include "wifi_store.h"
+
+// UI / rendering
+#include "ui_actions.h"
+#include "ui_invalidate.h"
+#include "ui_runtime.h"
 #include "display_state.h"
 #include "graphics.h"
-#include "input.h"
+
+// UI state / flows
+#include "controls_help_state.h"
 #include "inventory_state.h"
 #include "new_pet_flow_state.h"
 #include "runtime_flags_state.h"
 #include "settings_state.h"
-#include "settings_toggles_state.h" // wifiEnabled, g_app.autoScreenOffEnabled
+#include "settings_toggles_state.h"
 #include "sleep_state.h"
-#include "time_persist.h"
-#include "time_state.h"
-#include "ui_actions.h"
 #include "user_toggles_state.h"
+
+// Misc
+#include "brightness_state.h"
+#include "input.h"
+
+// Include End Here
 
 static bool dirty = false;
 static uint32_t lastSaveMs = 0;
@@ -80,6 +112,8 @@ static const char *SAVE_BAK1_PATH = "/raising_hell/save/save.bak1";
 static const char *SAVE_BAK2_PATH = "/raising_hell/save/save.bak2";
 static const char *SAVE_BAK3_PATH = "/raising_hell/save/save.bak3";
 static const char *AUTO_HEAL_FALLBACK_PET_NAME = "Bub";
+
+bool saveManagerAutoHeal();
 
 // ------------------------------------------------------------
 // NEW PET FLOW BOOT RESUME FLAG
@@ -802,13 +836,13 @@ static bool loadSaveFileInternal(const char *path)
   const size_t sz = (size_t)f.size();
   g_lastLoadSize = (uint32_t)sz;
 
-  if (sz < sizeof(uint32_t) + sizeof(uint16_t))
+  if (sz != sizeof(SavePayload))
   {
     g_lastLoadErr = SLE_READ_FAIL;
-    Serial.printf("[SAVE] FAIL path=%s reason=too_small size=%lu min=%u\n",
+    Serial.printf("[SAVE] FAIL path=%s reason=payload_size_bad size=%lu need=%u\n",
                   path,
                   (unsigned long)sz,
-                  (unsigned)(sizeof(uint32_t) + sizeof(uint16_t)));
+                  (unsigned)sizeof(SavePayload));
     f.close();
     return false;
   }
@@ -816,7 +850,7 @@ static bool loadSaveFileInternal(const char *path)
   SavePayload p{};
   memset(&p, 0, sizeof(p));
 
-  const size_t want = (sz < sizeof(p)) ? sz : sizeof(p);
+  const size_t want = sizeof(p);
   const int r = f.read((uint8_t *)&p, want);
   f.close();
 
@@ -850,16 +884,6 @@ static bool loadSaveFileInternal(const char *path)
                   (unsigned)p.version,
                   (unsigned)SAVE_VERSION,
                   (unsigned long)sz);
-    return false;
-  }
-
-  if (sz < sizeof(SavePayload))
-  {
-    g_lastLoadErr = SLE_READ_FAIL;
-    Serial.printf("[SAVE] FAIL path=%s reason=short_payload size=%lu need=%u\n",
-                  path,
-                  (unsigned long)sz,
-                  (unsigned)sizeof(SavePayload));
     return false;
   }
 
@@ -1007,14 +1031,14 @@ static bool autoHealLoadedSaveIfNeeded()
   const bool hadBlankPetName = isBlankName(pet.name);
   bool changed = false;
 
-  if (!hadNamePending && !hadBlankPetName)
-    return false;
-
   Serial.printf("[SAVE][AUTOHEAL] begin namePending=%d blankPetName=%d name='%s'\n",
                 hadNamePending ? 1 : 0,
                 hadBlankPetName ? 1 : 0,
                 pet.name);
 
+  // --------------------------------------------------------------------------
+  // Name / pending-flag recovery
+  // --------------------------------------------------------------------------
   if (hadBlankPetName)
   {
     pet.setName(AUTO_HEAL_FALLBACK_PET_NAME);
@@ -1034,6 +1058,171 @@ static bool autoHealLoadedSaveIfNeeded()
   {
     Serial.println("[SAVE][AUTOHEAL] clearing stale name_pending.flag");
     clearNamePendingFlag();
+    changed = true;
+  }
+
+  // --------------------------------------------------------------------------
+  // Core stat clamps
+  // --------------------------------------------------------------------------
+  const int hungerBefore = pet.hunger;
+  const int happyBefore = pet.happiness;
+  const int energyBefore = pet.energy;
+  const int healthBefore = pet.health;
+
+  pet.clampStats();
+
+  if (pet.hunger != hungerBefore ||
+      pet.happiness != happyBefore ||
+      pet.energy != energyBefore ||
+      pet.health != healthBefore)
+  {
+    Serial.printf("[SAVE][AUTOHEAL] clamped stats h=%d->%d m=%d->%d e=%d->%d hp=%d->%d\n",
+                  hungerBefore, pet.hunger,
+                  happyBefore, pet.happiness,
+                  energyBefore, pet.energy,
+                  healthBefore, pet.health);
+    changed = true;
+  }
+
+  // --------------------------------------------------------------------------
+  // Pet type clamp
+  // --------------------------------------------------------------------------
+  const int petTypeBefore = (int)pet.type;
+  switch (pet.type)
+  {
+    case PET_DEVIL:
+    case PET_KAIJU:
+    case PET_ELDRITCH:
+    case PET_ALIEN:
+    case PET_ANUBIS:
+    case PET_AXOLOTL:
+      break;
+
+    default:
+      pet.type = PET_DEVIL;
+      Serial.printf("[SAVE][AUTOHEAL] invalid pet type %d -> %d\n",
+                    petTypeBefore, (int)pet.type);
+      changed = true;
+      break;
+  }
+
+  // --------------------------------------------------------------------------
+  // Level / XP / evo sanity
+  // --------------------------------------------------------------------------
+  const uint16_t levelBefore = pet.level;
+  const uint32_t xpBefore = pet.xp;
+  const uint8_t evoBefore = pet.evoStage;
+
+  if (pet.level < 1)
+  {
+    pet.level = 1;
+    changed = true;
+  }
+  if (pet.level > 999)
+  {
+    pet.level = 999;
+    changed = true;
+  }
+
+  if (pet.evoStage > 3)
+  {
+    pet.evoStage = 3;
+    changed = true;
+  }
+
+  const uint32_t nextXp = pet.xpForNextLevel();
+  if (nextXp > 0 && pet.xp >= nextXp)
+  {
+    pet.xp = nextXp - 1;
+    changed = true;
+  }
+
+  if (pet.level != levelBefore || pet.xp != xpBefore || pet.evoStage != evoBefore)
+  {
+    Serial.printf("[SAVE][AUTOHEAL] level/xp/evo repaired lvl=%u->%u xp=%lu->%lu evo=%u->%u\n",
+                  (unsigned)levelBefore, (unsigned)pet.level,
+                  (unsigned long)xpBefore, (unsigned long)pet.xp,
+                  (unsigned)evoBefore, (unsigned)pet.evoStage);
+  }
+
+  // --------------------------------------------------------------------------
+  // Birth epoch sanity
+  // --------------------------------------------------------------------------
+  const uint32_t birthBefore = g_birthEpoch;
+  const uint32_t nowEpoch = getNowEpochOrZero();
+
+  if (g_birthEpoch != 0)
+  {
+    const bool tooOld = (g_birthEpoch < 946684800UL); // before 2000-01-01
+    const bool tooFuture = (nowEpoch != 0 && g_birthEpoch > (nowEpoch + 86400UL));
+
+    if (tooOld || tooFuture)
+    {
+      g_birthEpoch = (nowEpoch != 0) ? nowEpoch : 0;
+      pet.birth_epoch = g_birthEpoch;
+      Serial.printf("[SAVE][AUTOHEAL] repaired birth epoch %lu -> %lu\n",
+                    (unsigned long)birthBefore,
+                    (unsigned long)g_birthEpoch);
+      changed = true;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Inventory selection sanity
+  // --------------------------------------------------------------------------
+  const int invSelBefore = g_app.inventory.selectedIndex;
+  const int invCount = g_app.inventory.countItems();
+
+  if (invCount <= 0)
+  {
+    if (g_app.inventory.selectedIndex != 0)
+    {
+      g_app.inventory.selectedIndex = 0;
+      Serial.printf("[SAVE][AUTOHEAL] inventory selectedIndex %d -> 0 (empty inventory)\n",
+                    invSelBefore);
+      changed = true;
+    }
+  }
+  else
+  {
+    if (g_app.inventory.selectedIndex < 0)
+    {
+      g_app.inventory.selectedIndex = 0;
+      changed = true;
+    }
+    else if (g_app.inventory.selectedIndex >= invCount)
+    {
+      g_app.inventory.selectedIndex = invCount - 1;
+      changed = true;
+    }
+
+    if (g_app.inventory.selectedIndex != invSelBefore)
+    {
+      Serial.printf("[SAVE][AUTOHEAL] inventory selectedIndex %d -> %d (count=%d)\n",
+                    invSelBefore,
+                    g_app.inventory.selectedIndex,
+                    invCount);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Runtime sleep sanity
+  // --------------------------------------------------------------------------
+  if (pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
+      g_app.sleepUntilRested || g_app.sleepUntilAwakened ||
+      g_app.sleepTargetEnergy != 0 || g_app.sleepStartTime != 0 ||
+      g_app.sleepDurationMs != 0)
+  {
+    pet.isSleeping = false;
+    g_app.isSleeping = false;
+    g_app.sleepingByTimer = false;
+    g_app.sleepUntilRested = false;
+    g_app.sleepUntilAwakened = false;
+    g_app.sleepTargetEnergy = 0;
+    g_app.sleepStartTime = 0;
+    g_app.sleepDurationMs = 0;
+
+    Serial.println("[SAVE][AUTOHEAL] normalized runtime sleep state");
     changed = true;
   }
 
@@ -1105,10 +1294,15 @@ bool saveManagerLoad()
     }
   
     // ---- Auto-heal + lifecycle handling ----
-    autoHealLoadedSaveIfNeeded();
+    const bool healed = autoHealLoadedSaveIfNeeded();
 
     const bool namePending = namePendingFlagExists();
     const bool blankPetName = isBlankName(pet.name);
+
+    if (healed)
+    {
+      Serial.println("[SAVE] auto-heal changed loaded payload");
+    }
 
     Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n",
                   namePending ? 1 : 0,

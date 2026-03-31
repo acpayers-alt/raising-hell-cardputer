@@ -88,6 +88,33 @@ static inline UIState uiStateForTab(Tab t)
   }
 }
 
+static inline bool shouldTickAssetOtaNow()
+{
+  // HARD STOP: never run OTA if SD is not ready
+  if (!g_sdReady)
+    return false;
+
+  // NEVER tick OTA if assets are missing at runtime
+  if (g_assetsMissing)
+    return false;
+
+  switch (g_app.uiState)
+  {
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_WIFI_IMPORTED:
+  case UIState::BOOT_WIFI_WAIT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+    return true;
+
+  default:
+    break;
+  }
+
+  return g_bootAssetProvisionActive || g_bootUiBlockedForAssetProvision;
+}
+
 void appMainLoopTick()
 {
   // ---------------------------------------------------------------------------
@@ -174,7 +201,8 @@ void appMainLoopTick()
   if (!isScreenOn())
   {
     wifiTimeTick();
-    assetOtaTick();
+    if (shouldTickAssetOtaNow())
+      assetOtaTick();
     updateTime();
     updateBattery();
     batteryProtectionTick(now);
@@ -244,59 +272,237 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-  // ---------------------------------------------------------------------------
-  // MODAL: SD assets missing screen (all builds)
-  // Draw ONCE to prevent flicker; retry check on ENTER.
-  // ---------------------------------------------------------------------------
-  if (g_assetsMissing && !g_bootAssetProvisionMustComplete)
-  {
-    static bool s_prevSelectHeld_assets = false;
-    const bool enterOnce = (input.selectHeld && !s_prevSelectHeld_assets);
-    s_prevSelectHeld_assets = input.selectHeld;
+  const bool allowRuntimeSdProbe = (g_app.uiState == UIState::PET_SCREEN) || (g_app.uiState == UIState::SLEEP_MENU) ||
+                                   (g_app.uiState == UIState::INVENTORY) || (g_app.uiState == UIState::SHOP) ||
+                                   (g_app.uiState == UIState::PET_SLEEPING);
 
-    static bool s_drawn = false;
-    if (!s_drawn)
+  // ---------------------------------------------------------------------------
+  // SD / asset / provisioning state transition logging
+  // ---------------------------------------------------------------------------
+  if (allowRuntimeSdProbe)
+  {
+    static bool s_prevLoggedSdReady = true;
+    static bool s_prevLoggedAssetsMissing = false;
+    static bool s_prevLoggedProvisionMustComplete = false;
+    static bool s_prevLoggedProvisionActive = false;
+    static bool s_prevLoggedUiBlockedForProvision = false;
+
+    const bool sdReadyNow = g_sdReady;
+    const bool assetsMissingNow = g_assetsMissing;
+    const bool provisionMustCompleteNow = g_bootAssetProvisionMustComplete;
+    const bool provisionActiveNow = g_bootAssetProvisionActive;
+    const bool uiBlockedForProvisionNow = g_bootUiBlockedForAssetProvision;
+
+    if (sdReadyNow != s_prevLoggedSdReady || assetsMissingNow != s_prevLoggedAssetsMissing ||
+        provisionMustCompleteNow != s_prevLoggedProvisionMustComplete ||
+        provisionActiveNow != s_prevLoggedProvisionActive ||
+        uiBlockedForProvisionNow != s_prevLoggedUiBlockedForProvision)
     {
-      drawAssetsMissingScreen();
-      s_drawn = true;
+      Serial.printf("[SDRUNTIME] sdReady=%d assetsMissing=%d provisionMust=%d provisionActive=%d uiBlocked=%d ui=%d\n",
+                    sdReadyNow ? 1 : 0, assetsMissingNow ? 1 : 0, provisionMustCompleteNow ? 1 : 0,
+                    provisionActiveNow ? 1 : 0, uiBlockedForProvisionNow ? 1 : 0, (int)g_app.uiState);
+
+      s_prevLoggedSdReady = sdReadyNow;
+      s_prevLoggedAssetsMissing = assetsMissingNow;
+      s_prevLoggedProvisionMustComplete = provisionMustCompleteNow;
+      s_prevLoggedProvisionActive = provisionActiveNow;
+      s_prevLoggedUiBlockedForProvision = uiBlockedForProvisionNow;
     }
 
-    if (enterOnce || input.selectOnce)
+    // ---------------------------------------------------------------------------
+    // Runtime SD / asset probe
+    // Detect mid-session SD removal or asset disappearance.
+    // ---------------------------------------------------------------------------
+    static uint32_t s_nextSdProbeMs = 0;
+    if ((int32_t)(now - s_nextSdProbeMs) >= 0)
     {
-      // Re-check SD + marker file
-      if (!g_sdReady)
-      {
-        g_sdReady = initSD();
-      }
+      s_nextSdProbeMs = now + 300;
 
-      // If SD comes back, allow the normal boot pipeline to proceed again.
+      const bool sdReadyBeforeProbe = g_sdReady;
+      const bool assetsMissingBeforeProbe = g_assetsMissing;
+
+      bool assetsPresentNow = false;
+
+      // Always verify SD state — don't trust stale g_sdReady.
+      // IMPORTANT: do NOT auto-remount here, because that blocks the UI and
+      // makes the pet screen appear frozen. The modal retry path will handle
+      // remount explicitly when the user presses Enter.
       if (g_sdReady)
       {
-        g_sdGaveUp = false;
-        g_sdFirstTryMs = 0;
-        g_sdTryCount = 0;
+        if (!SD.exists("/"))
+        {
+          Serial.printf("[SDRUNTIME] probe: SD root missing -> forcing sdReady=0 ui=%d\n", (int)g_app.uiState);
+
+          g_sdReady = false;
+          assetsPresentNow = false;
+        }
+        else
+        {
+          assetsPresentNow = sdAssetsPresent();
+          if (!assetsPresentNow)
+          {
+            Serial.printf("[SDRUNTIME] probe: sdReady=1 but assetsPresent=0 -> forcing assetsMissing ui=%d\n",
+                          (int)g_app.uiState);
+          }
+        }
       }
 
-      g_assetsMissing = !(g_sdReady && sdAssetsPresent());
+      g_assetsMissing = !(g_sdReady && assetsPresentNow);
       g_assetsChecked = true;
 
-      if (!g_assetsMissing)
+      // -------------------------------------------------------------------------
+      // HARD STOP: kill any active provisioning session if assets disappear
+      // -------------------------------------------------------------------------
+      const bool badSdStateNow = (g_assetsMissing || !g_sdReady);
+      const bool badSdStateBefore = (assetsMissingBeforeProbe || !sdReadyBeforeProbe);
+
+      if (badSdStateNow)
       {
-        s_drawn = false;
-        drawBootSplash();
-        invalidateBackgroundCache();
-        requestUIRedraw();
-        renderUI();
-      }
-      else
-      {
-        s_drawn = false;
+        const bool wasActive = g_bootAssetProvisionActive || g_bootUiBlockedForAssetProvision ||
+                               g_bootProvisionWifiOnboardingStarted || g_bootAssetProvisionMustComplete;
+
+        if (wasActive)
+        {
+          Serial.printf("[SDRUNTIME] FORCE STOP provisioning (assets missing) ui=%d\n", (int)g_app.uiState);
+        }
+
+        g_bootAssetProvisionMustComplete = false;
+        g_bootUiBlockedForAssetProvision = false;
+        g_bootAssetProvisionActive = false;
+        g_bootProvisionWifiOnboardingStarted = false;
+
+        if (!badSdStateBefore)
+        {
+          assetOtaResetState();
+        }
       }
     }
+  }
 
-    soundTick();
-    delay(10);
-    return;
+  //   // ---------------------------------------------------------------------------
+  // MODAL: SD assets missing / SD card missing
+  // ---------------------------------------------------------------------------
+  {
+    static bool s_assetsMissingModalDrawn = false;
+    static bool s_assetsMissingModalLogged = false;
+    static bool s_prevAssetsMissingModalActive = false;
+    static bool s_prevAssetsMissingModalSdReady = true;
+
+    const bool assetsMissingModalActive = (g_assetsMissing && !g_bootAssetProvisionMustComplete);
+
+    // If the modal just became inactive, fully reset its one-shot state.
+    if (!assetsMissingModalActive && s_prevAssetsMissingModalActive)
+    {
+      s_assetsMissingModalDrawn = false;
+      s_assetsMissingModalLogged = false;
+    }
+
+    // If SD readiness changed while the modal was/should be active,
+    // force the modal to redraw so the message switches correctly between
+    // "ASSETS MISSING" and "SD CARD NOT DETECTED".
+    if (assetsMissingModalActive && (g_sdReady != s_prevAssetsMissingModalSdReady))
+    {
+      s_assetsMissingModalDrawn = false;
+      s_assetsMissingModalLogged = false;
+    }
+
+    s_prevAssetsMissingModalActive = assetsMissingModalActive;
+    s_prevAssetsMissingModalSdReady = g_sdReady;
+
+    if (assetsMissingModalActive)
+    {
+      bool retryRequested = false;
+
+      if (input.selectOnce)
+        retryRequested = true;
+
+      while (input.kbHasEvent())
+      {
+        KeyEvent ev = input.kbPop();
+        const uint8_t c = ev.code;
+
+        if (c == RH_KEY_ENTER || c == '\n' || c == '\r' || c == 'g' || c == 'G')
+          retryRequested = true;
+      }
+
+      if (!s_assetsMissingModalLogged)
+      {
+        Serial.printf("[SDRUNTIME] entering assets-missing modal sdReady=%d assetsMissing=%d provisionMust=%d ui=%d\n",
+                      g_sdReady ? 1 : 0, g_assetsMissing ? 1 : 0, g_bootAssetProvisionMustComplete ? 1 : 0,
+                      (int)g_app.uiState);
+        clearInputLatch();
+        s_assetsMissingModalLogged = true;
+      }
+
+      if (!s_assetsMissingModalDrawn)
+      {
+        drawAssetsMissingScreen();
+        s_assetsMissingModalDrawn = true;
+      }
+
+      if (retryRequested)
+      {
+        Serial.printf("[SDRUNTIME] retry requested sdReady=%d ui=%d\n", g_sdReady ? 1 : 0, (int)g_app.uiState);
+
+        g_sdReady = remountSDWithRetry(3);
+
+        Serial.printf("[SDRUNTIME] retry remount result sdReady=%d ui=%d\n", g_sdReady ? 1 : 0, (int)g_app.uiState);
+
+        if (g_sdReady)
+        {
+          g_sdGaveUp = false;
+          g_sdFirstTryMs = 0;
+          g_sdTryCount = 0;
+        }
+
+        g_assetsMissing = !(g_sdReady && sdAssetsPresent());
+        g_assetsChecked = true;
+
+        if (g_assetsMissing)
+        {
+          Serial.printf("[SDRUNTIME] retry: assets still missing sdReady=%d\n", g_sdReady ? 1 : 0);
+
+          g_bootAssetProvisionMustComplete = false;
+          g_bootUiBlockedForAssetProvision = false;
+          g_bootAssetProvisionActive = false;
+          g_bootProvisionWifiOnboardingStarted = false;
+
+          assetOtaResetState();
+
+          s_assetsMissingModalDrawn = false;
+          s_assetsMissingModalLogged = false;
+
+          // If the card is still not mountable after explicit user retry,
+          // do a cold reboot. Hot-remount is not recovering on this hardware,
+          // but cold boot does.
+          if (!g_sdReady)
+          {
+            Serial.println("[SDRUNTIME] retry failed with sdReady=0 -> rebooting for cold SD init");
+            delay(100);
+            ESP.restart();
+          }
+        }
+        else
+        {
+          g_bootAssetProvisionMustComplete = false;
+          g_bootUiBlockedForAssetProvision = false;
+          g_bootAssetProvisionActive = false;
+          g_bootProvisionWifiOnboardingStarted = false;
+
+          s_assetsMissingModalDrawn = false;
+          s_assetsMissingModalLogged = false;
+
+          drawBootSplash();
+          invalidateBackgroundCache();
+          requestUIRedraw();
+          renderUI();
+        }
+      }
+
+      soundTick();
+      delay(10);
+      return;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -325,7 +531,9 @@ void appMainLoopTick()
       }
 
       wifiTimeTick();
-      assetOtaTick();
+
+      if (shouldTickAssetOtaNow())
+        assetOtaTick();
       if (g_timeAnchorAttempted || timeIsSynced())
         updateTime();
       updateBattery();

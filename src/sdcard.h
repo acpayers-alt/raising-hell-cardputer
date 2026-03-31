@@ -8,6 +8,8 @@ extern bool g_sdReady;
 // Init / diagnostics
 bool initSD();
 void listDir(const char* path);
+bool remountSD();
+bool remountSDWithRetry(uint8_t attempts = 2);
 
 // Save / load
 bool sdLoadSave(struct SavePayload &out);

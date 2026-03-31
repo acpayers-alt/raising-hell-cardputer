@@ -359,12 +359,27 @@ static bool bootVisualsLockedForProvisioning()
 
 static bool bootAssetProvisionRequested() { return assetProvisionBootRequested(); }
 
-static bool bootAssetProvisionMandatory() { return g_sdReady && !sdAssetsPresent(); }
+static bool bootAssetProvisionMandatory()
+{
+  if (!g_sdReady)
+    return false;
+
+  return !sdAssetsPresent();
+}
 
 bool g_bootUiBlockedForAssetProvision = false;
 
 static bool bootAssetProvisionRequired()
 {
+  // Never allow the boot provisioning pipeline to re-arm itself once we are
+  // already past boot and assets disappear at runtime. Runtime missing-assets
+  // handling owns that case.
+  if (g_assetsMissing && !g_bootLandingDeferredForAssetProvision)
+    return false;
+
+  if (!g_sdReady)
+    return false;
+
   const bool requested = bootAssetProvisionRequested();
   const bool mandatory = bootAssetProvisionMandatory();
   const bool tooOld = !mandatory && g_bootAssetPackTooOldCached;
@@ -604,10 +619,8 @@ static void finalizeBootLanding()
   g_bootAssetProvisionMustComplete = false;
   g_bootProvisionWifiOnboardingStarted = false;
 
-  Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n",
-    (int)s_bootFinalLandingState,
-    g_controlsHelpSeen ? 1 : 0,
-    g_postProvisionControlsHelpPending ? 1 : 0);
+  Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n", (int)s_bootFinalLandingState,
+                g_controlsHelpSeen ? 1 : 0, g_postProvisionControlsHelpPending ? 1 : 0);
 
   if (g_postProvisionControlsHelpPending)
   {
@@ -633,23 +646,22 @@ static void finalizeBootLanding()
   {
     clearInputLatch();
     inputForceClear();
-  
+
     if (s_bootFinalLandingState == UIState::CHOOSE_PET)
     {
       g_choosePetInputUnlockMs = millis() + 350;
       g_choosePetBlockHatchUntilRelease = true;
     }
-  
-    Serial.printf("[BOOT][LAND] controlsHelpBegin returnState=%d\n",
-      (int)s_bootFinalLandingState);
-      
+
+    Serial.printf("[BOOT][LAND] controlsHelpBegin returnState=%d\n", (int)s_bootFinalLandingState);
+
     controlsHelpBegin(s_bootFinalLandingState, Tab::TAB_PET);
     return;
   }
 
   const UIState afterOk = s_bootFinalLandingState;
   const bool loadedFromSD = (afterOk != UIState::CHOOSE_PET);
-  
+
   uint16_t seedMarkNow = 0;
   EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
 
@@ -696,6 +708,27 @@ void postBootInitTick()
 {
   const uint32_t now = millis();
 
+  // ---------------------------------------------------------------------------
+  // Runtime guard: if assets disappear after normal boot has already landed,
+  // never let the boot pipeline re-enter provisioning. Hand off to the runtime
+  // assets-missing flow instead.
+  // ---------------------------------------------------------------------------
+  if (!g_bootLandingDeferredForAssetProvision &&
+      g_app.uiState == UIState::PET_SCREEN &&
+      g_sdReady &&
+      !sdAssetsPresent())
+  {
+    g_assetsChecked = true;
+    g_assetsMissing = true;
+
+    g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
+    g_bootAssetProvisionMustComplete = false;
+    g_bootProvisionWifiOnboardingStarted = false;
+
+    return;
+  }
+   
   // ---------------------------------------------------------------------------
   // Stage 0: Apply TZ + anchor early (so localtime_r() is sane ASAP)
   // ---------------------------------------------------------------------------
@@ -857,7 +890,7 @@ void postBootInitTick()
 
     const UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
     s_bootFinalLandingState = afterOk;
-    
+
     bootMarkFirmwareSeenAndRequestProvisionIfChanged();
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
@@ -886,11 +919,11 @@ void postBootInitTick()
     else
       runtimeLogLine("[BOOT] path=NORMAL_BOOT");
 
-      if (!loadedFromSD)
-      {
-        g_app.inventory.init();
-      }    
-  
+    if (!loadedFromSD)
+    {
+      g_app.inventory.init();
+    }
+
     if (forcedFirstRun)
     {
       g_app.inventory.resetToDefaults();
@@ -908,6 +941,13 @@ void postBootInitTick()
       if (g_bootAssetProvisionMustComplete)
       {
         g_bootAssetProvisionActive = false;
+        Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED sdReady=%d assetsMissing=%d must=%d active=%d requested=%d ui=%d\n",
+                      g_sdReady ? 1 : 0,
+                      g_assetsMissing ? 1 : 0,
+                      g_bootAssetProvisionMustComplete ? 1 : 0,
+                      g_bootAssetProvisionActive ? 1 : 0,
+                      bootAssetProvisionRequested() ? 1 : 0,
+                      (int)g_app.uiState);
         uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();
@@ -915,7 +955,7 @@ void postBootInitTick()
         clearInputLatch();
         return;
       }
-
+      
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
       g_bootAssetProvisionActive = true;
       requestUIRedraw();
@@ -1075,16 +1115,26 @@ void postBootInitTick()
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------
+  
+  // 🔥 HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
+  if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
+  {
+    g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
+    g_bootAssetProvisionMustComplete = false;
+    return;
+  }
+  
   if (bootAssetProvisionRequired())
   {
     // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
     if (bootAssetProvisionWifiOnboardingActive())
       return;
-
+  
     // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
     if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
       return;
-
+  
     if (runBootAssetProvision())
       return;
   }
