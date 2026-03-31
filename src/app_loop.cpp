@@ -1,50 +1,85 @@
 #include "app_loop.h"
 
+// -----------------------------------------------------------------------------
+// Arduino / platform
+// -----------------------------------------------------------------------------
+#include <Arduino.h>
+#include <cstring>
+
+// -----------------------------------------------------------------------------
+// External libraries
+// -----------------------------------------------------------------------------
 #include "M5Cardputer.h"
-#include "anim_engine.h"
+
+// -----------------------------------------------------------------------------
+// App / core state
+// -----------------------------------------------------------------------------
 #include "app_state.h"
-#include "asset_ota.h"
-#include "auto_screen.h"
-#include "boot_pipeline.h"
 #include "build_flags.h"
-#include "console.h"
-#include "death_state.h"
-#include "debug_state.h"
-#include "display.h"
-#include "display_state.h"
-#include "evolution_flow.h"
+
+// -----------------------------------------------------------------------------
+// Asset / boot / provisioning
+// -----------------------------------------------------------------------------
+#include "asset_ota.h"
+#include "boot_pipeline.h"
 #include "flow_boot_wifi.h"
 #include "flow_controls_help.h"
-#include "game_options_state.h"
-#include "graphics.h"
-#include "hatching_flow.h"
-#include "input.h"
-#include "input_activity_state.h"
 #include "launcher_wifi_import.h"
-#include "led_status.h"
-#include "menu_actions.h"
-#include "motion.h"
-#include "no_legacy_aliases.h"
-#include "pet.h"
-#include "power_button.h"
-#include "save_manager.h"
-#include "sdcard.h"
 #include "settings_flow_state.h"
-#include "sleep_state.h"
-#include "sound.h"
-#include "time_persist.h"
-#include "time_state.h"
+
+// -----------------------------------------------------------------------------
+// Display / rendering / UI
+// -----------------------------------------------------------------------------
+#include "auto_screen.h"
+#include "console.h"
+#include "display.h"
+#include "display_state.h"
+#include "graphics.h"
+#include "menu_actions.h"
+#include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_input_router.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
 #include "ui_state_console.h"
 #include "ui_tabs.h"
+
+// -----------------------------------------------------------------------------
+// Input / interaction
+// -----------------------------------------------------------------------------
+#include "input.h"
+#include "input_activity_state.h"
+#include "motion.h"
+#include "power_button.h"
+
+// -----------------------------------------------------------------------------
+// Gameplay / simulation
+// -----------------------------------------------------------------------------
+#include "anim_engine.h"
+#include "death_state.h"
+#include "evolution_flow.h"
+#include "game_options_state.h"
+#include "hatching_flow.h"
+#include "pet.h"
+#include "sleep_state.h"
+#include "sound.h"
+
+// -----------------------------------------------------------------------------
+// Storage / persistence / time / networking
+// -----------------------------------------------------------------------------
+#include "save_manager.h"
+#include "sdcard.h"
+#include "time_persist.h"
+#include "time_state.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
 
-#include <Arduino.h>
-#include <cstring>
+// -----------------------------------------------------------------------------
+// Debug / misc
+// -----------------------------------------------------------------------------
+#include "debug_state.h"
+#include "led_status.h"
+#include "no_legacy_aliases.h"
 
 bool handleMenuInput(InputState &in);
 
@@ -791,17 +826,31 @@ void appMainLoopTick()
     // ---------------------------------------------------------------------------
     if (input.homeOnce)
     {
-      const bool canHome = (g_app.uiState != UIState::SET_TIME) && (g_app.uiState != UIState::POWER_MENU) &&
-                           (g_app.uiState != UIState::DEATH) && (g_app.uiState != UIState::BURIAL_SCREEN) &&
-                           (g_app.uiState != UIState::MINI_GAME) && (g_app.uiState != UIState::HATCHING) &&
+      if (g_app.uiState == UIState::SETTINGS && settingsHasReturnTarget())
+      {
+        noteUserActivity();
+        closeSettingsAndReturn(input);
+        invalidateBackgroundCache();
+        requestUIRedraw();
+        input = InputState{};
+        clearInputLatch();
+        return;
+      }
+    
+      const bool canHome = (g_app.uiState != UIState::SET_TIME) &&
+                           (g_app.uiState != UIState::POWER_MENU) &&
+                           (g_app.uiState != UIState::DEATH) &&
+                           (g_app.uiState != UIState::BURIAL_SCREEN) &&
+                           (g_app.uiState != UIState::MINI_GAME) &&
+                           (g_app.uiState != UIState::HATCHING) &&
                            (g_app.uiState != UIState::EVOLUTION);
-
+    
       if (canHome && g_app.uiState != UIState::PET_SLEEPING)
       {
         noteUserActivity();
-
+    
         uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 200);
-
+    
         invalidateBackgroundCache();
         requestUIRedraw();
         input = InputState{};
@@ -809,7 +858,7 @@ void appMainLoopTick()
         return;
       }
     }
-
+    
     // ---------------------------------------------------------------------------
     // Waking from sleep screen state
     // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "settings_flow_state.h"
 #include "app_state.h"
 #include "graphics.h"
 #include "input.h"
@@ -9,6 +10,7 @@
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
+#include "settings_flow_state.h"
 
 int g_titleMenuIndex = 0;
 
@@ -18,8 +20,8 @@ constexpr int kTitleMenuCount = 3;
 
 enum TitleMenuItem : int {
   TITLE_CONTINUE = 0,
-  TITLE_NEW_PET  = 1,
-  TITLE_IMPORT   = 2,
+  TITLE_IMPORT   = 1,
+  TITLE_SETTINGS = 2,
 };
 
 static bool titleItemEnabled(int idx)
@@ -27,8 +29,8 @@ static bool titleItemEnabled(int idx)
   switch (idx)
   {
     case TITLE_CONTINUE: return saveManagerSaveFileExists();
-    case TITLE_NEW_PET:  return true;
     case TITLE_IMPORT:   return saveManagerHasImportableBubJson();
+    case TITLE_SETTINGS: return true;
     default:             return false;
   }
 }
@@ -36,9 +38,9 @@ static bool titleItemEnabled(int idx)
 static int titleFirstEnabledItem()
 {
   if (titleItemEnabled(TITLE_CONTINUE)) return TITLE_CONTINUE;
-  if (titleItemEnabled(TITLE_NEW_PET))  return TITLE_NEW_PET;
   if (titleItemEnabled(TITLE_IMPORT))   return TITLE_IMPORT;
-  return TITLE_NEW_PET;
+  if (titleItemEnabled(TITLE_SETTINGS)) return TITLE_SETTINGS;
+  return TITLE_SETTINGS;
 }
 
 static int titleStepEnabled(int startIdx, int dir)
@@ -121,21 +123,13 @@ void uiTitleMenuHandle(InputState& in)
       break;
     }
 
-    case TITLE_NEW_PET:
-    {
-      playBeep();
-      saveManagerStartFreshPetFlow();
-      swallowTitleInput(in);
-      return;
-    }
-
     case TITLE_IMPORT:
     {
       char path[128];
       if (saveManagerImportLatestBubJson(path, sizeof(path)))
       {
         playBeep();
-        ui_showMessage("Bub imported");
+        ui_showMessage("Pet imported");
         g_titleMenuIndex = TITLE_CONTINUE;
         requestFullUIRedraw();
       }
@@ -149,13 +143,21 @@ void uiTitleMenuHandle(InputState& in)
       swallowTitleInput(in);
       return;
     }
+
+    case TITLE_SETTINGS:
+    {
+      playBeep();
+      openSettingsWithReturn(UIState::TITLE_MENU, Tab::TAB_PET);
+      swallowTitleInput(in);
+      return;
+    }
   }
 
   swallowTitleInput(in);
-  
-  Serial.printf("[TITLE] enter idx=%d continue=%d new=%d import=%d\n",
-    g_titleMenuIndex,
-    saveManagerSaveFileExists() ? 1 : 0,
-    1,
-    saveManagerHasImportableBubJson() ? 1 : 0);
+
+  Serial.printf("[TITLE] idx=%d continue=%d import=%d settings=%d\n",
+                g_titleMenuIndex,
+                saveManagerSaveFileExists() ? 1 : 0,
+                saveManagerHasImportableBubJson() ? 1 : 0,
+                1);
 }

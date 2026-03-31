@@ -71,12 +71,12 @@
 #include "mini_games.h"
 #include "name_entry_state.h"
 #include "new_pet_flow_state.h"
-#include "ui_state_title_menu.h"
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
 #include "settings_state.h"
 #include "system_status_state.h"
 #include "time_state.h"
+#include "ui_state_title_menu.h"
 #include "user_toggles_state.h"
 #include "wifi_setup_state.h"
 
@@ -2063,7 +2063,7 @@ static void drawGameOptionsMenu()
 
   const char *labels[] = {renameLine, exportLine, importLine, decayLine, deathLine, ledLine};
   const int totalItems = 6;
-  
+
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
@@ -5331,7 +5331,7 @@ static void drawCurrentScreen(bool redrawBg)
     drawWifiConnectWaitScreen();
     return;
 
-    case UIState::SET_TIME:
+  case UIState::SET_TIME:
     drawSetTimeScreen();
     return;
 
@@ -5958,86 +5958,63 @@ void drawTitleMenuScreen(bool redrawBg)
   char continueBuf[40];
   snprintf(continueBuf, sizeof(continueBuf), hasSave ? "Continue: %s" : "Continue", petName);
 
-  const char *labels[3] = {
-    continueBuf,
-    "New Pet",
-    "Import Pet"
-  };
-
-  const bool enabled[3] = {
-    hasSave,
-    true,
-    hasImport
-  };
-
-  // Title
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("RAISING HELL", SCREEN_W / 2, 10, 4);
+  const char *labels[3] = {continueBuf, "Import Pet", "Settings"};
+  const bool enabled[3] = {hasSave, hasImport, true};
 
   // Menu panel
-  const int panelX = 44;
-  const int panelY = 50;
-  const int panelW = SCREEN_W - (panelX * 2);
-  const int panelH = 56;
-
-  spr.fillRoundRect(panelX, panelY, panelW, panelH, 8, TFT_BLACK);
-  spr.drawRoundRect(panelX, panelY, panelW, panelH, 8, TFT_WHITE);
-
   const int rowH = 16;
-  for (int i = 0; i < 3; ++i)
+  const int itemCount = 3;
+  const int menuBottomY = SCREEN_H - 3;
+  const int menuTopY = menuBottomY - (itemCount * rowH);
+
+  for (int i = 0; i < itemCount; ++i)
   {
-    const int rowY = panelY + 6 + (i * rowH);
+    const int rowY = menuTopY + (i * rowH);
+
     const bool selected = (i == g_titleMenuIndex);
 
-    if (selected)
-      spr.fillRoundRect(panelX + 6, rowY - 1, panelW - 12, 14, 5, uiModalOutline(pet.type));
-
     uint16_t fg = TFT_WHITE;
+
     if (!enabled[i])
       fg = TFT_DARKGREY;
     else if (selected)
-      fg = TFT_BLACK;
+      fg = TFT_YELLOW;
 
-    const uint16_t bg = selected ? uiModalOutline(pet.type) : TFT_BLACK;
-
-    spr.setTextDatum(TL_DATUM);
-    spr.setTextColor(fg, bg);
-    spr.drawString(labels[i], panelX + 12, rowY, 2);
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(fg, TFT_TRANSPARENT);
+    spr.drawString(labels[i], SCREEN_W / 2, rowY, 2);
 
     if (!enabled[i])
     {
+      spr.setTextDatum(TC_DATUM);
+      spr.setTextColor(TFT_DARKGREY);
+
       if (i == 0)
-        spr.drawString("(no save)", panelX + panelW - 66, rowY, 1);
-      else if (i == 2)
-        spr.drawString("(none found)", panelX + panelW - 82, rowY, 1);
+        spr.drawString("(no save)", SCREEN_W / 2, rowY + 10, 1);
+      else if (i == 1)
+        spr.drawString("(none found)", SCREEN_W / 2, rowY + 10, 1);
     }
   }
-
-  // Footer / rescue hint
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("\\ Console    ENTER Select", SCREEN_W / 2, SCREEN_H - 11, 1);
 
   // Status block
   const char *assetVer = assetOtaInstalledVersion();
   const AssetOtaChannel ch = (AssetOtaChannel)assetOtaGetConfig().channel;
 
-  char saveBuf[48];
-  char assetBuf[48];
-  char buildBuf[48];
+  char assetBuf[32];
+  char buildBuf[32];
 
-  snprintf(saveBuf, sizeof(saveBuf), "Save: %s", hasSave ? petName : "none");
-  snprintf(assetBuf, sizeof(assetBuf), "Assets: %s", (assetVer && assetVer[0]) ? assetVer : "none");
-  snprintf(buildBuf, sizeof(buildBuf), "Build: %s %s",
-           (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC",
-           RH_VERSION_STRING);
+  snprintf(assetBuf, sizeof(assetBuf), "%s", (assetVer && assetVer[0]) ? assetVer : "none");
+  snprintf(buildBuf, sizeof(buildBuf), "%s %s", (ch == AssetOtaChannel::DEV) ? "DEV" : "PUB", RH_VERSION_STRING);
 
+  // Build version: top-left
   spr.setTextDatum(TL_DATUM);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString(saveBuf, 6, 88, 1);
-  spr.drawString(assetBuf, 6, 98, 1);
-  spr.drawString(buildBuf, 6, 108, 1);
+  spr.drawString(buildBuf, 4, 2, 1);
+
+  // Asset version: top-right
+  spr.setTextDatum(TR_DATUM);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.drawString(assetBuf, SCREEN_W - 4, 2, 1);
 }
 
 void drawChoosePetScreen(bool redrawBg)

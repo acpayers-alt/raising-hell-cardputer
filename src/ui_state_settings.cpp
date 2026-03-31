@@ -9,17 +9,17 @@
 #include "ui_defs.h"
 
 // UI + audio
-#include "ui_runtime.h"
 #include "sound.h"
+#include "ui_runtime.h"
 
 // Saving
-#include "sdcard.h"
 #include "save_manager.h"
+#include "sdcard.h"
 
 // Screen/brightness/auto screen
-#include "display.h"
 #include "auto_screen.h"
 #include "brightness_state.h"
+#include "display.h"
 
 // Console + flows invoked from settings
 #include "console.h"
@@ -29,41 +29,30 @@
 
 // WiFi controls used from settings
 #include "wifi_power.h"
-#include "wifi_store.h"
 #include "wifi_setup_state.h"
+#include "wifi_store.h"
 
 // Misc toggles used in settings pages
-#include "led_status.h"
 #include "game_options_state.h"
+#include "led_status.h"
 
 #include <stdint.h>
 
+#include "asset_ota.h"
+#include "graphics.h" // ui_showMessage
+#include "menu_actions.h"
 #include "settings_nav_state.h"
 #include "time_persist.h"
-#include "ui_input_utils.h"
-#include "menu_actions.h"
-#include "wifi_time.h"      // wifiIsEnabled, wifiSetEnabled
-#include "graphics.h"       // ui_showMessage
-#include "ui_settings_pages.h"
-#include "ui_settings_menu.h"
-#include "ui_input_common.h"
 #include "ui_actions.h"
-#include "asset_ota.h"
+#include "ui_input_common.h"
+#include "ui_input_utils.h"
+#include "ui_settings_menu.h"
+#include "ui_settings_pages.h"
+#include "wifi_time.h" // wifiIsEnabled, wifiSetEnabled
 
 void resetSettingsNav(bool resetTopIndex);
 
-void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage startPage)
-{
-  g_settingsFlow.settingsReturnState = returnState;
-  g_settingsFlow.settingsReturnTab = returnTab;
-  g_settingsFlow.settingsReturnValid = true;
-  g_settingsFlow.settingsPage = startPage;
-
-  uiActionEnterState(UIState::SETTINGS, returnTab, true);
-  requestUIRedraw();
-}
-
-void uiSettingsHandle(InputState& input)
+void uiSettingsHandle(InputState &input)
 {
   if (g_settingsFlow.settingsPage == SettingsPage::SYSTEM)
   {
@@ -71,9 +60,11 @@ void uiSettingsHandle(InputState& input)
       return;
   }
 
-  auto backToReturnPage = [&]() -> bool {
+  auto backToReturnPage = [&]() -> bool
+  {
     if (g_settingsFlow.settingsPage == SettingsPage::DECAY_MODE ||
-        g_settingsFlow.settingsPage == SettingsPage::AUTO_SCREEN) {
+        g_settingsFlow.settingsPage == SettingsPage::AUTO_SCREEN)
+    {
       g_settingsFlow.settingsPage = g_settingsFlow.settingsReturnPage;
       requestUIRedraw();
       playBeep();
@@ -83,8 +74,10 @@ void uiSettingsHandle(InputState& input)
     return false;
   };
 
-  auto backToTopLevel = [&]() -> bool {
-    if (g_settingsFlow.settingsPage != SettingsPage::TOP) {
+  auto backToTopLevel = [&]() -> bool
+  {
+    if (g_settingsFlow.settingsPage != SettingsPage::TOP)
+    {
       g_settingsFlow.settingsPage = SettingsPage::TOP;
       requestUIRedraw();
       playBeep();
@@ -94,27 +87,19 @@ void uiSettingsHandle(InputState& input)
     return false;
   };
 
-  auto exitSettings = [&]() {
+  auto exitSettings = [&]()
+  {
     resetSettingsNav(true);
-
-    UIState retState = UIState::PET_SCREEN;
-    Tab     retTab   = Tab::TAB_PET;
-
-    if (g_settingsFlow.settingsReturnValid) {
-      retState = g_settingsFlow.settingsReturnState;
-      retTab   = g_settingsFlow.settingsReturnTab;
-    }
-
-    g_settingsFlow.settingsReturnValid = false;
-
-    uiActionEnterState(retState, retTab, true);
     playBeep();
+    closeSettingsAndReturn(input);
     clearInputLatch();
   };
 
   int move = input.encoderDelta;
-  if (input.upOnce) move = -1;
-  if (input.downOnce) move = 1;
+  if (input.upOnce)
+    move = -1;
+  if (input.downOnce)
+    move = 1;
 
   if (g_settingsFlow.settingsPage == SettingsPage::STATUS)
   {
@@ -126,18 +111,21 @@ void uiSettingsHandle(InputState& input)
       clearInputLatch();
       return;
     }
-  
+
     UiSettingsPages::Handle_STATUS(input, move);
     return;
   }
-    
-  if (assetOtaConfirmActive()) {
-    if (UiSettingsMenu::Handle(input, move)) {
+
+  if (assetOtaConfirmActive())
+  {
+    if (UiSettingsMenu::Handle(input, move))
+    {
       return;
     }
   }
 
-  if (input.menuOnce || input.escOnce) {
+  if (input.menuOnce || input.escOnce)
+  {
     if (backToReturnPage())
       return;
 
@@ -148,11 +136,13 @@ void uiSettingsHandle(InputState& input)
     return;
   }
 
-  if (UiSettingsMenu::Handle(input, move)) {
+  if (UiSettingsMenu::Handle(input, move))
+  {
     return;
   }
-    
-  if (g_settingsFlow.settingsPage == SettingsPage::CREDITS) {
+
+  if (g_settingsFlow.settingsPage == SettingsPage::CREDITS)
+  {
     return;
   }
 }

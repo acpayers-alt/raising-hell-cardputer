@@ -407,7 +407,7 @@ static void actGame_ImportBub(InputState &)
   char path[128];
   if (saveManagerImportLatestBubJson(path, sizeof(path)))
   {
-    ui_showMessage("Bub imported");
+    ui_showMessage("Pet imported");
     invalidateBackgroundCache();
     requestUIRedraw();
     Serial.printf("[UI] Import Bub OK path=%s\n", path);
