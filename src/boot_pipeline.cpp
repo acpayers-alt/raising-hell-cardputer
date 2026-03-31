@@ -1154,5 +1154,18 @@ void postBootInitTick()
   {
     g_ntpSaved = true;
     saveTimeAnchor();
+
+    // If boot was paused for time recovery, time is now valid and we may still
+    // be sitting on the splash/BOOT state without ever completing the normal
+    // post-boot landing. Finish that handoff now.
+    if (!g_bootLandingDeferredForAssetProvision &&
+        !g_bootLandingDone &&
+        g_app.uiState == UIState::BOOT)
+    {
+      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n",
+                    (int)s_bootFinalLandingState);
+      finalizeBootLanding();
+      return;
+    }
   }
 }

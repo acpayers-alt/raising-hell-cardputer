@@ -179,7 +179,6 @@ void saveManagerFullWipe()
   clearNvsNamespace("rh_settings");
   clearNvsNamespace("rh_wifi");
   clearNvsNamespace("rh_tz");
-  void saveManagerFullWipe();
 
   // --- Time ---
   clearTimeAnchor();
@@ -1366,6 +1365,15 @@ bool saveManagerLoad()
 
     Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
                   blankPetName ? 1 : 0, pet.name);
+
+    // --- PET NAME (once per boot) ---
+    static bool s_loggedPetNameThisBoot = false;
+
+    if (!s_loggedPetNameThisBoot && pet.name[0] != '\0')
+    {
+      Serial.printf("[PET] current '%s' lvl=%u xp=%lu type=%d\n", pet.name, (unsigned)pet.level, (unsigned long)pet.xp,
+                    (int)pet.type);
+    }
 
     if (appLifecycleLoadedSaveRequiresChoosePet(namePending, blankPetName))
     {

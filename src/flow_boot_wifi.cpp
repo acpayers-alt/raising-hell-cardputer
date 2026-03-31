@@ -540,6 +540,9 @@ void uiBootNtpWaitHandle(InputState &in)
 
   if (timeIsSynced())
   {
+    Serial.printf("[BOOTWIFI] NTP synced -> returning to BOOT afterOk=%d\n",
+                  (int)g_bootWizardAfterOkState);
+
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
@@ -549,6 +552,6 @@ void uiBootNtpWaitHandle(InputState &in)
     requestUIRedraw();
     return;
   }
-  
+    
   uiActionSwallowAll(in);
 }

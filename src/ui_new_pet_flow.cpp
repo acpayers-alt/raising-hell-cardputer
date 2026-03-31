@@ -1,6 +1,7 @@
 #include "ui_new_pet_flow.h"
 
 #include <string.h>
+#include <Arduino.h>
 
 #include "app_state.h"
 #include "graphics.h"
@@ -33,7 +34,8 @@ void finalizeNewPetFromName(InputState& in)
   g_textCaptureMode = false;
 
   pet.setName(g_pendingPetName[0] ? g_pendingPetName : "PET");
-
+  Serial.printf("[PET] named '%s'\n", pet.getName());
+  
   // Commit chosen type into the final saved pet
   pet.type = g_pendingPetType;
 

@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <string.h>
+#include <Arduino.h>
 
 #include "app_state.h"
 #include "graphics.h"
@@ -79,6 +80,7 @@ void uiNamePetHandle(InputState &in)
 
         pet.setName(g_pendingPetName);
         saveManagerMarkDirty();
+        Serial.printf("[PET] named '%s'\n", pet.getName());
 
         g_namePetRenameMode = false;
         g_settingsFlow.settingsPage = SettingsPage::GAME;
