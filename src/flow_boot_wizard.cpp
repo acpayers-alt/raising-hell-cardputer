@@ -3,12 +3,12 @@
 #include "flow_boot_wifi.h"
 #include "launcher_wifi_import.h"
 #include "ui_actions.h"
+#include "ui_state_wifi_connect_wait.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include "ui_state_wifi_connect_wait.h"
 
-UIState g_bootWizardAfterOkState = UIState::BOOT;
-Tab g_bootWizardAfterOkTab = Tab::TAB_PET;
+extern UIState g_bootWizardAfterOkState;
+extern Tab g_bootWizardAfterOkTab;
 
 void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
 {
@@ -16,12 +16,6 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
   g_bootWizardAfterOkTab = afterOkTab;
 
   Serial.println("[BOOTWIZ] bootWizardBegin entered");
-
-  String importedSsid;
-  String importedPwd;
-
-  const bool imported = launcherImportWifiCreds(importedSsid, importedPwd);
-  Serial.printf("[BOOTWIZ] launcherImportWifiCreds=%d ssid='%s'\n", imported ? 1 : 0, importedSsid.c_str());
 
   // Try stored creds first.
   {

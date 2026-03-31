@@ -23,6 +23,9 @@
 
 // --- End of includes
 
+extern UIState g_bootWizardAfterOkState;
+extern Tab g_bootWizardAfterOkTab;
+
 uint8_t g_controlsHelpSeen = 0;
 
 static uint32_t s_controlsHelpEnterMs = 0;
@@ -72,11 +75,11 @@ void controlsHelpDismiss()
   // boot wizard entry function, not directly into a wizard state.
   if (s_controlsHelpReturn.state == UIState::BOOT_WIFI_PROMPT)
   {
-    bootWizardBegin(UIState::CHOOSE_PET, s_controlsHelpReturn.tab);
+    bootWizardBegin(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
     requestFullUIRedraw();
     return;
   }
-
+  
   if (s_controlsHelpReturn.state == UIState::CHOOSE_PET)
 {
   g_choosePetInputUnlockMs = millis() + 350;

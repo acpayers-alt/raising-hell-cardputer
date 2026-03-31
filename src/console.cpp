@@ -15,6 +15,8 @@
 #include "asset_ota_config.h"
 #include "asset_provision_request.h"
 #include "boot_firmware_marker.h"
+#include "boot_pipeline.h"
+#include "controls_help_state.h"
 #include "save_manager.h"
 #include "sdcard.h"
 #include "wifi_power.h"
@@ -545,6 +547,11 @@ static void execLine(char *line)
     logLine("Recovery / repair:");
     logLine("  name <pet name>     set pet name");
     logLine("  saveheal            repair save name/pending-flag issues");
+    logLine("  bootflags           show boot/recovery flags");
+    logLine("  bootheal            clear common stuck boot flags");
+    logLine("  clearnamepending    clear name-pending flag");
+    logLine("  clearpostprov       clear post-provision help flag");
+    logLine("  clearbootsetup      clear boot setup pending flag");
     logLine("  assetstatus         show asset OTA/debug status");
     logLine("  assetflag           show asset provision boot flag");
     logLine("  assetflag clear     clear asset provision boot flag");
@@ -1290,6 +1297,86 @@ static void execLine(char *line)
     return;
   }
 
+  if (!strcmp(argv[0], "bootflags"))
+  {
+    logLine("Boot / recovery flags:");
+    logf("  save exists:        %s", saveManagerSaveFileExists() ? "YES" : "NO");
+    logf("  import exists:      %s", saveManagerHasImportableBubJson() ? "YES" : "NO");
+    logf("  name pending:       %s", saveManagerNamePendingFlagExists() ? "SET" : "CLEAR");
+    logf("  asset boot flag:    %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
+    logf("  boot setup pending: %s", bootSetupPendingFlagExists() ? "SET" : "CLEAR");
+    logf("  postprov help:      %s", bootPostProvisionControlsHelpPending() ? "SET" : "CLEAR");
+    logf("  controls help seen: %s", g_controlsHelpSeen ? "YES" : "NO");
+    return;
+  }
+
+  if (!strcmp(argv[0], "clearnamepending"))
+  {
+    const bool before = saveManagerNamePendingFlagExists();
+    saveManagerClearNamePendingFlag();
+    const bool after = saveManagerNamePendingFlagExists();
+
+    logf("name pending: before=%s after=%s",
+         before ? "SET" : "CLEAR",
+         after ? "SET" : "CLEAR");
+    return;
+  }
+
+  if (!strcmp(argv[0], "clearpostprov"))
+  {
+    const bool before = bootPostProvisionControlsHelpPending();
+    bootPostProvisionControlsHelpClear();
+    const bool after = bootPostProvisionControlsHelpPending();
+
+    logf("postprov help: before=%s after=%s",
+         before ? "SET" : "CLEAR",
+         after ? "SET" : "CLEAR");
+    return;
+  }
+
+  if (!strcmp(argv[0], "clearbootsetup"))
+  {
+    const bool before = bootSetupPendingFlagExists();
+    bootSetupClearPendingFlag();
+    const bool after = bootSetupPendingFlagExists();
+
+    logf("boot setup pending: before=%s after=%s",
+         before ? "SET" : "CLEAR",
+         after ? "SET" : "CLEAR");
+    return;
+  }
+
+  if (!strcmp(argv[0], "bootheal"))
+  {
+    const bool namePendingBefore = saveManagerNamePendingFlagExists();
+    const bool postProvBefore = bootPostProvisionControlsHelpPending();
+    const bool bootSetupBefore = bootSetupPendingFlagExists();
+
+    saveManagerClearNamePendingFlag();
+    bootPostProvisionControlsHelpClear();
+    bootSetupClearPendingFlag();
+
+    const bool namePendingAfter = saveManagerNamePendingFlagExists();
+    const bool postProvAfter = bootPostProvisionControlsHelpPending();
+    const bool bootSetupAfter = bootSetupPendingFlagExists();
+
+    logLine("bootheal:");
+    logf("  name pending:       %s -> %s",
+         namePendingBefore ? "SET" : "CLEAR",
+         namePendingAfter ? "SET" : "CLEAR");
+    logf("  postprov help:      %s -> %s",
+         postProvBefore ? "SET" : "CLEAR",
+         postProvAfter ? "SET" : "CLEAR");
+    logf("  boot setup pending: %s -> %s",
+         bootSetupBefore ? "SET" : "CLEAR",
+         bootSetupAfter ? "SET" : "CLEAR");
+
+    if (!namePendingBefore && !postProvBefore && !bootSetupBefore)
+      logLine("  no changes");
+
+    return;
+  }
+  
   // MONITOR
   if (!strcmp(argv[0], "mon"))
   {

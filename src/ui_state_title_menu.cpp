@@ -152,4 +152,10 @@ void uiTitleMenuHandle(InputState& in)
   }
 
   swallowTitleInput(in);
+  
+  Serial.printf("[TITLE] enter idx=%d continue=%d new=%d import=%d\n",
+    g_titleMenuIndex,
+    saveManagerSaveFileExists() ? 1 : 0,
+    1,
+    saveManagerHasImportableBubJson() ? 1 : 0);
 }

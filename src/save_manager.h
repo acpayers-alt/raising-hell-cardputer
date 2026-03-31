@@ -63,6 +63,7 @@ void saveManagerDeletePetOnly();
 void saveManagerStampBirthNow();
 
 void saveManagerClearNamePendingFlag();
+bool saveManagerNamePendingFlagExists();
 
 bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize);
 bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize);

@@ -34,6 +34,7 @@
 // App / lifecycle
 #include "app_lifecycle.h"
 #include "app_state.h"
+#include "boot_pipeline.h"
 
 // Storage / SD
 #include "sdcard.h"
@@ -550,6 +551,7 @@ static void printState(const char *tag)
 }
 
 void saveManagerClearNamePendingFlag() { clearNamePendingFlag(); }
+bool saveManagerNamePendingFlagExists() { return namePendingFlagExists(); }
 
 // Back-compat: older code called this name.
 static void removeNamePendingFlag() { clearNamePendingFlag(); }
@@ -1838,7 +1840,12 @@ void saveManagerFactoryReset()
   clearTimeAnchor();
   invalidateTimeNow();
 
-  writeNamePendingFlag();
+  // Clear ALL transient boot/new-pet flow flags so factory reset always
+  // reboots into a clean first-boot/title-menu state.
+  clearNamePendingFlag();
+  bootSetupClearPendingFlag();
+  bootPostProvisionControlsHelpClear();
+
   // Also wipe the EEPROM-backed inventory mirror so a brand-new pet cannot
   // inherit inventory across a factory reset.
   g_app.inventory.wipePersistedEeprom();
