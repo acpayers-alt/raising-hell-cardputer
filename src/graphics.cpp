@@ -87,6 +87,7 @@
 #include "ui_play_menu.h"
 #include "ui_power_menu.h"
 #include "ui_settings_menu.h"
+#include "ui_settings_pages.h"
 #include "ui_sleep_menu.h"
 #include "ui_state_import_pet_list.h"
 
@@ -2043,6 +2044,78 @@ static void drawSettingsTopMenu()
   spr.setTextDatum(TL_DATUM);
 }
 
+static void drawNewPetConfirmOverlay()
+{
+  const uint16_t modalOutline = uiModalOutline(pet.type);
+
+  const int pad = 10;
+  const int boxW = screenW - (pad * 2);
+  const int boxH = 82;
+  const int x = pad;
+  const int y = (screenH - boxH) / 2;
+
+  spr.fillRoundRect(x, y, boxW, boxH, 8, TFT_BLACK);
+  spr.drawRoundRect(x, y, boxW, boxH, 8, modalOutline);
+
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("Store current pet first?", screenW / 2, y + 8);
+
+  spr.setTextFont(1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.drawString("Save slot will be overwritten", screenW / 2, y + 28);
+  spr.drawString("Would you like to store your pet?", screenW / 2, y + 40);
+
+  const int pillY = y + 48;
+  const int pillH = 22;
+  const int gap = 10;
+
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  const char *yesLabel = "YES";
+  const char *noLabel = "NO";
+
+  const int padX = 14;
+  const int yesW = spr.textWidth(yesLabel) + padX;
+  const int noW = spr.textWidth(noLabel) + padX;
+  const int totalW = yesW + gap + noW;
+  const int startX = (screenW - totalW) / 2;
+
+  const bool yesSel = (UiSettingsPages::GameNewPetConfirmIndex() == 0);
+  const bool noSel = (UiSettingsPages::GameNewPetConfirmIndex() == 1);
+
+  const uint16_t selFill = uiPillFillSelected(pet.type);
+  const uint16_t selOut = uiPillOutline(pet.type);
+
+  const uint16_t yesFill = yesSel ? selFill : TFT_BLACK;
+  const uint16_t noFill = noSel ? selFill : TFT_BLACK;
+  const uint16_t yesOut = yesSel ? selOut : TFT_DARKGREY;
+  const uint16_t noOut = noSel ? selOut : TFT_DARKGREY;
+
+  spr.fillRoundRect(startX, pillY, yesW, pillH, 8, yesFill);
+  spr.drawRoundRect(startX, pillY, yesW, pillH, 8, yesOut);
+
+  spr.fillRoundRect(startX + yesW + gap, pillY, noW, pillH, 8, noFill);
+  spr.drawRoundRect(startX + yesW + gap, pillY, noW, pillH, 8, noOut);
+
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(TFT_WHITE, yesFill);
+  spr.drawString(yesLabel, startX + (yesW / 2), pillY + (pillH / 2));
+
+  spr.setTextColor(TFT_WHITE, noFill);
+  spr.drawString(noLabel, startX + yesW + gap + (noW / 2), pillY + (pillH / 2));
+
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.setTextDatum(BC_DATUM);
+  spr.drawString("ENTER: Continue   MENU/ESC: Cancel", screenW / 2, y + boxH - 6);
+  spr.setTextDatum(TL_DATUM);
+}
+
 static void drawGameOptionsMenu()
 {
   drawTopBar();
@@ -2053,8 +2126,9 @@ static void drawGameOptionsMenu()
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const char *renameLine = "Rename Pet";
-  const char *exportLine = "Export Pet";
-  const char *importLine = "Import Pet";
+  const char *storeLine = "Store Pet";
+  const char *storedLine = "Stored Pets";
+  const char *newPetLine = "New Pet";
 
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
@@ -2065,8 +2139,8 @@ static void drawGameOptionsMenu()
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {renameLine, exportLine, importLine, decayLine, deathLine, ledLine};
-  const int totalItems = 6;
+  const char *labels[] = {renameLine, storeLine, storedLine, newPetLine, decayLine, deathLine, ledLine};
+  const int totalItems = 7;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
@@ -2106,6 +2180,11 @@ static void drawGameOptionsMenu()
 
     spr.setTextColor(textCol, fill);
     spr.drawString(labels[i], boxX + 10, ty);
+  }
+  if (UiSettingsPages::GameNewPetConfirmActive())
+
+  {
+    drawNewPetConfirmOverlay();
   }
 }
 
@@ -6035,7 +6114,7 @@ void drawTitleMenuScreen(bool redrawBg)
   char continueBuf[40];
   snprintf(continueBuf, sizeof(continueBuf), hasSave ? "Continue: %s" : "Continue", petName);
 
-  const char *labels[3] = {continueBuf, "Import Pet", "Settings"};
+  const char *labels[3] = {continueBuf, "Resume Pet", "Settings"};
   const bool enabled[3] = {hasSave, hasImport, true};
 
   // Menu panel

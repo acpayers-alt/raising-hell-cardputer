@@ -136,6 +136,12 @@ void uiSettingsHandle(InputState &input)
     return;
   }
 
+  if (g_settingsFlow.settingsPage == SettingsPage::GAME &&
+    UiSettingsPages::GameNewPetConfirmActive())
+{
+  UiSettingsPages::Handle_GAME(input, move);
+  return;
+}
   if (UiSettingsMenu::Handle(input, move))
   {
     return;

@@ -22,6 +22,7 @@
 #include "ui_input_utils.h" // uiDrainKb
 #include "ui_runtime.h"
 #include "ui_settings_actions.h"
+#include "ui_settings_pages.h"
 
 // --- UI / Flow ---
 #include "menu_actions.h"
@@ -421,6 +422,15 @@ static void actGame_ImportBub(InputState &)
   playBeep();
   clearInputLatch();
 }
+
+static void actGame_NewPet(InputState &)
+{
+  UiSettingsPages::ShowGameNewPetConfirm();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 static void actGame_DecayMode(InputState &)
 {
   g_app.decayModeIndex = (int)saveManagerGetDecayMode();
@@ -542,12 +552,13 @@ static MenuItem kWifiItems[] = {
 #endif
 
 static MenuItem kGameItems[] = {
-    {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
-    {"Store Pet", actGame_ExportBub, nullptr, nullptr, nullptr},
-    {"Stored Pets", actGame_ImportBub, nullptr, nullptr, nullptr},
-    {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
-    {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
-    {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
+  {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
+  {"Store Pet", actGame_ExportBub, nullptr, nullptr, nullptr},
+  {"Stored Pets", actGame_ImportBub, nullptr, nullptr, nullptr},
+  {"New Pet", actGame_NewPet, nullptr, nullptr, nullptr},
+  {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
+  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+  {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {
