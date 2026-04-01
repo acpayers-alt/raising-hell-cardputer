@@ -5782,7 +5782,7 @@ void uiDrawLevelUpPopup()
 // ============================================================================
 // Utility: message overlay
 // ============================================================================
-void ui_showMessage(const char *msg)
+static void uiShowToastInternal(const char *msg, uint32_t durationMs)
 {
   if (!msg)
     return;
@@ -5791,10 +5791,24 @@ void ui_showMessage(const char *msg)
   g_toastMsg[sizeof(g_toastMsg) - 1] = '\0';
 
   g_toastActive = true;
-  g_toastUntilMs = millis() + 900; // show for ~0.9s
+  g_toastUntilMs = durationMs ? (millis() + durationMs) : 0;
 
-  // Ensure the next render paints it
   requestUIRedraw();
+}
+
+void ui_showMessage(const char *msg)
+{
+  uiShowToastInternal(msg, 900);
+}
+
+void ui_showTimedMessage(const char *msg, uint32_t durationMs)
+{
+  uiShowToastInternal(msg, durationMs);
+}
+
+void ui_showSuccessMessage(const char *msg)
+{
+  uiShowToastInternal(msg, 1200);
 }
 
 static void uiDrawToastOverlay()
@@ -5802,14 +5816,18 @@ static void uiDrawToastOverlay()
   if (!g_toastActive)
     return;
 
-  const uint32_t now = millis();
-  if ((int32_t)(now - g_toastUntilMs) >= 0)
-  {
-    g_toastActive = false;
-    g_toastMsg[0] = '\0';
-    return;
-  }
-
+    const uint32_t now = millis();
+    if (g_toastUntilMs != 0 && (int32_t)(now - g_toastUntilMs) >= 0)
+    {
+      g_toastActive = false;
+      g_toastUntilMs = 0;
+      g_toastMsg[0] = '\0';
+  
+      // Force one clean repaint so the old toast pixels do not linger.
+      requestFullUIRedraw();
+      return;
+    }
+    
   if (!isScreenOn())
     return;
 

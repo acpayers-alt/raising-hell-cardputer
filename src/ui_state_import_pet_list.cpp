@@ -69,10 +69,10 @@ void uiImportPetListHandle(InputState &in)
                                      exportCurrentPetFirst))
       {
         playBeep();
-        ui_showMessage("Pet Resumed");
+        ui_showSuccessMessage("Pet Resumed");
         uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
       }
-      else
+            else
       {
         playBeep();
         ui_showMessage(exportCurrentPetFirst ? "Resume Failed" : "Import failed");
