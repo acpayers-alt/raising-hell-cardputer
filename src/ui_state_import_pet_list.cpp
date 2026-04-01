@@ -14,6 +14,7 @@ constexpr int kMaxPetExports = 24;
 PetExportEntry s_entries[kMaxPetExports];
 int s_entryCount = 0;
 int s_importIndex = 0;
+bool s_confirming = false;
 
 static void swallowImportInput(InputState& in)
 {
@@ -23,18 +24,86 @@ static void swallowImportInput(InputState& in)
   inputForceClear();
   clearInputLatch();
 }
-}
+} // namespace
 
 void uiImportPetListOnEnter(InputState& in)
 {
   s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
   s_importIndex = 0;
+  s_confirming = false;
   swallowImportInput(in);
   requestFullUIRedraw();
 }
 
 void uiImportPetListHandle(InputState& in)
 {
+  if (s_confirming)
+  {
+    // YES: export current pet first, then import selected pet
+    if (in.leftOnce || in.upOnce)
+    {
+      char importedPath[128];
+      if (saveManagerImportBubAtPath(
+              s_entries[s_importIndex].path,
+              importedPath,
+              sizeof(importedPath),
+              true))
+      {
+        playBeep();
+        ui_showMessage("Pet imported");
+        uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+      }
+      else
+      {
+        playBeep();
+        ui_showMessage("Import failed");
+        requestUIRedraw();
+      }
+
+      s_confirming = false;
+      swallowImportInput(in);
+      return;
+    }
+
+    // NO: import selected pet without exporting current pet first
+    if (in.rightOnce || in.downOnce)
+    {
+      char importedPath[128];
+      if (saveManagerImportBubAtPath(
+              s_entries[s_importIndex].path,
+              importedPath,
+              sizeof(importedPath),
+              false))
+      {
+        playBeep();
+        ui_showMessage("Pet imported");
+        uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+      }
+      else
+      {
+        playBeep();
+        ui_showMessage("Import failed");
+        requestUIRedraw();
+      }
+
+      s_confirming = false;
+      swallowImportInput(in);
+      return;
+    }
+
+    // Cancel confirm prompt
+    if (in.menuOnce || in.escOnce)
+    {
+      s_confirming = false;
+      requestFullUIRedraw();
+      swallowImportInput(in);
+      return;
+    }
+
+    clearInputLatch();
+    return;
+  }
+
   int move = 0;
   if (in.upOnce || in.leftOnce || in.encoderDelta < 0) move = -1;
   if (in.downOnce || in.rightOnce || in.encoderDelta > 0) move = +1;
@@ -74,26 +143,19 @@ void uiImportPetListHandle(InputState& in)
     return;
   }
 
-  char importedPath[128];
-  if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), true))
-  {
-    playBeep();
-    ui_showMessage("Pet imported");
-    uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
-  }
-  else
-  {
-    playBeep();
-    ui_showMessage("Import failed");
-    requestUIRedraw();
-  }
-
+  s_confirming = true;
+  requestFullUIRedraw();
   swallowImportInput(in);
 }
 
 int uiImportPetListCount()
 {
   return s_entryCount;
+}
+
+int uiImportPetListVisibleCount()
+{
+  return (s_entryCount < 5) ? s_entryCount : 5;
 }
 
 const PetExportEntry& uiImportPetListGet(int idx)
@@ -104,4 +166,9 @@ const PetExportEntry& uiImportPetListGet(int idx)
 int uiImportPetListSelected()
 {
   return s_importIndex;
+}
+
+bool uiImportPetListConfirming()
+{
+  return s_confirming;
 }

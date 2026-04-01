@@ -795,7 +795,7 @@ SavePayload makeDefaultSavePayload()
   p.pet.xp = 0;
   p.pet.evoStage = 0;
 
-  strcpy(p.pet.name, "Baby Demon");
+  strcpy(p.pet.name, "Bub");
 
   memset(&p.inv, 0, sizeof(p.inv));
   p.inv.selectedIndex = 0;
@@ -1967,6 +1967,10 @@ bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
 
   DynamicJsonDocument doc(4096);
 
+  // Flavor text / warning for users who open .bub files manually.
+  // Keep this as valid JSON so imports continue to work safely.
+  doc["_warning"] = "Changing these values will bring on the curse. You have been warned.";
+  
   doc["format"] = EXPORT_MAGIC;
   doc["exportVersion"] = EXPORT_VERSION;
   doc["createdAtEpoch"] = nowEpoch;

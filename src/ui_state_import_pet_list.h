@@ -1,12 +1,13 @@
 #pragma once
+
 #include "input.h"
-
-
-struct PetExportEntry;
-
-int uiImportPetListCount();
-const PetExportEntry& uiImportPetListGet(int idx);
-int uiImportPetListSelected();
+#include "save_manager.h"
 
 void uiImportPetListOnEnter(InputState& in);
 void uiImportPetListHandle(InputState& in);
+
+int uiImportPetListCount();
+int uiImportPetListVisibleCount();
+const PetExportEntry& uiImportPetListGet(int idx);
+int uiImportPetListSelected();
+bool uiImportPetListConfirming();

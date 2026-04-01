@@ -130,7 +130,7 @@ void uiTitleMenuHandle(InputState& in)
       swallowTitleInput(in);
       return;
     }
-    
+        
     case TITLE_SETTINGS:
     {
       playBeep();

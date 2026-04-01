@@ -76,6 +76,7 @@
 #include "settings_state.h"
 #include "system_status_state.h"
 #include "time_state.h"
+#include "ui_state_import_pet_list.h"
 #include "ui_state_title_menu.h"
 #include "user_toggles_state.h"
 #include "wifi_setup_state.h"
@@ -5951,39 +5952,64 @@ void drawImportPetListScreen(bool redrawBg)
   if (redrawBg)
     spr.fillSprite(TFT_BLACK);
 
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextColor(TFT_WHITE);
-  spr.drawString("Pet Exports", SCREEN_W / 2, 4, 2);
+  // 🔥 INSERT IT RIGHT HERE 🔥
+  if (uiImportPetListConfirming())
+  {
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+
+    spr.drawString("Export current pet?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+
+    spr.setTextColor(TFT_YELLOW);
+    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+
+    return;
+  }
 
   const int rowH = 18;
   const int startY = 20;
 
   const int count = uiImportPetListCount();
+  const int visibleCount = uiImportPetListVisibleCount();
   const int selectedIdx = uiImportPetListSelected();
 
-  for (int i = 0; i < count && i < 5; ++i)
+  for (int i = 0; i < visibleCount; ++i)
   {
     const int y = startY + (i * rowH);
     const bool selected = (i == selectedIdx);
 
-    const auto &e = uiImportPetListGet(i);
+    const PetExportEntry &e = uiImportPetListGet(i);
 
     spr.setTextDatum(TL_DATUM);
+
+    // --- draw name ---
     spr.setTextColor(selected ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString(e.name, 6, y, 2);
+    int nameWidth = spr.drawString(e.name, 6, y, 2);
 
+    // --- build meta string ---
     char meta[48];
-    snprintf(meta, sizeof(meta), "%s  %lu", e.petType, (unsigned long)e.createdAtEpoch);
 
+    time_t t = (time_t)e.createdAtEpoch;
+    struct tm tmBuf;
+    localtime_r(&t, &tmBuf);
+
+    // Format: MM/DD HH:MM
+    snprintf(meta, sizeof(meta), "%s  %02d/%02d %02d:%02d", e.petType, tmBuf.tm_mon + 1, tmBuf.tm_mday, tmBuf.tm_hour,
+             tmBuf.tm_min);
+
+    // --- draw meta to the right of name ---
     spr.setTextColor(selected ? TFT_YELLOW : TFT_LIGHTGREY);
-    spr.drawString(meta, 10, y + 9, 1);
-  }
+    spr.drawString(meta, 6 + nameWidth + 6, y + 5, 1);
 
-  if (uiImportPetListCount() == 0)
-  {
-    spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(TFT_DARKGREY);
-    spr.drawString("No exports found", SCREEN_W / 2, SCREEN_H / 2, 2);
+    if (count == 0)
+    {
+      spr.setTextDatum(TC_DATUM);
+      spr.setTextColor(TFT_DARKGREY);
+      spr.drawString("No exports found", SCREEN_W / 2, SCREEN_H / 2, 2);
+    }
   }
 }
 
