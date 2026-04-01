@@ -15,6 +15,7 @@ PetExportEntry s_entries[kMaxPetExports];
 int s_entryCount = 0;
 int s_importIndex = 0;
 bool s_confirming = false;
+int s_confirmIndex = 0; // 0 = YES, 1 = NO
 
 static void swallowImportInput(InputState &in)
 {
@@ -29,6 +30,7 @@ static void swallowImportInput(InputState &in)
 void uiImportPetListOnEnter(InputState &in)
 {
   s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
+  s_confirming = false;
   s_importIndex = 0;
   s_confirming = false;
   swallowImportInput(in);
@@ -39,33 +41,32 @@ void uiImportPetListHandle(InputState &in)
 {
   if (s_confirming)
   {
-    // YES: export current pet first, then import selected pet
     if (in.leftOnce || in.upOnce)
     {
-      char importedPath[128];
-      if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), true))
-      {
-        playBeep();
-        ui_showMessage("Pet Resumed");
-        uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
-      }
-      else
-      {
-        playBeep();
-        ui_showMessage("Resume Failed");
-        requestUIRedraw();
-      }
-
-      s_confirming = false;
+      s_confirmIndex = 0;
+      playBeep();
+      requestFullUIRedraw();
       swallowImportInput(in);
       return;
     }
 
-    // NO: import selected pet without exporting current pet first
     if (in.rightOnce || in.downOnce)
     {
+      s_confirmIndex = 1;
+      playBeep();
+      requestFullUIRedraw();
+      swallowImportInput(in);
+      return;
+    }
+
+    const bool activateConfirm = in.selectOnce || in.encoderPressOnce;
+    if (activateConfirm)
+    {
+      const bool exportCurrentPetFirst = (s_confirmIndex == 0);
+
       char importedPath[128];
-      if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), false))
+      if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath),
+                                     exportCurrentPetFirst))
       {
         playBeep();
         ui_showMessage("Pet Resumed");
@@ -74,7 +75,7 @@ void uiImportPetListHandle(InputState &in)
       else
       {
         playBeep();
-        ui_showMessage("Import failed");
+        ui_showMessage(exportCurrentPetFirst ? "Resume Failed" : "Import failed");
         requestUIRedraw();
       }
 
@@ -87,6 +88,7 @@ void uiImportPetListHandle(InputState &in)
     if (in.menuOnce || in.escOnce)
     {
       s_confirming = false;
+      s_confirmIndex = 0;
       requestFullUIRedraw();
       swallowImportInput(in);
       return;
@@ -140,6 +142,7 @@ void uiImportPetListHandle(InputState &in)
   }
 
   s_confirming = true;
+  s_confirmIndex = 0;
   requestFullUIRedraw();
   swallowImportInput(in);
 }
@@ -153,3 +156,5 @@ const PetExportEntry &uiImportPetListGet(int idx) { return s_entries[idx]; }
 int uiImportPetListSelected() { return s_importIndex; }
 
 bool uiImportPetListConfirming() { return s_confirming; }
+
+int uiImportPetListConfirmIndex() { return s_confirmIndex; }

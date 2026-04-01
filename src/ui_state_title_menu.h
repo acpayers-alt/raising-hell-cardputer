@@ -6,3 +6,6 @@ extern int g_titleMenuIndex;
 
 void uiTitleMenuOnEnter(InputState& in);
 void uiTitleMenuHandle(InputState& in);
+
+bool uiTitleMenuHasSave();
+bool uiTitleMenuHasImport();

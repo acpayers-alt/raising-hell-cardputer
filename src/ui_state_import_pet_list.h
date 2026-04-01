@@ -11,3 +11,4 @@ int uiImportPetListVisibleCount();
 const PetExportEntry& uiImportPetListGet(int idx);
 int uiImportPetListSelected();
 bool uiImportPetListConfirming();
+int uiImportPetListConfirmIndex();

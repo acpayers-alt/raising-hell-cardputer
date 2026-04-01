@@ -28,6 +28,7 @@
 #include "menu_actions.h"
 #include "name_entry_state.h"
 #include "settings_flow_state.h"
+#include "settings_nav_state.h"
 
 // --- Networking / Time ---
 #include "wifi_power.h"
@@ -209,6 +210,15 @@ static void actTop_Credits(InputState &)
   requestUIRedraw();
   playBeep();
   clearInputLatch();
+}
+
+static void actTop_MainMenu(InputState &in)
+{
+  resetSettingsNav(true);
+  g_settingsFlow.settingsPage = SettingsPage::TOP;
+  g_settingsFlow.settingsReturnValid = false;
+  playBeep();
+  uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, in, 120);
 }
 
 // ------------------------------------------------------------
@@ -405,20 +415,8 @@ static void actGame_ExportBub(InputState &)
 
 static void actGame_ImportBub(InputState &)
 {
-  char path[128];
-  if (saveManagerImportLatestBubJson(path, sizeof(path)))
-  {
-    ui_showMessage("Pet resumed");
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    Serial.printf("[UI] Import Pet OK path=%s\n", path);
-  }
-  else
-  {
-    ui_showMessage("No valid export");
-    Serial.println("[UI] Import Pet FAILED");
-  }
-
+  uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+  requestFullUIRedraw();
   playBeep();
   clearInputLatch();
 }
@@ -499,14 +497,15 @@ static MenuItem kSystemItems[] = {
 // Menu definitions
 // ------------------------------------------------------------
 static MenuItem kTopItems[] = {
-    {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
-    {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
-    {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
-    {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
-    {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
-    {"Console", actTop_Console, nullptr, nullptr, enConsole},
-    {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
-    {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
+  {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
+  {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
+  {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
+  {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
+  {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
+  {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
+  {"Console", actTop_Console, nullptr, nullptr, enConsole},
+  {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
+  {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kScreenItems[] = {

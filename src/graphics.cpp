@@ -1965,11 +1965,10 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {nullptr, // 0 => volumeLine
-                                       "Controls",       "Screen Settings >", "System Settings >",
-                                       "Game Options >", "Console >",         "System Status >",
-                                       "Credits"};
+                                       "Controls",  "Screen Settings >", "System Settings >", "Game Options >",
+                                       "Main Menu", "Console >",         "System Status >",   "Credits"};
 
-  const int totalItems = 8;
+  const int totalItems = 9;
 
   g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
@@ -6031,22 +6030,22 @@ void drawImportPetListScreen(bool redrawBg)
   if (redrawBg)
     spr.fillSprite(TFT_BLACK);
 
-  // 🔥 INSERT IT RIGHT HERE 🔥
-  if (uiImportPetListConfirming())
-  {
-    spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(TFT_WHITE);
-
-    spr.drawString("Export current pet?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
-
-    spr.setTextColor(TFT_YELLOW);
-    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
-
-    spr.setTextColor(TFT_WHITE);
-    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
-
-    return;
-  }
+    if (uiImportPetListConfirming())
+    {
+      const int confirmIndex = uiImportPetListConfirmIndex();
+  
+      spr.setTextDatum(TC_DATUM);
+      spr.setTextColor(TFT_WHITE);
+      spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+  
+      spr.setTextColor(confirmIndex == 0 ? TFT_YELLOW : TFT_WHITE);
+      spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+  
+      spr.setTextColor(confirmIndex == 1 ? TFT_YELLOW : TFT_WHITE);
+      spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+  
+      return;
+    }
 
   const int rowH = 18;
   const int startY = 20;
@@ -6107,14 +6106,14 @@ void drawTitleMenuScreen(bool redrawBg)
       spr.fillSprite(TFT_BLACK);
   }
 
-  const bool hasSave = saveManagerSaveFileExists();
-  const bool hasImport = saveManagerHasImportableBubJson();
+  const bool hasSave = uiTitleMenuHasSave();
+  const bool hasImport = uiTitleMenuHasImport();
   const char *petName = (hasSave && pet.getName()[0]) ? pet.getName() : "No Save";
 
   char continueBuf[40];
   snprintf(continueBuf, sizeof(continueBuf), hasSave ? "Continue: %s" : "Continue", petName);
 
-  const char *labels[3] = {continueBuf, "Resume Pet", "Settings"};
+  const char *labels[3] = {continueBuf, "Pet Storage", "Settings"};
   const bool enabled[3] = {hasSave, hasImport, true};
 
   // Menu panel

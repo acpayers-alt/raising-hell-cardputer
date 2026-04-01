@@ -2,15 +2,14 @@
 
 #include <Arduino.h>
 
-#include "settings_flow_state.h"
 #include "app_state.h"
 #include "graphics.h"
 #include "input.h"
 #include "save_manager.h"
+#include "settings_flow_state.h"
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
-#include "settings_flow_state.h"
 
 int g_titleMenuIndex = 0;
 
@@ -18,9 +17,22 @@ namespace
 {
 constexpr int kTitleMenuCount = 3;
 
-enum TitleMenuItem : int {
+static bool s_titleHasSave = false;
+static bool s_titleHasImport = false;
+
+bool uiTitleMenuHasSave() { return s_titleHasSave; }
+bool uiTitleMenuHasImport() { return s_titleHasImport; }
+
+static void refreshTitleMenuAvailability()
+{
+  s_titleHasSave = saveManagerSaveFileExists();
+  s_titleHasImport = saveManagerHasImportableBubJson();
+}
+
+enum TitleMenuItem : int
+{
   TITLE_CONTINUE = 0,
-  TITLE_IMPORT   = 1,
+  TITLE_IMPORT = 1,
   TITLE_SETTINGS = 2,
 };
 
@@ -28,18 +40,25 @@ static bool titleItemEnabled(int idx)
 {
   switch (idx)
   {
-    case TITLE_CONTINUE: return saveManagerSaveFileExists();
-    case TITLE_IMPORT:   return saveManagerHasImportableBubJson();
-    case TITLE_SETTINGS: return true;
-    default:             return false;
+  case TITLE_CONTINUE:
+    return s_titleHasSave;
+  case TITLE_IMPORT:
+    return s_titleHasImport;
+  case TITLE_SETTINGS:
+    return true;
+  default:
+    return false;
   }
 }
 
 static int titleFirstEnabledItem()
 {
-  if (titleItemEnabled(TITLE_CONTINUE)) return TITLE_CONTINUE;
-  if (titleItemEnabled(TITLE_IMPORT))   return TITLE_IMPORT;
-  if (titleItemEnabled(TITLE_SETTINGS)) return TITLE_SETTINGS;
+  if (titleItemEnabled(TITLE_CONTINUE))
+    return TITLE_CONTINUE;
+  if (titleItemEnabled(TITLE_IMPORT))
+    return TITLE_IMPORT;
+  if (titleItemEnabled(TITLE_SETTINGS))
+    return TITLE_SETTINGS;
   return TITLE_SETTINGS;
 }
 
@@ -49,8 +68,10 @@ static int titleStepEnabled(int startIdx, int dir)
   for (int i = 0; i < kTitleMenuCount; ++i)
   {
     idx += dir;
-    if (idx < 0) idx = kTitleMenuCount - 1;
-    if (idx >= kTitleMenuCount) idx = 0;
+    if (idx < 0)
+      idx = kTitleMenuCount - 1;
+    if (idx >= kTitleMenuCount)
+      idx = 0;
 
     if (titleItemEnabled(idx))
       return idx;
@@ -58,7 +79,7 @@ static int titleStepEnabled(int startIdx, int dir)
   return startIdx;
 }
 
-static void swallowTitleInput(InputState& in)
+static void swallowTitleInput(InputState &in)
 {
   while (in.kbHasEvent())
     (void)in.kbPop();
@@ -69,22 +90,25 @@ static void swallowTitleInput(InputState& in)
 }
 } // namespace
 
-void uiTitleMenuOnEnter(InputState& in)
+void uiTitleMenuOnEnter(InputState &in)
 {
   swallowTitleInput(in);
+  refreshTitleMenuAvailability();
 
   if (!titleItemEnabled(g_titleMenuIndex))
     g_titleMenuIndex = titleFirstEnabledItem();
 }
 
-void uiTitleMenuHandle(InputState& in)
+void uiTitleMenuHandle(InputState &in)
 {
   if (!titleItemEnabled(g_titleMenuIndex))
     g_titleMenuIndex = titleFirstEnabledItem();
 
   int move = 0;
-  if (in.upOnce || in.leftOnce || in.encoderDelta < 0) move = -1;
-  if (in.downOnce || in.rightOnce || in.encoderDelta > 0) move = +1;
+  if (in.upOnce || in.leftOnce || in.encoderDelta < 0)
+    move = -1;
+  if (in.downOnce || in.rightOnce || in.encoderDelta > 0)
+    move = +1;
 
   if (move != 0)
   {
@@ -111,40 +135,47 @@ void uiTitleMenuHandle(InputState& in)
 
   switch (g_titleMenuIndex)
   {
-    case TITLE_CONTINUE:
+  case TITLE_CONTINUE:
+  {
+    if (s_titleHasSave)
     {
-      if (saveManagerSaveFileExists())
-      {
-        playBeep();
-        uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-        swallowTitleInput(in);
-        return;
-      }
-      break;
+      playBeep();
+      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+      swallowTitleInput(in);
+      return;
     }
+    break;
+  }
 
-    case TITLE_IMPORT:
-    {
-      playBeep();
-      uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
-      swallowTitleInput(in);
-      return;
-    }
-        
-    case TITLE_SETTINGS:
-    {
-      playBeep();
-      openSettingsWithReturn(UIState::TITLE_MENU, Tab::TAB_PET);
-      swallowTitleInput(in);
-      return;
-    }
+  case TITLE_IMPORT:
+  {
+    playBeep();
+    uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+    swallowTitleInput(in);
+    return;
+  }
+
+  case TITLE_SETTINGS:
+  {
+    playBeep();
+    openSettingsWithReturn(UIState::TITLE_MENU, Tab::TAB_PET);
+    swallowTitleInput(in);
+    return;
+  }
   }
 
   swallowTitleInput(in);
 
-  Serial.printf("[TITLE] idx=%d continue=%d import=%d settings=%d\n",
-                g_titleMenuIndex,
-                saveManagerSaveFileExists() ? 1 : 0,
-                saveManagerHasImportableBubJson() ? 1 : 0,
-                1);
+  Serial.printf("[TITLE] idx=%d continue=%d import=%d settings=%d\n", g_titleMenuIndex, s_titleHasSave ? 1 : 0,
+                s_titleHasImport ? 1 : 0, 1);
+}
+
+bool uiTitleMenuHasSave()
+{
+  return s_titleHasSave;
+}
+
+bool uiTitleMenuHasImport()
+{
+  return s_titleHasImport;
 }

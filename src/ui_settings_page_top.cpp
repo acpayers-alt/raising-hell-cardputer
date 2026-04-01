@@ -14,13 +14,15 @@
 #include "graphics.h"
 #include "ui_input_utils.h"
 #include "flow_console.h"
+#include "settings_nav_state.h"
+#include "ui_actions.h"
 
 namespace UiSettingsPages {
 
 void Handle_TOP(InputState& input, int move) {
   if (move != 0) {
-    const int totalItems = 8;
-    g_app.settingsIndex += move;
+    const int totalItems = 9;
+        g_app.settingsIndex += move;
     if (g_app.settingsIndex < 0) g_app.settingsIndex = totalItems - 1;
     if (g_app.settingsIndex > totalItems - 1) g_app.settingsIndex = 0;
 
@@ -87,7 +89,16 @@ void Handle_TOP(InputState& input, int move) {
         return;
       }
 
-      case 5: { // Console
+      case 5: { // Main Menu
+        resetSettingsNav(true);
+        g_settingsFlow.settingsPage = SettingsPage::TOP;
+        g_settingsFlow.settingsReturnValid = false;
+        playBeep();
+        uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
+        return;
+      }
+
+      case 6: { // Console
         openConsoleWithReturn(UIState::SETTINGS, g_app.currentTab, true, g_settingsFlow.settingsPage);
         uiDrainKb(input);
         clearInputLatch();
@@ -96,7 +107,7 @@ void Handle_TOP(InputState& input, int move) {
         return;
       }
 
-      case 6: { // System Status
+      case 7: { // System Status
         g_settingsFlow.settingsPage = SettingsPage::STATUS;
         g_app.statusScreenIndex = 0;
         requestUIRedraw();
@@ -105,7 +116,7 @@ void Handle_TOP(InputState& input, int move) {
         return;
       }
 
-      case 7: { // Credits
+      case 8: { // Credits
         g_settingsFlow.settingsPage = SettingsPage::CREDITS;
         requestUIRedraw();
         playBeep();
