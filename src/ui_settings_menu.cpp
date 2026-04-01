@@ -482,7 +482,7 @@ static void actPet_RenamePet(InputState &input)
   g_namePetRenameMode = true;
   g_namePetJustOpened = true;
 
-  // Make NAME_PET return to Pet Settings, not Game.
+  // Make NAME_PET return to Pet Options, not Game.
   g_settingsFlow.settingsPage = SettingsPage::PET;
 
   inputSetTextCapture(true);
@@ -518,14 +518,17 @@ static void actPet_StoredPets(InputState &input)
 
 static void actPet_NewPet(InputState &input)
 {
-  g_settingsFlow.settingsPage = SettingsPage::PET;
+  (void)input;
 
-  g_app.newPetFlowActive = true;
-  uiActionEnterStateClean(UIState::CHOOSE_PET, Tab::TAB_PET, true, input, 120);
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+  UiSettingsPages::ShowGameNewPetConfirm();
+
   requestFullUIRedraw();
   requestUIRedraw();
   playBeep();
+  clearInputLatch();
 }
+
 
 // ------------------------------------------------------------
 // SYSTEM page actions + hook
@@ -565,7 +568,7 @@ static MenuItem kTopItems[] = {
   {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
   {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
   {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
-  {"Pet Settings", actTop_OpenPet, nullptr, nullptr, nullptr},
+  {"Pet Options", actTop_OpenPet, nullptr, nullptr, nullptr},
   {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
   {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
   {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
@@ -725,6 +728,67 @@ bool Handle(InputState &input, int move)
       return true;
     }
 
+    return true;
+  }
+
+  // ------------------------------------------------------------
+  // New Pet confirm modal (Pet Options)
+  // ------------------------------------------------------------
+  if (g_settingsFlow.settingsPage == SettingsPage::PET &&
+      UiSettingsPages::GameNewPetConfirmActive())
+  {
+    if (input.leftOnce || input.upOnce)
+    {
+      UiSettingsPages::SetGameNewPetConfirmIndex(0);
+      playBeep();
+      requestUIRedraw();
+      clearInputLatch();
+      return true;
+    }
+
+    if (input.rightOnce || input.downOnce)
+    {
+      UiSettingsPages::SetGameNewPetConfirmIndex(1);
+      playBeep();
+      requestUIRedraw();
+      clearInputLatch();
+      return true;
+    }
+
+    if (input.menuOnce || input.escOnce || input.hotSettings)
+    {
+      UiSettingsPages::HideGameNewPetConfirm();
+      requestUIRedraw();
+      clearInputLatch();
+      return true;
+    }
+
+    if (uiIsSelect(input))
+    {
+      const bool storeFirst = (UiSettingsPages::GameNewPetConfirmIndex() == 0);
+
+      if (storeFirst)
+      {
+        char parkedPath[128];
+        if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
+        {
+          playBeep();
+          ui_showMessage("Store failed");
+          UiSettingsPages::HideGameNewPetConfirm();
+          requestUIRedraw();
+          clearInputLatch();
+          return true;
+        }
+      }
+
+      UiSettingsPages::HideGameNewPetConfirm();
+      playBeep();
+      saveManagerStartFreshPetFlow();
+      clearInputLatch();
+      return true;
+    }
+
+    clearInputLatch();
     return true;
   }
 

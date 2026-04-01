@@ -1967,7 +1967,7 @@ static void drawSettingsTopMenu()
 
   static const char *labelsStatic[] = {"Main Menu",
                                        nullptr, // 1 => volumeLine
-                                       "Controls",       "Pet Settings >", "Screen Settings >", "System Settings >",
+                                       "Controls",       "Pet Options >", "Screen Settings >", "System Settings >",
                                        "Game Options >", "Console >",      "System Status >",   "Credits"};
 
   const int totalItems = 10;
@@ -2963,6 +2963,10 @@ void drawSettingsMenu()
   case SettingsPage::AUTO_SCREEN:
     drawAutoScreenPickerMenu();
     break;
+  }
+  if (UiSettingsPages::GameNewPetConfirmActive())
+  {
+    drawNewPetConfirmOverlay();
   }
 }
 

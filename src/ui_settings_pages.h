@@ -15,4 +15,6 @@ void Handle_STATUS(InputState &input, int move);
 bool GameNewPetConfirmActive();
 int GameNewPetConfirmIndex();
 void ShowGameNewPetConfirm();
+void HideGameNewPetConfirm();
+void SetGameNewPetConfirmIndex(int idx);
 } // namespace UiSettingsPages

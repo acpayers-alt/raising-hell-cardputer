@@ -35,6 +35,16 @@ void ShowGameNewPetConfirm()
   s_newPetConfirmIndex = 0;
 }
 
+void HideGameNewPetConfirm()
+{
+  s_newPetConfirmActive = false;
+}
+
+void SetGameNewPetConfirmIndex(int idx)
+{
+  s_newPetConfirmIndex = (idx != 0) ? 1 : 0;
+}
+
 void Handle_GAME(InputState &input, int move)
 {
   (void)move;
