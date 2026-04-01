@@ -883,11 +883,23 @@ static void readKeyboard(InputState &out)
       if (!c)
         continue;
 
-      const uint8_t ucEsc = (uint8_t)c;
-      if (ucEsc == 0x1B || ucEsc == 0x29 || c == '`' || c == '~' || ucEsc == 0xB0)
-      {
-        continue;
-      }
+        const uint8_t ucEsc = (uint8_t)c;
+
+        // ESC should behave like the global cancel/settings key, not disappear.
+        if (ucEsc == 0x1B)
+        {
+          out.hotSettings = true;
+          continue;
+        }
+  
+        // Cardputer ESC comes through the tilde/backquote family.
+        // In normal UI flow this should behave like the existing global
+        // cancel/settings key, not disappear.
+        if (ucEsc == 0x1B || ucEsc == 0x29 || c == '`' || c == '~' || ucEsc == 0xB0)
+        {
+          out.hotSettings = true;
+          continue;
+        }
 
       // Enter HID usage 0x28
       if ((uint8_t)c == 0x28)

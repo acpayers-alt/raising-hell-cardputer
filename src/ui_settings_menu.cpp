@@ -382,6 +382,7 @@ static void actGame_RenamePet(InputState &input)
 
   g_namePetRenameMode = true;
   g_namePetJustOpened = true;
+  g_settingsFlow.settingsPage = SettingsPage::GAME;
 
   inputSetTextCapture(true);
   g_textCaptureMode = true;

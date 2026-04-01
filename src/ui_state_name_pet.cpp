@@ -1,23 +1,48 @@
 #include "ui_state_name_pet.h"
 
-#include <ctype.h>
+// ─────────────────────────────────────
+// Standard / C
+// ─────────────────────────────────────
 #include <string.h>
+
+// ─────────────────────────────────────
+// Arduino / platform
+// ─────────────────────────────────────
 #include <Arduino.h>
 
+// ─────────────────────────────────────
+// Core app state & models
+// ─────────────────────────────────────
 #include "app_state.h"
-#include "graphics.h"
-#include "input.h"
-#include "name_entry_state.h"
-#include "new_pet_flow_state.h"
 #include "pet.h"
 #include "save_manager.h"
-#include "settings_flow_state.h"
-#include "sound.h"
-#include "ui_actions.h"
+
+// ─────────────────────────────────────
+// Input system
+// ─────────────────────────────────────
+#include "input.h"
+#include "name_entry_state.h"
 #include "ui_input_common.h"
-#include "ui_new_pet_flow.h"
+
+// ─────────────────────────────────────
+// UI runtime / actions
+// ─────────────────────────────────────
+#include "ui_actions.h"
 #include "ui_runtime.h"
+
+// ─────────────────────────────────────
+// UI states / flows
+// ─────────────────────────────────────
+#include "new_pet_flow_state.h"
+#include "settings_flow_state.h"
+#include "ui_new_pet_flow.h"
 #include "ui_state_settings.h"
+
+// ─────────────────────────────────────
+// Rendering / feedback
+// ─────────────────────────────────────
+#include "graphics.h"
+#include "sound.h"
 
 void uiNamePetHandle(InputState &in)
 {
@@ -30,40 +55,35 @@ void uiNamePetHandle(InputState &in)
     clearInputLatch();
   }
 
-  bool changed = false;
-
-  // Back cancels
-  if (in.menuOnce)
+  // Allow cancel only when this is a normal rename flow.
+  // New-pet naming remains mandatory.
+  if (g_namePetRenameMode && (in.menuOnce || in.hotSettings))
   {
     inputSetTextCapture(false);
     g_textCaptureMode = false;
 
-    if (g_namePetRenameMode)
-    {
-      g_namePetRenameMode = false;
-      g_settingsFlow.settingsPage = SettingsPage::GAME;
-      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);
-    }
-    else
-    {
-      // ESC is intentionally ignored on NAME_PET during new pet flow;
-      // MENU returns to choose pet.
-      g_choosePetBlockHatchUntilRelease = true;
-      openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);
-    }
+    g_namePetRenameMode = false;
+    g_namePetJustOpened = false;
 
-    requestUIRedraw();
+    uiActionSwallowAll(in);
     uiDrainKb(in);
     inputForceClear();
     clearInputLatch();
+
+    g_settingsFlow.settingsPage = SettingsPage::GAME;
+    uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+    requestFullUIRedraw();
+    requestUIRedraw();
     return;
   }
+
+  bool changed = false;
 
   while (in.kbHasEvent())
   {
     KeyEvent ev = in.kbPop();
     const uint8_t c = ev.code;
-
+    
     // Enter → finalize
     if (c == '\n' || c == RH_KEY_ENTER)
     {
@@ -83,8 +103,10 @@ void uiNamePetHandle(InputState &in)
         Serial.printf("[PET] named '%s'\n", pet.getName());
 
         g_namePetRenameMode = false;
+        g_namePetJustOpened = false;
         g_settingsFlow.settingsPage = SettingsPage::GAME;
-        openSettingsWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, SettingsPage::GAME);
+        uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+        requestFullUIRedraw();
         requestUIRedraw();
         invalidateBackgroundCache();
 
