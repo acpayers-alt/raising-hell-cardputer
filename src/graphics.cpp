@@ -1306,12 +1306,13 @@ void drawBootSplash()
 void ui_setBootSplashActive(bool on)
 {
   g_bootSplashActive = on;
-  if (on)
-  {
-    bgDrawnForState = false;
-    invalidateBackgroundCache();
-  }
+  bgDrawnForState = false;
+  invalidateBackgroundCache();
+
+  if (!on)
+    requestFullUIRedraw();
 }
+
 bool ui_isBootSplashActive() { return g_bootSplashActive; }
 
 // -----------------------------------------------------------------------------
@@ -1964,9 +1965,11 @@ static void drawSettingsTopMenu()
   char volumeLine[24];
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
-  static const char *labelsStatic[] = {nullptr, // 0 => volumeLine
-                                       "Controls",  "Screen Settings >", "System Settings >", "Game Options >",
-                                       "Main Menu", "Console >",         "System Status >",   "Credits"};
+  static const char *labelsStatic[] = {"Main Menu",
+                                       nullptr, // 1 => volumeLine
+                                       "Controls",       "Screen Settings >", "System Settings >",
+                                       "Game Options >", "Console >",         "System Status >",
+                                       "Credits"};
 
   const int totalItems = 9;
 
@@ -1978,14 +1981,21 @@ static void drawSettingsTopMenu()
 
   int itemH = 20;
   int gap = 5;
+  const int sectionGap = 8; // extra space below Main Menu
 
   int totalH = visCount * itemH + (visCount - 1) * gap;
+  if (start == 0 && visCount > 1)
+    totalH += sectionGap;
+
   while (totalH > contentH && itemH > 16)
   {
     itemH--;
     if (gap > 3)
       gap--;
+
     totalH = visCount * itemH + (visCount - 1) * gap;
+    if (start == 0 && visCount > 1)
+      totalH += sectionGap;
   }
 
   int startY = contentY + (contentH - totalH) / 2;
@@ -2005,7 +2015,10 @@ static void drawSettingsTopMenu()
   for (int row = 0; row < visCount; row++)
   {
     const int i = start + row;
-    const int y = startY + row * (itemH + gap);
+    int y = startY + row * (itemH + gap);
+    if (start == 0 && i > 0)
+      y += sectionGap;
+
     const bool sel = (i == g_app.settingsIndex);
 
     const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
@@ -2021,9 +2034,15 @@ static void drawSettingsTopMenu()
     spr.setTextColor(textCol, fill);
 
     const char *label = labelsStatic[i];
-    if (i == 0)
+    if (i == 1)
       label = volumeLine;
     spr.drawString(label, boxX + 10, ty);
+
+    if (i == 0 && start == 0 && visCount > 1)
+    {
+      const int lineY = y + itemH + (sectionGap / 2) + 1;
+      spr.drawFastHLine(boxX + 10, lineY, boxW - 20, TFT_LIGHTGREY);
+    }
   }
 
   spr.setTextFont(1);
@@ -5120,6 +5139,8 @@ void drawConsoleScreen()
 // ============================================================================
 static void drawWifiSetupScreen()
 {
+  const int sectionGap = 8;
+
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_SCAN)
   {
     drawTopBar();
@@ -5168,7 +5189,10 @@ static void drawWifiSetupScreen()
     for (int row = 0; row < visCount; ++row)
     {
       const int i = start + row;
-      const int y = startY + row * (itemH + gap);
+      int y = startY + row * (itemH + gap);
+      if (start == 0 && i > 0)
+        y += sectionGap;
+
       const bool sel = (i == g_wifi.scanIndex);
 
       const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
@@ -5796,38 +5820,29 @@ static void uiShowToastInternal(const char *msg, uint32_t durationMs)
   requestUIRedraw();
 }
 
-void ui_showMessage(const char *msg)
-{
-  uiShowToastInternal(msg, 900);
-}
+void ui_showMessage(const char *msg) { uiShowToastInternal(msg, 900); }
 
-void ui_showTimedMessage(const char *msg, uint32_t durationMs)
-{
-  uiShowToastInternal(msg, durationMs);
-}
+void ui_showTimedMessage(const char *msg, uint32_t durationMs) { uiShowToastInternal(msg, durationMs); }
 
-void ui_showSuccessMessage(const char *msg)
-{
-  uiShowToastInternal(msg, 1200);
-}
+void ui_showSuccessMessage(const char *msg) { uiShowToastInternal(msg, 1200); }
 
 static void uiDrawToastOverlay()
 {
   if (!g_toastActive)
     return;
 
-    const uint32_t now = millis();
-    if (g_toastUntilMs != 0 && (int32_t)(now - g_toastUntilMs) >= 0)
-    {
-      g_toastActive = false;
-      g_toastUntilMs = 0;
-      g_toastMsg[0] = '\0';
-  
-      // Force one clean repaint so the old toast pixels do not linger.
-      requestFullUIRedraw();
-      return;
-    }
-    
+  const uint32_t now = millis();
+  if (g_toastUntilMs != 0 && (int32_t)(now - g_toastUntilMs) >= 0)
+  {
+    g_toastActive = false;
+    g_toastUntilMs = 0;
+    g_toastMsg[0] = '\0';
+
+    // Force one clean repaint so the old toast pixels do not linger.
+    requestFullUIRedraw();
+    return;
+  }
+
   if (!isScreenOn())
     return;
 
@@ -6048,22 +6063,22 @@ void drawImportPetListScreen(bool redrawBg)
   if (redrawBg)
     spr.fillSprite(TFT_BLACK);
 
-    if (uiImportPetListConfirming())
-    {
-      const int confirmIndex = uiImportPetListConfirmIndex();
-  
-      spr.setTextDatum(TC_DATUM);
-      spr.setTextColor(TFT_WHITE);
-      spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
-  
-      spr.setTextColor(confirmIndex == 0 ? TFT_YELLOW : TFT_WHITE);
-      spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
-  
-      spr.setTextColor(confirmIndex == 1 ? TFT_YELLOW : TFT_WHITE);
-      spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
-  
-      return;
-    }
+  if (uiImportPetListConfirming())
+  {
+    const int confirmIndex = uiImportPetListConfirmIndex();
+
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+
+    spr.setTextColor(confirmIndex == 0 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+
+    spr.setTextColor(confirmIndex == 1 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+
+    return;
+  }
 
   const int rowH = 18;
   const int startY = 20;
@@ -6126,13 +6141,16 @@ void drawTitleMenuScreen(bool redrawBg)
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
-  const char *petName = (hasSave && pet.getName()[0]) ? pet.getName() : "No Save";
+  const char *petName = (hasSave && pet.getName()[0]) ? pet.getName() : "";
 
-  char continueBuf[40];
-  snprintf(continueBuf, sizeof(continueBuf), hasSave ? "Continue: %s" : "Continue", petName);
+  char row0Buf[40];
+  if (hasSave)
+    snprintf(row0Buf, sizeof(row0Buf), "Continue: %s", petName);
+  else
+    snprintf(row0Buf, sizeof(row0Buf), "New Pet");
 
-  const char *labels[3] = {continueBuf, "Pet Storage", "Settings"};
-  const bool enabled[3] = {hasSave, hasImport, true};
+  const char *labels[3] = {row0Buf, "Pet Storage", "Settings"};
+  const bool enabled[3] = {true, hasImport, true};
 
   // Menu panel
   const int rowH = 16;
@@ -6162,9 +6180,7 @@ void drawTitleMenuScreen(bool redrawBg)
       spr.setTextDatum(TC_DATUM);
       spr.setTextColor(TFT_DARKGREY);
 
-      if (i == 0)
-        spr.drawString("(no save)", SCREEN_W / 2, rowY + 10, 1);
-      else if (i == 1)
+      if (i == 1)
         spr.drawString("(none found)", SCREEN_W / 2, rowY + 10, 1);
     }
   }

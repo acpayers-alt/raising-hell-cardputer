@@ -6,6 +6,8 @@
 #include "ui_state_wifi_connect_wait.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
+#include "graphics.h"
+#include "ui_runtime.h"
 
 extern UIState g_bootWizardAfterOkState;
 extern Tab g_bootWizardAfterOkTab;
@@ -16,6 +18,9 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
   g_bootWizardAfterOkTab = afterOkTab;
 
   Serial.println("[BOOTWIZ] bootWizardBegin entered");
+  
+  ui_setBootSplashActive(false);
+  requestFullUIRedraw();
 
   // Try stored creds first.
   {

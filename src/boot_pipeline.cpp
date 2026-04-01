@@ -185,10 +185,8 @@ static bool bootAssetPackTooOld()
   const bool tooOld =
       (!haveInstalled || !installedPack.length() || compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0);
 
-  runtimeLogf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d",
-              RH_MIN_REQUIRED_ASSET_PACK,
-              (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)",
-              haveInstalled ? 1 : 0,
+  runtimeLogf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d", RH_MIN_REQUIRED_ASSET_PACK,
+              (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)", haveInstalled ? 1 : 0,
               tooOld ? 1 : 0);
 
   return tooOld;
@@ -482,10 +480,7 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
   spr.pushSprite(0, 0);
 }
 
-void bootAssetProvisionRedraw(const char *line1, const char *line2)
-{
-  drawBootAssetProvisionScreen(line1, line2);
-}
+void bootAssetProvisionRedraw(const char *line1, const char *line2) { drawBootAssetProvisionScreen(line1, line2); }
 
 static bool bootAssetProvisionWaitingAtIntroScreen()
 {
@@ -647,10 +642,36 @@ static void finalizeBootLanding()
   g_bootAssetProvisionMustComplete = false;
   g_bootProvisionWifiOnboardingStarted = false;
 
-  Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n",
-                (int)s_bootFinalLandingState,
-                g_controlsHelpSeen ? 1 : 0,
-                g_postProvisionControlsHelpPending ? 1 : 0);
+  Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n", (int)s_bootFinalLandingState,
+                g_controlsHelpSeen ? 1 : 0, g_postProvisionControlsHelpPending ? 1 : 0);
+
+  // If we are landing on the title screen with no save file, this is a
+  // "no-save title menu" landing, not an active new-pet flow.
+  //
+  // saveManagerLoad() may already have staged a fresh in-memory new-pet flow
+  // and written name_pending.flag before the first-boot wizard ran.
+  // If we keep those flags here, the next reboot will incorrectly think
+  // onboarding/new-pet flow is still pending.
+  if (s_bootFinalLandingState == UIState::TITLE_MENU && !bootSaveFileExists())
+  {
+    const bool hadNamePending = saveManagerNamePendingFlagExists();
+    const bool hadBootSetupPending = bootSetupPendingFlagExists();
+
+    if (hadNamePending)
+      saveManagerClearNamePendingFlag();
+
+    if (hadBootSetupPending)
+      bootSetupClearPendingFlag();
+
+    g_app.newPetFlowActive = false;
+
+    Serial.printf("[BOOT][LAND] no-save title cleanup namePending=%d bootSetupPending=%d\n", hadNamePending ? 1 : 0,
+                  hadBootSetupPending ? 1 : 0);
+
+    Serial.printf("[BOOT][LAND] post-cleanup namePending=%d bootSetupPending=%d saveExists=%d\n",
+                  saveManagerNamePendingFlagExists() ? 1 : 0, bootSetupPendingFlagExists() ? 1 : 0,
+                  bootSaveFileExists() ? 1 : 0);
+  }
 
   if (g_postProvisionControlsHelpPending)
   {
@@ -713,9 +734,7 @@ void postBootInitTick()
   // never let the boot pipeline re-enter provisioning. Hand off to the runtime
   // assets-missing flow instead.
   // ---------------------------------------------------------------------------
-  if (!g_bootLandingDeferredForAssetProvision &&
-      g_app.uiState == UIState::PET_SCREEN &&
-      g_sdReady &&
+  if (!g_bootLandingDeferredForAssetProvision && g_app.uiState == UIState::PET_SCREEN && g_sdReady &&
       !sdAssetsPresent())
   {
     g_assetsChecked = true;
@@ -873,9 +892,7 @@ void postBootInitTick()
       loadedFromSD = saveManagerLoad();
 
     const bool saveFileExistsNow = bootSaveFileExists();
-    runtimeLogf("[BOOT][SAVECHK] loadedFromSD=%d saveFileExists=%d",
-                loadedFromSD ? 1 : 0,
-                saveFileExistsNow ? 1 : 0);
+    runtimeLogf("[BOOT][SAVECHK] loadedFromSD=%d saveFileExists=%d", loadedFromSD ? 1 : 0, saveFileExistsNow ? 1 : 0);
 
     DBG_ON("[LOAD] saveManagerLoad -> %d\n", (int)loadedFromSD);
 
@@ -901,19 +918,13 @@ void postBootInitTick()
     const bool assetsPresentNow = sdAssetsPresent();
 
     runtimeLogf("[BOOT][ASSET] requested=%d mandatory=%d tooOld=%d assetsPresent=%d minRequired=%s",
-                provisionRequested ? 1 : 0,
-                provisionMandatory ? 1 : 0,
-                provisionTooOld ? 1 : 0,
-                assetsPresentNow ? 1 : 0,
-                RH_MIN_REQUIRED_ASSET_PACK);
+                provisionRequested ? 1 : 0, provisionMandatory ? 1 : 0, provisionTooOld ? 1 : 0,
+                assetsPresentNow ? 1 : 0, RH_MIN_REQUIRED_ASSET_PACK);
 
     const bool deferForAssetProvision = provisionRequested || provisionMandatory || provisionTooOld;
 
     runtimeLogf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d",
-                settingsLoaded ? 1 : 0,
-                loadedFromSD ? 1 : 0,
-                timeIsValid() ? 1 : 0,
-                firstBootWizard ? 1 : 0,
+                settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
                 (int)afterOk);
 
     if (deferForAssetProvision)
@@ -951,12 +962,8 @@ void postBootInitTick()
         g_bootAssetProvisionActive = false;
         Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED sdReady=%d assetsMissing=%d must=%d "
                       "active=%d requested=%d ui=%d\n",
-                      g_sdReady ? 1 : 0,
-                      g_assetsMissing ? 1 : 0,
-                      g_bootAssetProvisionMustComplete ? 1 : 0,
-                      g_bootAssetProvisionActive ? 1 : 0,
-                      bootAssetProvisionRequested() ? 1 : 0,
-                      (int)g_app.uiState);
+                      g_sdReady ? 1 : 0, g_assetsMissing ? 1 : 0, g_bootAssetProvisionMustComplete ? 1 : 0,
+                      g_bootAssetProvisionActive ? 1 : 0, bootAssetProvisionRequested() ? 1 : 0, (int)g_app.uiState);
         uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();
@@ -993,9 +1000,7 @@ void postBootInitTick()
 
       // First prefer creds we previously saved ourselves.
       String storedSsid, storedPwd;
-      if (wifiStoreHasCreds() &&
-          wifiStoreLoad(storedSsid, storedPwd) &&
-          storedSsid.length() > 0)
+      if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
       {
         Serial.printf("[BOOTPIPE] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
         wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
@@ -1036,9 +1041,7 @@ void postBootInitTick()
 
       // Try stored creds first (same as first boot wizard)
       String storedSsid, storedPwd;
-      if (wifiStoreHasCreds() &&
-          wifiStoreLoad(storedSsid, storedPwd) &&
-          storedSsid.length() > 0)
+      if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
       {
         Serial.printf("[BOOTPIPE] (time recovery) using stored wifi creds ssid='%s'\n", storedSsid.c_str());
         wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
@@ -1167,9 +1170,7 @@ void postBootInitTick()
     // If boot was paused for time recovery, time is now valid and we may still
     // be sitting on the splash/BOOT state without ever completing the normal
     // post-boot landing. Finish that handoff now.
-    if (!g_bootLandingDeferredForAssetProvision &&
-        !g_bootLandingDone &&
-        g_app.uiState == UIState::BOOT)
+    if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
     {
       Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
       finalizeBootLanding();

@@ -10,6 +10,7 @@
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
+#include "ui_input_common.h"
 
 int g_titleMenuIndex = 0;
 
@@ -19,9 +20,6 @@ constexpr int kTitleMenuCount = 3;
 
 static bool s_titleHasSave = false;
 static bool s_titleHasImport = false;
-
-bool uiTitleMenuHasSave() { return s_titleHasSave; }
-bool uiTitleMenuHasImport() { return s_titleHasImport; }
 
 static void refreshTitleMenuAvailability()
 {
@@ -41,7 +39,7 @@ static bool titleItemEnabled(int idx)
   switch (idx)
   {
   case TITLE_CONTINUE:
-    return s_titleHasSave;
+    return true; // Continue or New Pet
   case TITLE_IMPORT:
     return s_titleHasImport;
   case TITLE_SETTINGS:
@@ -95,8 +93,17 @@ void uiTitleMenuOnEnter(InputState &in)
   swallowTitleInput(in);
   refreshTitleMenuAvailability();
 
-  if (!titleItemEnabled(g_titleMenuIndex))
+  //If no save exists, always focus "New Pet" (row 0)
+  if (!s_titleHasSave)
+  {
+    g_titleMenuIndex = TITLE_CONTINUE;
+  }
+  else if (!titleItemEnabled(g_titleMenuIndex))
+  {
     g_titleMenuIndex = titleFirstEnabledItem();
+  }
+
+  requestFullUIRedraw();
 }
 
 void uiTitleMenuHandle(InputState &in)
@@ -137,14 +144,25 @@ void uiTitleMenuHandle(InputState &in)
   {
   case TITLE_CONTINUE:
   {
+    playBeep();
+
     if (s_titleHasSave)
     {
-      playBeep();
       uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
       swallowTitleInput(in);
       return;
     }
-    break;
+    else
+    {
+      g_app.newPetFlowActive = true;
+
+      uiActionSwallowAll(in);
+      uiDrainKb(in);
+      clearInputLatch();
+
+      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+      return;
+    }
   }
 
   case TITLE_IMPORT:
@@ -166,16 +184,10 @@ void uiTitleMenuHandle(InputState &in)
 
   swallowTitleInput(in);
 
-  Serial.printf("[TITLE] idx=%d continue=%d import=%d settings=%d\n", g_titleMenuIndex, s_titleHasSave ? 1 : 0,
-                s_titleHasImport ? 1 : 0, 1);
+  Serial.printf("[TITLE] idx=%d row0=%s import=%d settings=%d\n", g_titleMenuIndex,
+                s_titleHasSave ? "continue" : "newpet", s_titleHasImport ? 1 : 0, 1);
 }
 
-bool uiTitleMenuHasSave()
-{
-  return s_titleHasSave;
-}
+bool uiTitleMenuHasSave() { return s_titleHasSave; }
 
-bool uiTitleMenuHasImport()
-{
-  return s_titleHasImport;
-}
+bool uiTitleMenuHasImport() { return s_titleHasImport; }

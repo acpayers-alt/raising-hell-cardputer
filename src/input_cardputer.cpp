@@ -204,12 +204,12 @@ static inline bool backspaceMapsToMenuInState(UIState s)
 
   switch (s)
   {
-    case UIState::INVENTORY:
-    case UIState::SHOP:
-    case UIState::PET_SLEEPING:
-      return false; // Backspace inactive here
-    default:
-      return true;
+  case UIState::INVENTORY:
+  case UIState::SHOP:
+  case UIState::PET_SLEEPING:
+    return false; // Backspace inactive here
+  default:
+    return true;
   }
 }
 
@@ -558,7 +558,7 @@ static void readKeyboard(InputState &out)
   if (!escAnyHeld)
     s_settingsKeyLatched = false;
 
-    // Always compute mini-game held controls
+  // Always compute mini-game held controls
   const bool heldUp = kbHeldUpArrow();
   const bool heldDown = kbHeldDownArrow();
   const bool heldLeft = kbHeldLeftArrow();
@@ -755,26 +755,26 @@ static void readKeyboard(InputState &out)
   // ESC edge generation (uses escAnyHeld, not just st.word)
   // -----------------------------------------------------------------------------
   const bool escNow = escAnyHeld;
-  
+
   // Block ESC on mandatory boot/timekeeping screens so users can't skip them.
   auto escBlockedInState = [](UIState s) -> bool
   {
     switch (s)
     {
-      case UIState::NAME_PET:
-      case UIState::CHOOSE_PET:
-        return true;
-      default:
-        return false;
+    case UIState::NAME_PET:
+    case UIState::CHOOSE_PET:
+      return true;
+    default:
+      return false;
     }
   };
-  
+
   const bool escBlockedNow = escBlockedInState(g_app.uiState);
-  
+
   // Cooldown: prevents menu flicker if some code clears the latch while ESC is still held.
   static uint32_t s_escOnceMs = 0;
   const uint32_t kEscCooldownMs = 250;
-  
+
   if (escNow)
   {
     if (!s_settingsKeyLatched)
@@ -787,10 +787,10 @@ static void readKeyboard(InputState &out)
           s_escOnceMs = now;
         }
       }
-  
+
       if (inMiniGameUi)
         out.mgQuitOnce = true;
-  
+
       s_settingsKeyLatched = true;
     }
   }
@@ -889,56 +889,6 @@ static void readKeyboard(InputState &out)
         continue;
       }
 
-      // Arrow keys HID usage IDs: Right=0x4F, Left=0x50, Down=0x51, Up=0x52
-      if ((uint8_t)c == 0x52)
-      { // Up
-        if (g_textCaptureMode)
-          out.kbPush((uint8_t)';');
-        else
-        {
-          sawUpThisTick = true;
-          if (!s_navUpLatched && acceptNav(s_navUpMs))
-            out.upOnce = true;
-          s_navUpLatched = true;
-        }
-        continue;
-      }
-      if ((uint8_t)c == 0x51)
-      { // Down
-        if (g_textCaptureMode)
-          out.kbPush((uint8_t)'.');
-        else
-        {
-          sawDownThisTick = true;
-          if (!s_navDownLatched && acceptNav(s_navDownMs))
-            out.downOnce = true;
-          s_navDownLatched = true;
-        }
-        continue;
-      }
-      if ((uint8_t)c == 0x50)
-      { // Left
-        if (!g_textCaptureMode)
-        {
-          sawLeftThisTick = true;
-          if (!s_navLeftLatched && acceptNav(s_navLeftMs))
-            out.leftOnce = true;
-          s_navLeftLatched = true;
-        }
-        continue;
-      }
-      if ((uint8_t)c == 0x4F)
-      { // Right
-        if (!g_textCaptureMode)
-        {
-          sawRightThisTick = true;
-          if (!s_navRightLatched && acceptNav(s_navRightMs))
-            out.rightOnce = true;
-          s_navRightLatched = true;
-        }
-        continue;
-      }
-
       // Enter HID usage 0x28
       if ((uint8_t)c == 0x28)
       {
@@ -1024,14 +974,29 @@ static void readKeyboard(InputState &out)
         // Bottom row tab jumps
         switch (lc)
         {
-          case 'z': out.tabJump = 0; continue;
-          case 'x': out.tabJump = 1; continue;
-          case 'c': out.tabJump = 2; continue;
-          case 'v': out.tabJump = 3; continue;
-          case 'b': out.tabJump = 4; continue;
-          case 'n': out.tabJump = 5; continue;
-          case 'm': out.tabJump = 6; continue;
-          default: break;
+        case 'z':
+          out.tabJump = 0;
+          continue;
+        case 'x':
+          out.tabJump = 1;
+          continue;
+        case 'c':
+          out.tabJump = 2;
+          continue;
+        case 'v':
+          out.tabJump = 3;
+          continue;
+        case 'b':
+          out.tabJump = 4;
+          continue;
+        case 'n':
+          out.tabJump = 5;
+          continue;
+        case 'm':
+          out.tabJump = 6;
+          continue;
+        default:
+          break;
         }
 
         // WASD / HJKL / EWO nav cluster
@@ -1075,10 +1040,14 @@ static void readKeyboard(InputState &out)
   }
 
   // Release nav latches when key no longer present
-  if (!sawUpThisTick) s_navUpLatched = false;
-  if (!sawDownThisTick) s_navDownLatched = false;
-  if (!sawLeftThisTick) s_navLeftLatched = false;
-  if (!sawRightThisTick) s_navRightLatched = false;
+  if (!sawUpThisTick)
+    s_navUpLatched = false;
+  if (!sawDownThisTick)
+    s_navDownLatched = false;
+  if (!sawLeftThisTick)
+    s_navLeftLatched = false;
+  if (!sawRightThisTick)
+    s_navRightLatched = false;
 
   // Backspace/Delete fallback
   if (!sawDelWordThisTick)

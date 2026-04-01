@@ -217,6 +217,7 @@ static void actTop_MainMenu(InputState &in)
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
   g_settingsFlow.settingsReturnValid = false;
+  
   playBeep();
   uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, in, 120);
 }
@@ -497,12 +498,12 @@ static MenuItem kSystemItems[] = {
 // Menu definitions
 // ------------------------------------------------------------
 static MenuItem kTopItems[] = {
+  {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
   {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
   {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
   {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
   {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
   {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
-  {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
   {"Console", actTop_Console, nullptr, nullptr, enConsole},
   {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
   {"Credits", actTop_Credits, nullptr, nullptr, nullptr},

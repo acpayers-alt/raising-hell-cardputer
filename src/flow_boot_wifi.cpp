@@ -540,18 +540,23 @@ void uiBootNtpWaitHandle(InputState &in)
 
   if (timeIsSynced())
   {
-    Serial.printf("[BOOTWIFI] NTP synced -> returning to BOOT afterOk=%d\n",
+    Serial.printf("[BOOTWIFI] NTP synced -> returning to final state afterOk=%d\n",
                   (int)g_bootWizardAfterOkState);
+
+    bootSetupClearPendingFlag();
+    Serial.println("[BOOTWIFI] cleared boot setup pending");
+
+    ui_setBootSplashActive(false);
 
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
 
-    uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+    uiActionEnterState(g_bootWizardAfterOkState, g_bootWizardAfterOkTab, true);
     requestFullUIRedraw();
     requestUIRedraw();
     return;
   }
-    
+        
   uiActionSwallowAll(in);
 }

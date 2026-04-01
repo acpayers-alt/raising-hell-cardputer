@@ -19,34 +19,22 @@
 
 namespace UiSettingsPages {
 
-void Handle_TOP(InputState& input, int move) {
-  if (move != 0) {
-    const int totalItems = 9;
-        g_app.settingsIndex += move;
-    if (g_app.settingsIndex < 0) g_app.settingsIndex = totalItems - 1;
-    if (g_app.settingsIndex > totalItems - 1) g_app.settingsIndex = 0;
-
-    requestUIRedraw();
-    playBeep();
-    return;
-  }
-
-  if (g_app.settingsIndex == 0) {
-    if (input.leftOnce || input.rightOnce) {
-      soundAdjustVolume(input.leftOnce ? -1 : 1);
-      saveSettingsToSD();
-      saveManagerMarkDirty();
+  void Handle_TOP(InputState& input, int move) {
+    if (move != 0) {
+      const int totalItems = 9;
+      g_app.settingsIndex += move;
+      if (g_app.settingsIndex < 0) g_app.settingsIndex = totalItems - 1;
+      if (g_app.settingsIndex > totalItems - 1) g_app.settingsIndex = 0;
+  
       requestUIRedraw();
       playBeep();
-      clearInputLatch();
       return;
     }
-  }
-
-  if (uiIsSelect(input)) {
-    switch (g_app.settingsIndex) {
-      case 0: { // Volume cycles
-        soundAdjustVolume(+1);
+  
+    // Volume row is now index 1.
+    if (g_app.settingsIndex == 1) {
+      if (input.leftOnce || input.rightOnce) {
+        soundAdjustVolume(input.leftOnce ? -1 : 1);
         saveSettingsToSD();
         saveManagerMarkDirty();
         requestUIRedraw();
@@ -54,80 +42,93 @@ void Handle_TOP(InputState& input, int move) {
         clearInputLatch();
         return;
       }
-
-      case 1: { // Controls
-        openControlsHelpFromSettings();
-        playBeep();
-        clearInputLatch();
-        return;
+    }
+  
+    if (uiIsSelect(input)) {
+      switch (g_app.settingsIndex) {
+        case 0: { // Main Menu
+          resetSettingsNav(true);
+          g_settingsFlow.settingsPage = SettingsPage::TOP;
+          g_settingsFlow.settingsReturnValid = false;
+          playBeep();
+          uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
+          return;
+        }
+  
+        case 1: { // Volume cycles
+          soundAdjustVolume(+1);
+          saveSettingsToSD();
+          saveManagerMarkDirty();
+          requestUIRedraw();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        case 2: { // Controls
+          openControlsHelpFromSettings();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        case 3: { // Screen Settings
+          g_settingsFlow.settingsPage = SettingsPage::SCREEN;
+          g_app.screenSettingsIndex = 0;
+          requestUIRedraw();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        case 4: { // System
+          g_settingsFlow.settingsPage = SettingsPage::SYSTEM;
+          g_app.systemSettingsIndex = 0;
+          requestUIRedraw();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        case 5: { // Game
+          g_settingsFlow.settingsPage = SettingsPage::GAME;
+          g_app.gameOptionsIndex = 0;
+          requestUIRedraw();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        case 6: { // Console
+          openConsoleWithReturn(UIState::SETTINGS, g_app.currentTab, true, g_settingsFlow.settingsPage);
+          uiDrainKb(input);
+          clearInputLatch();
+          requestUIRedraw();
+          playBeep();
+          return;
+        }
+  
+        case 7: { // System Status
+          g_settingsFlow.settingsPage = SettingsPage::STATUS;
+          g_app.statusScreenIndex = 0;
+          requestUIRedraw();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        case 8: { // Credits
+          g_settingsFlow.settingsPage = SettingsPage::CREDITS;
+          requestUIRedraw();
+          playBeep();
+          clearInputLatch();
+          return;
+        }
+  
+        default:
+          break;
       }
-
-      case 2: { // Screen Settings
-        g_settingsFlow.settingsPage = SettingsPage::SCREEN;
-        g_app.screenSettingsIndex    = 0;
-        requestUIRedraw();
-        playBeep();
-        clearInputLatch();
-        return;
-      }
-
-      case 3: { // System
-        g_settingsFlow.settingsPage = SettingsPage::SYSTEM;
-        g_app.systemSettingsIndex    = 0;
-        requestUIRedraw();
-        playBeep();
-        clearInputLatch();
-        return;
-      }
-
-      case 4: { // Game
-        g_settingsFlow.settingsPage = SettingsPage::GAME;
-        g_app.gameOptionsIndex       = 0;
-        requestUIRedraw();
-        playBeep();
-        clearInputLatch();
-        return;
-      }
-
-      case 5: { // Main Menu
-        resetSettingsNav(true);
-        g_settingsFlow.settingsPage = SettingsPage::TOP;
-        g_settingsFlow.settingsReturnValid = false;
-        playBeep();
-        uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
-        return;
-      }
-
-      case 6: { // Console
-        openConsoleWithReturn(UIState::SETTINGS, g_app.currentTab, true, g_settingsFlow.settingsPage);
-        uiDrainKb(input);
-        clearInputLatch();
-        requestUIRedraw();
-        playBeep();
-        return;
-      }
-
-      case 7: { // System Status
-        g_settingsFlow.settingsPage = SettingsPage::STATUS;
-        g_app.statusScreenIndex = 0;
-        requestUIRedraw();
-        playBeep();
-        clearInputLatch();
-        return;
-      }
-
-      case 8: { // Credits
-        g_settingsFlow.settingsPage = SettingsPage::CREDITS;
-        requestUIRedraw();
-        playBeep();
-        clearInputLatch();
-        return;
-      }
-
-      default:
-        break;
     }
   }
-}
-
+  
 } // namespace UiSettingsPages
