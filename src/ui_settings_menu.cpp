@@ -9,24 +9,24 @@
 #include "build_flags.h"
 
 // --- Core Systems ---
-#include "save_manager.h"
-#include "sdcard.h"
-#include "sound.h"
 #include "auto_screen.h"
 #include "brightness_state.h"
 #include "display.h"
+#include "save_manager.h"
+#include "sdcard.h"
+#include "sound.h"
 
 // --- UI Core ---
 #include "ui_actions.h"
-#include "ui_runtime.h"
 #include "ui_input_common.h"
-#include "ui_input_utils.h"   // uiDrainKb
+#include "ui_input_utils.h" // uiDrainKb
+#include "ui_runtime.h"
 #include "ui_settings_actions.h"
 
 // --- UI / Flow ---
-#include "settings_flow_state.h"
 #include "menu_actions.h"
 #include "name_entry_state.h"
+#include "settings_flow_state.h"
 
 // --- Networking / Time ---
 #include "wifi_power.h"
@@ -51,7 +51,7 @@
 // --- Graphics ---
 #include "graphics.h" // ui_showMessage
 
-//End of Evangelincludes
+// End of Evangelincludes
 
 // ------------------------------------------------------------
 // Minimal embedded menu model
@@ -388,13 +388,13 @@ static void actGame_ExportBub(InputState &)
   char path[128];
   if (saveManagerExportCurrentBubJson(path, sizeof(path)))
   {
-    ui_showMessage("Bub exported");
-    Serial.printf("[UI] Export Bub OK path=%s\n", path);
+    ui_showMessage("Pet exported");
+    Serial.printf("[UI] Export Pet OK path=%s\n", path);
   }
   else
   {
     ui_showMessage("Export failed");
-    Serial.println("[UI] Export Bub FAILED");
+    Serial.println("[UI] Export Pet FAILED");
   }
 
   requestUIRedraw();
@@ -407,15 +407,15 @@ static void actGame_ImportBub(InputState &)
   char path[128];
   if (saveManagerImportLatestBubJson(path, sizeof(path)))
   {
-    ui_showMessage("Pet imported");
+    ui_showMessage("Pet resumed");
     invalidateBackgroundCache();
     requestUIRedraw();
-    Serial.printf("[UI] Import Bub OK path=%s\n", path);
+    Serial.printf("[UI] Import Pet OK path=%s\n", path);
   }
   else
   {
     ui_showMessage("No valid export");
-    Serial.println("[UI] Import Bub FAILED");
+    Serial.println("[UI] Import Pet FAILED");
   }
 
   playBeep();
@@ -489,14 +489,14 @@ static MenuItem kSystemItems[] = {
 // Menu definitions
 // ------------------------------------------------------------
 static MenuItem kTopItems[] = {
-  {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
-  {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
-  {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
-  {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
-  {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
-  {"Console", actTop_Console, nullptr, nullptr, enConsole},
-  {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
-  {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
+    {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
+    {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
+    {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
+    {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
+    {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
+    {"Console", actTop_Console, nullptr, nullptr, enConsole},
+    {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
+    {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kScreenItems[] = {
@@ -542,12 +542,12 @@ static MenuItem kWifiItems[] = {
 #endif
 
 static MenuItem kGameItems[] = {
-  {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
-  {"Export Bub", actGame_ExportBub, nullptr, nullptr, nullptr},
-  {"Import Bub", actGame_ImportBub, nullptr, nullptr, nullptr},
-  {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
-  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
-  {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
+    {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
+    {"Store Pet", actGame_ExportBub, nullptr, nullptr, nullptr},
+    {"Stored Pets", actGame_ImportBub, nullptr, nullptr, nullptr},
+    {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
+    {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+    {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {
@@ -593,29 +593,26 @@ static const MenuPageDef *findPage(SettingsPage page)
 namespace UiSettingsMenu
 {
 
-  static int wifiVisibleItemCount()
+static int wifiVisibleItemCount()
+{
+  int count = 0;
+  for (int i = 0; i < (int)(sizeof(kWifiItems) / sizeof(kWifiItems[0])); ++i)
   {
-    int count = 0;
-    for (int i = 0; i < (int)(sizeof(kWifiItems) / sizeof(kWifiItems[0])); ++i)
-    {
-      if (!kWifiItems[i].isEnabled || kWifiItems[i].isEnabled())
-        ++count;
-    }
-    return count;
+    if (!kWifiItems[i].isEnabled || kWifiItems[i].isEnabled())
+      ++count;
   }
-    
-  int WifiItemCount()
-  {
-    return (int)(sizeof(kWifiItems) / sizeof(kWifiItems[0]));
-  }
-  
-  const char *WifiItemLabel(int index)
-  {
-    const int count = WifiItemCount();
-    if (index < 0 || index >= count)
-      return "";
-    return kWifiItems[index].label ? kWifiItems[index].label : "";
-  }
+  return count;
+}
+
+int WifiItemCount() { return (int)(sizeof(kWifiItems) / sizeof(kWifiItems[0])); }
+
+const char *WifiItemLabel(int index)
+{
+  const int count = WifiItemCount();
+  if (index < 0 || index >= count)
+    return "";
+  return kWifiItems[index].label ? kWifiItems[index].label : "";
+}
 
 bool Handle(InputState &input, int move)
 {
@@ -623,8 +620,8 @@ bool Handle(InputState &input, int move)
   if (!def)
     return false;
 
-int &cursor = def->cursor();
-const int count = (int)def->itemCount;
+  int &cursor = def->cursor();
+  const int count = (int)def->itemCount;
 
   if (assetOtaConfirmActive())
   {
@@ -668,7 +665,7 @@ const int count = (int)def->itemCount;
   if (cursor >= count)
     cursor = count - 1;
 
-    MenuItem &item = def->items[cursor];
+  MenuItem &item = def->items[cursor];
 
   // Optional per-page hook (e.g., Factory Reset flow on SYSTEM page)
   if (def->pageHook)

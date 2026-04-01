@@ -2053,8 +2053,8 @@ static void drawGameOptionsMenu()
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const char *renameLine = "Rename Pet";
-  const char *exportLine = "Export Bub";
-  const char *importLine = "Import Bub";
+  const char *exportLine = "Export Pet";
+  const char *importLine = "Import Pet";
 
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
@@ -6008,7 +6008,7 @@ void drawImportPetListScreen(bool redrawBg)
     {
       spr.setTextDatum(TC_DATUM);
       spr.setTextColor(TFT_DARKGREY);
-      spr.drawString("No exports found", SCREEN_W / 2, SCREEN_H / 2, 2);
+      spr.drawString("No stored pets", SCREEN_W / 2, SCREEN_H / 2, 2);
     }
   }
 }
