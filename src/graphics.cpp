@@ -507,6 +507,14 @@ static bool s_hudMoodIconReady = false;
 static M5Canvas s_hudRestIcon(&spr);
 static bool s_hudRestIconReady = false;
 
+static void drawStringScaled(M5Canvas &spr, const char *text, int x, int y, int scale, uint16_t color)
+{
+  spr.setTextSize(scale);
+  spr.setTextColor(color, TFT_TRANSPARENT);
+  spr.drawString(text, x, y, 1);
+  spr.setTextSize(1);
+}
+
 static int deathTransitionYNudgeForPet()
 {
   switch (pet.type)
@@ -6376,11 +6384,10 @@ void drawTitleMenuScreen(bool redrawBg)
   const bool enabled[3] = {true, hasImport, true};
 
   // Menu panel
-  const int rowH = 16;
+  const int rowH = 20;
   const int itemCount = 3;
-  const int menuBottomY = SCREEN_H - 3;
-  const int menuTopY = menuBottomY - (itemCount * rowH);
-
+  const int menuTopY = (SCREEN_H / 2) + 10;
+  
   for (int i = 0; i < itemCount; ++i)
   {
     const int rowY = menuTopY + (i * rowH);
@@ -6396,7 +6403,7 @@ void drawTitleMenuScreen(bool redrawBg)
 
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(fg, TFT_TRANSPARENT);
-    spr.drawString(labels[i], SCREEN_W / 2, rowY, 2);
+    drawStringScaled(spr, labels[i], SCREEN_W / 2, rowY, 2, fg);
 
     if (!enabled[i])
     {
