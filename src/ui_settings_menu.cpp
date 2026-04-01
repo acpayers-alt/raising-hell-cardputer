@@ -516,6 +516,31 @@ static void actPet_StoredPets(InputState &input)
   clearInputLatch();
 }
 
+static void actPet_BackupCurrentPet(InputState &input)
+{
+  char path[128];
+  if (!saveManagerBackupCurrentPet(path, sizeof(path)))
+    ui_showMessage("Backup Failed");
+  else
+    ui_showSuccessMessage("Pet Saved!");
+
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+  requestUIRedraw();
+  uiDrainKb(input);
+  clearInputLatch();
+  playBeep();
+}
+
+static void actPet_RestoreFromBackup(InputState &input)
+{
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+  playBeep();
+  uiActionEnterState(UIState::BACKUP_PET_LIST, Tab::TAB_PET, true);
+  requestUIRedraw();
+  uiDrainKb(input);
+  clearInputLatch();
+}
+
 static void actPet_NewPet(InputState &input)
 {
   (void)input;
@@ -623,6 +648,8 @@ static MenuItem kPetItems[] = {
   {"Rename Pet", actPet_RenamePet, nullptr, nullptr, nullptr},
   {"Store Pet", actPet_StorePet, nullptr, nullptr, nullptr},
   {"Stored Pets", actPet_StoredPets, nullptr, nullptr, nullptr},
+  {"Backup Current Pet", actPet_BackupCurrentPet, nullptr, nullptr, nullptr},
+  {"Restore From Backup", actPet_RestoreFromBackup, nullptr, nullptr, nullptr},
   {"New Pet", actPet_NewPet, nullptr, nullptr, nullptr},
   {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
 };

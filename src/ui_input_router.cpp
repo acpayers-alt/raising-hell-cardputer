@@ -6,10 +6,11 @@
 #include "ui_input_interceptors.h"
 #include "ui_state_choose_pet.h"
 #include "ui_state_handlers.h"
-#include "ui_state_pet_sleeping.h"
-#include "wifi_setup_state.h"
-#include "ui_state_title_menu.h"
 #include "ui_state_import_pet_list.h"
+#include "ui_state_pet_sleeping.h"
+#include "ui_state_title_menu.h"
+#include "wifi_setup_state.h"
+#include "ui_state_backup_pet_list.h"
 
 // ----------------------------------------------------------------------------
 // Text capture policy
@@ -69,19 +70,22 @@ bool uiHandleInput(InputState &in)
   {
     if (g_app.uiState == UIState::PET_SLEEPING)
       uiPetSleepingOnEnter(in);
-  
+
     if (g_app.uiState == UIState::TITLE_MENU)
       uiTitleMenuOnEnter(in);
-  
+
+    if (g_app.uiState == UIState::BACKUP_PET_LIST)
+      uiBackupPetListOnEnter(in);
+
     if (g_app.uiState == UIState::IMPORT_PET_LIST)
       uiImportPetListOnEnter(in);
-  
+
     if (g_app.uiState == UIState::CHOOSE_PET)
       uiChoosePetOnEnter(in);
-  
+
     s_prevState = g_app.uiState;
   }
-  
+
   // ---------------------------------------------------------------
 
   if (isNoInputState(g_app.uiState))

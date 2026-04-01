@@ -17,6 +17,8 @@ int s_entryCount = 0;
 int s_importIndex = 0;
 bool s_confirming = false;
 int s_confirmIndex = 0; // 0 = YES, 1 = NO
+static int s_windowStart = 0;
+constexpr int kVisibleRows = 5;
 
 static void swallowImportInput(InputState &in)
 {
@@ -34,6 +36,8 @@ void uiImportPetListOnEnter(InputState &in)
   s_confirming = false;
   s_importIndex = 0;
   s_confirming = false;
+  s_windowStart = 0;
+  
   swallowImportInput(in);
   requestFullUIRedraw();
 }
@@ -117,18 +121,24 @@ void uiImportPetListHandle(InputState &in)
   if (in.downOnce || in.rightOnce || in.encoderDelta > 0)
     move = +1;
 
-  if (move != 0 && s_entryCount > 0)
-  {
-    s_importIndex += move;
-    if (s_importIndex < 0)
-      s_importIndex = s_entryCount - 1;
-    if (s_importIndex >= s_entryCount)
-      s_importIndex = 0;
-    playBeep();
-    requestFullUIRedraw();
-    swallowImportInput(in);
-    return;
-  }
+    if (move != 0 && s_entryCount > 0)
+    {
+      s_importIndex += move;
+      if (s_importIndex < 0)
+        s_importIndex = s_entryCount - 1;
+      if (s_importIndex >= s_entryCount)
+        s_importIndex = 0;
+  
+      if (s_importIndex < s_windowStart)
+        s_windowStart = s_importIndex;
+      if (s_importIndex >= s_windowStart + kVisibleRows)
+        s_windowStart = s_importIndex - kVisibleRows + 1;
+  
+      playBeep();
+      requestFullUIRedraw();
+      swallowImportInput(in);
+      return;
+    }
 
   if (in.menuOnce || in.escOnce)
   {
@@ -173,9 +183,20 @@ void uiImportPetListHandle(InputState &in)
 
 int uiImportPetListCount() { return s_entryCount; }
 
-int uiImportPetListVisibleCount() { return (s_entryCount < 5) ? s_entryCount : 5; }
+int uiImportPetListVisibleCount()
+{
+  const int remaining = s_entryCount - s_windowStart;
+return (remaining <= 0) ? 0 : ((remaining < kVisibleRows) ? remaining : kVisibleRows);}
 
-const PetExportEntry &uiImportPetListGet(int idx) { return s_entries[idx]; }
+int uiImportPetListWindowStart()
+{
+  return s_windowStart;
+}
+
+const PetExportEntry &uiImportPetListGetVisible(int idx)
+{
+  return s_entries[s_windowStart + idx];
+}
 
 int uiImportPetListSelected() { return s_importIndex; }
 

@@ -11,6 +11,7 @@
 // -----------------------------------------------------------------------------
 // Core UI states
 // -----------------------------------------------------------------------------
+#include "ui_state_backup_pet_list.h" // uiBackupPetListHandle
 #include "ui_state_burial.h"          // uiBurialHandle
 #include "ui_state_choose_pet.h"      // uiChoosePetHandle
 #include "ui_state_console.h"         // uiConsoleHandle
@@ -36,7 +37,7 @@
 #include "ui_state_wifi_connect_wait.h" // uiWifiConnectWaitHandle
 #include "ui_state_wifi_setup.h"        // uiWifiSetupHandle
 
-static constexpr int kUiStateCount = 31; // UIState is 0..26 in ui_defs.h
+static constexpr int kUiStateCount = 32;
 
 static inline int toIndex(UIState s) { return (int)s; }
 
@@ -72,6 +73,7 @@ static StateHandlerFn kHandlers[kUiStateCount] = {
     /* 28 BOOT_ASSET_WIFI_REQUIRED   */ uiBootAssetWifiRequiredHandle,
     /* 29 TITLE_MENU                 */ uiTitleMenuHandle,
     /* 30 IMPORT_PET_LIST            */ uiImportPetListHandle,
+    /* 31 BACKUP_PET_LIST            */ uiBackupPetListHandle,
 };
 
 StateHandlerFn uiGetStateHandler(UIState state)

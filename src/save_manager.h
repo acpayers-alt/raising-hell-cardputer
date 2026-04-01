@@ -49,6 +49,10 @@ struct PetExportEntry
   bool valid;
 };
 
+int saveManagerListPetBackups(PetExportEntry* outEntries, int maxEntries);
+bool saveManagerBackupCurrentPet(char *outPath, size_t outPathSize);
+bool saveManagerValidateBubAtPath(const char* path);
+bool saveManagerDeletePetBackupAtPath(const char* path);
 int saveManagerListPetExports(PetExportEntry* outEntries, int maxEntries);
 bool saveManagerImportBubAtPath(const char* path, char* outPath, size_t outPathSize, bool backupCurrentFirst = true);
 

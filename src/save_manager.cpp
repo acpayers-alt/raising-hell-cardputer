@@ -130,6 +130,7 @@ static const char *AUTO_HEAL_FALLBACK_PET_NAME = "Bub";
 
 bool saveManagerAutoHeal();
 static const char *NAME_PENDING_FLAG_PATH = "/raising_hell/save/name_pending.flag";
+static const char *BACKUPS_DIR = "/raising_hell/backup";
 static const char *EXPORTS_DIR = "/raising_hell/exports";
 static const char *EXPORT_MAGIC = "raising_hell_bub_export";
 static const uint16_t EXPORT_VERSION = 1;
@@ -180,9 +181,9 @@ static void tryRemove(const char *path)
     SD.remove(path);
 }
 
-static bool ensureExportsDir()
+static bool ensurePetDir(const char *dirPath)
 {
-  if (!g_sdReady)
+  if (!g_sdReady || !dirPath || !dirPath[0])
     return false;
 
   if (!SD.exists("/raising_hell"))
@@ -191,14 +192,18 @@ static bool ensureExportsDir()
       return false;
   }
 
-  if (!SD.exists(EXPORTS_DIR))
+  if (!SD.exists(dirPath))
   {
-    if (!SD.mkdir(EXPORTS_DIR))
+    if (!SD.mkdir(dirPath))
       return false;
   }
 
   return true;
 }
+
+static bool ensureExportsDir() { return ensurePetDir(EXPORTS_DIR); }
+
+static bool ensureBackupsDir() { return ensurePetDir(BACKUPS_DIR); }
 
 static const char *petTypeToStringForExport(PetType t)
 {
@@ -371,15 +376,15 @@ static void sortPetExportsNewestFirst(PetExportEntry *entries, int count)
   }
 }
 
-int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries)
+static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries, int maxEntries)
 {
   if (!outEntries || maxEntries <= 0)
     return 0;
 
-  if (!g_sdReady || !SD.exists(EXPORTS_DIR))
+  if (!g_sdReady || !dirPath || !SD.exists(dirPath))
     return 0;
 
-  File dir = SD.open(EXPORTS_DIR);
+  File dir = SD.open(dirPath);
   if (!dir || !dir.isDirectory())
     return 0;
 
@@ -394,13 +399,11 @@ int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries)
       if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
       {
         char full[128];
-        snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
+        snprintf(full, sizeof(full), "%s/%s", dirPath, nm);
 
         PetExportEntry entry{};
         if (readExportMetadata(full, entry))
-        {
           outEntries[count++] = entry;
-        }
       }
     }
 
@@ -410,6 +413,16 @@ int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries)
 
   sortPetExportsNewestFirst(outEntries, count);
   return count;
+}
+
+int saveManagerListPetBackups(PetExportEntry *outEntries, int maxEntries)
+{
+  return listPetEntriesFromDir(BACKUPS_DIR, outEntries, maxEntries);
+}
+
+int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries)
+{
+  return listPetEntriesFromDir(EXPORTS_DIR, outEntries, maxEntries);
 }
 
 static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)
@@ -1736,459 +1749,515 @@ bool saveManagerLoad()
   inputSetTextCapture(false);
   g_textCaptureMode = false;
   g_app.newPetFlowActive = false;
-  
+
   clearNamePendingFlag();
 
   dirty = false;
   clearInputLatch();
 
-  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d\n",
-    g_app.newPetFlowActive ? 1 : 0,
-    saveManagerNamePendingFlagExists() ? 1 : 0);
-    
+  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d\n", g_app.newPetFlowActive ? 1 : 0,
+                saveManagerNamePendingFlagExists() ? 1 : 0);
+
   return false;
-  }
-  
-  void saveManagerStampBirthNow()
-  {
-    uint32_t now = getNowEpochOrZero();
-    g_birthEpoch = now;
-    pet.birth_epoch = now;
-    saveManagerMarkDirty();
-  }
+}
 
-  bool saveManagerAutoHeal()
-  {
-    if (!g_sdReady)
-    {
-      Serial.println("[SAVE][AUTOHEAL] skipped: SD not ready");
-      return false;
-    }
+void saveManagerStampBirthNow()
+{
+  uint32_t now = getNowEpochOrZero();
+  g_birthEpoch = now;
+  pet.birth_epoch = now;
+  saveManagerMarkDirty();
+}
 
-    return autoHealLoadedSaveIfNeeded();
+bool saveManagerAutoHeal()
+{
+  if (!g_sdReady)
+  {
+    Serial.println("[SAVE][AUTOHEAL] skipped: SD not ready");
+    return false;
   }
 
-  bool saveManagerSave()
+  return autoHealLoadedSaveIfNeeded();
+}
+
+bool saveManagerSave()
+{
+  DBG_ON("[SAVE] SAVE begin dirty=%d sd=%d\n", dirty ? 1 : 0, g_sdReady ? 1 : 0);
+  if (!g_sdReady)
+    return false;
+
+  const bool settingsOk = saveSettingsToSD_internal();
+  const bool saveOk = saveSaveToSD_internal();
+  const bool ok = settingsOk && saveOk;
+
+  if (ok)
   {
-    DBG_ON("[SAVE] SAVE begin dirty=%d sd=%d\n", dirty ? 1 : 0, g_sdReady ? 1 : 0);
-    if (!g_sdReady)
-      return false;
+    dirty = false;
+    lastSaveMs = millis();
+    DBGLN_ON("[SAVE] SAVE OK");
 
-    const bool settingsOk = saveSettingsToSD_internal();
-    const bool saveOk = saveSaveToSD_internal();
-    const bool ok = settingsOk && saveOk;
-
-    if (ok)
+    if (namePendingFlagExists() && !isBlankName(pet.name))
     {
-      dirty = false;
-      lastSaveMs = millis();
-      DBGLN_ON("[SAVE] SAVE OK");
-
-      if (namePendingFlagExists() && !isBlankName(pet.name))
-      {
-        clearNamePendingFlag();
-      }
-    }
-    else
-    {
-      DBG_ON("[SAVE] SAVE FAIL settings=%d save=%d\n", settingsOk ? 1 : 0, saveOk ? 1 : 0);
-    }
-
-    return ok;
-  }
-
-  void saveManagerMarkDirty()
-  {
-    dirty = true;
-    DBG_ON("[SAVE] DIRTY now=%lu ui=%d tab=%d\n", (unsigned long)millis(), (int)g_app.uiState, (int)g_app.currentTab);
-  }
-
-  void saveManagerTick()
-  {
-    if (!dirty)
-      return;
-
-    if (!g_sdReady)
-    {
-      DBG_ON("[SAVE] TICK dirty but SD not ready\n");
-      return;
-    }
-
-    const uint32_t now = millis();
-    if (now - lastSaveMs < DEBOUNCE_MS)
-    {
-      DBG_ON("[SAVE] TICK debounce now=%lu last=%lu delta=%lu\n", (unsigned long)now, (unsigned long)lastSaveMs,
-             (unsigned long)(now - lastSaveMs));
-      return;
-    }
-
-    DBG_ON("[SAVE] TICK firing save now=%lu\n", (unsigned long)now);
-    (void)saveManagerSave();
-  }
-
-  void saveManagerForce()
-  {
-    if (!g_sdReady)
-      return;
-
-    const bool settingsOk = saveSettingsToSD_internal();
-
-    if (!dirty)
-    {
-      if (!settingsOk)
-        DBG_ON("[SAVE] FORCE settings write failed\n");
-      return;
-    }
-
-    const bool saveOk = saveSaveToSD_internal();
-    if (settingsOk && saveOk)
-    {
-      dirty = false;
-      lastSaveMs = millis();
-      DBGLN_ON("[SAVE] FORCE OK");
-
-      if (namePendingFlagExists() && !isBlankName(pet.name))
-      {
-        clearNamePendingFlag();
-      }
-    }
-    else
-    {
-      DBG_ON("[SAVE] FORCE FAIL settings=%d save=%d\n", settingsOk ? 1 : 0, saveOk ? 1 : 0);
+      clearNamePendingFlag();
     }
   }
-
-  bool loadSettingsFromSD()
+  else
   {
-    bool loadedOld = false;
-    const bool ok = loadSettingsFromSD_internal(&loadedOld);
-    if (ok && loadedOld)
+    DBG_ON("[SAVE] SAVE FAIL settings=%d save=%d\n", settingsOk ? 1 : 0, saveOk ? 1 : 0);
+  }
+
+  return ok;
+}
+
+void saveManagerMarkDirty()
+{
+  dirty = true;
+  DBG_ON("[SAVE] DIRTY now=%lu ui=%d tab=%d\n", (unsigned long)millis(), (int)g_app.uiState, (int)g_app.currentTab);
+}
+
+void saveManagerTick()
+{
+  if (!dirty)
+    return;
+
+  if (!g_sdReady)
+  {
+    DBG_ON("[SAVE] TICK dirty but SD not ready\n");
+    return;
+  }
+
+  const uint32_t now = millis();
+  if (now - lastSaveMs < DEBOUNCE_MS)
+  {
+    DBG_ON("[SAVE] TICK debounce now=%lu last=%lu delta=%lu\n", (unsigned long)now, (unsigned long)lastSaveMs,
+           (unsigned long)(now - lastSaveMs));
+    return;
+  }
+
+  DBG_ON("[SAVE] TICK firing save now=%lu\n", (unsigned long)now);
+  (void)saveManagerSave();
+}
+
+void saveManagerForce()
+{
+  if (!g_sdReady)
+    return;
+
+  const bool settingsOk = saveSettingsToSD_internal();
+
+  if (!dirty)
+  {
+    if (!settingsOk)
+      DBG_ON("[SAVE] FORCE settings write failed\n");
+    return;
+  }
+
+  const bool saveOk = saveSaveToSD_internal();
+  if (settingsOk && saveOk)
+  {
+    dirty = false;
+    lastSaveMs = millis();
+    DBGLN_ON("[SAVE] FORCE OK");
+
+    if (namePendingFlagExists() && !isBlankName(pet.name))
     {
-      saveSettingsToSD_internal();
+      clearNamePendingFlag();
     }
-    return ok;
   }
-
-  void saveSettingsToSD() { saveSettingsToSD_internal(); }
-
-  bool saveManagerSaveFileExists()
+  else
   {
-    if (!g_sdReady)
-      return false;
-
-    return SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin");
+    DBG_ON("[SAVE] FORCE FAIL settings=%d save=%d\n", settingsOk ? 1 : 0, saveOk ? 1 : 0);
   }
+}
 
-  void saveManagerNewPet()
+bool loadSettingsFromSD()
+{
+  bool loadedOld = false;
+  const bool ok = loadSettingsFromSD_internal(&loadedOld);
+  if (ok && loadedOld)
   {
-    if (!g_sdReady)
-      return;
-    (void)ensureSaveDir();
-    newPetInternal();
+    saveSettingsToSD_internal();
   }
+  return ok;
+}
 
-  void saveManagerNewPetNoSave()
+void saveSettingsToSD() { saveSettingsToSD_internal(); }
+
+bool saveManagerSaveFileExists()
+{
+  if (!g_sdReady)
+    return false;
+
+  return SD.exists("/raising_hell/save/save.bin") || SD.exists("raising_hell/save/save.bin");
+}
+
+void saveManagerNewPet()
+{
+  if (!g_sdReady)
+    return;
+  (void)ensureSaveDir();
+  newPetInternal();
+}
+
+void saveManagerNewPetNoSave()
+{
+  if (!g_sdReady)
   {
-    if (!g_sdReady)
-    {
-      newPetInternalNoSave();
-      return;
-    }
-
-    ensureSaveDir();
     newPetInternalNoSave();
+    return;
   }
 
-  uint32_t saveManagerGetBirthEpoch() { return g_birthEpoch; }
+  ensureSaveDir();
+  newPetInternalNoSave();
+}
 
-  uint8_t saveManagerGetDecayMode()
+uint32_t saveManagerGetBirthEpoch() { return g_birthEpoch; }
+
+uint8_t saveManagerGetDecayMode()
+{
+  uint8_t m = g_gameopt.decayMode;
+  if (m > 5)
+    m = 2;
+  return m;
+}
+
+void saveManagerSetDecayMode(uint8_t m)
+{
+  if (m > 5)
+    m = 2;
+  g_gameopt.decayMode = m;
+
+  if (!saveGameOptionsToSD_internal())
+    DBG_ON("[SAVE] game options write failed\n");
+}
+
+void saveManagerFactoryReset()
+{
+  tryRemove("/raising_hell/save/pet.bin");
+  tryRemove("/raising_hell/save/inventory.bin");
+  tryRemove("/raising_hell/save/settings.bin");
+  tryRemove(SAVE_PATH);
+  tryRemove(SAVE_TMP_PATH);
+  tryRemove(SAVE_BAK1_PATH);
+  tryRemove(SAVE_BAK2_PATH);
+  tryRemove(SAVE_BAK3_PATH);
+  tryRemove("/raising_hell/save/gameopt.bin");
+  tryRemove("/raising_hell/save/gameopt.tmp");
+  tryRemove("/raising_hell/save/settings.tmp");
+  tryRemove(NAME_PENDING_FLAG_PATH);
+
+  tryRemove("/raising_hell/save/birth.txt");
+
+  clearNvsNamespace("rh_settings");
+  clearNvsNamespace("rh_wifi");
+  clearNvsNamespace("rh_tz");
+  clearTimeAnchor();
+  invalidateTimeNow();
+
+  // Clear ALL transient boot/new-pet flow flags so factory reset always
+  // reboots into a clean first-boot/title-menu state.
+  clearNamePendingFlag();
+  bootSetupClearPendingFlag();
+  bootPostProvisionControlsHelpClear();
+
+  // Also wipe the EEPROM-backed inventory mirror so a brand-new pet cannot
+  // inherit inventory across a factory reset.
+  g_app.inventory.wipePersistedEeprom();
+
+  delay(50);
+  ESP.restart();
+}
+
+static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t outPathSize)
+{
+  if (outPath && outPathSize > 0)
+    outPath[0] = '\0';
+
+  if (!g_sdReady || !dirPath || !dirPath[0])
+    return false;
+
+  if (!ensurePetDir(dirPath))
+    return false;
+
+  char safeName[32];
+  sanitizeExportFilename(pet.getName(), safeName, sizeof(safeName));
+
+  const uint32_t nowEpoch = getNowEpochOrZero();
+
+  char finalPath[128];
+  snprintf(finalPath, sizeof(finalPath), "%s/bub_%s_%lu.bub", dirPath, safeName, (unsigned long)nowEpoch);
+
+  char tmpPath[140];
+  snprintf(tmpPath, sizeof(tmpPath), "%s.part", finalPath);
+
+  tryRemove(tmpPath);
+
+  DynamicJsonDocument doc(4096);
+  doc["_warning"] = "Changing these values will bring on the curse. You have been warned.";
+  doc["format"] = EXPORT_MAGIC;
+  doc["exportVersion"] = EXPORT_VERSION;
+  doc["createdAtEpoch"] = nowEpoch;
+  doc["gameVersion"] = getFirmwareVersionString();
+  doc["assetPackVersion"] = assetOtaInstalledVersion();
+
+  JsonObject profile = doc.createNestedObject("profile");
+  profile["name"] = pet.getName();
+  profile["petType"] = petTypeToStringForExport(pet.type);
+  profile["level"] = pet.level;
+  profile["xp"] = pet.xp;
+  profile["evoStage"] = pet.evoStage;
+  profile["birthEpoch"] = g_birthEpoch;
+
+  JsonObject stats = profile.createNestedObject("stats");
+  stats["hunger"] = pet.hunger;
+  stats["happiness"] = pet.happiness;
+  stats["energy"] = pet.energy;
+  stats["health"] = pet.health;
+  stats["inf"] = pet.inf;
+
+  JsonObject gameOptions = doc.createNestedObject("gameOptions");
+  gameOptions["decayMode"] = saveManagerGetDecayMode();
+
+  JsonObject inventory = doc.createNestedObject("inventory");
+  inventory["selectedIndex"] = g_app.inventory.selectedIndex;
+  JsonArray slots = inventory.createNestedArray("slots");
+
+  for (int i = 0; i < Inventory::MAX_ITEMS; ++i)
   {
-    uint8_t m = g_gameopt.decayMode;
-    if (m > 5)
-      m = 2;
-    return m;
+    const Item &it = g_app.inventory.items[i];
+    if (it.type == ITEM_NONE || it.quantity <= 0)
+      continue;
+
+    JsonObject row = slots.createNestedObject();
+    row["item"] = itemTypeToStringForExport(it.type);
+    row["qty"] = it.quantity;
   }
 
-  void saveManagerSetDecayMode(uint8_t m)
+  File f = SD.open(tmpPath, FILE_WRITE);
+  if (!f)
+    return false;
+
+  if (serializeJsonPretty(doc, f) == 0)
   {
-    if (m > 5)
-      m = 2;
-    g_gameopt.decayMode = m;
-
-    if (!saveGameOptionsToSD_internal())
-      DBG_ON("[SAVE] game options write failed\n");
-  }
-
-  void saveManagerFactoryReset()
-  {
-    tryRemove("/raising_hell/save/pet.bin");
-    tryRemove("/raising_hell/save/inventory.bin");
-    tryRemove("/raising_hell/save/settings.bin");
-    tryRemove(SAVE_PATH);
-    tryRemove(SAVE_TMP_PATH);
-    tryRemove(SAVE_BAK1_PATH);
-    tryRemove(SAVE_BAK2_PATH);
-    tryRemove(SAVE_BAK3_PATH);
-    tryRemove("/raising_hell/save/gameopt.bin");
-    tryRemove("/raising_hell/save/gameopt.tmp");
-    tryRemove("/raising_hell/save/settings.tmp");
-    tryRemove(NAME_PENDING_FLAG_PATH);
-
-    tryRemove("/raising_hell/save/birth.txt");
-
-    clearNvsNamespace("rh_settings");
-    clearNvsNamespace("rh_wifi");
-    clearNvsNamespace("rh_tz");
-    clearTimeAnchor();
-    invalidateTimeNow();
-
-    // Clear ALL transient boot/new-pet flow flags so factory reset always
-    // reboots into a clean first-boot/title-menu state.
-    clearNamePendingFlag();
-    bootSetupClearPendingFlag();
-    bootPostProvisionControlsHelpClear();
-
-    // Also wipe the EEPROM-backed inventory mirror so a brand-new pet cannot
-    // inherit inventory across a factory reset.
-    g_app.inventory.wipePersistedEeprom();
-
-    delay(50);
-    ESP.restart();
-  }
-
-  bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
-  {
-    if (outPath && outPathSize > 0)
-      outPath[0] = '\0';
-
-    if (!g_sdReady)
-      return false;
-    if (!ensureExportsDir())
-      return false;
-
-    char safeName[32];
-    sanitizeExportFilename(pet.getName(), safeName, sizeof(safeName));
-
-    char path[128];
-    const uint32_t nowEpoch = getNowEpochOrZero();
-    snprintf(path, sizeof(path), "%s/bub_%s_%lu.bub", EXPORTS_DIR, safeName, (unsigned long)nowEpoch);
-
-    DynamicJsonDocument doc(4096);
-
-    // Flavor text / warning for users who open .bub files manually.
-    // Keep this as valid JSON so imports continue to work safely.
-    doc["_warning"] = "Changing these values will bring on the curse. You have been warned.";
-
-    doc["format"] = EXPORT_MAGIC;
-    doc["exportVersion"] = EXPORT_VERSION;
-    doc["createdAtEpoch"] = nowEpoch;
-    doc["gameVersion"] = getFirmwareVersionString();
-    doc["assetPackVersion"] = assetOtaInstalledVersion();
-
-    JsonObject profile = doc.createNestedObject("profile");
-    profile["name"] = pet.getName();
-    profile["petType"] = petTypeToStringForExport(pet.type);
-    profile["level"] = pet.level;
-    profile["xp"] = pet.xp;
-    profile["evoStage"] = pet.evoStage;
-    profile["birthEpoch"] = g_birthEpoch;
-
-    JsonObject stats = profile.createNestedObject("stats");
-    stats["hunger"] = pet.hunger;
-    stats["happiness"] = pet.happiness;
-    stats["energy"] = pet.energy;
-    stats["health"] = pet.health;
-    stats["inf"] = pet.inf;
-
-    JsonObject gameOptions = doc.createNestedObject("gameOptions");
-    gameOptions["decayMode"] = saveManagerGetDecayMode();
-
-    JsonObject inventory = doc.createNestedObject("inventory");
-    inventory["selectedIndex"] = g_app.inventory.selectedIndex;
-    JsonArray slots = inventory.createNestedArray("slots");
-
-    for (int i = 0; i < Inventory::MAX_ITEMS; ++i)
-    {
-      const Item &it = g_app.inventory.items[i];
-      if (it.type == ITEM_NONE || it.quantity <= 0)
-        continue;
-
-      JsonObject row = slots.createNestedObject();
-      row["item"] = itemTypeToStringForExport(it.type);
-      row["qty"] = it.quantity;
-    }
-
-    File f = SD.open(path, FILE_WRITE);
-    if (!f)
-      return false;
-
-    if (serializeJsonPretty(doc, f) == 0)
-    {
-      f.close();
-      SD.remove(path);
-      return false;
-    }
-
-    f.flush();
     f.close();
-
-    if (outPath && outPathSize > 0)
-    {
-      strncpy(outPath, path, outPathSize - 1);
-      outPath[outPathSize - 1] = '\0';
-    }
-
-    Serial.printf("[EXPORT] wrote '%s' pet='%s'\n", path, pet.getName());
-    return true;
+    tryRemove(tmpPath);
+    return false;
   }
 
-  bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
+  f.flush();
+  const size_t writtenSize = (size_t)f.size();
+  f.close();
+
+  if (writtenSize == 0)
   {
-    char path[128];
-    if (!findLatestExportPath(path, sizeof(path)))
-      return false;
-
-    return saveManagerImportBubAtPath(path, outPath, outPathSize, true);
+    tryRemove(tmpPath);
+    return false;
   }
 
-  bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathSize, bool backupCurrentFirst)
+  PetExportEntry verify{};
+  if (!readExportMetadata(tmpPath, verify))
   {
-    if (outPath && outPathSize > 0)
-      outPath[0] = '\0';
-
-    if (!path || !path[0])
-      return false;
-
-    if (backupCurrentFirst && saveManagerSaveFileExists())
-    {
-      char backupPath[128];
-      if (!saveManagerExportCurrentBubJson(backupPath, sizeof(backupPath)))
-      {
-        Serial.println("[IMPORT] backup-current failed");
-        return false;
-      }
-    }
-
-    File f = SD.open(path, FILE_READ);
-    if (!f)
-      return false;
-
-    DynamicJsonDocument doc(4096);
-    const DeserializationError err = deserializeJson(doc, f);
-    f.close();
-
-    if (err)
-    {
-      Serial.printf("[IMPORT] failed '%s' reason=json_parse\n", path);
-      return false;
-    }
-
-    const char *format = doc["format"] | "";
-    const uint16_t exportVersion = doc["exportVersion"] | 0;
-    if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
-    {
-      Serial.printf("[IMPORT] failed '%s' reason=format/version\n", path);
-      return false;
-    }
-
-    JsonObject profile = doc["profile"];
-    JsonObject stats = profile["stats"];
-    JsonObject inventory = doc["inventory"];
-    JsonArray slots = inventory["slots"];
-
-    const char *name = profile["name"] | "";
-    const char *petTypeStr = profile["petType"] | "";
-    PetType importedType = PET_DEVIL;
-    if (!petTypeFromStringForImport(petTypeStr, importedType))
-      importedType = PET_DEVIL;
-
-    pet.setName((name && name[0]) ? name : "Bub");
-    pet.type = importedType;
-    pet.level = (uint16_t)constrain((int)(profile["level"] | 1), 1, 999);
-    pet.xp = (uint32_t)(profile["xp"] | 0);
-    pet.evoStage = (uint8_t)constrain((int)(profile["evoStage"] | 0), 0, 3);
-
-    pet.hunger = constrain((int)(stats["hunger"] | 50), 0, 100);
-    pet.happiness = constrain((int)(stats["happiness"] | 50), 0, 100);
-    pet.energy = constrain((int)(stats["energy"] | 50), 0, 100);
-    pet.health = constrain((int)(stats["health"] | 100), 0, 100);
-    pet.inf = (int)(stats["inf"] | 0);
-    pet.isSleeping = false;
-
-    g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
-    pet.birth_epoch = g_birthEpoch;
-
-    g_app.inventory.clear();
-    for (JsonObject row : slots)
-    {
-      const char *itemStr = row["item"] | "";
-      const int qty = (int)(row["qty"] | 0);
-      if (qty <= 0)
-        continue;
-
-      ItemType t = ITEM_NONE;
-      if (!itemTypeFromStringForImport(itemStr, t))
-        continue;
-
-      if (t != ITEM_NONE)
-        g_app.inventory.addItem(t, qty);
-    }
-
-    g_app.inventory.selectedIndex =
-        constrain((int)(inventory["selectedIndex"] | 0), 0, max(0, g_app.inventory.countItems() - 1));
-
-    saveManagerSetDecayMode((uint8_t)constrain((int)(doc["gameOptions"]["decayMode"] | 2), 0, 5));
-
-    pet.clampStats();
-    clearNamePendingFlag();
-    g_app.inventory.syncEepromNoDirty();
-    saveManagerMarkDirty();
-    saveManagerForce();
-
-    if (outPath && outPathSize > 0)
-    {
-      strncpy(outPath, path, outPathSize - 1);
-      outPath[outPathSize - 1] = '\0';
-    }
-
-    Serial.printf("[IMPORT] applied '%s' pet='%s'\n", path, pet.getName());
-    return true;
+    tryRemove(tmpPath);
+    return false;
   }
 
-  // ------------------------------------------------------------
-  // DELETE ALL SAVES (true death)
-  // ------------------------------------------------------------
-  void saveManagerDeleteAll()
+  tryRemove(finalPath);
+  if (!SD.rename(tmpPath, finalPath))
   {
-    // Used when the pet is buried (hard reset of pet-related data)
-    if (!g_sdReady)
-      return;
-
-    // Remove all pet-related blobs (settings / game options may remain elsewhere)
-    SD.remove(SAVE_PATH); // /raising_hell/save/save.bin
-    SD.remove("/raising_hell/save/pet.bin");
-    SD.remove("/raising_hell/save/inventory.bin");
-    SD.remove(SAVE_BAK1_PATH);
-    SD.remove(SAVE_BAK2_PATH);
-    SD.remove(SAVE_BAK3_PATH);
-
-    // Also wipe the EEPROM-backed inventory mirror so the next pet starts clean.
-    g_app.inventory.wipePersistedEeprom();
+    tryRemove(tmpPath);
+    return false;
   }
 
-  void saveManagerDeletePetOnly()
+  if (outPath && outPathSize > 0)
   {
-    // Delete ONLY the pet + inventory. Keep settings/game options.
-    if (!g_sdReady)
-      return;
-
-    SD.remove("/raising_hell/save/pet.bin");
-    SD.remove("/raising_hell/save/inventory.bin");
-    SD.remove(SAVE_PATH); // if you still store some pet-state here
-    SD.remove(SAVE_BAK1_PATH);
-    SD.remove(SAVE_BAK2_PATH);
-    SD.remove(SAVE_BAK3_PATH);
-
-    // Also wipe the EEPROM-backed inventory mirror so the next pet starts clean.
-    g_app.inventory.wipePersistedEeprom();
+    strncpy(outPath, finalPath, outPathSize - 1);
+    outPath[outPathSize - 1] = '\0';
   }
+
+  Serial.printf("[EXPORT] wrote '%s' pet='%s'\n", finalPath, pet.getName());
+  return true;
+}
+
+bool saveManagerBackupCurrentPet(char *outPath, size_t outPathSize)
+{
+  return writeCurrentBubJsonToDir(BACKUPS_DIR, outPath, outPathSize);
+}
+
+bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
+{
+  return writeCurrentBubJsonToDir(EXPORTS_DIR, outPath, outPathSize);
+}
+
+bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize)
+{
+  char path[128];
+  if (!findLatestExportPath(path, sizeof(path)))
+    return false;
+
+  return saveManagerImportBubAtPath(path, outPath, outPathSize, true);
+}
+
+bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathSize, bool backupCurrentFirst)
+{
+  if (outPath && outPathSize > 0)
+    outPath[0] = '\0';
+
+  if (!path || !path[0])
+    return false;
+
+  if (backupCurrentFirst && saveManagerSaveFileExists())
+  {
+    char backupPath[128];
+    if (!saveManagerExportCurrentBubJson(backupPath, sizeof(backupPath)))
+    {
+      Serial.println("[IMPORT] backup-current failed");
+      return false;
+    }
+  }
+
+  File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  DynamicJsonDocument doc(4096);
+  const DeserializationError err = deserializeJson(doc, f);
+  f.close();
+
+  if (err)
+  {
+    Serial.printf("[IMPORT] failed '%s' reason=json_parse\n", path);
+    return false;
+  }
+
+  const char *format = doc["format"] | "";
+  const uint16_t exportVersion = doc["exportVersion"] | 0;
+  if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
+  {
+    Serial.printf("[IMPORT] failed '%s' reason=format/version\n", path);
+    return false;
+  }
+
+  JsonObject profile = doc["profile"];
+  JsonObject stats = profile["stats"];
+  JsonObject inventory = doc["inventory"];
+  JsonArray slots = inventory["slots"];
+
+  const char *name = profile["name"] | "";
+  const char *petTypeStr = profile["petType"] | "";
+  PetType importedType = PET_DEVIL;
+  if (!petTypeFromStringForImport(petTypeStr, importedType))
+    importedType = PET_DEVIL;
+
+  pet.setName((name && name[0]) ? name : "Bub");
+  pet.type = importedType;
+  pet.level = (uint16_t)constrain((int)(profile["level"] | 1), 1, 999);
+  pet.xp = (uint32_t)(profile["xp"] | 0);
+  pet.evoStage = (uint8_t)constrain((int)(profile["evoStage"] | 0), 0, 3);
+
+  pet.hunger = constrain((int)(stats["hunger"] | 50), 0, 100);
+  pet.happiness = constrain((int)(stats["happiness"] | 50), 0, 100);
+  pet.energy = constrain((int)(stats["energy"] | 50), 0, 100);
+  pet.health = constrain((int)(stats["health"] | 100), 0, 100);
+  pet.inf = (int)(stats["inf"] | 0);
+  pet.isSleeping = false;
+
+  g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
+  pet.birth_epoch = g_birthEpoch;
+
+  g_app.inventory.clear();
+  for (JsonObject row : slots)
+  {
+    const char *itemStr = row["item"] | "";
+    const int qty = (int)(row["qty"] | 0);
+    if (qty <= 0)
+      continue;
+
+    ItemType t = ITEM_NONE;
+    if (!itemTypeFromStringForImport(itemStr, t))
+      continue;
+
+    if (t != ITEM_NONE)
+      g_app.inventory.addItem(t, qty);
+  }
+
+  g_app.inventory.selectedIndex =
+      constrain((int)(inventory["selectedIndex"] | 0), 0, max(0, g_app.inventory.countItems() - 1));
+
+  saveManagerSetDecayMode((uint8_t)constrain((int)(doc["gameOptions"]["decayMode"] | 2), 0, 5));
+
+  pet.clampStats();
+  clearNamePendingFlag();
+  g_app.inventory.syncEepromNoDirty();
+  saveManagerMarkDirty();
+  saveManagerForce();
+
+  if (outPath && outPathSize > 0)
+  {
+    strncpy(outPath, path, outPathSize - 1);
+    outPath[outPathSize - 1] = '\0';
+  }
+
+  Serial.printf("[IMPORT] applied '%s' pet='%s'\n", path, pet.getName());
+  return true;
+}
+
+bool saveManagerValidateBubAtPath(const char *path)
+{
+  if (!path || !path[0])
+    return false;
+
+  PetExportEntry entry{};
+  return readExportMetadata(path, entry);
+}
+
+bool saveManagerDeletePetBackupAtPath(const char *path)
+{
+  if (!g_sdReady || !path || !path[0])
+    return false;
+
+  if (strncmp(path, BACKUPS_DIR, strlen(BACKUPS_DIR)) != 0)
+    return false;
+
+  if (!SD.exists(path))
+    return false;
+
+  return SD.remove(path);
+}
+
+// ------------------------------------------------------------
+// DELETE ALL SAVES (true death)
+// ------------------------------------------------------------
+void saveManagerDeleteAll()
+{
+  // Used when the pet is buried (hard reset of pet-related data)
+  if (!g_sdReady)
+    return;
+
+  // Remove all pet-related blobs (settings / game options may remain elsewhere)
+  SD.remove(SAVE_PATH); // /raising_hell/save/save.bin
+  SD.remove("/raising_hell/save/pet.bin");
+  SD.remove("/raising_hell/save/inventory.bin");
+  SD.remove(SAVE_BAK1_PATH);
+  SD.remove(SAVE_BAK2_PATH);
+  SD.remove(SAVE_BAK3_PATH);
+
+  // Also wipe the EEPROM-backed inventory mirror so the next pet starts clean.
+  g_app.inventory.wipePersistedEeprom();
+}
+
+void saveManagerDeletePetOnly()
+{
+  // Delete ONLY the pet + inventory. Keep settings/game options.
+  if (!g_sdReady)
+    return;
+
+  SD.remove("/raising_hell/save/pet.bin");
+  SD.remove("/raising_hell/save/inventory.bin");
+  SD.remove(SAVE_PATH); // if you still store some pet-state here
+  SD.remove(SAVE_BAK1_PATH);
+  SD.remove(SAVE_BAK2_PATH);
+  SD.remove(SAVE_BAK3_PATH);
+
+  // Also wipe the EEPROM-backed inventory mirror so the next pet starts clean.
+  g_app.inventory.wipePersistedEeprom();
+}

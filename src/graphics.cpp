@@ -76,11 +76,6 @@
 #include "settings_state.h"
 #include "system_status_state.h"
 #include "time_state.h"
-#include "ui_state_import_pet_list.h"
-#include "ui_state_title_menu.h"
-#include "user_toggles_state.h"
-#include "wifi_setup_state.h"
-
 #include "ui_death_menu.h"
 #include "ui_feed_menu.h"
 #include "ui_menu_state.h"
@@ -89,7 +84,11 @@
 #include "ui_settings_menu.h"
 #include "ui_settings_pages.h"
 #include "ui_sleep_menu.h"
+#include "ui_state_backup_pet_list.h"
 #include "ui_state_import_pet_list.h"
+#include "ui_state_title_menu.h"
+#include "user_toggles_state.h"
+#include "wifi_setup_state.h"
 
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
@@ -106,19 +105,16 @@
 
 // END of includes
 
-static void drawImportPetListScreen(bool redrawBg);
-
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
-static void drawBurialScreen();
-
 void drawHatchingScreen(bool redrawBg);
+static void drawBurialScreen();
 static void drawEvolutionScreen();
-
 static void drawMiniStatPreview();
 static void drawMiniStatPreviewSleepLeft();
-
 static void drawPetPerfHud();
+static void drawBackupPetListScreen(bool redrawBg);
+static void drawImportPetListScreen(bool redrawBg);
 
 // --- Compatibility wrappers / missing helpers (compile fix) ---
 static void drawSettingsScreen();
@@ -1968,7 +1964,7 @@ static void drawSettingsTopMenu()
   static const char *labelsStatic[] = {"Main Menu",
                                        nullptr, // 1 => volumeLine
                                        "Controls",       "Pet Options >", "Screen Settings >", "System Settings >",
-                                       "Game Options >", "Console >",      "System Status >",   "Credits"};
+                                       "Game Options >", "Console >",     "System Status >",   "Credits"};
 
   const int totalItems = 10;
 
@@ -2145,13 +2141,15 @@ static void drawPetSettingsMenu()
   const char *renameLine = "Rename Pet";
   const char *storeLine = "Store Pet";
   const char *storedLine = "Stored Pets";
+  const char *backupLine = "Backup Current Pet";
+  const char *restoreLine = "Restore From Backup";
   const char *newPetLine = "New Pet";
 
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {renameLine, storeLine, storedLine, newPetLine, deathLine};
-  const int totalItems = 5;
+  const char *labels[] = {renameLine, storeLine, storedLine, backupLine, restoreLine, newPetLine, deathLine};
+  const int totalItems = 7;
 
   g_app.petSettingsIndex = clampi(g_app.petSettingsIndex, 0, totalItems - 1);
 
@@ -5527,6 +5525,10 @@ static void drawCurrentScreen(bool redrawBg)
     drawImportPetListScreen(redrawBg);
     return;
 
+  case UIState::BACKUP_PET_LIST:
+    drawBackupPetListScreen(redrawBg);
+    return;
+
   case UIState::CHOOSE_PET:
     drawChoosePetScreen(redrawBg);
     return;
@@ -6164,41 +6166,118 @@ void drawImportPetListScreen(bool redrawBg)
   const int count = uiImportPetListCount();
   const int visibleCount = uiImportPetListVisibleCount();
   const int selectedIdx = uiImportPetListSelected();
+  const int windowStart = uiImportPetListWindowStart();
 
   for (int i = 0; i < visibleCount; ++i)
   {
     const int y = startY + (i * rowH);
-    const bool selected = (i == selectedIdx);
-
-    const PetExportEntry &e = uiImportPetListGet(i);
+    const bool selected = ((windowStart + i) == selectedIdx);
+    const PetExportEntry &e = uiImportPetListGetVisible(i);
 
     spr.setTextDatum(TL_DATUM);
-
-    // --- draw name ---
     spr.setTextColor(selected ? TFT_YELLOW : TFT_WHITE);
     int nameWidth = spr.drawString(e.name, 6, y, 2);
 
-    // --- build meta string ---
     char meta[48];
-
     time_t t = (time_t)e.createdAtEpoch;
-    struct tm tmBuf;
+    struct tm tmBuf{};
     localtime_r(&t, &tmBuf);
-
-    // Format: MM/DD HH:MM
     snprintf(meta, sizeof(meta), "%s  %02d/%02d %02d:%02d", e.petType, tmBuf.tm_mon + 1, tmBuf.tm_mday, tmBuf.tm_hour,
              tmBuf.tm_min);
 
-    // --- draw meta to the right of name ---
     spr.setTextColor(selected ? TFT_YELLOW : TFT_LIGHTGREY);
     spr.drawString(meta, 6 + nameWidth + 6, y + 5, 1);
+  }
+}
 
-    if (count == 0)
+static void drawBackupPetListScreen(bool redrawBg)
+{
+  if (!isScreenOn())
+    return;
+
+  if (redrawBg)
+    spr.fillSprite(TFT_BLACK);
+
+  if (uiBackupPetListConfirmDeleteActive())
+  {
+    const int idx = uiBackupPetListConfirmDeleteIndex();
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Delete this backup?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+    spr.setTextColor(idx == 0 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+    spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+    return;
+  }
+
+  if (uiBackupPetListConfirmRestoreActive())
+  {
+    const int idx = uiBackupPetListConfirmRestoreIndex();
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 18, 2);
+
+    spr.setTextColor(idx == 0 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("YES", SCREEN_W / 2 - 50, SCREEN_H / 2 + 10, 2);
+
+    spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("NO", SCREEN_W / 2, SCREEN_H / 2 + 10, 2);
+
+    spr.setTextColor(idx == 2 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("CANCEL", SCREEN_W / 2 + 50, SCREEN_H / 2 + 10, 2);
+    return;
+  }
+
+  if (uiBackupPetListActionMenuActive())
+  {
+    const int idx = uiBackupPetListActionIndex();
+    const char *items[3] = {"Restore", "Delete Backup", "Cancel"};
+
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Backup Options", SCREEN_W / 2, 24, 2);
+
+    for (int i = 0; i < 3; ++i)
     {
-      spr.setTextDatum(TC_DATUM);
-      spr.setTextColor(TFT_DARKGREY);
-      spr.drawString("No stored pets", SCREEN_W / 2, SCREEN_H / 2, 2);
+      spr.setTextColor(i == idx ? TFT_YELLOW : TFT_WHITE);
+      spr.drawString(items[i], SCREEN_W / 2, 52 + (i * 18), 2);
     }
+    return;
+  }
+
+  const int count = uiBackupPetListCount();
+  if (count <= 0)
+  {
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_DARKGREY);
+    spr.drawString("No backups found", SCREEN_W / 2, SCREEN_H / 2, 2);
+    return;
+  }
+
+  const int rowH = 18;
+  const int startY = 20;
+  const int visibleCount = uiBackupPetListVisibleCount();
+
+  for (int i = 0; i < visibleCount; ++i)
+  {
+    const int y = startY + (i * rowH);
+    const bool selected = ((uiBackupPetListWindowStart() + i) == uiBackupPetListSelected());
+    const PetExportEntry &e = uiBackupPetListGetVisible(i);
+
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(selected ? TFT_YELLOW : TFT_WHITE);
+    int nameWidth = spr.drawString(e.name, 6, y, 2);
+
+    char meta[48];
+    time_t t = (time_t)e.createdAtEpoch;
+    struct tm tmBuf{};
+    localtime_r(&t, &tmBuf);
+    snprintf(meta, sizeof(meta), "%s  %02d/%02d %02d:%02d", e.petType, tmBuf.tm_mon + 1, tmBuf.tm_mday, tmBuf.tm_hour,
+             tmBuf.tm_min);
+
+    spr.setTextColor(selected ? TFT_YELLOW : TFT_LIGHTGREY);
+    spr.drawString(meta, 6 + nameWidth + 6, y + 5, 1);
   }
 }
 
