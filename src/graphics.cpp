@@ -6143,6 +6143,21 @@ void drawImportPetListScreen(bool redrawBg)
   if (redrawBg)
     spr.fillSprite(TFT_BLACK);
 
+  if (uiImportPetListConfirmDeleteActive())
+  {
+    const int idx = uiImportPetListConfirmDeleteIndex();
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Delete this stored pet?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+
+    spr.setTextColor(idx == 0 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+
+    spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+    return;
+  }
+
   if (uiImportPetListConfirming())
   {
     const int confirmIndex = uiImportPetListConfirmIndex();
@@ -6160,6 +6175,23 @@ void drawImportPetListScreen(bool redrawBg)
     return;
   }
 
+  if (uiImportPetListActionMenuActive())
+  {
+    const int idx = uiImportPetListActionIndex();
+    const char *items[3] = {"Retrieve", "Delete", "Cancel"};
+
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Stored Pet Options", SCREEN_W / 2, 24, 2);
+
+    for (int i = 0; i < 3; ++i)
+    {
+      spr.setTextColor(i == idx ? TFT_YELLOW : TFT_WHITE);
+      spr.drawString(items[i], SCREEN_W / 2, 52 + (i * 18), 2);
+    }
+    return;
+  }
+  
   const int rowH = 18;
   const int startY = 20;
 
