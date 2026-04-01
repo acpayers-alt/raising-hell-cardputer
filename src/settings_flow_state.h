@@ -23,3 +23,5 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
 bool settingsHasReturnTarget();
 UIState settingsReturnState();
 Tab settingsReturnTab();
+extern bool g_importPetListReturnToSettings;
+extern SettingsPage g_importPetListReturnPage;

@@ -1967,11 +1967,10 @@ static void drawSettingsTopMenu()
 
   static const char *labelsStatic[] = {"Main Menu",
                                        nullptr, // 1 => volumeLine
-                                       "Controls",       "Screen Settings >", "System Settings >",
-                                       "Game Options >", "Console >",         "System Status >",
-                                       "Credits"};
+                                       "Controls",       "Pet Settings >", "Screen Settings >", "System Settings >",
+                                       "Game Options >", "Console >",      "System Status >",   "Credits"};
 
-  const int totalItems = 9;
+  const int totalItems = 10;
 
   g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
@@ -2134,7 +2133,7 @@ static void drawNewPetConfirmOverlay()
   spr.setTextDatum(TL_DATUM);
 }
 
-static void drawGameOptionsMenu()
+static void drawPetSettingsMenu()
 {
   drawTopBar();
 
@@ -2148,17 +2147,89 @@ static void drawGameOptionsMenu()
   const char *storedLine = "Stored Pets";
   const char *newPetLine = "New Pet";
 
-  char decayLine[32];
-  snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
-
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
+
+  const char *labels[] = {renameLine, storeLine, storedLine, newPetLine, deathLine};
+  const int totalItems = 5;
+
+  g_app.petSettingsIndex = clampi(g_app.petSettingsIndex, 0, totalItems - 1);
+
+  constexpr int MAX_VISIBLE = 4;
+  int start = 0, visCount = 0;
+  listWindow(totalItems, g_app.petSettingsIndex, MAX_VISIBLE, start, visCount);
+
+  const int itemH = 22;
+  const int gap = 6;
+
+  const int totalH = visCount * itemH + (visCount - 1) * gap;
+  const int startY = contentY + (contentH - totalH) / 2;
+
+  const int boxW = (SCREEN_W * 3) / 4;
+  const int boxX = (SCREEN_W - boxW) / 2;
+  const int radius = 10;
+
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextDatum(TL_DATUM);
+
+  for (int row = 0; row < visCount; row++)
+  {
+    const int i = start + row;
+    const int y = startY + row * (itemH + gap);
+    const bool sel = (i == g_app.petSettingsIndex);
+
+    const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
+    const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
+    const uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
+
+    spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);
+    spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);
+
+    const int th = spr.fontHeight();
+    const int ty = y + (itemH - th) / 2;
+
+    spr.setTextColor(textCol, fill);
+    spr.drawString(labels[i], boxX + 10, ty);
+  }
+
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.setTextDatum(TL_DATUM);
+
+  const int arrowX = boxX + boxW + 6;
+  const int arrowUpY = startY - 2;
+  const int arrowDownY = startY + totalH - 10;
+
+  if (start > 0)
+    spr.drawString("^", arrowX, arrowUpY);
+  if (start + visCount < totalItems)
+    spr.drawString("v", arrowX, arrowDownY);
+
+  spr.setTextDatum(TL_DATUM);
+}
+
+static void drawGameOptionsMenu()
+{
+  drawTopBar();
+
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H;
+
+  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+
+  char decayLine[32];
+  snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
 
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {renameLine, storeLine, storedLine, newPetLine, decayLine, deathLine, ledLine};
-  const int totalItems = 7;
+  char perfHudLine[32];
+  snprintf(perfHudLine, sizeof(perfHudLine), "Pet Perf HUD: %s", g_petPerfHudEnabled ? "ON" : "OFF");
+
+  const char *labels[] = {decayLine, ledLine, perfHudLine};
+  const int totalItems = 3;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
@@ -2861,6 +2932,9 @@ void drawSettingsMenu()
   default:
   case SettingsPage::TOP:
     drawSettingsTopMenu();
+    break;
+  case SettingsPage::PET:
+    drawPetSettingsMenu();
     break;
   case SettingsPage::SCREEN:
     drawScreenSettingsMenu();

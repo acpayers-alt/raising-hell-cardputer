@@ -84,6 +84,7 @@ struct MenuPageDef
 
 static int &cursorTop() { return g_app.settingsIndex; }
 static int &cursorScreen() { return g_app.screenSettingsIndex; }
+static int &cursorPet() { return g_app.petSettingsIndex; }
 static int &cursorWifi() { return g_wifi.wifiSettingsIndex; }
 static int &cursorGame() { return g_app.gameOptionsIndex; }
 static int &cursorSystem() { return g_app.systemSettingsIndex; }
@@ -143,6 +144,15 @@ static void actTop_VolumeRight(InputState &)
 static void actTop_Controls(InputState &)
 {
   openControlsHelpFromSettings();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actTop_OpenPet(InputState &)
+{
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+  g_app.petSettingsIndex = 0;
+  requestUIRedraw();
   playBeep();
   clearInputLatch();
 }
@@ -464,6 +474,59 @@ static void actGame_ToggleLedAlerts(InputState &)
   clearInputLatch();
 }
 
+static void actPet_RenamePet(InputState &input)
+{
+  strncpy(g_pendingPetName, pet.getName(), PET_NAME_MAX);
+  g_pendingPetName[PET_NAME_MAX] = '\0';
+
+  g_namePetRenameMode = true;
+  g_namePetJustOpened = true;
+
+  // Make NAME_PET return to Pet Settings, not Game.
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+
+  inputSetTextCapture(true);
+  g_textCaptureMode = true;
+
+  uiActionEnterState(UIState::NAME_PET, g_app.currentTab, true);
+
+  requestUIRedraw();
+  invalidateBackgroundCache();
+  uiDrainKb(input);
+  clearInputLatch();
+  playBeep();
+}
+
+static void actPet_StorePet(InputState &input)
+{
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+  actGame_ExportBub(input);
+}
+
+static void actPet_StoredPets(InputState &input)
+{
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+  g_importPetListReturnToSettings = true;
+  g_importPetListReturnPage = SettingsPage::PET;
+
+  playBeep();
+  uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+  requestUIRedraw();
+  uiDrainKb(input);
+  clearInputLatch();
+}
+
+static void actPet_NewPet(InputState &input)
+{
+  g_settingsFlow.settingsPage = SettingsPage::PET;
+
+  g_app.newPetFlowActive = true;
+  uiActionEnterStateClean(UIState::CHOOSE_PET, Tab::TAB_PET, true, input, 120);
+  requestFullUIRedraw();
+  requestUIRedraw();
+  playBeep();
+}
+
 // ------------------------------------------------------------
 // SYSTEM page actions + hook
 // ------------------------------------------------------------
@@ -502,6 +565,7 @@ static MenuItem kTopItems[] = {
   {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
   {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
   {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
+  {"Pet Settings", actTop_OpenPet, nullptr, nullptr, nullptr},
   {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
   {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
   {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
@@ -552,14 +616,18 @@ static MenuItem kWifiItems[] = {
 
 #endif
 
-static MenuItem kGameItems[] = {
-  {"Rename Pet", actGame_RenamePet, nullptr, nullptr, nullptr},
-  {"Store Pet", actGame_ExportBub, nullptr, nullptr, nullptr},
-  {"Stored Pets", actGame_ImportBub, nullptr, nullptr, nullptr},
-  {"New Pet", actGame_NewPet, nullptr, nullptr, nullptr},
-  {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
+static MenuItem kPetItems[] = {
+  {"Rename Pet", actPet_RenamePet, nullptr, nullptr, nullptr},
+  {"Store Pet", actPet_StorePet, nullptr, nullptr, nullptr},
+  {"Stored Pets", actPet_StoredPets, nullptr, nullptr, nullptr},
+  {"New Pet", actPet_NewPet, nullptr, nullptr, nullptr},
   {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+};
+
+static MenuItem kGameItems[] = {
+  {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
   {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
+  {"Pet Perf HUD", actGame_TogglePetPerfHud, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {
@@ -576,17 +644,18 @@ static MenuItem kDecayModeItems[] = {
 };
 
 static MenuPageDef kPages[] = {
-    {SettingsPage::TOP, kTopItems, (uint8_t)(sizeof(kTopItems) / sizeof(kTopItems[0])), cursorTop, nullptr},
-    {SettingsPage::SCREEN, kScreenItems, (uint8_t)(sizeof(kScreenItems) / sizeof(kScreenItems[0])), cursorScreen,
-     nullptr},
-    {SettingsPage::SYSTEM, kSystemItems, (uint8_t)(sizeof(kSystemItems) / sizeof(kSystemItems[0])), cursorSystem,
-     hookSystem},
-    {SettingsPage::WIFI, kWifiItems, (uint8_t)(sizeof(kWifiItems) / sizeof(kWifiItems[0])), cursorWifi, nullptr},
-    {SettingsPage::GAME, kGameItems, (uint8_t)(sizeof(kGameItems) / sizeof(kGameItems[0])), cursorGame, nullptr},
-    {SettingsPage::AUTO_SCREEN, kAutoScreenItems, (uint8_t)(sizeof(kAutoScreenItems) / sizeof(kAutoScreenItems[0])),
-     cursorAutoScreen, nullptr},
-    {SettingsPage::DECAY_MODE, kDecayModeItems, (uint8_t)(sizeof(kDecayModeItems) / sizeof(kDecayModeItems[0])),
-     cursorDecayMode, nullptr},
+  {SettingsPage::TOP, kTopItems, (uint8_t)(sizeof(kTopItems) / sizeof(kTopItems[0])), cursorTop, nullptr},
+  {SettingsPage::PET, kPetItems, (uint8_t)(sizeof(kPetItems) / sizeof(kPetItems[0])), cursorPet, nullptr},
+  {SettingsPage::SCREEN, kScreenItems, (uint8_t)(sizeof(kScreenItems) / sizeof(kScreenItems[0])), cursorScreen,
+   nullptr},
+  {SettingsPage::SYSTEM, kSystemItems, (uint8_t)(sizeof(kSystemItems) / sizeof(kSystemItems[0])), cursorSystem,
+   hookSystem},
+  {SettingsPage::WIFI, kWifiItems, (uint8_t)(sizeof(kWifiItems) / sizeof(kWifiItems[0])), cursorWifi, nullptr},
+  {SettingsPage::GAME, kGameItems, (uint8_t)(sizeof(kGameItems) / sizeof(kGameItems[0])), cursorGame, nullptr},
+  {SettingsPage::AUTO_SCREEN, kAutoScreenItems, (uint8_t)(sizeof(kAutoScreenItems) / sizeof(kAutoScreenItems[0])),
+   cursorAutoScreen, nullptr},
+  {SettingsPage::DECAY_MODE, kDecayModeItems, (uint8_t)(sizeof(kDecayModeItems) / sizeof(kDecayModeItems[0])),
+   cursorDecayMode, nullptr},
 };
 
 static const MenuPageDef *findPage(SettingsPage page)

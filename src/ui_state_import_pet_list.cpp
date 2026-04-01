@@ -4,6 +4,7 @@
 #include "graphics.h"
 #include "input.h"
 #include "save_manager.h"
+#include "settings_flow_state.h"
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
@@ -65,14 +66,26 @@ void uiImportPetListHandle(InputState &in)
       const bool exportCurrentPetFirst = (s_confirmIndex == 0);
 
       char importedPath[128];
-      if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath),
+      if (saveManagerImportBubAtPath(s_entries[s_importIndex].path,
+                                     importedPath,
+                                     sizeof(importedPath),
                                      exportCurrentPetFirst))
       {
         playBeep();
         ui_showSuccessMessage("Pet Resumed");
-        uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+
+        if (g_importPetListReturnToSettings)
+        {
+          g_settingsFlow.settingsPage = g_importPetListReturnPage;
+          g_importPetListReturnToSettings = false;
+          uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+        }
+        else
+        {
+          uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+        }
       }
-            else
+      else
       {
         playBeep();
         ui_showMessage(exportCurrentPetFirst ? "Resume Failed" : "Import failed");
@@ -120,7 +133,18 @@ void uiImportPetListHandle(InputState &in)
   if (in.menuOnce || in.escOnce)
   {
     playBeep();
-    uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+
+    if (g_importPetListReturnToSettings)
+    {
+      g_settingsFlow.settingsPage = g_importPetListReturnPage;
+      g_importPetListReturnToSettings = false;
+      uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+    }
+    else
+    {
+      uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+    }
+
     swallowImportInput(in);
     return;
   }

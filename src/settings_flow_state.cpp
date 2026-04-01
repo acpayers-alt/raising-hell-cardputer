@@ -7,6 +7,9 @@
 // Single global instance
 SettingsFlowState g_settingsFlow;
 
+bool g_importPetListReturnToSettings = false;
+SettingsPage g_importPetListReturnPage = SettingsPage::TOP;
+
 void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage page)
 {
   g_settingsFlow.settingsReturnValid = true;

@@ -72,6 +72,7 @@ enum class HomeApp : uint8_t {
 // --------------------
 enum class SettingsPage : uint8_t {
   TOP,
+  PET,
   SCREEN,
   SYSTEM,
   GAME,

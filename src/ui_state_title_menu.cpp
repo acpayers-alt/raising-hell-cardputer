@@ -168,6 +168,8 @@ void uiTitleMenuHandle(InputState &in)
   case TITLE_IMPORT:
   {
     playBeep();
+    g_importPetListReturnToSettings = false;
+    g_importPetListReturnPage = SettingsPage::TOP;
     uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
     swallowTitleInput(in);
     return;

@@ -70,7 +70,6 @@ void uiNamePetHandle(InputState &in)
     inputForceClear();
     clearInputLatch();
 
-    g_settingsFlow.settingsPage = SettingsPage::GAME;
     uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
     requestFullUIRedraw();
     requestUIRedraw();
@@ -83,7 +82,7 @@ void uiNamePetHandle(InputState &in)
   {
     KeyEvent ev = in.kbPop();
     const uint8_t c = ev.code;
-    
+
     // Enter → finalize
     if (c == '\n' || c == RH_KEY_ENTER)
     {
@@ -104,7 +103,6 @@ void uiNamePetHandle(InputState &in)
 
         g_namePetRenameMode = false;
         g_namePetJustOpened = false;
-        g_settingsFlow.settingsPage = SettingsPage::GAME;
         uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();

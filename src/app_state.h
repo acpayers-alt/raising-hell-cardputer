@@ -39,6 +39,7 @@ struct AppState {
   // Settings sub-menu indices (migrated from g_ui / UIRuntimeState)
   int screenSettingsIndex = 0;
   int systemSettingsIndex = 0;
+  int petSettingsIndex    = 0;
   int gameOptionsIndex    = 0;
   int playIndex           = 0;
   int autoScreenIndex     = 0;
