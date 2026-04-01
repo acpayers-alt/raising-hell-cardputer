@@ -6198,16 +6198,50 @@ static void drawBackupPetListScreen(bool redrawBg)
   if (redrawBg)
     spr.fillSprite(TFT_BLACK);
 
-  if (uiBackupPetListConfirmDeleteActive())
+  if (uiBackupPetListConfirmRestoreActive())
   {
-    const int idx = uiBackupPetListConfirmDeleteIndex();
+    const int idx = uiBackupPetListConfirmRestoreIndex();
+
+    const int selectedIdx = uiBackupPetListSelected();
+    const int windowStart = uiBackupPetListWindowStart();
+    const int visibleIdx = selectedIdx - windowStart;
+
+    char titleBuf[64];
+    titleBuf[0] = '\0';
+
+    if (visibleIdx >= 0 && visibleIdx < uiBackupPetListVisibleCount())
+    {
+      const PetExportEntry &e = uiBackupPetListGetVisible(visibleIdx);
+
+      time_t t = (time_t)e.createdAtEpoch;
+      struct tm tmBuf{};
+      localtime_r(&t, &tmBuf);
+
+      static const char *kMonths[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+      const char *mon = "???";
+      if (tmBuf.tm_mon >= 0 && tmBuf.tm_mon < 12)
+        mon = kMonths[tmBuf.tm_mon];
+
+      snprintf(titleBuf, sizeof(titleBuf), "Restore %s (%s %d, %02d:%02d)?", e.name[0] ? e.name : "backup", mon,
+               tmBuf.tm_mday, tmBuf.tm_hour, tmBuf.tm_min);
+    }
+    else
+    {
+      snprintf(titleBuf, sizeof(titleBuf), "Restore backup?");
+    }
+
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(TFT_WHITE);
-    spr.drawString("Delete this backup?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+    spr.drawString(titleBuf, SCREEN_W / 2, SCREEN_H / 2 - 30, 2);
+    spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 12, 2);
+
     spr.setTextColor(idx == 0 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+    spr.drawString("YES", SCREEN_W / 2 - 40, SCREEN_H / 2 + 12, 2);
+
     spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+    spr.drawString("CANCEL", SCREEN_W / 2 + 40, SCREEN_H / 2 + 12, 2);
     return;
   }
 

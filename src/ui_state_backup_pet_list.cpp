@@ -26,7 +26,7 @@ bool s_confirmDeleteActive = false;
 int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
 
 bool s_confirmRestoreActive = false;
-int s_confirmRestoreIndex = 0; // 0 Yes, 1 No, 2 Cancel
+int s_confirmRestoreIndex = 0; // 0 Yes, 1 Cancel
 
 static void swallowBackupInput(InputState &in)
 {
@@ -95,10 +95,7 @@ static void beginRestoreConfirm()
 static void performRestore(bool storeCurrentFirst, InputState &in)
 {
   char importedPath[128];
-  if (saveManagerImportBubAtPath(s_entries[s_selected].path,
-                                 importedPath,
-                                 sizeof(importedPath),
-                                 storeCurrentFirst))
+  if (saveManagerImportBubAtPath(s_entries[s_selected].path, importedPath, sizeof(importedPath), storeCurrentFirst))
   {
     playBeep();
     ui_showSuccessMessage("Pet Restored!");
@@ -168,18 +165,18 @@ void uiBackupPetListHandle(InputState &in)
 {
   if (s_confirmDeleteActive)
   {
-    if (in.leftOnce || in.upOnce)
+    if (in.leftOnce || in.upOnce || in.encoderDelta < 0)
     {
-      s_confirmDeleteIndex = 0;
+      s_confirmDeleteIndex = 0; // YES
       playBeep();
       requestFullUIRedraw();
       swallowBackupInput(in);
       return;
     }
 
-    if (in.rightOnce || in.downOnce)
+    if (in.rightOnce || in.downOnce || in.encoderDelta > 0)
     {
-      s_confirmDeleteIndex = 1;
+      s_confirmDeleteIndex = 1; // NO
       playBeep();
       requestFullUIRedraw();
       swallowBackupInput(in);
@@ -193,6 +190,7 @@ void uiBackupPetListHandle(InputState &in)
       else
       {
         s_confirmDeleteActive = false;
+        s_confirmDeleteIndex = 0;
         requestFullUIRedraw();
         swallowBackupInput(in);
       }
@@ -214,20 +212,18 @@ void uiBackupPetListHandle(InputState &in)
 
   if (s_confirmRestoreActive)
   {
-    if (in.leftOnce || in.upOnce)
+    if (in.leftOnce || in.upOnce || in.encoderDelta < 0)
     {
-      s_confirmRestoreIndex = 0;
+      s_confirmRestoreIndex = 0; // YES
       playBeep();
       requestFullUIRedraw();
       swallowBackupInput(in);
       return;
     }
 
-    if (in.rightOnce || in.downOnce)
+    if (in.rightOnce || in.downOnce || in.encoderDelta > 0)
     {
-      s_confirmRestoreIndex++;
-      if (s_confirmRestoreIndex > 2)
-        s_confirmRestoreIndex = 2;
+      s_confirmRestoreIndex = 1; // CANCEL
       playBeep();
       requestFullUIRedraw();
       swallowBackupInput(in);
@@ -237,12 +233,15 @@ void uiBackupPetListHandle(InputState &in)
     if (in.selectOnce || in.encoderPressOnce)
     {
       if (s_confirmRestoreIndex == 0)
+      {
         performRestore(true, in);
-      else if (s_confirmRestoreIndex == 1)
-        performRestore(false, in);
+      }
       else
       {
         s_confirmRestoreActive = false;
+        s_confirmRestoreIndex = 0;
+        s_actionMenuActive = false;
+        s_actionIndex = 0;
         requestFullUIRedraw();
         swallowBackupInput(in);
       }
@@ -253,6 +252,8 @@ void uiBackupPetListHandle(InputState &in)
     {
       s_confirmRestoreActive = false;
       s_confirmRestoreIndex = 0;
+      s_actionMenuActive = false;
+      s_actionIndex = 0;
       requestFullUIRedraw();
       swallowBackupInput(in);
       return;
@@ -261,7 +262,7 @@ void uiBackupPetListHandle(InputState &in)
     clearInputLatch();
     return;
   }
-
+  
   if (s_actionMenuActive)
   {
     int move = 0;
@@ -374,10 +375,7 @@ void uiBackupPetListHandle(InputState &in)
   swallowBackupInput(in);
 }
 
-int uiBackupPetListCount()
-{
-  return s_entryCount;
-}
+int uiBackupPetListCount() { return s_entryCount; }
 
 int uiBackupPetListVisibleCount()
 {
@@ -385,47 +383,20 @@ int uiBackupPetListVisibleCount()
   return (remaining <= 0) ? 0 : ((remaining < kVisibleRows) ? remaining : kVisibleRows);
 }
 
-int uiBackupPetListWindowStart()
-{
-  return s_windowStart;
-}
+int uiBackupPetListWindowStart() { return s_windowStart; }
 
-const PetExportEntry &uiBackupPetListGetVisible(int idx)
-{
-  return s_entries[s_windowStart + idx];
-}
+const PetExportEntry &uiBackupPetListGetVisible(int idx) { return s_entries[s_windowStart + idx]; }
 
-int uiBackupPetListSelected()
-{
-  return s_selected;
-}
+int uiBackupPetListSelected() { return s_selected; }
 
-bool uiBackupPetListActionMenuActive()
-{
-  return s_actionMenuActive;
-}
+bool uiBackupPetListActionMenuActive() { return s_actionMenuActive; }
 
-int uiBackupPetListActionIndex()
-{
-  return s_actionIndex;
-}
+int uiBackupPetListActionIndex() { return s_actionIndex; }
 
-bool uiBackupPetListConfirmDeleteActive()
-{
-  return s_confirmDeleteActive;
-}
+bool uiBackupPetListConfirmDeleteActive() { return s_confirmDeleteActive; }
 
-int uiBackupPetListConfirmDeleteIndex()
-{
-  return s_confirmDeleteIndex;
-}
+int uiBackupPetListConfirmDeleteIndex() { return s_confirmDeleteIndex; }
 
-bool uiBackupPetListConfirmRestoreActive()
-{
-  return s_confirmRestoreActive;
-}
+bool uiBackupPetListConfirmRestoreActive() { return s_confirmRestoreActive; }
 
-int uiBackupPetListConfirmRestoreIndex()
-{
-  return s_confirmRestoreIndex;
-}
+int uiBackupPetListConfirmRestoreIndex() { return s_confirmRestoreIndex; }
