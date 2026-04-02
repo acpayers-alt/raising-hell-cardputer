@@ -451,6 +451,7 @@ static inline uint16_t uiModalOutline(PetType t) { return uiSchemeForPet(t).topO
 static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
 static const char *PATH_BG_SLEEP = "/raising_hell/graphics/background/sleep_bg.jpg";
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
+static const char *PATH_BG_NONPET_TILE = "/raising_hell/graphics/background/flow/tab_bg.jpg";
 
 static const char *PATH_STAT_KAIJU = "/raising_hell/graphics/pet/kai_stat.png";
 static const char *PATH_STAT_AXOLOTL = "/raising_hell/graphics/pet/axo_stat.png";
@@ -1247,6 +1248,10 @@ static void restorePetAreaFromCache();
 // -----------------------------------------------------------------------------
 static UIState lastDrawnState = UIState::PET_SCREEN;
 static bool bgDrawnForState = false;
+static M5Canvas s_nonPetTile(&M5.Display);
+static bool s_nonPetTileReady = false;
+static int s_nonPetTileW = 0;
+static int s_nonPetTileH = 0;
 
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
@@ -1339,6 +1344,75 @@ void drawBackground(const char *path)
 static inline void clearContentArea(uint16_t color = TFT_BLACK)
 {
   spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, color);
+}
+
+static bool ensureNonPetTileReady()
+{
+  if (s_nonPetTileReady && s_nonPetTileW > 0 && s_nonPetTileH > 0)
+    return true;
+
+  s_nonPetTile.deleteSprite();
+  s_nonPetTileReady = false;
+  s_nonPetTileW = 0;
+  s_nonPetTileH = 0;
+
+  if (!g_sdReady)
+    return false;
+
+  s_nonPetTile.setColorDepth(16);
+  if (!s_nonPetTile.createSprite(60, 34))
+  {
+    Serial.println("[NONPET TILE] createSprite failed");
+    return false;
+  }
+
+  s_nonPetTile.fillSprite(TFT_BLACK);
+
+  bool ok = false;
+  const char *path = PATH_BG_NONPET_TILE;
+  const char *ext = strrchr(path, '.');
+
+  if (ext && (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0))
+    ok = canvasDrawJpgFromSD(s_nonPetTile, path, 0, 0);
+  else
+    ok = canvasDrawPngFromSD(s_nonPetTile, path, 0, 0);
+
+  if (!ok)
+  {
+    Serial.printf("[NONPET TILE] load failed path='%s'\n", path ? path : "(null)");
+    s_nonPetTile.deleteSprite();
+    return false;
+  }
+
+  s_nonPetTileW = s_nonPetTile.width();
+  s_nonPetTileH = s_nonPetTile.height();
+  s_nonPetTileReady = (s_nonPetTileW > 0 && s_nonPetTileH > 0);
+
+  Serial.printf("[NONPET TILE] ready path='%s' w=%d h=%d\n",
+                path ? path : "(null)",
+                s_nonPetTileW,
+                s_nonPetTileH);
+
+  return s_nonPetTileReady;
+}
+
+static void drawNonPetTabBackground()
+{
+  spr.fillScreen(TFT_BLACK);
+
+  if (!ensureNonPetTileReady())
+  {
+    spr.fillScreen(TFT_RED);
+    return;
+  }
+
+  for (int y = 0; y < SCREEN_H; y += s_nonPetTileH)
+  {
+    for (int x = 0; x < SCREEN_W; x += s_nonPetTileW)
+    {
+      s_nonPetTile.pushSprite(&spr, x, y);
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -1970,39 +2044,33 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-    "Controls",
-    nullptr, // 1 => volumeLine
-    "Pet Options >",
-    "Screen Settings >",
-    "System Settings >",
-    "Game Options >",
-    "Console >",
-    "System Status >",
-    "Credits",
-    "Main Menu",
-};
+      "Controls",
+      nullptr, // 1 => volumeLine
+      "Pet Options >", "Screen Settings >", "System Settings >", "Game Options >",
+      "Console >",     "System Status >",   "Credits",           "Main Menu",
+  };
 
-const int totalItems = 10;
+  const int totalItems = 10;
 
-g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
+  g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
-constexpr int MAX_VISIBLE = 5;
-int start = 0, visCount = 0;
-listWindow(totalItems, g_app.settingsIndex, MAX_VISIBLE, start, visCount);
+  constexpr int MAX_VISIBLE = 5;
+  int start = 0, visCount = 0;
+  listWindow(totalItems, g_app.settingsIndex, MAX_VISIBLE, start, visCount);
 
-int itemH = 20;
-int gap = 5;
+  int itemH = 20;
+  int gap = 5;
 
-int totalH = visCount * itemH + (visCount - 1) * gap;
+  int totalH = visCount * itemH + (visCount - 1) * gap;
 
-while (totalH > contentH && itemH > 16)
-{
-  itemH--;
-  if (gap > 3)
-    gap--;
+  while (totalH > contentH && itemH > 16)
+  {
+    itemH--;
+    if (gap > 3)
+      gap--;
 
-  totalH = visCount * itemH + (visCount - 1) * gap;
-}
+    totalH = visCount * itemH + (visCount - 1) * gap;
+  }
 
   int startY = contentY + (contentH - totalH) / 2;
   if (startY < contentY)
@@ -2148,7 +2216,7 @@ static void drawPetSettingsMenu()
 
   const char *labels[] = {renameLine, backupLine, restoreLine, newPetLine};
   const int totalItems = 4;
-    
+
   g_app.petSettingsIndex = clampi(g_app.petSettingsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
@@ -3004,9 +3072,9 @@ static void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t out
 
 void drawShopScreen()
 {
+  drawNonPetTabBackground();
   drawTopBar();
   drawTabBar();
-  clearContentArea(TFT_BLACK);
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
@@ -3119,8 +3187,9 @@ void drawShopScreen()
   const int panelY = contentY + 6;
   const int panelH = contentH - 12;
 
+  spr.fillRoundRect(panelX, panelY, panelW, panelH, 10, TFT_BLACK);
   spr.drawRoundRect(panelX, panelY, panelW, panelH, 10, TFT_DARKGREY);
-
+  
   const int pad = 8;
 
   // Image pinned near the top of the panel
@@ -3220,9 +3289,9 @@ void drawShopScreen()
 
 void drawFeedMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
   drawTabBar();
-  clearContentArea(TFT_BLACK);
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
@@ -3325,9 +3394,9 @@ void drawFeedMenu()
 
 void drawSleepMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
   drawTabBar();
-  clearContentArea(TFT_BLACK);
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
@@ -3431,9 +3500,9 @@ static void drawInventoryLeftStatsPanel(int contentY, int contentH, int boxX)
 
 void drawInventoryMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
   drawTabBar();
-  clearContentArea(TFT_BLACK);
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
@@ -3550,8 +3619,9 @@ void drawInventoryMenu()
   const int panelY = contentY + 6;
   const int panelH = contentH - 12;
 
+  spr.fillRoundRect(panelX, panelY, panelW, panelH, 10, TFT_BLACK);
   spr.drawRoundRect(panelX, panelY, panelW, panelH, 10, TFT_DARKGREY);
-
+  
   // Determine hovered item type (and compute stat deltas)
   ItemType hoveredType = ITEM_NONE;
 
@@ -4128,7 +4198,9 @@ static void drawStatsTab(bool redrawBg)
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+  drawNonPetTabBackground();
+  drawTopBar();
+  drawTabBar();
 
   const int pad = 6;
   const int cardX = pad;
@@ -4353,19 +4425,16 @@ static void drawStatsTab(bool redrawBg)
 // ============================================================================
 // PLAY TAB (mini-games list)
 // ============================================================================
-static void drawPlayTabMock(bool redrawBg)
+static void drawPlayTab(bool redrawBg)
 {
   if (!isScreenOn())
     return;
 
-  if (redrawBg)
-  {
-    spr.fillRect(0, TOP_BAR_H, SCREEN_W, SCREEN_H - TOP_BAR_H - TAB_BAR_H, TFT_BLACK);
-  }
+  (void)redrawBg;
 
+  drawNonPetTabBackground();
   drawTopBar();
   drawTabBar();
-  clearContentArea(TFT_BLACK);
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
@@ -4626,6 +4695,11 @@ void graphicsReleaseUiCachesForMiniGame()
   g_petBgCachedStage = 255;
   g_forcePetBgCache = true;
 
+  s_nonPetTile.deleteSprite();
+  s_nonPetTileReady = false;
+  s_nonPetTileW = 0;
+  s_nonPetTileH = 0;
+  
   // Release cached sleep animation full-screen frame buffers.
   freeSleepAnimFrameCache();
 
@@ -5484,7 +5558,7 @@ static void drawTabDrivenScreen(bool redrawBg)
     drawFeedMenu();
     break;
   case Tab::TAB_PLAY:
-    drawPlayTabMock(redrawBg);
+    drawPlayTab(redrawBg);
     break;
   case Tab::TAB_SLEEP:
     drawSleepMenu();
