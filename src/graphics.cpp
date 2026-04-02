@@ -12,6 +12,7 @@
 #include "display_dims_state.h"
 #include "sdcard.h"
 #include "tft_compat.h"
+#include <ctype.h>
 
 // -----------------------------------------------------------------------------
 // Arduino / Std Libs
@@ -1398,7 +1399,7 @@ static bool ensureNonPetTileReady()
   s_nonPetTileReady = (s_nonPetTileW > 0 && s_nonPetTileH > 0);
 
   if (s_nonPetTileReady)
-  s_nonPetTileCachedType = desiredType;
+    s_nonPetTileCachedType = desiredType;
 
   if (s_nonPetTileW != NONPET_TILE_W || s_nonPetTileH != NONPET_TILE_H)
   {
@@ -2047,13 +2048,12 @@ static const char *decayModeToText(uint8_t m)
 
 static void drawSettingsTopMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
   const int contentBottom = contentY + contentH;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   char volumeLine[24];
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
@@ -2217,12 +2217,13 @@ static void drawNewPetConfirmOverlay()
 
 static void drawPetSettingsMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+  const int contentBottom = contentY + contentH;
+  (0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const char *renameLine = "Rename Pet";
   const char *backupLine = "Backup Current Pet";
@@ -2291,12 +2292,12 @@ static void drawPetSettingsMenu()
 
 static void drawGameOptionsMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
-
+  
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+  const int contentBottom = contentY + contentH;
 
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
@@ -2483,12 +2484,12 @@ static void drawDecayModePickerMenu()
 
 static void drawScreenSettingsMenu()
 {
-  drawTopBar();
+drawNonPetTabBackground();
+drawTopBar();
 
-  const int contentY = TOP_BAR_H;
-  const int contentH = SCREEN_H - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+const int contentY = TOP_BAR_H;
+const int contentH = SCREEN_H - TOP_BAR_H;
+const int contentBottom = contentY + contentH;
 
   char bLine[28];
   snprintf(bLine, sizeof(bLine), "Brightness: %s", brightnessToText(brightnessLevel));
@@ -2542,12 +2543,12 @@ static void drawScreenSettingsMenu()
 
 static void drawWifiSettingsMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
-
+  
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+  const int contentBottom = contentY + contentH;
 
   const int totalItems = UiSettingsMenu::WifiItemCount();
   g_wifi.wifiSettingsIndex = clampi(g_wifi.wifiSettingsIndex, 0, totalItems - 1);
@@ -2690,12 +2691,12 @@ static void drawFactoryResetConfirmOverlay()
 
 static void drawSystemSettingsMenu()
 {
-  drawTopBar();
+drawNonPetTabBackground();
+drawTopBar();
 
-  const int contentY = TOP_BAR_H;
-  const int contentH = SCREEN_H - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
+const int contentY = TOP_BAR_H;
+const int contentH = SCREEN_H - TOP_BAR_H;
+const int contentBottom = contentY + contentH;
 
   const char *labels[] = {"Set Time", "Factory Reset", "WiFi Settings >"};
   const int totalItems = 3;
@@ -2865,13 +2866,13 @@ static const char *basenameFromUrl(const char *url)
 
 static void drawSystemStatusMenu()
 {
+  drawNonPetTabBackground();
   drawTopBar();
-
+  
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
-
+  const int contentBottom = contentY + contentH;
+  
   const AssetOtaConfig &cfg = assetOtaGetConfig();
   const AssetOtaChannel ch = (AssetOtaChannel)cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
@@ -4714,7 +4715,7 @@ void graphicsReleaseUiCachesForMiniGame()
   s_nonPetTileReady = false;
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
-s_nonPetTileCachedType = (PetType)255;
+  s_nonPetTileCachedType = (PetType)255;
 
   // Release cached sleep animation full-screen frame buffers.
   freeSleepAnimFrameCache();
@@ -6326,13 +6327,23 @@ void drawImportPetListScreen(bool redrawBg)
     else if (isCurrent)
       nameColor = TFT_GREEN;
 
+    char typePretty[16];
+    snprintf(typePretty, sizeof(typePretty), "%s", e.petType);
+    typePretty[0] = (char)toupper((unsigned char)typePretty[0]);
+    for (int j = 1; typePretty[j]; ++j)
+      typePretty[j] = (char)tolower((unsigned char)typePretty[j]);
+
+    char nameWithSep[48];
+    snprintf(nameWithSep, sizeof(nameWithSep), "%s - ", e.name);
+
     spr.setTextColor(nameColor);
-    int nameWidth = spr.drawString(e.name, 6, y, 2);
+    int nameWidth = spr.drawString(nameWithSep, 6, y, 2);
+
     char meta[48];
     time_t t = (time_t)e.createdAtEpoch;
     struct tm tmBuf{};
     localtime_r(&t, &tmBuf);
-    snprintf(meta, sizeof(meta), "%s  %02d/%02d %02d:%02d", e.petType, tmBuf.tm_mon + 1, tmBuf.tm_mday, tmBuf.tm_hour,
+    snprintf(meta, sizeof(meta), "%s  %02d/%02d %02d:%02d", typePretty, tmBuf.tm_mon + 1, tmBuf.tm_mday, tmBuf.tm_hour,
              tmBuf.tm_min);
 
     uint16_t metaColor = TFT_LIGHTGREY;
@@ -6342,7 +6353,7 @@ void drawImportPetListScreen(bool redrawBg)
       metaColor = TFT_GREEN;
 
     spr.setTextColor(metaColor);
-    spr.drawString(meta, 6 + nameWidth + 6, y + 5, 1);
+    spr.drawString(meta, 6 + nameWidth, y, 2);
   }
 }
 
