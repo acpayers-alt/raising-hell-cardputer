@@ -15,17 +15,21 @@
 namespace
 {
 constexpr int kMaxPetExports = 24;
+constexpr int kVisibleRows = 5;
+
 PetExportEntry s_entries[kMaxPetExports];
 int s_entryCount = 0;
 int s_importIndex = 0;
+int s_windowStart = 0;
+
 bool s_confirming = false;
-int s_confirmIndex = 0; // 0 = YES, 1 = NO
-static int s_windowStart = 0;
-constexpr int kVisibleRows = 5;
-static bool s_actionMenuActive = false;
-static int s_actionIndex = 0; // 0 Retrieve, 1 Delete, 2 Cancel
-static bool s_confirmDeleteActive = false;
-static int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
+int s_confirmIndex = 0; // legacy/dead state, kept for compatibility with existing getters
+
+bool s_actionMenuActive = false;
+int s_actionIndex = 0; // 0 Retrieve, 1 Delete, 2 Cancel
+
+bool s_confirmDeleteActive = false;
+int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
 
 static void swallowImportInput(InputState &in)
 {
@@ -52,18 +56,61 @@ static bool deleteStoredPetAtPath(const char *path)
   return SD.remove(path);
 }
 
+static void clampImportSelection()
+{
+  if (s_entryCount <= 0)
+  {
+    s_importIndex = 0;
+    s_windowStart = 0;
+    return;
+  }
+
+  if (s_importIndex < 0)
+    s_importIndex = 0;
+  if (s_importIndex >= s_entryCount)
+    s_importIndex = s_entryCount - 1;
+
+  if (s_windowStart < 0)
+    s_windowStart = 0;
+  if (s_importIndex < s_windowStart)
+    s_windowStart = s_importIndex;
+  if (s_importIndex >= s_windowStart + kVisibleRows)
+    s_windowStart = s_importIndex - kVisibleRows + 1;
+}
+
+static void reloadStoredPets()
+{
+  s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
+  clampImportSelection();
+}
+
+static void leaveImportList()
+{
+  if (g_importPetListReturnToSettings)
+  {
+    g_settingsFlow.settingsPage = g_importPetListReturnPage;
+    g_importPetListReturnToSettings = false;
+    uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+  }
+  else
+  {
+    uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+  }
+}
+
 } // namespace
 
 void uiImportPetListOnEnter(InputState &in)
 {
-  s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
+  reloadStoredPets();
+
   s_confirming = false;
-  s_importIndex = 0;
-  s_windowStart = 0;
+  s_confirmIndex = 0;
   s_actionMenuActive = false;
   s_actionIndex = 0;
   s_confirmDeleteActive = false;
   s_confirmDeleteIndex = 0;
+
   swallowImportInput(in);
   requestFullUIRedraw();
 }
@@ -98,22 +145,7 @@ void uiImportPetListHandle(InputState &in)
         {
           playBeep();
           ui_showSuccessMessage("Stored Pet Deleted");
-
-          s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
-          if (s_entryCount <= 0)
-          {
-            s_importIndex = 0;
-            s_windowStart = 0;
-          }
-          else
-          {
-            if (s_importIndex >= s_entryCount)
-              s_importIndex = s_entryCount - 1;
-            if (s_importIndex < s_windowStart)
-              s_windowStart = s_importIndex;
-            if (s_importIndex >= s_windowStart + kVisibleRows)
-              s_windowStart = s_importIndex - kVisibleRows + 1;
-          }
+          reloadStoredPets();
         }
         else
         {
@@ -124,7 +156,9 @@ void uiImportPetListHandle(InputState &in)
       }
 
       s_confirmDeleteActive = false;
+      s_confirmDeleteIndex = 0;
       s_actionMenuActive = false;
+      s_actionIndex = 0;
       requestFullUIRedraw();
       swallowImportInput(in);
       return;
@@ -171,11 +205,29 @@ void uiImportPetListHandle(InputState &in)
 
       if (s_actionIndex == 0)
       {
-        // Retrieve -> existing restore confirm flow
-        s_actionMenuActive = false;
-        s_confirming = true;
-        s_confirmIndex = 0;
-        requestFullUIRedraw();
+        // Retrieve -> always store current pet first, no extra prompt.
+        char importedPath[128];
+        if (saveManagerImportBubAtPath(s_entries[s_importIndex].path,
+                                       importedPath,
+                                       sizeof(importedPath),
+                                       true))
+        {
+          ui_showSuccessMessage("Pet Retrieved");
+          s_actionMenuActive = false;
+          s_actionIndex = 0;
+          swallowImportInput(in);
+          leaveImportList();
+          return;
+        }
+        else
+        {
+          ui_showMessage("Retrieve Failed");
+          s_actionMenuActive = false;
+          s_actionIndex = 0;
+          requestUIRedraw();
+          swallowImportInput(in);
+          return;
+        }
       }
       else if (s_actionIndex == 1)
       {
@@ -183,6 +235,8 @@ void uiImportPetListHandle(InputState &in)
         s_confirmDeleteActive = true;
         s_confirmDeleteIndex = 0;
         requestFullUIRedraw();
+        swallowImportInput(in);
+        return;
       }
       else
       {
@@ -190,85 +244,15 @@ void uiImportPetListHandle(InputState &in)
         s_actionMenuActive = false;
         s_actionIndex = 0;
         requestFullUIRedraw();
+        swallowImportInput(in);
+        return;
       }
-
-      swallowImportInput(in);
-      return;
     }
 
     if (in.menuOnce || in.escOnce)
     {
       s_actionMenuActive = false;
       s_actionIndex = 0;
-      requestFullUIRedraw();
-      swallowImportInput(in);
-      return;
-    }
-
-    clearInputLatch();
-    return;
-  }
-
-  if (s_confirming)
-  {
-    if (in.leftOnce || in.upOnce)
-    {
-      s_confirmIndex = 0;
-      playBeep();
-      requestFullUIRedraw();
-      swallowImportInput(in);
-      return;
-    }
-
-    if (in.rightOnce || in.downOnce)
-    {
-      s_confirmIndex = 1;
-      playBeep();
-      requestFullUIRedraw();
-      swallowImportInput(in);
-      return;
-    }
-
-    const bool activateConfirm = in.selectOnce || in.encoderPressOnce;
-    if (activateConfirm)
-    {
-      const bool exportCurrentPetFirst = (s_confirmIndex == 0);
-
-      char importedPath[128];
-      if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath),
-                                     exportCurrentPetFirst))
-      {
-        playBeep();
-        ui_showSuccessMessage("Pet Resumed");
-
-        if (g_importPetListReturnToSettings)
-        {
-          g_settingsFlow.settingsPage = g_importPetListReturnPage;
-          g_importPetListReturnToSettings = false;
-          uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
-        }
-        else
-        {
-          uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
-        }
-      }
-      else
-      {
-        playBeep();
-        ui_showMessage(exportCurrentPetFirst ? "Resume Failed" : "Import failed");
-        requestUIRedraw();
-      }
-
-      s_confirming = false;
-      swallowImportInput(in);
-      return;
-    }
-
-    // Cancel confirm prompt
-    if (in.menuOnce || in.escOnce)
-    {
-      s_confirming = false;
-      s_confirmIndex = 0;
       requestFullUIRedraw();
       swallowImportInput(in);
       return;
@@ -306,19 +290,8 @@ void uiImportPetListHandle(InputState &in)
   if (in.menuOnce || in.escOnce)
   {
     playBeep();
-
-    if (g_importPetListReturnToSettings)
-    {
-      g_settingsFlow.settingsPage = g_importPetListReturnPage;
-      g_importPetListReturnToSettings = false;
-      uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
-    }
-    else
-    {
-      uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
-    }
-
     swallowImportInput(in);
+    leaveImportList();
     return;
   }
 
@@ -357,6 +330,8 @@ int uiImportPetListWindowStart() { return s_windowStart; }
 const PetExportEntry &uiImportPetListGetVisible(int idx) { return s_entries[s_windowStart + idx]; }
 
 int uiImportPetListSelected() { return s_importIndex; }
+
+// Legacy/dead state kept so existing graphics/header references still compile cleanly.
 bool uiImportPetListConfirming() { return s_confirming; }
 int uiImportPetListConfirmIndex() { return s_confirmIndex; }
 

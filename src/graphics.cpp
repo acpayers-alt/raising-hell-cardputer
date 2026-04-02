@@ -2147,8 +2147,6 @@ static void drawPetSettingsMenu()
   spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const char *renameLine = "Rename Pet";
-  const char *storeLine = "Store Pet";
-  const char *storedLine = "Stored Pets";
   const char *backupLine = "Backup Current Pet";
   const char *restoreLine = "Restore From Backup";
   const char *newPetLine = "New Pet";
@@ -2156,9 +2154,9 @@ static void drawPetSettingsMenu()
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {renameLine, storeLine, storedLine, backupLine, restoreLine, newPetLine, deathLine};
-  const int totalItems = 7;
-
+  const char *labels[] = {renameLine, backupLine, restoreLine, newPetLine, deathLine};
+  const int totalItems = 5;
+  
   g_app.petSettingsIndex = clampi(g_app.petSettingsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
@@ -6171,23 +6169,6 @@ void drawImportPetListScreen(bool redrawBg)
     return;
   }
 
-  if (uiImportPetListConfirming())
-  {
-    const int confirmIndex = uiImportPetListConfirmIndex();
-
-    spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(TFT_WHITE);
-    spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
-
-    spr.setTextColor(confirmIndex == 0 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
-
-    spr.setTextColor(confirmIndex == 1 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
-
-    return;
-  }
-
   if (uiImportPetListActionMenuActive())
   {
     const int idx = uiImportPetListActionIndex();
@@ -6213,16 +6194,41 @@ void drawImportPetListScreen(bool redrawBg)
   const int selectedIdx = uiImportPetListSelected();
   const int windowStart = uiImportPetListWindowStart();
 
+  if (count <= 0)
+  {
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("No stored pets found", SCREEN_W / 2, SCREEN_H / 2, 2);
+    return;
+  }
+
   for (int i = 0; i < visibleCount; ++i)
   {
     const int y = startY + (i * rowH);
     const bool selected = ((windowStart + i) == selectedIdx);
     const PetExportEntry &e = uiImportPetListGetVisible(i);
 
-    spr.setTextDatum(TL_DATUM);
-    spr.setTextColor(selected ? TFT_YELLOW : TFT_WHITE);
-    int nameWidth = spr.drawString(e.name, 6, y, 2);
+    // Detect if this entry is the currently active pet
+    bool isCurrent = false;
+    if (pet.getName()[0] && strcmp(e.name, pet.getName()) == 0)
+    {
+      isCurrent = true;
+    }
 
+    spr.setTextDatum(TL_DATUM);
+
+    // Priority:
+    // 1. Selected = yellow
+    // 2. Current pet = green
+    // 3. Default = white
+    uint16_t nameColor = TFT_WHITE;
+    if (selected)
+      nameColor = TFT_YELLOW;
+    else if (isCurrent)
+      nameColor = TFT_GREEN;
+
+    spr.setTextColor(nameColor);
+    int nameWidth = spr.drawString(e.name, 6, y, 2);
     char meta[48];
     time_t t = (time_t)e.createdAtEpoch;
     struct tm tmBuf{};
@@ -6230,7 +6236,13 @@ void drawImportPetListScreen(bool redrawBg)
     snprintf(meta, sizeof(meta), "%s  %02d/%02d %02d:%02d", e.petType, tmBuf.tm_mon + 1, tmBuf.tm_mday, tmBuf.tm_hour,
              tmBuf.tm_min);
 
-    spr.setTextColor(selected ? TFT_YELLOW : TFT_LIGHTGREY);
+    uint16_t metaColor = TFT_LIGHTGREY;
+    if (selected)
+      metaColor = TFT_YELLOW;
+    else if (isCurrent)
+      metaColor = TFT_GREEN;
+
+    spr.setTextColor(metaColor);
     spr.drawString(meta, 6 + nameWidth + 6, y + 5, 1);
   }
 }
@@ -6287,24 +6299,6 @@ static void drawBackupPetListScreen(bool redrawBg)
 
     spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
     spr.drawString("CANCEL", SCREEN_W / 2 + 40, SCREEN_H / 2 + 12, 2);
-    return;
-  }
-
-  if (uiBackupPetListConfirmRestoreActive())
-  {
-    const int idx = uiBackupPetListConfirmRestoreIndex();
-    spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(TFT_WHITE);
-    spr.drawString("Store Current Pet First?", SCREEN_W / 2, SCREEN_H / 2 - 18, 2);
-
-    spr.setTextColor(idx == 0 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("YES", SCREEN_W / 2 - 50, SCREEN_H / 2 + 10, 2);
-
-    spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("NO", SCREEN_W / 2, SCREEN_H / 2 + 10, 2);
-
-    spr.setTextColor(idx == 2 ? TFT_YELLOW : TFT_WHITE);
-    spr.drawString("CANCEL", SCREEN_W / 2 + 50, SCREEN_H / 2 + 10, 2);
     return;
   }
 

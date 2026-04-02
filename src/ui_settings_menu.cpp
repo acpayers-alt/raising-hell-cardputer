@@ -645,19 +645,16 @@ static MenuItem kWifiItems[] = {
 #endif
 
 static MenuItem kPetItems[] = {
-  {"Rename Pet", actPet_RenamePet, nullptr, nullptr, nullptr},
-  {"Store Pet", actPet_StorePet, nullptr, nullptr, nullptr},
-  {"Stored Pets", actPet_StoredPets, nullptr, nullptr, nullptr},
-  {"Backup Current Pet", actPet_BackupCurrentPet, nullptr, nullptr, nullptr},
-  {"Restore From Backup", actPet_RestoreFromBackup, nullptr, nullptr, nullptr},
-  {"New Pet", actPet_NewPet, nullptr, nullptr, nullptr},
-  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+    {"Rename Pet", actPet_RenamePet, nullptr, nullptr, nullptr},
+    {"Backup Current Pet", actPet_BackupCurrentPet, nullptr, nullptr, nullptr},
+    {"Restore From Backup", actPet_RestoreFromBackup, nullptr, nullptr, nullptr},
+    {"New Pet", actPet_NewPet, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kGameItems[] = {
   {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
+  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
   {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
-  {"Pet Perf HUD", actGame_TogglePetPerfHud, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {
