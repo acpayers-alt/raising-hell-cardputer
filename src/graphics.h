@@ -10,6 +10,7 @@
 
 void graphicsRecoverAfterOta();
 void graphicsReleasePetLayerForOta();
+void graphicsReleaseUiCachesForMiniGame();
 
 // -----------------------------------------------------------------------------
 // Modal / messages

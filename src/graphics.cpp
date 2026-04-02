@@ -3911,7 +3911,7 @@ static void drawPetScreenImpl(bool redrawBg)
     (void)animConsumeFrameChanged();
   }
 
-  const bool needRestore = animChanged;
+  const bool needRestore = redrawBg || animChanged || needPetBg;
 
   cachePetAreaBackgroundIfNeeded(needPetBg);
   g_forcePetBgCache = false;
@@ -4615,6 +4615,26 @@ static void freeSleepAnimFrameCache()
   s_sleepAnimFrameCacheReady = false;
 }
 
+void graphicsReleaseUiCachesForMiniGame()
+{
+  // Release pet-area cached sprite.
+  petLayer.deleteSprite();
+  petLayerReady = false;
+
+  g_petBgCachedPath = nullptr;
+  g_petBgCachedType = (PetType)255;
+  g_petBgCachedStage = 255;
+  g_forcePetBgCache = true;
+
+  // Release cached sleep animation full-screen frame buffers.
+  freeSleepAnimFrameCache();
+
+  // Force the UI to rebuild cleanly when we return.
+  bgDrawnForState = false;
+  lastDrawnState = (UIState)255;
+  invalidateBackgroundCache();
+}
+
 static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, uint8_t frameCount, int drawX, int drawY)
 {
   if (mode == 0 || !frames || frameCount == 0)
@@ -5268,7 +5288,7 @@ static void drawWifiSetupScreen()
     {
       const int i = start + row;
       int y = startY + row * (itemH + gap);
-      
+
       const bool sel = (i == g_wifi.scanIndex);
 
       const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
@@ -6907,8 +6927,11 @@ static void drawDeathTransitionScreen(bool redrawBg)
   static uint8_t s_lastBgEvoStage = 255;
 
   const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
+
   const bool cacheMissing = (g_petBgCachedPath == nullptr);
-  const bool needPetBg = redrawBg || petChanged || cacheMissing || g_forcePetBgCache;
+
+  // redrawBg should restore from cache, not force a fresh SD/JPEG rebuild.
+  const bool needPetBg = petChanged || cacheMissing || g_forcePetBgCache;
 
   s_lastBgPetType = pet.type;
   s_lastBgEvoStage = pet.evoStage;

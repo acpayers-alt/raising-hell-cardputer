@@ -642,6 +642,7 @@ void startFlappyFireball()
   mgResetAcceptState();
 
   currentMiniGame = MiniGame::FLAPPY_FIREBALL;
+  graphicsReleaseUiCachesForMiniGame();
   mgAssetsBeginSession(currentMiniGame, "startFlappyFireball");
   mgmem::beginSession(currentMiniGame, pet.type);
   mgmem::logUsage("flappy-start-beginSession");
@@ -2108,6 +2109,7 @@ void startResurrectionRun()
   soundSetVolumeLevel(soundGetVolumeLevel());
 
   currentMiniGame = MiniGame::RESURRECTION;
+  graphicsReleaseUiCachesForMiniGame();
   mgAssetsBeginSession(currentMiniGame, "startResurrectionRun");
   mgmem::beginSession(currentMiniGame, pet.type);
   mgmem::logUsage("rr beginSession");
@@ -3312,6 +3314,7 @@ void startCrossyRoad()
   mgResetAcceptState();
 
   currentMiniGame = MiniGame::CROSSY_ROAD;
+  graphicsReleaseUiCachesForMiniGame();
   mgAssetsBeginSession(currentMiniGame, "startCrossyRoad");
   mgmem::beginSession(currentMiniGame, pet.type);
   mgmem::logUsage("crossy-start-beginSession");
@@ -4443,6 +4446,7 @@ void startInfernalDodger()
 
   currentMiniGame = MiniGame::INFERNAL_DODGER;
 
+  graphicsReleaseUiCachesForMiniGame();
   mgAssetsBeginSession(currentMiniGame, "startInfernalDodger");
   mgmem::beginSession(currentMiniGame, pet.type);
   mgmem::logUsage("dodger-start-beginSession");
