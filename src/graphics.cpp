@@ -451,8 +451,8 @@ static inline uint16_t uiModalOutline(PetType t) { return uiSchemeForPet(t).topO
 static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
 static const char *PATH_BG_SLEEP = "/raising_hell/graphics/background/sleep_bg.jpg";
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
-static const char *PATH_BG_NONPET_TILE = "/raising_hell/graphics/background/flow/tab_bg.jpg";
-
+static const char *PATH_BG_NONPET_TILE_DEV = "/raising_hell/graphics/background/flow/dev_tab_bg.png";
+static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/flow/eld_tab_bg.png";
 static const char *PATH_STAT_KAIJU = "/raising_hell/graphics/pet/kai_stat.png";
 static const char *PATH_STAT_AXOLOTL = "/raising_hell/graphics/pet/axo_stat.png";
 static const char *PATH_STAT_ANUBIS = "/raising_hell/graphics/pet/anu_stat.png";
@@ -758,15 +758,16 @@ static const char *bgPathForPetWithStage(PetType t, int evoStage)
   return bgPathForPet(t);
 }
 
-static const char *devilHappyFaceForStage(uint8_t evoStage)
+static inline const char *nonPetTilePathForPet(PetType t)
 {
-  if (evoStage >= 3)
-    return DEV_FACE_HAPPY_ELDER;
-  if (evoStage == 2)
-    return DEV_FACE_HAPPY_ADULT;
-  if (evoStage == 1)
-    return DEV_FACE_HAPPY_TEEN;
-  return DEV_FACE_HAPPY_BABY;
+  switch (t)
+  {
+  case PET_ELDRITCH:
+    return PATH_BG_NONPET_TILE_ELD;
+  case PET_DEVIL:
+  default:
+    return PATH_BG_NONPET_TILE_DEV;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -1252,6 +1253,9 @@ static M5Canvas s_nonPetTile(&M5.Display);
 static bool s_nonPetTileReady = false;
 static int s_nonPetTileW = 0;
 static int s_nonPetTileH = 0;
+static PetType s_nonPetTileCachedType = (PetType)255;
+static constexpr int NONPET_TILE_W = 35;
+static constexpr int NONPET_TILE_H = 70;
 
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
@@ -1348,19 +1352,25 @@ static inline void clearContentArea(uint16_t color = TFT_BLACK)
 
 static bool ensureNonPetTileReady()
 {
-  if (s_nonPetTileReady && s_nonPetTileW > 0 && s_nonPetTileH > 0)
+  const PetType desiredType = pet.type;
+  const char *path = nonPetTilePathForPet(desiredType);
+
+  if (s_nonPetTileReady && s_nonPetTileW > 0 && s_nonPetTileH > 0 && s_nonPetTileCachedType == desiredType)
+  {
     return true;
+  }
 
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
+  s_nonPetTileCachedType = (PetType)255;
 
   if (!g_sdReady)
     return false;
 
   s_nonPetTile.setColorDepth(16);
-  if (!s_nonPetTile.createSprite(60, 34))
+  if (!s_nonPetTile.createSprite(NONPET_TILE_W, NONPET_TILE_H))
   {
     Serial.println("[NONPET TILE] createSprite failed");
     return false;
@@ -1369,7 +1379,6 @@ static bool ensureNonPetTileReady()
   s_nonPetTile.fillSprite(TFT_BLACK);
 
   bool ok = false;
-  const char *path = PATH_BG_NONPET_TILE;
   const char *ext = strrchr(path, '.');
 
   if (ext && (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0))
@@ -1388,10 +1397,16 @@ static bool ensureNonPetTileReady()
   s_nonPetTileH = s_nonPetTile.height();
   s_nonPetTileReady = (s_nonPetTileW > 0 && s_nonPetTileH > 0);
 
-  Serial.printf("[NONPET TILE] ready path='%s' w=%d h=%d\n",
-                path ? path : "(null)",
-                s_nonPetTileW,
-                s_nonPetTileH);
+  if (s_nonPetTileReady)
+  s_nonPetTileCachedType = desiredType;
+
+  if (s_nonPetTileW != NONPET_TILE_W || s_nonPetTileH != NONPET_TILE_H)
+  {
+    Serial.printf("[NONPET TILE] unexpected cache size %dx%d expected %dx%d\n", s_nonPetTileW, s_nonPetTileH,
+                  NONPET_TILE_W, NONPET_TILE_H);
+  }
+
+  Serial.printf("[NONPET TILE] ready path='%s' w=%d h=%d\n", path ? path : "(null)", s_nonPetTileW, s_nonPetTileH);
 
   return s_nonPetTileReady;
 }
@@ -3189,7 +3204,7 @@ void drawShopScreen()
 
   spr.fillRoundRect(panelX, panelY, panelW, panelH, 10, TFT_BLACK);
   spr.drawRoundRect(panelX, panelY, panelW, panelH, 10, TFT_DARKGREY);
-  
+
   const int pad = 8;
 
   // Image pinned near the top of the panel
@@ -3621,7 +3636,7 @@ void drawInventoryMenu()
 
   spr.fillRoundRect(panelX, panelY, panelW, panelH, 10, TFT_BLACK);
   spr.drawRoundRect(panelX, panelY, panelW, panelH, 10, TFT_DARKGREY);
-  
+
   // Determine hovered item type (and compute stat deltas)
   ItemType hoveredType = ITEM_NONE;
 
@@ -4699,7 +4714,8 @@ void graphicsReleaseUiCachesForMiniGame()
   s_nonPetTileReady = false;
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
-  
+s_nonPetTileCachedType = (PetType)255;
+
   // Release cached sleep animation full-screen frame buffers.
   freeSleepAnimFrameCache();
 
