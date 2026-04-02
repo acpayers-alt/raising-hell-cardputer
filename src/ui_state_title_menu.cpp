@@ -18,6 +18,8 @@ namespace
 {
 constexpr int kTitleMenuCount = 3;
 
+static void swallowTitleInput(InputState &in);
+
 static bool s_titleHasSave = false;
 static bool s_titleHasImport = false;
 
@@ -77,6 +79,28 @@ static int titleStepEnabled(int startIdx, int dir)
   return startIdx;
 }
 
+static void titleActivateContinue(InputState &in)
+{
+  playBeep();
+
+  refreshTitleMenuAvailability();
+
+  if (s_titleHasSave)
+  {
+    uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+    swallowTitleInput(in);
+    return;
+  }
+
+  g_app.newPetFlowActive = true;
+
+  uiActionSwallowAll(in);
+  uiDrainKb(in);
+  clearInputLatch();
+
+  uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+}
+
 static void swallowTitleInput(InputState &in)
 {
   while (in.kbHasEvent())
@@ -131,6 +155,12 @@ void uiTitleMenuHandle(InputState &in)
     return;
   }
 
+  if (in.menuOnce || in.escOnce)
+  {
+    titleActivateContinue(in);
+    return;
+  }
+
   const bool activate = in.selectOnce || in.encoderPressOnce;
   if (!activate)
   {
@@ -144,25 +174,8 @@ void uiTitleMenuHandle(InputState &in)
   {
   case TITLE_CONTINUE:
   {
-    playBeep();
-
-    if (s_titleHasSave)
-    {
-      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-      swallowTitleInput(in);
-      return;
-    }
-    else
-    {
-      g_app.newPetFlowActive = true;
-
-      uiActionSwallowAll(in);
-      uiDrainKb(in);
-      clearInputLatch();
-
-      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
-      return;
-    }
+    titleActivateContinue(in);
+    return;
   }
 
   case TITLE_IMPORT:

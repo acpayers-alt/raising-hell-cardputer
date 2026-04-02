@@ -1969,37 +1969,40 @@ static void drawSettingsTopMenu()
   char volumeLine[24];
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
-  static const char *labelsStatic[] = {"Main Menu",
-                                       nullptr, // 1 => volumeLine
-                                       "Controls",       "Pet Options >", "Screen Settings >", "System Settings >",
-                                       "Game Options >", "Console >",     "System Status >",   "Credits"};
+  static const char *labelsStatic[] = {
+    "Controls",
+    nullptr, // 1 => volumeLine
+    "Pet Options >",
+    "Screen Settings >",
+    "System Settings >",
+    "Game Options >",
+    "Console >",
+    "System Status >",
+    "Credits",
+    "Main Menu",
+};
 
-  const int totalItems = 10;
+const int totalItems = 10;
 
-  g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
+g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
-  constexpr int MAX_VISIBLE = 5;
-  int start = 0, visCount = 0;
-  listWindow(totalItems, g_app.settingsIndex, MAX_VISIBLE, start, visCount);
+constexpr int MAX_VISIBLE = 5;
+int start = 0, visCount = 0;
+listWindow(totalItems, g_app.settingsIndex, MAX_VISIBLE, start, visCount);
 
-  int itemH = 20;
-  int gap = 5;
-  const int sectionGap = 8; // extra space below Main Menu
+int itemH = 20;
+int gap = 5;
 
-  int totalH = visCount * itemH + (visCount - 1) * gap;
-  if (start == 0 && visCount > 1)
-    totalH += sectionGap;
+int totalH = visCount * itemH + (visCount - 1) * gap;
 
-  while (totalH > contentH && itemH > 16)
-  {
-    itemH--;
-    if (gap > 3)
-      gap--;
+while (totalH > contentH && itemH > 16)
+{
+  itemH--;
+  if (gap > 3)
+    gap--;
 
-    totalH = visCount * itemH + (visCount - 1) * gap;
-    if (start == 0 && visCount > 1)
-      totalH += sectionGap;
-  }
+  totalH = visCount * itemH + (visCount - 1) * gap;
+}
 
   int startY = contentY + (contentH - totalH) / 2;
   if (startY < contentY)
@@ -2019,8 +2022,6 @@ static void drawSettingsTopMenu()
   {
     const int i = start + row;
     int y = startY + row * (itemH + gap);
-    if (start == 0 && i > 0)
-      y += sectionGap;
 
     const bool sel = (i == g_app.settingsIndex);
 
@@ -2040,12 +2041,6 @@ static void drawSettingsTopMenu()
     if (i == 1)
       label = volumeLine;
     spr.drawString(label, boxX + 10, ty);
-
-    if (i == 0 && start == 0 && visCount > 1)
-    {
-      const int lineY = y + itemH + (sectionGap / 2) + 1;
-      spr.drawFastHLine(boxX + 10, lineY, boxW - 20, TFT_LIGHTGREY);
-    }
   }
 
   spr.setTextFont(1);
@@ -2151,12 +2146,9 @@ static void drawPetSettingsMenu()
   const char *restoreLine = "Restore From Backup";
   const char *newPetLine = "New Pet";
 
-  char deathLine[32];
-  snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
-
-  const char *labels[] = {renameLine, backupLine, restoreLine, newPetLine, deathLine};
-  const int totalItems = 5;
-  
+  const char *labels[] = {renameLine, backupLine, restoreLine, newPetLine};
+  const int totalItems = 4;
+    
   g_app.petSettingsIndex = clampi(g_app.petSettingsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
@@ -2226,13 +2218,13 @@ static void drawGameOptionsMenu()
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
 
+  char deathLine[32];
+  snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
+
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  char perfHudLine[32];
-  snprintf(perfHudLine, sizeof(perfHudLine), "Pet Perf HUD: %s", g_petPerfHudEnabled ? "ON" : "OFF");
-
-  const char *labels[] = {decayLine, ledLine, perfHudLine};
+  const char *labels[] = {decayLine, deathLine, ledLine};
   const int totalItems = 3;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
@@ -5226,7 +5218,6 @@ void drawConsoleScreen()
 // ============================================================================
 static void drawWifiSetupScreen()
 {
-  const int sectionGap = 8;
 
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_SCAN)
   {
@@ -5277,9 +5268,7 @@ static void drawWifiSetupScreen()
     {
       const int i = start + row;
       int y = startY + row * (itemH + gap);
-      if (start == 0 && i > 0)
-        y += sectionGap;
-
+      
       const bool sel = (i == g_wifi.scanIndex);
 
       const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;

@@ -98,21 +98,27 @@ static void performRestore(bool storeCurrentFirst, InputState &in)
   if (saveManagerImportBubAtPath(s_entries[s_selected].path, importedPath, sizeof(importedPath), storeCurrentFirst))
   {
     playBeep();
-    ui_showSuccessMessage("Pet Restored!");
+
     s_confirmRestoreActive = false;
+    s_confirmRestoreIndex = 0;
     s_actionMenuActive = false;
-    leaveBackupBrowser();
+    s_actionIndex = 0;
+
+    ui_showSuccessMessage("Pet Restored!");
+    uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+    return;
   }
   else
   {
     playBeep();
     ui_showMessage("Restore Failed");
     s_confirmRestoreActive = false;
+    s_confirmRestoreIndex = 0;
     s_actionMenuActive = false;
+    s_actionIndex = 0;
     requestUIRedraw();
+    swallowBackupInput(in);
   }
-
-  swallowBackupInput(in);
 }
 
 static void performDelete(InputState &in)
@@ -262,7 +268,7 @@ void uiBackupPetListHandle(InputState &in)
     clearInputLatch();
     return;
   }
-  
+
   if (s_actionMenuActive)
   {
     int move = 0;

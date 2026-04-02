@@ -108,7 +108,7 @@ void Handle_GAME(InputState &input, int move)
     return;
   }
 
-  const int totalItems = 7;
+  const int totalItems = 3;
 
   int mv = input.encoderDelta;
   if (input.upOnce)
@@ -132,51 +132,8 @@ void Handle_GAME(InputState &input, int move)
 
   if (uiIsSelect(input))
   {
-    // 0 = Rename Pet
+    // 0 = Decay Mode
     if (g_app.gameOptionsIndex == 0)
-    {
-      playBeep();
-      clearInputLatch();
-      return;
-    }
-
-    // 1 = Store Pet
-    if (g_app.gameOptionsIndex == 1)
-    {
-      char path[128];
-      if (!saveManagerExportCurrentBubJson(path, sizeof(path)))
-        ui_showMessage("Store failed");
-      else
-        ui_showMessage("Pet stored");
-
-      requestUIRedraw();
-      playBeep();
-      clearInputLatch();
-      return;
-    }
-
-    // 2 = Stored Pets
-    if (g_app.gameOptionsIndex == 2)
-    {
-      uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
-      playBeep();
-      clearInputLatch();
-      return;
-    }
-
-    // 3 = New Pet
-    if (g_app.gameOptionsIndex == 3)
-    {
-      s_newPetConfirmActive = true;
-      s_newPetConfirmIndex = 0;
-      requestUIRedraw();
-      playBeep();
-      clearInputLatch();
-      return;
-    }
-
-    // 4 = Decay Mode
-    if (g_app.gameOptionsIndex == 4)
     {
       g_app.decayModeIndex = (int)saveManagerGetDecayMode();
       g_settingsFlow.settingsReturnPage = SettingsPage::GAME;
@@ -187,8 +144,8 @@ void Handle_GAME(InputState &input, int move)
       return;
     }
 
-    // 5 = Pet Death
-    if (g_app.gameOptionsIndex == 5)
+    // 1 = Pet Death
+    if (g_app.gameOptionsIndex == 1)
     {
       petDeathEnabled = !petDeathEnabled;
       saveSettingsToSD();
@@ -199,8 +156,8 @@ void Handle_GAME(InputState &input, int move)
       return;
     }
 
-    // 6 = LED Alerts
-    if (g_app.gameOptionsIndex == 6)
+    // 2 = LED Alerts
+    if (g_app.gameOptionsIndex == 2)
     {
       ledAlertsEnabled = !ledAlertsEnabled;
 #if LED_STATUS_ENABLED

@@ -739,15 +739,15 @@ void appMainLoopTick()
     }
   }
   
-  // Keep title screen isolated from tabs/settings, but allow console as rescue surface.
+  // Keep title screen isolated from global tab/home/settings shortcuts,
+  // but allow the title menu to handle ESC/menu locally.
   if (g_app.uiState == UIState::TITLE_MENU)
   {
-    input.escOnce = false;
     input.hotSettings = false;
-    input.menuOnce = false;
     input.homeOnce = false;
     input.tabJump = 255;
   }
+  
   // Don't allow ESC/Q/tab jumps to steal focus on New Pet flow screens
   else if (g_app.uiState == UIState::CHOOSE_PET)
   {
