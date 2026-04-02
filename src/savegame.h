@@ -10,7 +10,7 @@
 
 // 'SHHR' (your constant; keep as-is if you already wrote files with it)
 #define SAVE_MAGIC   0x52484853
-#define SAVE_VERSION 3
+#define SAVE_VERSION 4
 
 // Back-compat names used by older code (sdcard.cpp)
 #define RH_SAVE_MAGIC   SAVE_MAGIC
@@ -45,6 +45,7 @@ struct PetPersist {
   uint32_t lastFedTimeMs;
   int32_t  inf;
   uint32_t birth_epoch;
+  uint64_t petId;
   char     name[PET_NAME_MAX + 1];
 
   // v3 progression
@@ -120,6 +121,32 @@ struct PetPersistV2 {
   char     name[PET_NAME_MAX + 1];
 };
 
+struct PetPersistV3 {
+  uint8_t  hunger;
+  uint8_t  happiness;
+  uint8_t  energy;
+  uint8_t  health;
+  uint8_t  petType;
+  uint8_t  isSleeping;
+  uint32_t lastFedTimeMs;
+  int32_t  inf;
+  uint32_t birth_epoch;
+  char     name[PET_NAME_MAX + 1];
+
+  uint16_t level;
+  uint32_t xp;
+  uint8_t  evoStage;
+};
+
+struct SavePayloadV3 {
+  uint32_t magic;
+  uint16_t version;
+
+  PetPersistV3 pet;
+  InvPersist   inv;
+  uint32_t     birth_epoch;
+};
+
 struct SavePayloadV2 {
   uint32_t magic;
   uint16_t version;
@@ -128,3 +155,4 @@ struct SavePayloadV2 {
   InvPersist   inv;
   uint32_t     birth_epoch;
 };
+

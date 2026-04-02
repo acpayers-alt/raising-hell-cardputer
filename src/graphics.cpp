@@ -2817,6 +2817,9 @@ static void drawSystemStatusMenu()
   snprintf(batteryBuf, sizeof(batteryBuf), "%d%% %s", batteryPercent, usbPowered ? "(USB)" : "");
 
   char buildBuf[16];
+  char saveVerBuf[16];
+  snprintf(saveVerBuf, sizeof(saveVerBuf), "%u", (unsigned)SAVE_VERSION);
+
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
   snprintf(buildBuf, sizeof(buildBuf), "PUBLIC");
 #else
@@ -2858,6 +2861,8 @@ static void drawSystemStatusMenu()
       buildBuf,
       "Firmware",
       RH_VERSION_STRING,
+      "Save Ver",
+      saveVerBuf,
       "Uptime",
       uptimeBuf,
       "Battery",
@@ -6199,7 +6204,7 @@ void drawImportPetListScreen(bool redrawBg)
     }
     return;
   }
-  
+
   const int rowH = 18;
   const int startY = 20;
 
@@ -6387,7 +6392,7 @@ void drawTitleMenuScreen(bool redrawBg)
   const int rowH = 20;
   const int itemCount = 3;
   const int menuTopY = (SCREEN_H / 2) + 10;
-  
+
   for (int i = 0; i < itemCount; ++i)
   {
     const int rowY = menuTopY + (i * rowH);

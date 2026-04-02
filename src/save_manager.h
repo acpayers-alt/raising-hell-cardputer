@@ -45,6 +45,7 @@ struct PetExportEntry
   char path[128];
   char name[24];
   char petType[16];
+  char petId[24];
   uint32_t createdAtEpoch;
   bool valid;
 };

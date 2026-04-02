@@ -325,6 +325,7 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
   out.path[0] = '\0';
   out.name[0] = '\0';
   out.petType[0] = '\0';
+  out.petId[0] = '\0';
   out.createdAtEpoch = 0;
 
   File f = SD.open(path, FILE_READ);
@@ -345,6 +346,7 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
   const char *name = doc["profile"]["name"] | "";
   const char *petType = doc["profile"]["petType"] | "";
   const uint32_t createdAtEpoch = (uint32_t)(doc["createdAtEpoch"] | 0);
+  const char *petId = doc["profile"]["petId"] | "";
 
   strncpy(out.path, path, sizeof(out.path) - 1);
   out.path[sizeof(out.path) - 1] = '\0';
@@ -354,6 +356,9 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
 
   strncpy(out.petType, (petType && petType[0]) ? petType : "DEVIL", sizeof(out.petType) - 1);
   out.petType[sizeof(out.petType) - 1] = '\0';
+
+  strncpy(out.petId, petId, sizeof(out.petId) - 1);
+  out.petId[sizeof(out.petId) - 1] = '\0';
 
   out.createdAtEpoch = createdAtEpoch;
   out.valid = true;
@@ -788,6 +793,18 @@ static uint32_t getNowEpochOrZero()
   return (now > 1700000000) ? (uint32_t)now : 0;
 }
 
+static uint64_t generatePetId()
+{
+  uint64_t hi = (uint64_t)esp_random();
+  uint64_t lo = (uint64_t)esp_random();
+  uint64_t id = (hi << 32) | lo;
+
+  if (id == 0)
+    id = ((uint64_t)getNowEpochOrZero() << 32) | 0xA5A5A5A5ULL;
+
+  return id;
+}
+
 SavePayload makeDefaultSavePayload()
 {
   SavePayload p{};
@@ -809,6 +826,7 @@ SavePayload makeDefaultSavePayload()
   p.pet.evoStage = 0;
 
   strcpy(p.pet.name, "Bub");
+  p.pet.petId = generatePetId();
 
   memset(&p.inv, 0, sizeof(p.inv));
   p.inv.selectedIndex = 0;
@@ -874,6 +892,50 @@ static void migrateV2ToRuntime(const SavePayloadV2 &p2)
   g_app.uiNeedsRedraw = true;
 }
 
+static void migrateV3ToRuntime(const SavePayloadV3 &p3)
+{
+  PetPersist p4{};
+  p4.hunger = p3.pet.hunger;
+  p4.happiness = p3.pet.happiness;
+  p4.energy = p3.pet.energy;
+  p4.health = p3.pet.health;
+  p4.petType = p3.pet.petType;
+  p4.isSleeping = 0;
+  p4.lastFedTimeMs = p3.pet.lastFedTimeMs;
+  p4.inf = p3.pet.inf;
+  p4.birth_epoch = p3.pet.birth_epoch;
+
+  memcpy(p4.name, p3.pet.name, sizeof(p4.name));
+  p4.name[PET_NAME_MAX] = '\0';
+
+  p4.petId = generatePetId();
+  p4.level = p3.pet.level;
+  p4.xp = p3.pet.xp;
+  p4.evoStage = p3.pet.evoStage;
+
+  pet.fromPersist(p4);
+
+  pet.isSleeping = false;
+  g_app.isSleeping = false;
+  g_app.sleepingByTimer = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+
+  if (g_app.uiState == UIState::PET_SLEEPING)
+  {
+    uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+  }
+
+  g_app.inventory.fromPersist(p3.inv);
+  g_birthEpoch = (p3.birth_epoch != 0) ? p3.birth_epoch : p3.pet.birth_epoch;
+
+  saveManagerMarkDirty();
+  g_app.uiNeedsRedraw = true;
+}
+
 static void pack(SavePayload &p)
 {
   memset(&p, 0, sizeof(p));
@@ -898,6 +960,8 @@ static void pack(SavePayload &p)
 static void unpack(const SavePayload &p)
 {
   pet.fromPersist(p.pet);
+  if (pet.petId == 0)
+  pet.petId = generatePetId();
   g_app.inventory.fromPersist(p.inv);
   // Keep the EEPROM mirror in sync with the authoritative payload.
   // This prevents stale inventory from leaking across factory reset/death.
@@ -1261,52 +1325,130 @@ static bool loadSaveFileInternal(const char *path)
   const size_t sz = (size_t)f.size();
   g_lastLoadSize = (uint32_t)sz;
 
-  if (sz != sizeof(SavePayload))
+  if (sz == sizeof(SavePayload))
+  {
+    SavePayload p{};
+    memset(&p, 0, sizeof(p));
+
+    const size_t want = sizeof(p);
+    const int r = f.read((uint8_t *)&p, want);
+    f.close();
+
+    if (r != (int)want)
+    {
+      g_lastLoadErr = SLE_READ_FAIL;
+      Serial.printf("[SAVE] FAIL path=%s reason=read_fail got=%d want=%u size=%lu\n",
+                    path, r, (unsigned)want, (unsigned long)sz);
+      return false;
+    }
+
+    if (p.magic != SAVE_MAGIC)
+    {
+      g_lastLoadErr = SLE_MAGIC_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=magic_bad got=0x%08lx want=0x%08lx size=%lu\n",
+                    path, (unsigned long)p.magic, (unsigned long)SAVE_MAGIC, (unsigned long)sz);
+      return false;
+    }
+
+    if (p.version != SAVE_VERSION && p.version != 0)
+    {
+      g_lastLoadErr = SLE_VERSION_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=version_bad got=%u want=%u size=%lu\n",
+                    path, (unsigned)p.version, (unsigned)SAVE_VERSION, (unsigned long)sz);
+      return false;
+    }
+
+    unpack(p);
+  }
+  else if (sz == sizeof(SavePayloadV3))
+  {
+    SavePayloadV3 p3{};
+    memset(&p3, 0, sizeof(p3));
+
+    const size_t want = sizeof(p3);
+    const int r = f.read((uint8_t *)&p3, want);
+    f.close();
+
+    if (r != (int)want)
+    {
+      g_lastLoadErr = SLE_READ_FAIL;
+      Serial.printf("[SAVE] FAIL path=%s reason=read_fail_v3 got=%d want=%u size=%lu\n",
+                    path, r, (unsigned)want, (unsigned long)sz);
+      return false;
+    }
+
+    if (p3.magic != SAVE_MAGIC)
+    {
+      g_lastLoadErr = SLE_MAGIC_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=magic_bad_v3 got=0x%08lx want=0x%08lx size=%lu\n",
+                    path, (unsigned long)p3.magic, (unsigned long)SAVE_MAGIC, (unsigned long)sz);
+      return false;
+    }
+
+    if (p3.version != 3)
+    {
+      g_lastLoadErr = SLE_VERSION_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=version_bad_v3 got=%u want=3 size=%lu\n",
+                    path, (unsigned)p3.version, (unsigned long)sz);
+      return false;
+    }
+
+    migrateV3ToRuntime(p3);
+  }
+  else if (sz == sizeof(SavePayloadV2))
+  {
+    SavePayloadV2 p2{};
+    memset(&p2, 0, sizeof(p2));
+
+    const size_t want = sizeof(p2);
+    const int r = f.read((uint8_t *)&p2, want);
+    f.close();
+
+    if (r != (int)want)
+    {
+      g_lastLoadErr = SLE_READ_FAIL;
+      Serial.printf("[SAVE] FAIL path=%s reason=read_fail_v2 got=%d want=%u size=%lu\n",
+                    path, r, (unsigned)want, (unsigned long)sz);
+      return false;
+    }
+
+    if (p2.magic != SAVE_MAGIC)
+    {
+      g_lastLoadErr = SLE_MAGIC_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=magic_bad_v2 got=0x%08lx want=0x%08lx size=%lu\n",
+                    path, (unsigned long)p2.magic, (unsigned long)SAVE_MAGIC, (unsigned long)sz);
+      return false;
+    }
+
+    if (p2.version != 2)
+    {
+      g_lastLoadErr = SLE_VERSION_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=version_bad_v2 got=%u want=2 size=%lu\n",
+                    path, (unsigned)p2.version, (unsigned long)sz);
+      return false;
+    }
+
+    migrateV2ToRuntime(p2);
+  }
+  else
   {
     g_lastLoadErr = SLE_READ_FAIL;
-    Serial.printf("[SAVE] FAIL path=%s reason=payload_size_bad size=%lu need=%u\n", path, (unsigned long)sz,
-                  (unsigned)sizeof(SavePayload));
+    Serial.printf("[SAVE] FAIL path=%s reason=payload_size_bad size=%lu need=%u/%u/%u\n",
+                  path,
+                  (unsigned long)sz,
+                  (unsigned)sizeof(SavePayload),
+                  (unsigned)sizeof(SavePayloadV3),
+                  (unsigned)sizeof(SavePayloadV2));
     f.close();
     return false;
   }
 
-  SavePayload p{};
-  memset(&p, 0, sizeof(p));
-
-  const size_t want = sizeof(p);
-  const int r = f.read((uint8_t *)&p, want);
-  f.close();
-
-  if (r != (int)want)
-  {
-    g_lastLoadErr = SLE_READ_FAIL;
-    Serial.printf("[SAVE] FAIL path=%s reason=read_fail got=%d want=%u size=%lu\n", path, r, (unsigned)want,
-                  (unsigned long)sz);
-    return false;
-  }
-
-  if (p.magic != SAVE_MAGIC)
-  {
-    g_lastLoadErr = SLE_MAGIC_BAD;
-    Serial.printf("[SAVE] FAIL path=%s reason=magic_bad got=0x%08lx want=0x%08lx size=%lu\n", path,
-                  (unsigned long)p.magic, (unsigned long)SAVE_MAGIC, (unsigned long)sz);
-    return false;
-  }
-
-  if (p.version != SAVE_VERSION && p.version != 0)
-  {
-    g_lastLoadErr = SLE_VERSION_BAD;
-    Serial.printf("[SAVE] FAIL path=%s reason=version_bad got=%u want=%u size=%lu\n", path, (unsigned)p.version,
-                  (unsigned)SAVE_VERSION, (unsigned long)sz);
-    return false;
-  }
-
-  unpack(p);
-
   g_lastLoadPath = path;
   g_lastLoadUsedBackup = (strcmp(path, SAVE_PATH) != 0);
 
-  Serial.printf("[SAVE] load OK path=%s size=%lu backup=%d\n", path, (unsigned long)g_lastLoadSize,
+  Serial.printf("[SAVE] load OK path=%s size=%lu backup=%d\n",
+                path,
+                (unsigned long)g_lastLoadSize,
                 g_lastLoadUsedBackup ? 1 : 0);
 
   return true;
@@ -1968,6 +2110,44 @@ void saveManagerFactoryReset()
   ESP.restart();
 }
 
+static void removeExportsWithPetId(const char *petIdStr)
+{
+  if (!g_sdReady || !petIdStr || !petIdStr[0] || !SD.exists(EXPORTS_DIR))
+    return;
+
+  File dir = SD.open(EXPORTS_DIR);
+  if (!dir || !dir.isDirectory())
+    return;
+
+  File file = dir.openNextFile();
+  while (file)
+  {
+    if (!file.isDirectory())
+    {
+      const char *nm = file.name();
+      const size_t len = strlen(nm);
+      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
+      {
+        char full[128];
+        snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
+
+        PetExportEntry entry{};
+        if (readExportMetadata(full, entry))
+        {
+          if (entry.petId[0] && strcmp(entry.petId, petIdStr) == 0)
+          {
+            SD.remove(full);
+            Serial.printf("[EXPORT] removed prior stored copy '%s' petId=%s\n", full, petIdStr);
+          }
+        }
+      }
+    }
+
+    file.close();
+    file = dir.openNextFile();
+  }
+}
+
 static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t outPathSize)
 {
   if (outPath && outPathSize > 0)
@@ -2007,6 +2187,9 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   profile["xp"] = pet.xp;
   profile["evoStage"] = pet.evoStage;
   profile["birthEpoch"] = g_birthEpoch;
+  char petIdBuf[24];
+  snprintf(petIdBuf, sizeof(petIdBuf), "%016llX", (unsigned long long)pet.petId);
+  profile["petId"] = petIdBuf;
 
   JsonObject stats = profile.createNestedObject("stats");
   stats["hunger"] = pet.hunger;
@@ -2021,6 +2204,9 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   JsonObject inventory = doc.createNestedObject("inventory");
   inventory["selectedIndex"] = g_app.inventory.selectedIndex;
   JsonArray slots = inventory.createNestedArray("slots");
+
+  if (strcmp(dirPath, EXPORTS_DIR) == 0)
+  removeExportsWithPetId(petIdBuf);
 
   for (int i = 0; i < Inventory::MAX_ITEMS; ++i)
   {
@@ -2163,6 +2349,15 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
 
   g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
   pet.birth_epoch = g_birthEpoch;
+
+  const char *petIdStr = profile["petId"] | "";
+  unsigned long long parsedPetId = 0ULL;
+  if (petIdStr && petIdStr[0])
+    sscanf(petIdStr, "%llx", &parsedPetId);
+
+  pet.petId = (uint64_t)parsedPetId;
+  if (pet.petId == 0)
+    pet.petId = generatePetId();
 
   g_app.inventory.clear();
   for (JsonObject row : slots)

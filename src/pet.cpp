@@ -80,8 +80,8 @@ void petResetUpdateTimers()
 // Pet-O-Matic
 // ------------------------------------------------------------
 Pet::Pet()
-    : type(PET_DEVIL), hunger(0), happiness(100), energy(100), health(100), inf(0), birth_epoch(0), isSleeping(false),
-      lastFedTime(0), x(120), y(80), width(64), height(64), level(1), xp(0), evoStage(0)
+    : type(PET_DEVIL), hunger(0), happiness(100), energy(100), health(100), inf(0), birth_epoch(0), petId(0),
+      isSleeping(false)
 {
   name[0] = '\0';
   strncpy(spritePath, "/graphics/pet/devil_baby_normal.raw", sizeof(spritePath));
@@ -833,7 +833,8 @@ void Pet::toPersist(PetPersist &out) const
   out.lastFedTimeMs = (uint32_t)lastFedTime;
   out.inf = (int32_t)inf;
   out.birth_epoch = birth_epoch;
-
+  out.petId = petId;
+  
   strncpy(out.name, name, PET_NAME_MAX);
   out.name[PET_NAME_MAX] = '\0';
 
@@ -855,6 +856,7 @@ void Pet::fromPersist(const PetPersist &in)
   lastFedTime = (unsigned long)in.lastFedTimeMs;
   inf = (int)in.inf;
   birth_epoch = in.birth_epoch;
+  petId = in.petId;
 
   strncpy(name, in.name, PET_NAME_MAX);
   name[PET_NAME_MAX] = '\0';
@@ -933,20 +935,18 @@ void Pet::addXP(uint32_t amount)
   else
     xp += amount;
 
-    while (level < 999)
-    {
-      const uint32_t need = xpForNextLevel();
-      if (xp < need)
-        break;
-    
-      xp -= need;
-      level++;
-    
-      Serial.printf("[XP] LEVEL UP → level=%u next=%lu\n",
-                    level,
-                    xpForNextLevel());
-    }
-    
+  while (level < 999)
+  {
+    const uint32_t need = xpForNextLevel();
+    if (xp < need)
+      break;
+
+    xp -= need;
+    level++;
+
+    Serial.printf("[XP] LEVEL UP → level=%u next=%lu\n", level, xpForNextLevel());
+  }
+
   saveManagerMarkDirty();
   requestUIRedraw();
 }

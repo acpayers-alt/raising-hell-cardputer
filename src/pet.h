@@ -72,6 +72,7 @@ public:
   int health;
   int inf;
   uint32_t birth_epoch;
+  uint64_t petId;
   bool isSleeping;
   unsigned long lastFedTime;
 

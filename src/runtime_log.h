@@ -12,3 +12,4 @@ int runtimeLogCount();
 const char *runtimeLogGetLine(int idx);   // idx: 0..count-1, oldest first
 void runtimeLogDumpToConsole();
 void runtimeLogDumpTailToConsole(int n);
+
