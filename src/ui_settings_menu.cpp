@@ -317,6 +317,10 @@ static void actWifi_Toggle(InputState &)
   const bool en = !wifiIsEnabled();
 
   wifiSetEnabled(en);
+  Serial.printf("[WIFI PREF WRITE] source=ui_settings_menu en=%d state=%d tab=%d\n",
+    en ? 1 : 0,
+    (int)g_app.uiState,
+    (int)g_app.currentTab);
   settingsSetWifiEnabled(en);
   applyWifiPower(en);
 

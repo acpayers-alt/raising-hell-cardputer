@@ -1620,7 +1620,16 @@ static bool ensureNonPetTileReady()
 
   if (!ok)
   {
-    Serial.printf("[NONPET TILE] load failed path='%s'\n", path ? path : "(null)");
+    static char s_lastNonPetTileFailPath[160] = {0};
+
+    const char *failPath = path ? path : "(null)";
+    if (strcmp(s_lastNonPetTileFailPath, failPath) != 0)
+    {
+      strncpy(s_lastNonPetTileFailPath, failPath, sizeof(s_lastNonPetTileFailPath) - 1);
+      s_lastNonPetTileFailPath[sizeof(s_lastNonPetTileFailPath) - 1] = '\0';
+      Serial.printf("[NONPET TILE] load failed path='%s'\n", failPath);
+    }
+
     s_nonPetTile.deleteSprite();
     return false;
   }
@@ -4959,14 +4968,25 @@ void graphicsReleaseUiCachesForMiniGame()
 
 static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, uint8_t frameCount, int drawX, int drawY)
 {
-  if (mode == 0 || !frames || frameCount == 0)
+  if (!frames || frameCount == 0)
     return false;
 
-  // Already built for this mode/count?
-  if (s_sleepAnimFrameCacheReady && s_sleepAnimFrameCache && s_sleepAnimFrameCacheMode == mode &&
+  if (s_sleepAnimFrameCacheReady &&
+      s_sleepAnimFrameCache &&
+      s_sleepAnimFrameCacheMode == mode &&
       s_sleepAnimFrameCacheCnt == frameCount)
   {
     return true;
+  }
+
+  const size_t pxCount = (size_t)SCREEN_W * (size_t)SCREEN_H;
+  const size_t bufBytes = pxCount * sizeof(uint16_t);
+  const size_t totalNeeded = bufBytes * frameCount;
+
+  if (ESP.getPsramSize() == 0 ||
+      heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) < (totalNeeded + 4096))
+  {
+    return false;
   }
 
   freeSleepAnimFrameCache();
@@ -4974,9 +4994,6 @@ static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, u
   uint16_t *sprBuf = (uint16_t *)spr.getBuffer();
   if (!sprBuf)
     return false;
-
-  const size_t pxCount = (size_t)SCREEN_W * (size_t)SCREEN_H;
-  const size_t bufBytes = pxCount * sizeof(uint16_t);
 
   s_sleepAnimFrameCache = (uint16_t **)calloc(frameCount, sizeof(uint16_t *));
   if (!s_sleepAnimFrameCache)

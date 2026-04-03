@@ -1,4 +1,5 @@
 #include "wifi_time.h"
+#include "app_state.h"
 #include "debug.h"
 #include "input_activity_state.h"
 #include "time_persist.h"

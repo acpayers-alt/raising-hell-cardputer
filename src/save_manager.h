@@ -90,3 +90,7 @@ bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize);
 void saveManagerSetPetIntroFadeBootFlag();
 
 void saveManagerAbortFreshPetFlow();
+
+void saveManagerSetSleepPendingFlag();
+void saveManagerClearSleepPendingFlag();
+bool saveManagerSleepPendingFlagExists();

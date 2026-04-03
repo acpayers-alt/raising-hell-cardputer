@@ -247,16 +247,19 @@ void Pet::petSleepTick()
   // Pre-birth: never allow sleep flags or sleep tick to run.
   if (isPreBirthUiState(g_app.uiState))
   {
-    if (g_app.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+    if (this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
         g_app.sleepUntilAwakened)
     {
-      g_app.isSleeping = false;
+      this->isSleeping = false;
       g_app.isSleeping = false;
       g_app.sleepingByTimer = false;
       g_app.sleepUntilRested = false;
       g_app.sleepUntilAwakened = false;
       g_app.sleepTargetEnergy = 0;
+      g_app.sleepStartTime = 0;
+      g_app.sleepDurationMs = 0;
 
+      saveManagerClearSleepPendingFlag();
       saveManagerMarkDirty();
       requestUIRedraw();
     }
@@ -270,24 +273,49 @@ void Pet::petSleepTick()
 
   if (!allowSleepUi)
   {
-    if (g_app.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+    if (this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
         g_app.sleepUntilAwakened)
     {
-      g_app.isSleeping = false;
+      this->isSleeping = false;
       g_app.isSleeping = false;
       g_app.sleepingByTimer = false;
       g_app.sleepUntilRested = false;
       g_app.sleepUntilAwakened = false;
       g_app.sleepTargetEnergy = 0;
+      g_app.sleepStartTime = 0;
+      g_app.sleepDurationMs = 0;
 
+      saveManagerClearSleepPendingFlag();
       saveManagerMarkDirty();
       requestUIRedraw();
     }
     return;
   }
 
+  static bool s_sleepFlagLatched = false;
+
   if (!g_app.isSleeping)
+  {
+    s_sleepFlagLatched = false;
     return;
+  }
+
+  // If the persisted flag already exists, this is either:
+  //   - a sleep restored from boot, or
+  //   - an already-established sleeping session.
+  // In either case, do NOT re-set the flag or mark dirty again.
+     
+  if (saveManagerSleepPendingFlagExists())
+  {
+    s_sleepFlagLatched = true;
+  }
+  else if (!s_sleepFlagLatched)
+  {
+    saveManagerSetSleepPendingFlag();
+    saveManagerMarkDirty();
+    Serial.println("[SLEEP] entered → flag set");
+    s_sleepFlagLatched = true;
+  }
 
   static uint32_t lastSleepUpdate = 0;
   static uint32_t sleepAccMs = 0;
@@ -426,20 +454,26 @@ void Pet::petSleepTick()
     {
       energy = 100;
 
-      g_app.isSleeping = false;
+      this->isSleeping = false;
       g_app.isSleeping = false;
       g_app.sleepingByTimer = false;
 
       g_app.sleepUntilRested = false;
       g_app.sleepUntilAwakened = false;
       g_app.sleepTargetEnergy = 0;
+      g_app.sleepStartTime = 0;
+      g_app.sleepDurationMs = 0;
 
+      saveManagerClearSleepPendingFlag();
       saveManagerMarkDirty();
       requestUIRedraw();
 
       if (g_app.uiState == UIState::PET_SLEEPING)
       {
+        graphicsReleaseUiCachesForMiniGame();
         uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+        requestFullUIRedraw();
+        forceRenderUIOnce();
       }
       return;
     }
@@ -452,20 +486,26 @@ void Pet::petSleepTick()
         uint32_t elapsed = now - g_app.sleepStartTime;
         if (elapsed >= g_app.sleepDurationMs)
         {
-          g_app.isSleeping = false;
+          this->isSleeping = false;
           g_app.isSleeping = false;
           g_app.sleepingByTimer = false;
 
           g_app.sleepUntilRested = false;
           g_app.sleepUntilAwakened = false;
           g_app.sleepTargetEnergy = 0;
+          g_app.sleepStartTime = 0;
+          g_app.sleepDurationMs = 0;
 
+          saveManagerClearSleepPendingFlag();
           saveManagerMarkDirty();
           requestUIRedraw();
 
           if (g_app.uiState == UIState::PET_SLEEPING)
           {
+            graphicsReleaseUiCachesForMiniGame();
             uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+            requestFullUIRedraw();
+            forceRenderUIOnce();
           }
 
           return;
@@ -584,14 +624,9 @@ void Pet::update()
 
   const bool allowSleepUi = (ui == UIState::PET_SLEEPING) || (ui == UIState::POWER_MENU) || isSettingsState(ui);
 
-  if (sleepingNow && !allowSleepUi)
-  {
-    this->isSleeping = false;
-    g_app.isSleeping = false;
-    g_app.sleepingByTimer = false;
-    g_app.sleepUntilRested = false;
-    g_app.sleepUntilAwakened = false;
-  }
+  // Do NOT force-exit sleep from update loop.
+  // Sleep transitions must be handled explicitly via UI/state logic.
+  // This avoids breaking rendering/caches during state transitions.
 
   // -------------------------------------------------
   // REAL-TIME DECAY CONSTANTS
@@ -834,7 +869,7 @@ void Pet::toPersist(PetPersist &out) const
   out.inf = (int32_t)inf;
   out.birth_epoch = birth_epoch;
   out.petId = petId;
-  
+
   strncpy(out.name, name, PET_NAME_MAX);
   out.name[PET_NAME_MAX] = '\0';
 

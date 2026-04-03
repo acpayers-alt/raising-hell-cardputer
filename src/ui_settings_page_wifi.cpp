@@ -78,6 +78,11 @@ void Handle_WIFI(InputState &input, int move)
       const bool en = !wifiIsEnabled();
 
       wifiSetEnabled(en);
+      Serial.printf("[WIFI PREF WRITE] source=ui_settings_page_wifi en=%d index=%d state=%d tab=%d\n",
+        en ? 1 : 0,
+        g_wifi.wifiSettingsIndex,
+        (int)g_app.uiState,
+        (int)g_app.currentTab);
       settingsSetWifiEnabled(en);
       applyWifiPower(en);
 

@@ -84,9 +84,18 @@
 // Misc
 #include "debug.h"
 #include "runtime_log.h"
+#include "ui_state_pet_sleeping.h"
 #include "version.h"
-
+#include "esp_heap_caps.h"
 // End of includes
+
+static void logMem(const char* tag)
+{
+  Serial.printf("[MEM][%s] free=%u largest=%u\n",
+                tag,
+                heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+}
 
 UIState g_bootWizardAfterOkState = UIState::TITLE_MENU;
 Tab g_bootWizardAfterOkTab = Tab::TAB_PET;
@@ -712,15 +721,33 @@ static void finalizeBootLanding()
 
   if (g_app.uiState == UIState::BOOT)
   {
+    if (s_bootFinalLandingState == UIState::PET_SLEEPING)
+    {
+      //CRITICAL: free any stale UI/sleep buffers before entering sleep screen
+      graphicsReleaseUiCachesForMiniGame();
+    }
+
     enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
+
+    if (s_bootFinalLandingState == UIState::PET_SLEEPING)
+    {
+      uiPetSleepingBootEnter();
+    }
   }
 
   ui_setBootSplashActive(false);
 
   invalidateBackgroundCache();
+
+  if (s_bootFinalLandingState == UIState::PET_SLEEPING)
+  {
+    requestFullUIRedraw();
+    sleepBgKickNow();
+    return;
+  }
+  
   requestUIRedraw();
-  renderUI();
-}
+  renderUI();}
 
 // -----------------------------------------------------------------------------
 // postBootInitTick()
@@ -907,7 +934,15 @@ void postBootInitTick()
     // It must never erase the fact that a valid save was loaded.
     const bool loadedSaveExists = loadedFromSD;
 
-    const UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
+    UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
+
+    // If a valid save was restored and the pet is still marked asleep,
+    // boot must land on PET_SLEEPING instead of TITLE_MENU/PET_SCREEN.
+    if (loadedSaveExists && saveManagerSleepPendingFlagExists())
+    {
+      afterOk = UIState::PET_SLEEPING;
+    }
+
     s_bootFinalLandingState = afterOk;
 
     bootMarkFirmwareSeenAndRequestProvisionIfChanged();
@@ -933,6 +968,8 @@ void postBootInitTick()
       runtimeLogLine("[BOOT] path=FIRST_BOOT_WIZARD");
     else if (!timeIsValid())
       runtimeLogLine("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
+    else if (loadedSaveExists && saveManagerSleepPendingFlagExists())
+      runtimeLogLine("[BOOT] path=PET_SLEEPING_RESTORE");
     else if (!loadedSaveExists)
       runtimeLogLine("[BOOT] path=TITLE_MENU_NO_SAVE");
     else
@@ -1063,6 +1100,15 @@ void postBootInitTick()
 
     if (!deferForAssetProvision)
     {
+      // We are done with boot-time deferred init for this boot path.
+      // Do not let Stage 3 come back around and re-apply Wi-Fi power/init
+      // after we have already landed in the real UI.
+      g_postBootInitDone = true;
+      g_wifiApplied = false;
+
+      Serial.printf("[BOOT] finalize direct landing=%d postBootInitDone=1 wifiApplied=1\n",
+                    (int)s_bootFinalLandingState);
+
       finalizeBootLanding();
       return;
     }
@@ -1076,55 +1122,57 @@ void postBootInitTick()
     if (now >= g_nextWifiTryMs)
     {
       g_nextWifiTryMs = now + 1000;
-
+    
       if (bootAssetProvisionRequired())
       {
-        // For mandatory provisioning, wait on the explicit intro screen until
-        // the user presses ENTER to begin Wi-Fi setup.
         if (g_bootAssetProvisionMustComplete && !g_bootProvisionWifiOnboardingStarted)
         {
           if (bootAssetProvisionWaitingAtIntroScreen())
             return;
-
+  
           g_bootProvisionWifiOnboardingStarted = true;
           g_bootAssetProvisionActive = false;
           ui_setBootSplashActive(false);
-
+  
           uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
           requestFullUIRedraw();
           requestUIRedraw();
           clearInputLatch();
           return;
         }
-
+  
         if (bootAssetProvisionWifiOnboardingActive())
           return;
       }
-
+  
       if (!g_wifiApplied)
       {
         const bool pref = settingsWifiEnabled();
+        Serial.printf("[BOOT][WIFI] applying pref=%d landing=%d\n",
+                      pref ? 1 : 0,
+                      (int)s_bootFinalLandingState);
         wifiSetEnabled(pref);
         applyWifiPower(pref);
         g_wifiApplied = true;
       }
-
+        
       wifiTimeInit();
-
+  
       if (bootAssetProvisionRequired())
       {
         g_bootAssetProvisionActive = true;
-
+  
         if (!bootAssetProvisionWifiReady())
           return;
       }
-
+  
       g_postBootInitDone = true;
       requestUIRedraw();
     }
+  
     return;
   }
-
+  
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------

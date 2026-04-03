@@ -5,6 +5,7 @@
 #include "input.h"
 #include "led_status.h"
 #include "pet.h"
+#include "save_manager.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
@@ -22,6 +23,18 @@ void uiPetSleepingOnEnter(const InputState &in)
   s_prevSelectHeld = in.selectHeld;
 
   // Extra safety: clear latches next tick.
+  inputForceClear();
+}
+
+void uiPetSleepingBootEnter()
+{
+  s_enterSleepUiMs = millis();
+
+  // We do not have a meaningful live InputState during boot landing,
+  // so start from a safe "not held" baseline.
+  s_prevSelectHeld = false;
+
+  clearInputLatch();
   inputForceClear();
 }
 
@@ -58,12 +71,21 @@ void uiPetSleepingHandle(InputState &in)
     g_app.sleepUntilAwakened = false;
     g_app.sleepUntilRested = false;
     g_app.sleepingByTimer = false;
+    g_app.sleepTargetEnergy = 0;
+    g_app.sleepStartTime = 0;
+    g_app.sleepDurationMs = 0;
 
     pet.isSleeping = false;
 
+    saveManagerClearSleepPendingFlag();
+    saveManagerMarkDirty();
+
+    graphicsReleaseUiCachesForMiniGame();
+
     uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
-    invalidateBackgroundCache();
-    requestUIRedraw();
+    requestFullUIRedraw();
+    forceRenderUIOnce();
     return;
   }
+  return;
 }

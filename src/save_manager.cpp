@@ -97,7 +97,11 @@ static SettingsData g_settings;
 
 bool settingsWifiEnabled() { return (g_settings.wifiEnabled != 0); }
 
-void settingsSetWifiEnabled(bool en) { g_settings.wifiEnabled = en ? 1 : 0; }
+void settingsSetWifiEnabled(bool en)
+{
+  Serial.printf("[WIFI PREF WRITE] en=%d @ %s:%d\n", en ? 1 : 0, __FILE__, __LINE__);
+  g_settings.wifiEnabled = en ? 1 : 0;
+}
 
 // Settings persistence
 bool loadSettingsFromSD();
@@ -117,6 +121,11 @@ uint32_t saveManagerLastLoadSize() { return g_lastLoadSize; }
 
 static void forceChoosePetFlowFromBoot();
 static uint64_t generatePetId();
+
+void saveManagerSetSleepPendingFlag();
+void saveManagerClearSleepPendingFlag();
+bool saveManagerSleepPendingFlagExists();
+void saveManagerEnterSleepState();
 
 // -----------------------------
 // Save root + paths
@@ -138,6 +147,7 @@ static const char *AUTO_HEAL_FALLBACK_PET_NAME = "Bub";
 
 bool saveManagerAutoHeal();
 static const char *NAME_PENDING_FLAG_PATH = "/raising_hell/save/name_pending.flag";
+static const char *SLEEP_PENDING_FLAG_PATH = "/raising_hell/save/sleep_pending.flag";
 static const char *BACKUPS_DIR = "/raising_hell/backup";
 static const char *EXPORTS_DIR = "/raising_hell/exports";
 static const char *EXPORT_MAGIC = "raising_hell_bub_export";
@@ -650,6 +660,64 @@ static void writeNamePendingFlag()
   }
 }
 
+static bool sleepPendingFlagExists()
+{
+  if (!g_sdReady)
+    return false;
+  return SD.exists(SLEEP_PENDING_FLAG_PATH);
+}
+
+static void writeSleepPendingFlag()
+{
+  if (!g_sdReady)
+    return;
+
+  if (!SD.exists("/raising_hell"))
+  {
+    if (!SD.mkdir("/raising_hell"))
+      return;
+  }
+  if (!SD.exists("/raising_hell/save"))
+  {
+    if (!SD.mkdir("/raising_hell/save"))
+      return;
+  }
+
+  File f = SD.open(SLEEP_PENDING_FLAG_PATH, FILE_WRITE);
+  if (f)
+  {
+    f.print("1");
+    f.close();
+  }
+}
+
+static void clearSleepPendingFlag()
+{
+  if (!g_sdReady)
+    return;
+  if (SD.exists(SLEEP_PENDING_FLAG_PATH))
+    SD.remove(SLEEP_PENDING_FLAG_PATH);
+}
+
+static void applySleepStateFromBootFlag()
+{
+  if (!sleepPendingFlagExists())
+    return;
+
+  pet.isSleeping = true;
+  g_app.isSleeping = true;
+  g_app.sleepingByTimer = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+
+  // Do NOT change UI state here.
+  // Boot flow will decide final landing, and then we can override it once.
+  Serial.println("[SAVE] restored sleeping pet from sleep_pending.flag");
+}
+
 static void rotateSaveBackups()
 {
   if (!g_sdReady)
@@ -733,6 +801,10 @@ static void newPetInternal();
 static bool ensureSaveDir();
 static void tryRemove(const char *path);
 static void clearNamePendingFlag();
+static bool sleepPendingFlagExists();
+static void writeSleepPendingFlag();
+static void clearSleepPendingFlag();
+static void applySleepStateFromBootFlag();
 
 static bool loadSettingsFromSD_internal(bool *outLoadedOld = nullptr);
 static bool saveSettingsToSD_internal();
@@ -757,6 +829,29 @@ static void printState(const char *tag)
 
 void saveManagerClearNamePendingFlag() { clearNamePendingFlag(); }
 bool saveManagerNamePendingFlagExists() { return namePendingFlagExists(); }
+void saveManagerSetSleepPendingFlag() { writeSleepPendingFlag(); }
+void saveManagerClearSleepPendingFlag() { clearSleepPendingFlag(); }
+bool saveManagerSleepPendingFlagExists() { return sleepPendingFlagExists(); }
+
+void saveManagerEnterSleepState()
+{
+  pet.isSleeping = true;
+  g_app.isSleeping = true;
+  g_app.sleepingByTimer = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+
+  writeSleepPendingFlag();
+  saveManagerMarkDirty();
+
+  uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
+  g_app.uiNeedsRedraw = true;
+
+  Serial.println("[SAVE] sleep entered + sleep_pending.flag set");
+}
 
 // Back-compat: older code called this name.
 static void removeNamePendingFlag() { clearNamePendingFlag(); }
@@ -961,7 +1056,6 @@ static void migrateV2ToRuntime(const SavePayloadV2 &p2)
 
   pet.fromPersist(p3);
 
-  // Always reboot awake
   pet.isSleeping = false;
   g_app.isSleeping = false;
   g_app.sleepingByTimer = false;
@@ -975,6 +1069,8 @@ static void migrateV2ToRuntime(const SavePayloadV2 &p2)
   {
     uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
   }
+
+  applySleepStateFromBootFlag();
 
   g_app.inventory.fromPersist(p2.inv);
 
@@ -1021,6 +1117,8 @@ static void migrateV3ToRuntime(const SavePayloadV3 &p3)
     uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
   }
 
+  applySleepStateFromBootFlag();
+
   g_app.inventory.fromPersist(p3.inv);
   g_birthEpoch = (p3.birth_epoch != 0) ? p3.birth_epoch : p3.pet.birth_epoch;
 
@@ -1058,7 +1156,7 @@ static void unpack(const SavePayload &p)
   // Keep the EEPROM mirror in sync with the authoritative payload.
   // This prevents stale inventory from leaking across factory reset/death.
   g_app.inventory.syncEepromNoDirty();
-  // Always come up awake
+  // Default to awake, then let boot flags override.
   pet.isSleeping = false;
   g_app.isSleeping = false;
   g_app.sleepingByTimer = false;
@@ -1067,6 +1165,8 @@ static void unpack(const SavePayload &p)
   g_app.sleepTargetEnergy = 0;
   g_app.sleepStartTime = 0;
   g_app.sleepDurationMs = 0;
+
+  applySleepStateFromBootFlag();
 
   uint32_t be = p.birth_epoch;
   if (be == 0)
@@ -1328,8 +1428,15 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   }
 
   applyTimezoneIndex(tzIndex);
-  return true;
-}
+
+  const bool wifiEn = (g_settings.wifiEnabled != 0);
+  wifiSetEnabled(wifiEn);
+  
+  Serial.printf("[WIFI LOAD] setting=%d runtime=%d\n",
+                wifiEn ? 1 : 0,
+                wifiIsEnabled() ? 1 : 0);
+    
+  return true;}
 
 static bool saveSettingsToSD_internal()
 {
@@ -1341,8 +1448,9 @@ static bool saveSettingsToSD_internal()
   g_settings.brightnessLevel = brightnessLevel;
   g_settings.autoScreenOffEnabled = g_app.autoScreenOffEnabled;
   g_settings.soundEnabled = soundEnabled;
-  g_settings.wifiEnabled = wifiIsEnabled() ? 1 : 0;
-  Serial.printf("[WIFI SAVE] runtime=%d persisted=%d\n", wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
+  g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
+  Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
+                wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
   g_settings.tzIndex = tzIndex;
 
   g_settings.autoScreenTimeoutSel = autoScreenTimeoutSel;
@@ -1889,9 +1997,11 @@ static bool autoHealLoadedSaveIfNeeded()
   // --------------------------------------------------------------------------
   // Runtime sleep sanity
   // --------------------------------------------------------------------------
-  if (pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
-      g_app.sleepUntilAwakened || g_app.sleepTargetEnergy != 0 || g_app.sleepStartTime != 0 ||
-      g_app.sleepDurationMs != 0)
+  const bool shouldRemainAsleep = saveManagerSleepPendingFlagExists();
+
+  if (!shouldRemainAsleep && (pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+                              g_app.sleepUntilAwakened || g_app.sleepTargetEnergy != 0 || g_app.sleepStartTime != 0 ||
+                              g_app.sleepDurationMs != 0))
   {
     pet.isSleeping = false;
     g_app.isSleeping = false;
@@ -1905,15 +2015,6 @@ static bool autoHealLoadedSaveIfNeeded()
     Serial.println("[SAVE][AUTOHEAL] normalized runtime sleep state");
     changed = true;
   }
-
-  if (changed)
-  {
-    saveManagerMarkDirty();
-    saveManagerForce();
-  }
-
-  Serial.printf("[SAVE][AUTOHEAL] end namePending=%d blankPetName=%d name='%s' changed=%d\n",
-                namePendingFlagExists() ? 1 : 0, isBlankName(pet.name) ? 1 : 0, pet.name, changed ? 1 : 0);
 
   return changed;
 }
