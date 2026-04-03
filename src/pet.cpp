@@ -266,29 +266,17 @@ void Pet::petSleepTick()
     return;
   }
 
-  // Allow sleep tick to continue while the user is in SETTINGS / sub-pages / console
-  // AND while the Power Menu is open (GO-hold should not wake the pet).
+  // Sleep transitions are owned by explicit UI/state actions.
+  // Do not auto-wake here just because we are temporarily not in PET_SLEEPING.
   const UIState ui = g_app.uiState;
-  const bool allowSleepUi = (ui == UIState::PET_SLEEPING) || (ui == UIState::POWER_MENU) || isSettingsState(ui);
+  const bool allowSleepUi =
+      (ui == UIState::PET_SLEEPING) ||
+      (ui == UIState::POWER_MENU) ||
+      (ui == UIState::PET_SCREEN) ||
+      isSettingsState(ui);
 
   if (!allowSleepUi)
   {
-    if (this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
-        g_app.sleepUntilAwakened)
-    {
-      this->isSleeping = false;
-      g_app.isSleeping = false;
-      g_app.sleepingByTimer = false;
-      g_app.sleepUntilRested = false;
-      g_app.sleepUntilAwakened = false;
-      g_app.sleepTargetEnergy = 0;
-      g_app.sleepStartTime = 0;
-      g_app.sleepDurationMs = 0;
-
-      saveManagerClearSleepPendingFlag();
-      saveManagerMarkDirty();
-      requestUIRedraw();
-    }
     return;
   }
 
@@ -622,8 +610,8 @@ void Pet::update()
   const bool sleepingNow = this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
                            g_app.sleepUntilAwakened;
 
-  const bool allowSleepUi = (ui == UIState::PET_SLEEPING) || (ui == UIState::POWER_MENU) || isSettingsState(ui);
-
+                           // Do NOT force-exit sleep here.
+                           // UI/state system owns sleep transitions.
   // Do NOT force-exit sleep from update loop.
   // Sleep transitions must be handled explicitly via UI/state logic.
   // This avoids breaking rendering/caches during state transitions.
@@ -886,7 +874,14 @@ void Pet::fromPersist(const PetPersist &in)
   health = (int)in.health;
 
   type = (PetType)in.petType;
+  
+// Do NOT blindly restore sleep state from persist.
+// Sleep state is owned by sleep_pending.flag (boot restore logic).
+// This avoids overwriting a restored sleeping state.
+if (!saveManagerSleepPendingFlagExists())
+{
   this->isSleeping = (in.isSleeping != 0);
+}
 
   lastFedTime = (unsigned long)in.lastFedTimeMs;
   inf = (int)in.inf;

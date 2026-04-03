@@ -11,6 +11,9 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 #include "ui_input_common.h"
+#include "pet.h"
+#include "ui_state_pet_sleeping.h"
+#include "ui_actions.h"
 
 int g_titleMenuIndex = 0;
 
@@ -81,26 +84,33 @@ static int titleStepEnabled(int startIdx, int dir)
 
 static void titleActivateContinue(InputState &in)
 {
-  playBeep();
+  const bool shouldEnterSleeping =
+      pet.isSleeping ||
+      g_app.isSleeping ||
+      g_app.sleepingByTimer ||
+      g_app.sleepUntilRested ||
+      g_app.sleepUntilAwakened ||
+      saveManagerSleepPendingFlagExists();
 
-  refreshTitleMenuAvailability();
+  uiActionEnterState(shouldEnterSleeping ? UIState::PET_SLEEPING : UIState::PET_SCREEN,
+                     Tab::TAB_PET,
+                     true);
 
-  if (s_titleHasSave)
+  if (shouldEnterSleeping)
   {
-    uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-    swallowTitleInput(in);
-    return;
+    uiPetSleepingBootEnter();
+    requestFullUIRedraw();
+    sleepBgKickNow();
+    forceRenderUIOnce();
+  }
+  else
+  {
+    requestUIRedraw();
   }
 
-  uiActionSwallowAll(in);
-  uiDrainKb(in);
+  inputForceClear();
   clearInputLatch();
-  
-  // IMPORTANT:
-  // Starting a brand-new pet from the title screen must go through the
-  // canonical fresh-pet init path, otherwise the previous runtime pet
-  // stats can leak into the new pet flow.
-  saveManagerStartFreshPetFlow();
+  (void)in;
 }
 
 static void swallowTitleInput(InputState &in)

@@ -641,6 +641,8 @@ static bool bootAssetProvisionWifiReady()
 }
 
 static void finalizeBootLanding()
+// This function MUST run before boot is considered complete.
+// It owns final system bring-up (Wi-Fi, UI landing, etc).
 {
   if (g_bootLandingDone)
     return;
@@ -955,13 +957,6 @@ void postBootInitTick()
     const bool loadedSaveExists = loadedFromSD;
 
     UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
-
-    // If a valid save was restored and the pet is still marked asleep,
-    // boot must land on PET_SLEEPING instead of TITLE_MENU/PET_SCREEN.
-    if (loadedSaveExists && saveManagerSleepPendingFlagExists())
-    {
-      afterOk = UIState::PET_SLEEPING;
-    }
 
     s_bootFinalLandingState = afterOk;
 
