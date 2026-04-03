@@ -157,9 +157,28 @@ void uiTitleMenuHandle(InputState &in)
     return;
   }
 
-  if (in.menuOnce || in.escOnce)
+  if (in.menuOnce)
   {
     titleActivateContinue(in);
+    return;
+  }
+
+  if (in.escOnce)
+  {
+    refreshTitleMenuAvailability();
+
+    if (s_titleHasSave)
+    {
+      playBeep();
+      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+      swallowTitleInput(in);
+      return;
+    }
+
+    // No pet loaded: Esc is intentionally dead on the title menu.
+    playBeep();
+    swallowTitleInput(in);
+    requestFullUIRedraw();
     return;
   }
 
