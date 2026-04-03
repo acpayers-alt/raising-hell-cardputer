@@ -1300,21 +1300,21 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
 
-// ------------------------------------------------------------
-// One-shot boot flag: pet intro fade
-// ------------------------------------------------------------
-if (g_settings.petScreenIntroFadeBootFlag)
-{
-  g_app.petScreenIntroFadePending = true;
+  // ------------------------------------------------------------
+  // One-shot boot flag: pet intro fade
+  // ------------------------------------------------------------
+  if (g_settings.petScreenIntroFadeBootFlag)
+  {
+    g_app.petScreenIntroFadePending = true;
 
-  // clear it so it's one-shot
-  g_settings.petScreenIntroFadeBootFlag = 0;
+    // clear it so it's one-shot
+    g_settings.petScreenIntroFadeBootFlag = 0;
 
-  // persist immediately so it doesn't retrigger next boot
-  saveSettingsToSD_internal();
+    // persist immediately so it doesn't retrigger next boot
+    saveSettingsToSD_internal();
 
-  Serial.println("[BOOT] pet intro fade armed (one-shot)");
-}
+    Serial.println("[BOOT] pet intro fade armed (one-shot)");
+  }
 
   uint8_t nvsTz;
   if (loadTzIndexFromNVS(&nvsTz))
@@ -1341,7 +1341,8 @@ static bool saveSettingsToSD_internal()
   g_settings.brightnessLevel = brightnessLevel;
   g_settings.autoScreenOffEnabled = g_app.autoScreenOffEnabled;
   g_settings.soundEnabled = soundEnabled;
-  g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
+  g_settings.wifiEnabled = wifiIsEnabled() ? 1 : 0;
+  Serial.printf("[WIFI SAVE] runtime=%d persisted=%d\n", wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
   g_settings.tzIndex = tzIndex;
 
   g_settings.autoScreenTimeoutSel = autoScreenTimeoutSel;

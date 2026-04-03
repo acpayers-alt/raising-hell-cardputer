@@ -1077,12 +1077,13 @@ static void execLine(char *line)
       return;
     }
 
-    // wifi off
     if (!strcmp(argv[1], "off"))
     {
       wifiSetEnabled(false);
+      settingsSetWifiEnabled(false);
       applyWifiPower(false);
       wifiConsoleDisconnect(false);
+      saveSettingsToSD();
       logLine("[OK] WiFi OFF");
       saveManagerMarkDirty(); // optional
       return;
@@ -1092,7 +1093,9 @@ static void execLine(char *line)
     if (!strcmp(argv[1], "on"))
     {
       wifiSetEnabled(true);
+      settingsSetWifiEnabled(true);
       applyWifiPower(true);
+      saveSettingsToSD();
 
       // If creds exist, try to connect automatically
       String ssid, pass;
@@ -1109,7 +1112,7 @@ static void execLine(char *line)
       saveManagerMarkDirty(); // optional
       return;
     }
-
+    
     // wifi clear
     if (!strcmp(argv[1], "clear"))
     {

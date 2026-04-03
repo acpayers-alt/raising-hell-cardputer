@@ -124,10 +124,9 @@ static void drawPetSleepingScreen();
 static void drawMiniGameScreen();
 static bool getPngWH(const char *path, int &outW, int &outH);
 static void drawCenteredImageSpr(const char *path, int cx, int cy);
-static void drawCrackedEggBig(int cx, int cy);
 static bool getPngWH(const char *path, int &outW, int &outH);
 static void drawCenteredImageSpr(const char *path, int cx, int cy);
-static void drawCrackedEggBig(int cx, int cy);
+static void drawCrackedEggBig(int cx, int topY, const char *path);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
@@ -6465,14 +6464,21 @@ static void drawCenteredImageSpr(const char *path, int cx, int cy)
   }
 }
 
-static void drawCrackedEggBig(int cx, int cy)
+static void drawCrackedEggBig(int cx, int topY, const char *path)
 {
-  const char *path = pendingEggCrackedPng();
   if (!path || !path[0] || !g_sdReady)
     return;
 
-  drawCenteredImageSpr(path, cx, cy);
+  int w = 0;
+  int h = 0;
+  const bool gotWH = getPngWH(path, w, h);
+
+  const int x = gotWH ? (cx - (w / 2)) : cx;
+  const int y = topY;
+
+  sprDrawPngFromSD(path, x, y);
 }
+
 static void drawCenteredLine(const char *s, int y, int font = 2, int size = 1)
 {
   spr.setTextDatum(TC_DATUM);
@@ -7063,20 +7069,21 @@ void drawHatchingScreen(bool redrawBg)
   }
 
   const int centerX = screenW / 2;
-  const int eggY = 92;
+  const int animEggY = screenH / 2;
+  const int crackedEggTopY = 4;
 
   const char *const *crackFrames = pendingEggCrackFrames();
 
   if (!g_app.flow.hatch.showingMsg)
   {
     if (g_app.flow.hatch.frame < 4)
-      drawCenteredImageSpr(crackFrames[g_app.flow.hatch.frame], centerX, eggY);
+      drawCenteredImageSpr(crackFrames[g_app.flow.hatch.frame], centerX, animEggY);
     else
-    drawCrackedEggBig(centerX, eggY);
+      drawCrackedEggBig(centerX, crackedEggTopY, pendingEggCrackedPng());
     return;
   }
 
-  drawCrackedEggBig(centerX, eggY);
+  drawCrackedEggBig(centerX, crackedEggTopY, pendingEggCrackedPng());
 
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
