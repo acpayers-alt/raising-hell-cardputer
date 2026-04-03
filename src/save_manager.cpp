@@ -71,6 +71,11 @@
 #include "version.h"
 
 // Include End Here
+
+// Forward declarations for internal helpers used before definition
+static void clearNamePendingFlag();
+static void resetRuntimeToCleanNoSaveState(bool resetName);
+
 static const char *getFirmwareVersionString()
 {
 #ifdef FW_VERSION
@@ -689,6 +694,27 @@ static void forceChoosePetFlowFromBoot()
 
 void saveManagerStartFreshPetFlow() { forceChoosePetFlowFromBoot(); }
 
+void saveManagerAbortFreshPetFlow()
+{
+  // Abort any half-started new-pet lifecycle cleanly.
+  clearNamePendingFlag();
+
+  // Ensure there is no live pet save to "continue".
+  saveManagerDeletePetOnly();
+
+  // Return runtime to a clean no-save state.
+  resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+
+  inputSetTextCapture(false);
+  g_textCaptureMode = false;
+  g_app.newPetFlowActive = false;
+
+  dirty = false;
+  clearInputLatch();
+
+  Serial.println("[SAVE] aborted fresh pet flow");
+}
+
 void saveManagerAssignFreshPetId()
 {
   pet.petId = generatePetId();
@@ -1129,6 +1155,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.petDeathEnabled = (tmp.petDeathEnabled != 0);
       tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
       tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
+      tmp.petScreenIntroFadeBootFlag = (tmp.petScreenIntroFadeBootFlag != 0);
     }
   }
   else if (sz == OLD_SZ_7)
@@ -1147,6 +1174,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
+      tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
@@ -1176,6 +1204,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.ledAlertsEnabled = (old[7] != 0);
 
       tmp.controlsHelpSeen = 0;
+      tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
@@ -1206,6 +1235,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
+      tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
@@ -1232,6 +1262,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
+      tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
@@ -1269,6 +1300,22 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
 
+// ------------------------------------------------------------
+// One-shot boot flag: pet intro fade
+// ------------------------------------------------------------
+if (g_settings.petScreenIntroFadeBootFlag)
+{
+  g_app.petScreenIntroFadePending = true;
+
+  // clear it so it's one-shot
+  g_settings.petScreenIntroFadeBootFlag = 0;
+
+  // persist immediately so it doesn't retrigger next boot
+  saveSettingsToSD_internal();
+
+  Serial.println("[BOOT] pet intro fade armed (one-shot)");
+}
+
   uint8_t nvsTz;
   if (loadTzIndexFromNVS(&nvsTz))
   {
@@ -1302,6 +1349,7 @@ static bool saveSettingsToSD_internal()
   g_settings.petDeathEnabled = petDeathEnabled ? 1 : 0;
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
+  g_settings.petScreenIntroFadeBootFlag = (g_settings.petScreenIntroFadeBootFlag != 0) ? 1 : 0;
 
   tryRemove(SET_TMP_PATH);
 
@@ -1349,6 +1397,23 @@ static void newPetInternalNoSave(bool resetName)
   }
 
   writeNamePendingFlag();
+}
+
+static void resetRuntimeToCleanNoSaveState(bool resetName)
+{
+  SavePayload p = makeDefaultSavePayload();
+  unpack(p);
+
+  // This is NOT an active new-pet flow.
+  // Do not arm name-pending, do not create a resumable flow state.
+  if (resetName)
+  {
+    pet.name[0] = '\0';
+  }
+
+  // Keep decay mode sane for a clean no-save boot.
+  g_gameopt.decayMode = 2;
+  saveGameOptionsToSD_internal();
 }
 
 static void clearNamePendingFlag()
@@ -1949,7 +2014,7 @@ bool saveManagerLoad()
   // Keep runtime state clean, but do NOT write name_pending.flag and do NOT
   // enter CHOOSE_PET here. Let the boot pipeline decide whether to run the
   // first-boot wizard and where to land afterward.
-  newPetInternalNoSave(/*resetName=*/true);
+  resetRuntimeToCleanNoSaveState(/*resetName=*/true);
 
   inputSetTextCapture(false);
   g_textCaptureMode = false;
@@ -1964,6 +2029,16 @@ bool saveManagerLoad()
                 saveManagerNamePendingFlagExists() ? 1 : 0);
 
   return false;
+}
+
+void saveManagerSetPetIntroFadeBootFlag()
+{
+  g_settings.petScreenIntroFadeBootFlag = 1;
+
+  // Persist immediately so reboot sees it
+  saveSettingsToSD_internal();
+
+  Serial.println("[SAVE] pet intro fade boot flag set");
 }
 
 void saveManagerStampBirthNow()

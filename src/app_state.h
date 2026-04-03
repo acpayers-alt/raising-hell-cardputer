@@ -46,8 +46,9 @@ struct AppState {
   int decayModeIndex      = 0;
 
   // Runtime flags
-  bool gameOver         = false;
-  bool newPetFlowActive = false;
+  bool gameOver                = false;
+  bool newPetFlowActive        = false;
+  bool petScreenIntroFadePending = false;
 
   // Sleep state
   bool     isSleeping         = false;

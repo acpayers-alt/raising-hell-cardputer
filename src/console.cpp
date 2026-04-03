@@ -34,14 +34,14 @@
 // Project: UI / Rendering
 // -----------------------------------------------------------------------------
 #include "graphics.h"
-#include "ui_runtime.h"
 #include "led_status.h"
+#include "ui_runtime.h"
 
 // -----------------------------------------------------------------------------
 // Project: Input / Debug
 // -----------------------------------------------------------------------------
-#include "input.h"
 #include "debug.h"
+#include "input.h"
 #include "runtime_log.h"
 
 // -----------------------------------------------------------------------------
@@ -53,8 +53,8 @@
 // -----------------------------------------------------------------------------
 // External / Framework
 // -----------------------------------------------------------------------------
-#include <Preferences.h>
 #include <FS.h>
+#include <Preferences.h>
 #include <SD.h>
 #include <esp_system.h>
 
@@ -593,6 +593,7 @@ static void execLine(char *line)
     logLine("  hurtpet             set low stats + HP=25 (test death flow)");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
     logLine("  healpet             restore HP + all core stats to 100");
+    logLine("  fadeboot        trigger pet intro fade on next boot");
 #endif
 
     return;
@@ -664,6 +665,18 @@ static void execLine(char *line)
     {
       logLine("failed to delete settings.bin");
     }
+    return;
+  }
+#endif
+
+#if !PUBLIC_BUILD
+  if (!strcmp(argv[0], "fadeboot"))
+  {
+    saveManagerSetPetIntroFadeBootFlag();
+    saveSettingsToSD();
+
+    logLine("[OK] pet intro fade armed for next boot");
+    logLine("[OK] reboot to trigger");
     return;
   }
 #endif
@@ -1267,11 +1280,9 @@ static void execLine(char *line)
     logf("  ota error:       %s", assetOtaLastErrorString());
     logf("  progress:        %u / %u", (unsigned)assetOtaCurrentFileIndex(), (unsigned)assetOtaTotalFileCount());
 
-    const bool needsRepair =
-        consoleAssetPackTooOld() ||
-        assetProvisionBootRequested() ||
-        (g_sdReady && !SD.exists(assetOtaLocalManifestPath())) ||
-        (strcmp(assetOtaLastErrorString(), "None") != 0);
+    const bool needsRepair = consoleAssetPackTooOld() || assetProvisionBootRequested() ||
+                             (g_sdReady && !SD.exists(assetOtaLocalManifestPath())) ||
+                             (strcmp(assetOtaLastErrorString(), "None") != 0);
 
     if (needsRepair)
     {
@@ -1316,9 +1327,7 @@ static void execLine(char *line)
     saveManagerClearNamePendingFlag();
     const bool after = saveManagerNamePendingFlagExists();
 
-    logf("name pending: before=%s after=%s",
-         before ? "SET" : "CLEAR",
-         after ? "SET" : "CLEAR");
+    logf("name pending: before=%s after=%s", before ? "SET" : "CLEAR", after ? "SET" : "CLEAR");
     return;
   }
 
@@ -1328,9 +1337,7 @@ static void execLine(char *line)
     bootPostProvisionControlsHelpClear();
     const bool after = bootPostProvisionControlsHelpPending();
 
-    logf("postprov help: before=%s after=%s",
-         before ? "SET" : "CLEAR",
-         after ? "SET" : "CLEAR");
+    logf("postprov help: before=%s after=%s", before ? "SET" : "CLEAR", after ? "SET" : "CLEAR");
     return;
   }
 
@@ -1340,9 +1347,7 @@ static void execLine(char *line)
     bootSetupClearPendingFlag();
     const bool after = bootSetupPendingFlagExists();
 
-    logf("boot setup pending: before=%s after=%s",
-         before ? "SET" : "CLEAR",
-         after ? "SET" : "CLEAR");
+    logf("boot setup pending: before=%s after=%s", before ? "SET" : "CLEAR", after ? "SET" : "CLEAR");
     return;
   }
 
@@ -1361,22 +1366,16 @@ static void execLine(char *line)
     const bool bootSetupAfter = bootSetupPendingFlagExists();
 
     logLine("bootheal:");
-    logf("  name pending:       %s -> %s",
-         namePendingBefore ? "SET" : "CLEAR",
-         namePendingAfter ? "SET" : "CLEAR");
-    logf("  postprov help:      %s -> %s",
-         postProvBefore ? "SET" : "CLEAR",
-         postProvAfter ? "SET" : "CLEAR");
-    logf("  boot setup pending: %s -> %s",
-         bootSetupBefore ? "SET" : "CLEAR",
-         bootSetupAfter ? "SET" : "CLEAR");
+    logf("  name pending:       %s -> %s", namePendingBefore ? "SET" : "CLEAR", namePendingAfter ? "SET" : "CLEAR");
+    logf("  postprov help:      %s -> %s", postProvBefore ? "SET" : "CLEAR", postProvAfter ? "SET" : "CLEAR");
+    logf("  boot setup pending: %s -> %s", bootSetupBefore ? "SET" : "CLEAR", bootSetupAfter ? "SET" : "CLEAR");
 
     if (!namePendingBefore && !postProvBefore && !bootSetupBefore)
       logLine("  no changes");
 
     return;
   }
-  
+
   // MONITOR
   if (!strcmp(argv[0], "mon"))
   {

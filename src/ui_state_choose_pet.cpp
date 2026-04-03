@@ -13,6 +13,7 @@
 #include "ui_runtime.h"
 #include "graphics.h"
 #include "ui_actions.h"
+#include "save_manager.h"
 
 static bool s_prevSelectHeld = false;
 
@@ -94,6 +95,22 @@ void uiChoosePetHandle(InputState& in)
 
   s_prevSelectHeld = in.selectHeld;
 
+  // Esc backs out of egg select and cancels the unfinished fresh-pet flow.
+  if (in.escOnce)
+  {
+    playBeep();
+
+    saveManagerAbortFreshPetFlow();
+
+    uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
+    requestFullUIRedraw();
+
+    while (in.kbHasEvent()) (void)in.kbPop();
+    inputForceClear();
+    clearInputLatch();
+    return;
+  }
+  
   int move = 0;
 
   // Choose-egg should support left/right + up/down + encoder

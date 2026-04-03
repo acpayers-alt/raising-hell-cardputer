@@ -42,7 +42,7 @@ void finalizeNewPetFromName(InputState& in)
 
   // Commit chosen type into the final saved pet
   pet.type = g_pendingPetType;
-  
+
   // New pet must start with the canonical starter inventory, regardless of
   // what the previous pet had (death / factory reset / flow restart, etc.).
   g_app.inventory.resetToDefaults();
@@ -55,10 +55,11 @@ void finalizeNewPetFromName(InputState& in)
   bootSetupClearPendingFlag();
 
   g_app.newPetFlowActive = false;
+  g_app.petScreenIntroFadePending = true;
 
   // Leave NAME flow and go back to pet screen
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-
+  
   requestUIRedraw();
   invalidateBackgroundCache();
   requestUIRedraw();

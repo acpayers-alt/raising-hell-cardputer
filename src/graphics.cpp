@@ -1486,6 +1486,10 @@ static PetType s_nonPetTileCachedType = (PetType)255;
 static constexpr int NONPET_TILE_W = 35;
 static constexpr int NONPET_TILE_H = 70;
 
+static bool s_petScreenIntroFadeActive = false;
+static uint32_t s_petScreenIntroFadeStartMs = 0;
+static constexpr uint32_t kPetScreenIntroFadeMs = 700;
+
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
 static constexpr int MINI_STAT_PAD = 4;
@@ -2287,20 +2291,13 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-    "Manual",
-    nullptr, // 1 => volumeLine
-    "Pet Options >",
-    "Screen Settings >",
-    "System Settings >",
-    "Game Options >",
-    "Console >",
-    "System Status >",
-    "Credits",
-    "Store Pet",
-    "Main Menu",
-};
+      "Manual",
+      nullptr, // 1 => volumeLine
+      "Pet Options >",   "Screen Settings >", "System Settings >", "Game Options >", "Console >",
+      "System Status >", "Credits",           "Store Pet",         "Main Menu",
+  };
 
-const int totalItems = 11;
+  const int totalItems = 11;
 
   g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 
@@ -5748,6 +5745,47 @@ static void drawWifiConnectWaitScreen()
 // ============================================================================
 // MAIN RENDER DISPATCHER HELPER
 // ============================================================================
+static void tickPetScreenIntroFade()
+{
+  if (g_app.uiState != UIState::PET_SCREEN)
+  {
+    if (s_petScreenIntroFadeActive)
+    {
+      s_petScreenIntroFadeActive = false;
+      applyBrightnessLevel(brightnessLevel);
+    }
+    return;
+  }
+
+  if (g_app.petScreenIntroFadePending)
+  {
+    g_app.petScreenIntroFadePending = false;
+    s_petScreenIntroFadeActive = true;
+    s_petScreenIntroFadeStartMs = millis();
+    setBacklight(0);
+  }
+
+  if (!s_petScreenIntroFadeActive)
+    return;
+
+  const uint32_t now = millis();
+  const uint32_t elapsed = now - s_petScreenIntroFadeStartMs;
+  const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
+
+  if (elapsed >= kPetScreenIntroFadeMs)
+  {
+    s_petScreenIntroFadeActive = false;
+    applyBrightnessLevel(brightnessLevel);
+    setBacklight(targetBrightness);
+    return;
+  }
+
+  const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
+
+  setBacklight(fadeBrightness);
+  requestUIRedraw();
+}
+
 void forceRenderUIOnce()
 {
   g_app.lastRenderTimeMs = 0;
@@ -6065,6 +6103,8 @@ void renderUI()
   {
     drawAssetOtaConfirmOverlay();
   }
+
+  tickPetScreenIntroFade();
 
   spr.pushSprite(0, 0);
 
@@ -6431,47 +6471,8 @@ static void drawCrackedEggBig(int cx, int cy)
   if (!path || !path[0] || !g_sdReady)
     return;
 
-  // Devil egg should NOT be scaled
-  if (g_pendingPetType == PET_DEVIL)
-  {
-    drawCenteredImageSpr(path, cx, cy);
-    return;
-  }
-
-  int w = 0;
-  int h = 0;
-  if (!getPngWH(path, w, h) || w <= 0 || h <= 0)
-  {
-    drawCenteredImageSpr(path, cx, cy);
-    return;
-  }
-
-  M5Canvas egg(&M5.Display);
-  egg.setColorDepth(16);
-
-  if (!egg.createSprite(w, h))
-  {
-    drawCenteredImageSpr(path, cx, cy);
-    return;
-  }
-
-  egg.fillSprite(TFT_BLACK);
-
-  if (!egg.drawPngFile(SD, path, 0, 0))
-  {
-    egg.deleteSprite();
-    drawCenteredImageSpr(path, cx, cy);
-    return;
-  }
-
-  egg.setPivot(w / 2, h / 2);
-
-  const float scale = 1.6f;
-  egg.pushRotateZoom(&spr, cx, cy, 0.0f, scale, scale);
-
-  egg.deleteSprite();
+  drawCenteredImageSpr(path, cx, cy);
 }
-
 static void drawCenteredLine(const char *s, int y, int font = 2, int size = 1)
 {
   spr.setTextDatum(TC_DATUM);
@@ -7062,22 +7063,20 @@ void drawHatchingScreen(bool redrawBg)
   }
 
   const int centerX = screenW / 2;
-  const int animEggY = 92;
-  const int crackedEggY = 78;
+  const int eggY = 92;
 
   const char *const *crackFrames = pendingEggCrackFrames();
 
   if (!g_app.flow.hatch.showingMsg)
   {
     if (g_app.flow.hatch.frame < 4)
-      drawCenteredImageSpr(crackFrames[g_app.flow.hatch.frame], centerX, animEggY);
+      drawCenteredImageSpr(crackFrames[g_app.flow.hatch.frame], centerX, eggY);
     else
-      drawCrackedEggBig(centerX, crackedEggY);
-
+    drawCrackedEggBig(centerX, eggY);
     return;
   }
 
-  drawCrackedEggBig(centerX, crackedEggY);
+  drawCrackedEggBig(centerX, eggY);
 
   spr.setTextDatum(MC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
