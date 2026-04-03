@@ -8,6 +8,8 @@
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
+#include "pet.h"
+#include "ui_state_pet_sleeping.h"
 
 namespace
 {
@@ -105,7 +107,22 @@ static void performRestore(bool storeCurrentFirst, InputState &in)
     s_actionIndex = 0;
 
     ui_showSuccessMessage("Pet Restored!");
-    uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+
+    const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
+
+    if (restoredSleeping)
+    {
+      uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, 200);
+      uiPetSleepingBootEnter();
+      requestFullUIRedraw();
+      sleepBgKickNow();
+      forceRenderUIOnce();
+    }
+    else
+    {
+      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+    }
+
     return;
   }
   else

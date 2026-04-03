@@ -1442,11 +1442,10 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   // Boot pipeline is the single owner of actual Wi-Fi bring-up.
   // Applying it here makes later boot logic think Wi-Fi is already enabled
   // even when the radio/connect path has not actually been restarted.
-  Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n",
-                wifiEn ? 1 : 0,
-                wifiIsEnabled() ? 1 : 0);
-                    
-  return true;}
+  Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiEn ? 1 : 0, wifiIsEnabled() ? 1 : 0);
+
+  return true;
+}
 
 static bool saveSettingsToSD_internal()
 {
@@ -2428,19 +2427,23 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   doc["exportVersion"] = EXPORT_VERSION;
   doc["createdAtEpoch"] = nowEpoch;
   doc["gameVersion"] = getFirmwareVersionString();
-  doc["assetPackVersion"] = assetOtaInstalledVersion();
-
   JsonObject profile = doc.createNestedObject("profile");
+
   profile["name"] = pet.getName();
   profile["petType"] = petTypeToStringForExport(pet.type);
   profile["level"] = pet.level;
   profile["xp"] = pet.xp;
   profile["evoStage"] = pet.evoStage;
   profile["birthEpoch"] = g_birthEpoch;
+  
   char petIdBuf[24];
   snprintf(petIdBuf, sizeof(petIdBuf), "%016llX", (unsigned long long)pet.petId);
   profile["petId"] = petIdBuf;
-
+  
+  profile["isSleeping"] =
+      (pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
+       g_app.sleepUntilRested || g_app.sleepUntilAwakened);
+  
   JsonObject stats = profile.createNestedObject("stats");
   stats["hunger"] = pet.hunger;
   stats["happiness"] = pet.happiness;
@@ -2602,6 +2605,8 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
   JsonObject inventory = doc["inventory"];
   JsonArray slots = inventory["slots"];
 
+  const bool importedSleeping = (bool)(profile["isSleeping"] | false);
+
   const char *name = profile["name"] | "";
   const char *petTypeStr = profile["petType"] | "";
   PetType importedType = PET_DEVIL;
@@ -2619,7 +2624,7 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
   pet.energy = constrain((int)(stats["energy"] | 50), 0, 100);
   pet.health = constrain((int)(stats["health"] | 100), 0, 100);
   pet.inf = (int)(stats["inf"] | 0);
-  pet.isSleeping = false;
+  pet.isSleeping = importedSleeping;
 
   g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
   pet.birth_epoch = g_birthEpoch;
@@ -2663,16 +2668,24 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
   pet.clampStats();
   clearNamePendingFlag();
   g_app.inventory.syncEepromNoDirty();
+  
+  // Restore runtime sleep state from imported backup
+  pet.isSleeping = importedSleeping;
+  g_app.isSleeping = importedSleeping;
+  g_app.sleepingByTimer = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+  
+  if (importedSleeping)
+    saveManagerSetSleepPendingFlag();
+  else
+    saveManagerClearSleepPendingFlag();
+  
   saveManagerMarkDirty();
   saveManagerForce();
-
-  if (outPath && outPathSize > 0)
-  {
-    strncpy(outPath, path, outPathSize - 1);
-    outPath[outPathSize - 1] = '\0';
-  }
-
-  Serial.printf("[IMPORT] applied '%s' pet='%s'\n", path, pet.getName());
   return true;
 }
 

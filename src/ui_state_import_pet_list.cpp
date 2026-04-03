@@ -11,6 +11,8 @@
 #include "ui_runtime.h"
 #include <SD.h>
 #include <cstring>
+#include "pet.h"
+#include "ui_state_pet_sleeping.h"
 
 namespace
 {
@@ -190,7 +192,22 @@ void uiImportPetListHandle(InputState &in)
             playBeep();
             g_importPetListReturnToSettings = false;
             ui_showSuccessMessage("Pet Resumed");
-            uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+
+            const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
+
+            if (restoredSleeping)
+            {
+              uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, 200);
+              uiPetSleepingBootEnter();
+              requestFullUIRedraw();
+              sleepBgKickNow();
+              forceRenderUIOnce();
+            }
+            else
+            {
+              uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+            }
+
             return;
           }
           else
@@ -275,7 +292,22 @@ void uiImportPetListHandle(InputState &in)
       g_importPetListReturnToSettings = false;
 
       ui_showSuccessMessage("Pet Resumed");
-      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+
+      const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
+
+      if (restoredSleeping)
+      {
+        uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, 200);
+        uiPetSleepingBootEnter();
+        requestFullUIRedraw();
+        sleepBgKickNow();
+        forceRenderUIOnce();
+      }
+      else
+      {
+        uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+      }
+
       return;
     }
     else

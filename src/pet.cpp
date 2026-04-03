@@ -270,11 +270,12 @@ void Pet::petSleepTick()
   // Do not auto-wake here just because we are temporarily not in PET_SLEEPING.
   const UIState ui = g_app.uiState;
   const bool allowSleepUi =
-      (ui == UIState::PET_SLEEPING) ||
-      (ui == UIState::POWER_MENU) ||
-      (ui == UIState::PET_SCREEN) ||
-      isSettingsState(ui);
-
+  (ui == UIState::PET_SLEEPING) ||
+  (ui == UIState::POWER_MENU) ||
+  (ui == UIState::PET_SCREEN) ||
+  (ui == UIState::TITLE_MENU) ||
+  isSettingsState(ui);
+  
   if (!allowSleepUi)
   {
     return;
@@ -874,7 +875,7 @@ void Pet::fromPersist(const PetPersist &in)
   health = (int)in.health;
 
   type = (PetType)in.petType;
-  
+
 // Do NOT blindly restore sleep state from persist.
 // Sleep state is owned by sleep_pending.flag (boot restore logic).
 // This avoids overwriting a restored sleeping state.
