@@ -56,6 +56,8 @@ bool saveManagerValidateBubAtPath(const char* path);
 bool saveManagerDeletePetBackupAtPath(const char* path);
 int saveManagerListPetExports(PetExportEntry* outEntries, int maxEntries);
 bool saveManagerImportBubAtPath(const char* path, char* outPath, size_t outPathSize, bool backupCurrentFirst = true);
+bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize);
+void saveManagerAssignFreshPetId();
 
 enum SaveLoadErr : uint8_t {
   SLE_OK = 0,

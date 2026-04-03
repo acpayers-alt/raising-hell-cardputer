@@ -92,13 +92,15 @@ static void titleActivateContinue(InputState &in)
     return;
   }
 
-  g_app.newPetFlowActive = true;
-
   uiActionSwallowAll(in);
   uiDrainKb(in);
   clearInputLatch();
-
-  uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+  
+  // IMPORTANT:
+  // Starting a brand-new pet from the title screen must go through the
+  // canonical fresh-pet init path, otherwise the previous runtime pet
+  // stats can leak into the new pet flow.
+  saveManagerStartFreshPetFlow();
 }
 
 static void swallowTitleInput(InputState &in)

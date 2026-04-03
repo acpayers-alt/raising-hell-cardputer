@@ -2287,13 +2287,20 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-      "Manual",
-      nullptr, // 1 => volumeLine
-      "Pet Options >", "Screen Settings >", "System Settings >", "Game Options >",
-      "Console >",     "System Status >",   "Credits",           "Main Menu",
-  };
+    "Manual",
+    nullptr, // 1 => volumeLine
+    "Pet Options >",
+    "Screen Settings >",
+    "System Settings >",
+    "Game Options >",
+    "Console >",
+    "System Status >",
+    "Credits",
+    "Store Pet",
+    "Main Menu",
+};
 
-  const int totalItems = 10;
+const int totalItems = 11;
 
   g_app.settingsIndex = clampi(g_app.settingsIndex, 0, totalItems - 1);
 

@@ -35,10 +35,14 @@ void finalizeNewPetFromName(InputState& in)
 
   pet.setName(g_pendingPetName[0] ? g_pendingPetName : "PET");
   Serial.printf("[PET] named '%s'\n", pet.getName());
-  
+
+  // This is a truly brand-new pet lifecycle, so it must get a brand-new
+  // identity even if some earlier runtime state accidentally survived.
+  saveManagerAssignFreshPetId();
+
   // Commit chosen type into the final saved pet
   pet.type = g_pendingPetType;
-
+  
   // New pet must start with the canonical starter inventory, regardless of
   // what the previous pet had (death / factory reset / flow restart, etc.).
   g_app.inventory.resetToDefaults();
