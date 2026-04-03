@@ -509,14 +509,6 @@ static bool s_hudMoodIconReady = false;
 static M5Canvas s_hudRestIcon(&spr);
 static bool s_hudRestIconReady = false;
 
-static void drawStringScaled(M5Canvas &spr, const char *text, int x, int y, int scale, uint16_t color)
-{
-  spr.setTextSize(scale);
-  spr.setTextColor(color, TFT_TRANSPARENT);
-  spr.drawString(text, x, y, 1);
-  spr.setTextSize(1);
-}
-
 static int deathTransitionYNudgeForPet()
 {
   switch (pet.type)
@@ -667,6 +659,62 @@ static bool drawHudIconCached(const char *path, int x, int y)
     return sprDrawPngFromSD(path, x, y);
 
   return false;
+}
+
+static void drawTitleMenuText(M5Canvas &dst, const char *text, int x, int y, uint8_t font, uint16_t fg,
+                              textdatum_t datum)
+{
+  if (!text || !*text)
+    return;
+
+  M5Canvas textSpr(&dst);
+  textSpr.setColorDepth(16);
+
+  textSpr.setTextFont(font);
+  textSpr.setTextSize(1);
+
+  const int tw = textSpr.textWidth(text);
+  const int th = (font == 1) ? 8 : 16;
+
+  const int padX = 2;
+  const int padY = 1;
+  const int sw = tw + padX * 2;
+  const int sh = th + padY * 2;
+
+  if (!textSpr.createSprite(sw, sh))
+    return;
+
+  const uint16_t key = TFT_MAGENTA;
+  textSpr.fillSprite(key);
+  textSpr.setTextColor(fg, key);
+  textSpr.setTextDatum(TL_DATUM);
+  textSpr.drawString(text, padX, padY, font);
+
+  int px = x;
+  int py = y;
+
+  switch (datum)
+  {
+  case textdatum_t::top_center:
+    px = x - (sw / 2);
+    py = y;
+    break;
+  case textdatum_t::top_left:
+    px = x;
+    py = y;
+    break;
+  case textdatum_t::top_right:
+    px = x - sw;
+    py = y;
+    break;
+  default:
+    px = x - (sw / 2);
+    py = y;
+    break;
+  }
+
+  textSpr.pushSprite(&dst, px, py, key);
+  textSpr.deleteSprite();
 }
 
 static void drawMiniStatNumberRight(int value, int rightX, int y)
@@ -2294,7 +2342,7 @@ static void drawGameOptionsMenu()
 {
   drawNonPetTabBackground();
   drawTopBar();
-  
+
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
   const int contentBottom = contentY + contentH;
@@ -2484,12 +2532,12 @@ static void drawDecayModePickerMenu()
 
 static void drawScreenSettingsMenu()
 {
-drawNonPetTabBackground();
-drawTopBar();
+  drawNonPetTabBackground();
+  drawTopBar();
 
-const int contentY = TOP_BAR_H;
-const int contentH = SCREEN_H - TOP_BAR_H;
-const int contentBottom = contentY + contentH;
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H;
+  const int contentBottom = contentY + contentH;
 
   char bLine[28];
   snprintf(bLine, sizeof(bLine), "Brightness: %s", brightnessToText(brightnessLevel));
@@ -2545,7 +2593,7 @@ static void drawWifiSettingsMenu()
 {
   drawNonPetTabBackground();
   drawTopBar();
-  
+
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
   const int contentBottom = contentY + contentH;
@@ -2691,12 +2739,12 @@ static void drawFactoryResetConfirmOverlay()
 
 static void drawSystemSettingsMenu()
 {
-drawNonPetTabBackground();
-drawTopBar();
+  drawNonPetTabBackground();
+  drawTopBar();
 
-const int contentY = TOP_BAR_H;
-const int contentH = SCREEN_H - TOP_BAR_H;
-const int contentBottom = contentY + contentH;
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H;
+  const int contentBottom = contentY + contentH;
 
   const char *labels[] = {"Set Time", "Factory Reset", "WiFi Settings >"};
   const int totalItems = 3;
@@ -2868,11 +2916,11 @@ static void drawSystemStatusMenu()
 {
   drawNonPetTabBackground();
   drawTopBar();
-  
+
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
   const int contentBottom = contentY + contentH;
-  
+
   const AssetOtaConfig &cfg = assetOtaGetConfig();
   const AssetOtaChannel ch = (AssetOtaChannel)cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
@@ -6483,47 +6531,91 @@ void drawTitleMenuScreen(bool redrawBg)
   const bool hasImport = uiTitleMenuHasImport();
   const char *petName = (hasSave && pet.getName()[0]) ? pet.getName() : "";
 
-  char row0Buf[40];
+  char row0Buf[80];
   if (hasSave)
-    snprintf(row0Buf, sizeof(row0Buf), "Continue: %s", petName);
+  {
+    const char *typePretty = "Devil";
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      typePretty = "Eldritch";
+      break;
+    case PET_DEVIL:
+    default:
+      typePretty = "Devil";
+      break;
+    }
+
+    snprintf(row0Buf, sizeof(row0Buf), "%s - lvl %u %s", petName, (unsigned)pet.level, typePretty);
+  }
   else
+  {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
+  }
 
   const char *labels[3] = {row0Buf, "Pet Storage", "Settings"};
   const bool enabled[3] = {true, hasImport, true};
 
   // Menu panel
-  const int rowH = 20;
+  // Menu panel
+  const int rowH = 18;
   const int itemCount = 3;
-  const int menuTopY = (SCREEN_H / 2) + 10;
+  const int menuTopY = (SCREEN_H / 2) + 12;
+  const int menuPadX = 12;
+  const int menuPadY = 8;
+  const int menuBoxY = menuTopY - menuPadY;
+  const int menuBoxH = (itemCount * rowH) + (menuPadY * 2);
+
+  const int panelX = menuPadX;
+  const int panelY = menuBoxY;
+  const int panelW = SCREEN_W - (menuPadX * 2);
+  const int panelH = menuBoxH;
+
+  // Checkerboard dither overlay behind menu text
+  for (int yy = panelY; yy < panelY + panelH; ++yy)
+  {
+    const int xStart = panelX + ((yy & 1) ? 1 : 0);
+    for (int xx = xStart; xx < panelX + panelW; xx += 2)
+    {
+      spr.drawPixel(xx, yy, TFT_BLACK);
+    }
+  }
 
   for (int i = 0; i < itemCount; ++i)
   {
     const int rowY = menuTopY + (i * rowH);
-
     const bool selected = (i == g_titleMenuIndex);
-
+  
     uint16_t fg = TFT_WHITE;
-
     if (!enabled[i])
       fg = TFT_DARKGREY;
     else if (selected)
       fg = TFT_YELLOW;
-
-    spr.setTextDatum(TC_DATUM);
-    spr.setTextColor(fg, TFT_TRANSPARENT);
-    drawStringScaled(spr, labels[i], SCREEN_W / 2, rowY, 2, fg);
-
-    if (!enabled[i])
+  
+    // Measure this item's text width using the same font the title menu helper uses
+    spr.setTextFont(2);
+    spr.setTextSize(1);
+    const int textW = spr.textWidth(labels[i]);
+  
+    // Draw selection arrows sized to the actual item width
+    if (selected)
     {
-      spr.setTextDatum(TC_DATUM);
-      spr.setTextColor(TFT_DARKGREY);
-
-      if (i == 1)
-        spr.drawString("(none found)", SCREEN_W / 2, rowY + 10, 1);
+      const int arrowGap = 6;
+      const int leftArrowX = (SCREEN_W / 2) - (textW / 2) - arrowGap;
+      const int rightArrowX = (SCREEN_W / 2) + (textW / 2) + arrowGap;
+  
+      drawTitleMenuText(spr, "<", leftArrowX, rowY, 2, TFT_YELLOW, textdatum_t::top_right);
+      drawTitleMenuText(spr, ">", rightArrowX, rowY, 2, TFT_YELLOW, textdatum_t::top_left);
+    }
+  
+    drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, fg, textdatum_t::top_center);
+  
+    if (!enabled[i] && i == 1)
+    {
+      drawTitleMenuText(spr, "(none found)", SCREEN_W / 2, rowY + 10, 1, TFT_DARKGREY, textdatum_t::top_center);
     }
   }
-
+  
   // Status block
   const char *assetVer = assetOtaInstalledVersion();
   const AssetOtaChannel ch = (AssetOtaChannel)assetOtaGetConfig().channel;
@@ -6536,12 +6628,16 @@ void drawTitleMenuScreen(bool redrawBg)
 
   // Build version: top-left
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.setTextColor(TFT_BLACK, TFT_TRANSPARENT);
+  spr.drawString(buildBuf, 5, 3, 1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_TRANSPARENT);
   spr.drawString(buildBuf, 4, 2, 1);
 
   // Asset version: top-right
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.setTextColor(TFT_BLACK, TFT_TRANSPARENT);
+  spr.drawString(assetBuf, SCREEN_W - 3, 3, 1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_TRANSPARENT);
   spr.drawString(assetBuf, SCREEN_W - 4, 2, 1);
 }
 
