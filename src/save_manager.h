@@ -1,12 +1,12 @@
 // save_manager.h
 #pragma once
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // Game Options persistence (stored in /raising_hell/save/gameopt.bin)
-uint8_t saveManagerGetDecayMode();            // 0=Normal, 1=Slow, 2=Off (example)
-void    saveManagerSetDecayMode(uint8_t mode);
+uint8_t saveManagerGetDecayMode(); // 0=Normal, 1=Slow, 2=Off (example)
+void saveManagerSetDecayMode(uint8_t mode);
 
 // SD-backed save system (game + settings)
 bool saveManagerLoad();      // returns true only if save.bin loaded OK
@@ -24,14 +24,14 @@ void saveManagerStartFreshPetFlow();
 bool saveManagerAutoHeal();
 void saveManagerFullWipe();
 
-uint32_t saveManagerGetBirthEpoch();   // handy for stats screen later
+uint32_t saveManagerGetBirthEpoch(); // handy for stats screen later
 
 // Settings persistence (settings.bin under /raising_hell/save/)
 bool loadSettingsFromSD();
 void saveSettingsToSD();
 void saveManagerNewPet();
 uint8_t saveManagerGetDecayMode();
-void    saveManagerSetDecayMode(uint8_t mode);
+void saveManagerSetDecayMode(uint8_t mode);
 extern bool ledAlertsEnabled;
 
 // Persisted WiFi preference (settings.bin)
@@ -50,16 +50,17 @@ struct PetExportEntry
   bool valid;
 };
 
-int saveManagerListPetBackups(PetExportEntry* outEntries, int maxEntries);
+int saveManagerListPetBackups(PetExportEntry *outEntries, int maxEntries);
 bool saveManagerBackupCurrentPet(char *outPath, size_t outPathSize);
-bool saveManagerValidateBubAtPath(const char* path);
-bool saveManagerDeletePetBackupAtPath(const char* path);
-int saveManagerListPetExports(PetExportEntry* outEntries, int maxEntries);
-bool saveManagerImportBubAtPath(const char* path, char* outPath, size_t outPathSize, bool backupCurrentFirst = true);
+bool saveManagerValidateBubAtPath(const char *path);
+bool saveManagerDeletePetBackupAtPath(const char *path);
+int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries);
+bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathSize, bool backupCurrentFirst = true);
 bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize);
 void saveManagerAssignFreshPetId();
 
-enum SaveLoadErr : uint8_t {
+enum SaveLoadErr : uint8_t
+{
   SLE_OK = 0,
   SLE_SD_NOT_READY,
   SLE_DIR_FAIL,
@@ -72,7 +73,6 @@ enum SaveLoadErr : uint8_t {
 
 uint8_t saveManagerLastLoadErr();
 uint32_t saveManagerLastLoadSize();
-
 
 // Deletes all save files (used when the pet is buried)
 void saveManagerDeleteAll();
@@ -94,3 +94,5 @@ void saveManagerAbortFreshPetFlow();
 void saveManagerSetSleepPendingFlag();
 void saveManagerClearSleepPendingFlag();
 bool saveManagerSleepPendingFlagExists();
+
+void saveManagerEnterSleepState();

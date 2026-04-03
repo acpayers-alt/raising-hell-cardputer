@@ -33,7 +33,11 @@ void uiPetSleepingBootEnter()
   // We do not have a meaningful live InputState during boot landing,
   // so start from a safe "not held" baseline.
   s_prevSelectHeld = false;
-
+  graphicsReleaseUiCachesForMiniGame();
+  Serial.printf("[HEAPCHK] uiPetSleepingBootEnter after-release free=%u largest=%u\n",
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+                
   clearInputLatch();
   inputForceClear();
 }
@@ -59,11 +63,12 @@ void uiPetSleepingHandle(InputState &in)
   if (in.menuOnce || in.escOnce)
   {
     g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
+    inputForceClear();   // critical: kill carried input
     openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
     uiActionSwallowAll(in);
     return;
   }
-
+    
   // Wake explicitly on enter/select (but not immediately on entry)
   if (allowWake && (in.selectOnce || in.encoderPressOnce || in.mgSelectOnce || selectEdgeFallback))
   {

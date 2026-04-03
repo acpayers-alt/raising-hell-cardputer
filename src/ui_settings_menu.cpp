@@ -23,6 +23,7 @@
 #include "ui_runtime.h"
 #include "ui_settings_actions.h"
 #include "ui_settings_pages.h"
+#include "ui_input_utils.h"
 
 // --- UI / Flow ---
 #include "menu_actions.h"
@@ -166,11 +167,12 @@ static void actTop_OpenScreen(InputState &)
   clearInputLatch();
 }
 
-static void actTop_OpenSystem(InputState &)
+static void actTop_OpenSystem(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::SYSTEM;
   g_app.systemSettingsIndex = 0;
   requestUIRedraw();
+  inputForceClear();
   playBeep();
   clearInputLatch();
 }
@@ -496,7 +498,6 @@ static void actPet_RenamePet(InputState &input)
 
   requestUIRedraw();
   invalidateBackgroundCache();
-  uiDrainKb(input);
   clearInputLatch();
   playBeep();
 }
@@ -591,11 +592,12 @@ static void actSystem_SetTime(InputState &)
   clearInputLatch();
 }
 
-static void actSystem_OpenWifi(InputState &)
+static void actSystem_OpenWifi(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::WIFI;
   g_wifi.wifiSettingsIndex = 0;
   requestUIRedraw();
+  inputForceClear();
   playBeep();
   clearInputLatch();
 }

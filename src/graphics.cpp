@@ -4968,8 +4968,14 @@ void graphicsReleaseUiCachesForMiniGame()
 
 static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, uint8_t frameCount, int drawX, int drawY)
 {
-  if (!frames || frameCount == 0)
+  if (mode == 0 || !frames || frameCount == 0)
     return false;
+
+  // No PSRAM on this hardware. Full-screen cached sleep frames are too large
+  // and can starve later graphics/WiFi allocations.
+  // Fall back to drawing sleep frames live instead of caching snapshots.
+  Serial.println("[SLEEP CACHE] disabled on no-PSRAM build");
+  return false;
 
   if (s_sleepAnimFrameCacheReady &&
       s_sleepAnimFrameCache &&
@@ -5215,7 +5221,10 @@ static void drawSleepScreenImpl(bool redrawBg)
   if (needBgDraw)
   {
     bool ok = false;
-
+    Serial.printf("[HEAPCHK] sleep-draw pre-bg free=%u largest=%u\n",
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+                  
     if (s_mode != 0 && frames && frameCount > 0)
     {
       if (ensureSleepAnimFrameCache(s_mode, frames, frameCount, 0, 18))

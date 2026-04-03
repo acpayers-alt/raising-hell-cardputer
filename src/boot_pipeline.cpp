@@ -83,17 +83,15 @@
 
 // Misc
 #include "debug.h"
+#include "esp_heap_caps.h"
 #include "runtime_log.h"
 #include "ui_state_pet_sleeping.h"
 #include "version.h"
-#include "esp_heap_caps.h"
 // End of includes
 
-static void logMem(const char* tag)
+static void logMem(const char *tag)
 {
-  Serial.printf("[MEM][%s] free=%u largest=%u\n",
-                tag,
-                heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+  Serial.printf("[MEM][%s] free=%u largest=%u\n", tag, heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
                 heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 }
 
@@ -719,12 +717,33 @@ static void finalizeBootLanding()
     EEPROM.commit();
   }
 
+  // Ensure Wi-Fi is actually applied before leaving boot
+  if (!g_wifiApplied)
+  {
+    const bool pref = settingsWifiEnabled();
+
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n", pref ? 1 : 0, wifiIsEnabled() ? 1 : 0);
+
+    wifiSetEnabled(false);
+    applyWifiPower(false);
+
+    wifiSetEnabled(pref);
+    applyWifiPower(pref);
+
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n", pref ? 1 : 0, wifiIsEnabled() ? 1 : 0);
+
+    g_wifiApplied = true;
+  }
+
   if (g_app.uiState == UIState::BOOT)
   {
     if (s_bootFinalLandingState == UIState::PET_SLEEPING)
     {
-      //CRITICAL: free any stale UI/sleep buffers before entering sleep screen
+      // Critical: free any stale UI/sleep buffers before entering sleep screen.
       graphicsReleaseUiCachesForMiniGame();
+      Serial.printf("[HEAPCHK] boot-sleep-landing after-release free=%u largest=%u\n",
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
     }
 
     enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
@@ -745,9 +764,10 @@ static void finalizeBootLanding()
     sleepBgKickNow();
     return;
   }
-  
+
   requestUIRedraw();
-  renderUI();}
+  renderUI();
+}
 
 // -----------------------------------------------------------------------------
 // postBootInitTick()
@@ -1100,129 +1120,71 @@ void postBootInitTick()
 
     if (!deferForAssetProvision)
     {
-      // We are done with boot-time deferred init for this boot path.
-      // Do not let Stage 3 come back around and re-apply Wi-Fi power/init
-      // after we have already landed in the real UI.
-      g_postBootInitDone = true;
-      g_wifiApplied = false;
-
-      Serial.printf("[BOOT] finalize direct landing=%d postBootInitDone=1 wifiApplied=1\n",
-                    (int)s_bootFinalLandingState);
-
-      finalizeBootLanding();
-      return;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Stage 3: WiFi/NTP init (deferred)
-  // ---------------------------------------------------------------------------
-  if (!g_postBootInitDone)
-  {
-    if (now >= g_nextWifiTryMs)
-    {
-      g_nextWifiTryMs = now + 1000;
+      // Boot is complete — finalize landing NOW (this runs Wi-Fi apply)
+      if (!g_bootLandingDone)
+      {
+        Serial.printf("[BOOT] finalize direct landing=%d postBootInitDone=1 wifiApplied=%d\n",
+                      (int)s_bootFinalLandingState,
+                      g_wifiApplied ? 1 : 0);
     
-      if (bootAssetProvisionRequired())
-      {
-        if (g_bootAssetProvisionMustComplete && !g_bootProvisionWifiOnboardingStarted)
-        {
-          if (bootAssetProvisionWaitingAtIntroScreen())
-            return;
-  
-          g_bootProvisionWifiOnboardingStarted = true;
-          g_bootAssetProvisionActive = false;
-          ui_setBootSplashActive(false);
-  
-          uiActionEnterState(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET, true);
-          requestFullUIRedraw();
-          requestUIRedraw();
-          clearInputLatch();
-          return;
-        }
-  
-        if (bootAssetProvisionWifiOnboardingActive())
-          return;
+        finalizeBootLanding();
+        return;
       }
-  
-      if (!g_wifiApplied)
-      {
-        const bool pref = settingsWifiEnabled();
-        Serial.printf("[BOOT][WIFI] applying pref=%d landing=%d\n",
-                      pref ? 1 : 0,
-                      (int)s_bootFinalLandingState);
-        wifiSetEnabled(pref);
-        applyWifiPower(pref);
-        g_wifiApplied = true;
-      }
-        
-      wifiTimeInit();
-  
-      if (bootAssetProvisionRequired())
-      {
-        g_bootAssetProvisionActive = true;
-  
-        if (!bootAssetProvisionWifiReady())
-          return;
-      }
-  
+    
       g_postBootInitDone = true;
-      requestUIRedraw();
     }
-  
-    return;
-  }
-  
-  // ---------------------------------------------------------------------------
-  // Stage 3.5: Deferred boot asset provisioning
-  // ---------------------------------------------------------------------------
-  // HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
-  if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
-  {
-    g_bootAssetProvisionActive = false;
-    g_bootUiBlockedForAssetProvision = false;
-    g_bootAssetProvisionMustComplete = false;
-    return;
-  }
-
-  if (bootAssetProvisionRequired())
-  {
-    // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
-    if (bootAssetProvisionWifiOnboardingActive())
-      return;
-
-    // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
-    if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
-      return;
-
-    if (runBootAssetProvision())
-      return;
-  }
-
-  if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
-  {
-    g_bootAssetProvisionActive = false;
-    g_bootUiBlockedForAssetProvision = false;
-    finalizeBootLanding();
-    return;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Stage 4: Persist time anchor once we have synced time
-  // ---------------------------------------------------------------------------
-  if (!g_ntpSaved && timeIsSynced())
-  {
-    g_ntpSaved = true;
-    saveTimeAnchor();
-
-    // If boot was paused for time recovery, time is now valid and we may still
-    // be sitting on the splash/BOOT state without ever completing the normal
-    // post-boot landing. Finish that handoff now.
-    if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
+    
+    // ---------------------------------------------------------------------------
+    // Stage 3.5: Deferred boot asset provisioning
+    // ---------------------------------------------------------------------------
+    // HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
+    if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
     {
-      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
+      g_bootAssetProvisionActive = false;
+      g_bootUiBlockedForAssetProvision = false;
+      g_bootAssetProvisionMustComplete = false;
+      return;
+    }
+
+    if (bootAssetProvisionRequired())
+    {
+      // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
+      if (bootAssetProvisionWifiOnboardingActive())
+        return;
+
+      // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
+      if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
+        return;
+
+      if (runBootAssetProvision())
+        return;
+    }
+
+    if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
+    {
+      g_bootAssetProvisionActive = false;
+      g_bootUiBlockedForAssetProvision = false;
       finalizeBootLanding();
       return;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Stage 4: Persist time anchor once we have synced time
+    // ---------------------------------------------------------------------------
+    if (!g_ntpSaved && timeIsSynced())
+    {
+      g_ntpSaved = true;
+      saveTimeAnchor();
+
+      // If boot was paused for time recovery, time is now valid and we may still
+      // be sitting on the splash/BOOT state without ever completing the normal
+      // post-boot landing. Finish that handoff now.
+      if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
+      {
+        Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
+        finalizeBootLanding();
+        return;
+      }
     }
   }
 }

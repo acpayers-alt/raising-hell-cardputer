@@ -615,6 +615,7 @@ void saveManagerFullWipe()
 
   // --- Flags ---
   tryRemove(NAME_PENDING_FLAG_PATH);
+  tryRemove(SLEEP_PENDING_FLAG_PATH);
 
   Serial.println("[DEV] FULL WIPE DONE → rebooting");
 
@@ -843,6 +844,12 @@ void saveManagerEnterSleepState()
   g_app.sleepTargetEnergy = 0;
   g_app.sleepStartTime = 0;
   g_app.sleepDurationMs = 0;
+
+  // Critical: free large UI caches before entering the sleeping screen.
+  graphicsReleaseUiCachesForMiniGame();
+  Serial.printf("[HEAPCHK] sleep-enter after-release free=%u largest=%u\n",
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 
   writeSleepPendingFlag();
   saveManagerMarkDirty();
@@ -1430,12 +1437,15 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   applyTimezoneIndex(tzIndex);
 
   const bool wifiEn = (g_settings.wifiEnabled != 0);
-  wifiSetEnabled(wifiEn);
-  
-  Serial.printf("[WIFI LOAD] setting=%d runtime=%d\n",
+
+  // Do not apply Wi-Fi hardware/runtime state here.
+  // Boot pipeline is the single owner of actual Wi-Fi bring-up.
+  // Applying it here makes later boot logic think Wi-Fi is already enabled
+  // even when the radio/connect path has not actually been restarted.
+  Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n",
                 wifiEn ? 1 : 0,
                 wifiIsEnabled() ? 1 : 0);
-    
+                    
   return true;}
 
 static bool saveSettingsToSD_internal()
@@ -2327,7 +2337,7 @@ void saveManagerFactoryReset()
   tryRemove("/raising_hell/save/gameopt.tmp");
   tryRemove("/raising_hell/save/settings.tmp");
   tryRemove(NAME_PENDING_FLAG_PATH);
-
+  tryRemove(SLEEP_PENDING_FLAG_PATH);
   tryRemove("/raising_hell/save/birth.txt");
 
   clearNvsNamespace("rh_settings");

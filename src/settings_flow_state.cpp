@@ -1,5 +1,6 @@
 #include "settings_flow_state.h"
 
+#include "input.h"
 #include "settings_state.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
@@ -17,8 +18,12 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
   g_settingsFlow.settingsReturnTab   = returnTab;
   g_settingsFlow.settingsPage        = page;
 
+  if (page == SettingsPage::TOP)
+    resetSettingsNav(false);
+
   uiActionEnterState(UIState::SETTINGS, returnTab, true);
   requestFullUIRedraw();
+  inputForceClear();
   clearInputLatch();
 }
 
