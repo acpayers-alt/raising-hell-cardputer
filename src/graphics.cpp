@@ -159,6 +159,9 @@ static void uiDrawToastOverlay();
 // Sleep Graphics Kick
 static volatile bool g_sleepBgKick = false;
 
+// Random Shit
+static void drawNonPetTabBackground();
+
 void sleepBgKickNow()
 {
   g_sleepBgKick = true;
@@ -883,56 +886,233 @@ static inline const char *sleepBgForPet(PetType type)
   }
 }
 
+enum class HelpLineType : uint8_t
+{
+  TITLE,
+  SECTION,
+  BODY,
+  GAP
+};
+
+struct HelpLine
+{
+  HelpLineType type;
+  const char *text;
+};
+
+static const HelpLine kControlsManual[] = {
+
+    {HelpLineType::SECTION, "Welcome to Raising Hell"},
+    {HelpLineType::BODY, "Thank you for playing"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Basic Controls"},
+    {HelpLineType::BODY, "LEFT/RIGHT  Switch tabs"},
+    {HelpLineType::BODY, "UP/DOWN     Move selection"},
+    {HelpLineType::BODY, "ENTER/G     Confirm / interact"},
+    {HelpLineType::BODY, "DEL/Q       Back / home"},
+    {HelpLineType::BODY, "ESC         Open Settings / cancel"},
+    {HelpLineType::BODY, "Z-M         Jump to tab"},
+    {HelpLineType::BODY, "GO          Toggle screen on/off"},
+    {HelpLineType::BODY, "\\           Console"},
+    {HelpLineType::BODY, "Shake       Wake console"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Alt Navigation Clusters"},
+    {HelpLineType::BODY, "(E A S D) and (O J K L)"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Congratulations!!"},
+    {HelpLineType::BODY, "You summoned something from"},
+    {HelpLineType::BODY, "beyond our mortal plane."},
+    {HelpLineType::BODY, "Now it's your problem!."},
+
+    {HelpLineType::GAP, nullptr},
+};
+
+static constexpr int kControlsManualCount = (int)(sizeof(kControlsManual) / sizeof(kControlsManual[0]));
+
+static int g_controlsHelpScroll = 0;
+
+static int controlsHelpLineHeight(const HelpLine &line)
+{
+  switch (line.type)
+  {
+  case HelpLineType::TITLE:
+    return 16;
+  case HelpLineType::SECTION:
+    return 16;
+  case HelpLineType::BODY:
+    return 14;
+  case HelpLineType::GAP:
+    return 8;
+  default:
+    return 14;
+  }
+}
+
+static int controlsHelpMaxScroll()
+{
+  const int topY = 6;
+  const int bottomHelpH = 14;
+  const int viewY = topY;
+  const int viewH = SCREEN_H - topY - bottomHelpH - 4;
+
+  int lastValidStart = 0;
+
+  for (int start = 0; start < kControlsManualCount; ++start)
+  {
+    int y = viewY;
+    bool drewAnything = false;
+
+    for (int i = start; i < kControlsManualCount; ++i)
+    {
+      const int lineH = controlsHelpLineHeight(kControlsManual[i]);
+      if (y + lineH > viewY + viewH)
+        break;
+
+      y += lineH;
+      drewAnything = true;
+    }
+
+    if (!drewAnything)
+      break;
+
+    lastValidStart = start;
+  }
+
+  return lastValidStart;
+}
+
+void controlsHelpResetScroll() { g_controlsHelpScroll = 0; }
+
+bool controlsHelpScrollUp()
+{
+  if (g_controlsHelpScroll <= 0)
+    return false;
+
+  --g_controlsHelpScroll;
+  requestUIRedraw();
+  return true;
+}
+
+bool controlsHelpScrollDown()
+{
+  const int maxScroll = controlsHelpMaxScroll();
+  if (g_controlsHelpScroll >= maxScroll)
+    return false;
+
+  ++g_controlsHelpScroll;
+  requestUIRedraw();
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // Controls Helper
 // -----------------------------------------------------------------------------
 static void drawControlsHelpScreen()
 {
-  spr.fillScreen(TFT_BLACK);
+  drawNonPetTabBackground();
 
-  spr.setTextDatum(textdatum_t::top_left);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  const int screenW = SCREEN_W;
+  const int screenH = SCREEN_H;
 
-  int x = 10;
-  int y = 10;
+  const int outerMargin = 8;
+  const int panelPad = 6;
+  const int panelRadius = 6;
 
-  // Title
-  spr.setTextColor(TFT_CYAN, TFT_BLACK);
-  spr.drawString("Controls", x, y);
-  y += 15; // tighter than before
+  const int panelX = outerMargin;
+  const int panelY = outerMargin;
+  const int panelW = screenW - (outerMargin * 2);
+  const int panelH = screenH - (outerMargin * 2);
 
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  const int viewX = panelX + panelPad;
+  const int viewY = panelY + panelPad;
+  const int viewW = panelW - (panelPad * 2);
+  const int viewH = panelH - (panelPad * 2);
 
-  const int lineGap = 12; // tighter vertical rhythm
+  // ---------------------------------------------------------------------------
+  // Background panel for controls help
+  // ---------------------------------------------------------------------------
+  spr.fillRoundRect(panelX, panelY, panelW, panelH, panelRadius, TFT_BLACK);
+  spr.drawRoundRect(panelX, panelY, panelW, panelH, panelRadius, TFT_DARKGREY);
 
-  spr.drawString("LEFT/RIGHT : switch tabs", x, y);
-  y += lineGap;
-  spr.drawString("UP/DOWN    : move selection", x, y);
-  y += lineGap;
-  spr.drawString("ENTER/G    : confirm", x, y);
-  y += lineGap;
-  spr.drawString("Del/Q      : back / home", x, y);
-  y += lineGap;
-  spr.drawString("ESC        : open Settings / cancel", x, y);
-  y += lineGap;
-  spr.drawString("Z-M        : jump to tab", x, y);
-  y += lineGap;
-  spr.drawString("GO         : toggle screen on/off", x, y);
-  y += lineGap;
-  spr.drawString("           : shake console to wake", x, y);
-  y += lineGap;
-  spr.drawString("\\          : console", x, y);
-  y += lineGap;
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextSize(1);
 
-  // Alt Navigation Cluster section
-  y += 2; // small separation
-  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  spr.drawString("Alt Navigation Clusters", x, y);
-  y += 14;
+  // Larger fonts than before
+  const int titleFont = 2;
+  const int sectionFont = 2;
+  const int bodyFont = 2;
 
-  spr.drawString("(E A S D) (O J K L)", x, y);
+  const int titleH = 16;
+  const int sectionH = 16;
+  const int bodyH = 14;
+  const int gapH = 8;
 
-  spr.pushSprite(0, 0);
+  int y = viewY;
+  int drawn = 0;
+
+  spr.setClipRect(viewX, viewY, viewW, viewH);
+
+  for (int i = g_controlsHelpScroll; i < kControlsManualCount; ++i)
+  {
+    const HelpLine &line = kControlsManual[i];
+
+    int lineH = bodyH;
+    switch (line.type)
+    {
+    case HelpLineType::TITLE:
+      lineH = titleH;
+      break;
+    case HelpLineType::SECTION:
+      lineH = sectionH;
+      break;
+    case HelpLineType::BODY:
+      lineH = bodyH;
+      break;
+    case HelpLineType::GAP:
+      lineH = gapH;
+      break;
+    }
+
+    if (y + lineH > viewY + viewH)
+      break;
+
+    switch (line.type)
+    {
+    case HelpLineType::TITLE:
+      spr.setTextColor(TFT_CYAN);
+      spr.drawString(line.text ? line.text : "", viewX, y, titleFont);
+      break;
+
+    case HelpLineType::SECTION:
+      spr.setTextColor(TFT_YELLOW);
+      spr.drawString(line.text ? line.text : "", viewX, y, sectionFont);
+      break;
+
+    case HelpLineType::BODY:
+      spr.setTextColor(TFT_WHITE);
+      spr.drawString(line.text ? line.text : "", viewX, y, bodyFont);
+      break;
+
+    case HelpLineType::GAP:
+      break;
+    }
+
+    y += lineH;
+    drawn++;
+  }
+
+  spr.clearClipRect();
+
+  // Scroll indicators
+  spr.setTextColor(TFT_LIGHTGREY, TFT_TRANSPARENT);
+  if (g_controlsHelpScroll > 0)
+    spr.drawString("^", panelX + panelW - 12, panelY + 4, 1);
+
+  if (g_controlsHelpScroll + drawn < kControlsManualCount)
+    spr.drawString("v", panelX + panelW - 12, panelY + panelH - 12, 1);
 }
 
 void drawBootWifiPromptScreen()
@@ -2107,7 +2287,7 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-      "Controls",
+      "Manual",
       nullptr, // 1 => volumeLine
       "Pet Options >", "Screen Settings >", "System Settings >", "Game Options >",
       "Console >",     "System Status >",   "Credits",           "Main Menu",
@@ -6553,8 +6733,9 @@ void drawTitleMenuScreen(bool redrawBg)
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }
 
-  const char *labels[3] = {row0Buf, "Pet Storage", "Settings"};
-  const bool enabled[3] = {true, hasImport, true};
+  const char *storageLabel = hasImport ? "Pet Storage" : "Pet Storage Empty";
+  const char *labels[3] = {row0Buf, storageLabel, "Settings"};
+  const bool enabled[3] = {true, true, true};
 
   // Menu panel
   // Menu panel
@@ -6585,37 +6766,32 @@ void drawTitleMenuScreen(bool redrawBg)
   {
     const int rowY = menuTopY + (i * rowH);
     const bool selected = (i == g_titleMenuIndex);
-  
+
     uint16_t fg = TFT_WHITE;
     if (!enabled[i])
       fg = TFT_DARKGREY;
     else if (selected)
       fg = TFT_YELLOW;
-  
+
     // Measure this item's text width using the same font the title menu helper uses
     spr.setTextFont(2);
     spr.setTextSize(1);
     const int textW = spr.textWidth(labels[i]);
-  
+
     // Draw selection arrows sized to the actual item width
     if (selected)
     {
       const int arrowGap = 6;
       const int leftArrowX = (SCREEN_W / 2) - (textW / 2) - arrowGap;
       const int rightArrowX = (SCREEN_W / 2) + (textW / 2) + arrowGap;
-  
+
       drawTitleMenuText(spr, "<", leftArrowX, rowY, 2, TFT_YELLOW, textdatum_t::top_right);
       drawTitleMenuText(spr, ">", rightArrowX, rowY, 2, TFT_YELLOW, textdatum_t::top_left);
     }
-  
+
     drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, fg, textdatum_t::top_center);
-  
-    if (!enabled[i] && i == 1)
-    {
-      drawTitleMenuText(spr, "(none found)", SCREEN_W / 2, rowY + 10, 1, TFT_DARKGREY, textdatum_t::top_center);
-    }
   }
-  
+
   // Status block
   const char *assetVer = assetOtaInstalledVersion();
   const AssetOtaChannel ch = (AssetOtaChannel)assetOtaGetConfig().channel;

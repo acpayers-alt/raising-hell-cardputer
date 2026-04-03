@@ -34,6 +34,7 @@ static ReturnTarget s_controlsHelpReturn{};
 void controlsHelpOnEnter()
 {
   s_controlsHelpEnterMs = millis();
+  controlsHelpResetScroll();
   inputForceClear();
   clearInputLatch();
 }

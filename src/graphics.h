@@ -65,6 +65,9 @@ void drawPowerMenu();
 void drawFeedMenu();
 void drawHatchingScreen(bool redrawBg);
 void drawTitleMenuScreen(bool redrawBg);
+void controlsHelpResetScroll();
+bool controlsHelpScrollUp();
+bool controlsHelpScrollDown();
 
 // Console
 void drawConsoleMenu();

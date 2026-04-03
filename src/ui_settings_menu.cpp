@@ -590,7 +590,7 @@ static MenuItem kSystemItems[] = {
 // Menu definitions
 // ------------------------------------------------------------
 static MenuItem kTopItems[] = {
-  {"Controls", actTop_Controls, nullptr, nullptr, nullptr},
+  {"Manual", actTop_Controls, nullptr, nullptr, nullptr},
   {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
   {"Pet Options", actTop_OpenPet, nullptr, nullptr, nullptr},
   {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
