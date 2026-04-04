@@ -82,6 +82,10 @@ void forceRenderUIOnce();
 // Main UI dispatcher
 void renderUI();
 
+//UI Resets
+void resetPetScreenPositionToHome();
+void startPetIntroWalkFromLeft();
+
 // Level-up modal
 void uiShowLevelUpPopup(uint16_t newLevel);
 bool uiIsLevelUpPopupActive();

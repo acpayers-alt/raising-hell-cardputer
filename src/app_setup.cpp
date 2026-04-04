@@ -9,81 +9,88 @@
 #include <stdint.h>
 
 // --- ESP / system -------------------------------------------------------------
-#include <esp_system.h>
-#include "esp_log.h"
-#include <esp_heap_caps.h>
 #include "esp_core_dump.h"
 #include "esp_err.h"
+#include "esp_log.h"
+#include <esp_heap_caps.h>
+#include <esp_system.h>
 
 // --- Hardware / platform ------------------------------------------------------
 #include "M5Cardputer.h"
-#include <WiFi.h>
 #include <EEPROM.h>
 #include <SD.h>
+#include <WiFi.h>
 
 // --- Core app systems ---------------------------------------------------------
 #include "app_state.h"
 #include "boot_pipeline.h"
-#include "system_status_state.h"
 #include "runtime_log.h"
+#include "system_status_state.h"
 #include "version.h"
 
 // --- Display / input / UX -----------------------------------------------------
+#include "auto_screen.h"
+#include "brightness_state.h"
+#include "controls_help_state.h"
 #include "display.h"
 #include "display_state.h"
 #include "input.h"
 #include "input_activity_state.h"
-#include "auto_screen.h"
-#include "brightness_state.h"
-#include "controls_help_state.h"
 
 // --- UI / flow ----------------------------------------------------------------
-#include "ui_runtime.h"
-#include "menu_actions.h"
+#include "evolution_flow.h"
 #include "flow_power_menu.h"
 #include "hatching_flow.h"
-#include "evolution_flow.h"
+#include "menu_actions.h"
+#include "ui_runtime.h"
 
 // --- Gameplay / pet systems ---------------------------------------------------
-#include "pet.h"
-#include "pet_defs.h"
+#include "activity.h"
 #include "inventory.h"
 #include "inventory_state.h"
-#include "activity.h"
 #include "mini_games.h"
 #include "motion.h"
+#include "pet.h"
+#include "pet_defs.h"
 
 // --- Save / persistence -------------------------------------------------------
+#include "eeprom_addrs.h"
 #include "save_manager.h"
 #include "time_persist.h"
-#include "eeprom_addrs.h"
 
 // --- Time / networking --------------------------------------------------------
-#include "wifi_time.h"
-#include "wifi_power.h"
-#include "timezone.h"
 #include "time_state.h"
+#include "timezone.h"
+#include "wifi_power.h"
+#include "wifi_time.h"
 
 // --- Storage / assets ---------------------------------------------------------
-#include "sdcard.h"
 #include "asset_ota.h"
 #include "asset_ota_config.h"
+#include "sdcard.h"
 
 // --- Rendering / animation ----------------------------------------------------
-#include "graphics.h"
 #include "anim_engine.h"
+#include "graphics.h"
 
 // --- Audio / feedback ---------------------------------------------------------
-#include "sound.h"
 #include "led_status.h"
+#include "sound.h"
 
 // --- Misc states --------------------------------------------------------------
+#include "console.h"
+#include "debug.h"
+#include "name_entry_state.h"
+#include "power_button.h"
 #include "settings_state.h"
 #include "sleep_state.h"
-#include "name_entry_state.h"
-#include "debug.h"
-#include "console.h"
-#include "power_button.h"
+
+//-- Battery Constants
+static constexpr int kBootBatteryEnterGateMv = 3600;
+static constexpr int kBootBatteryResumeMv = 3650;
+static constexpr uint32_t kBootBatteryStableMs = 1500;
+static constexpr uint32_t kBootBatteryPollMs = 250;
+static constexpr int kBootBatteryTargetPercent = 5;
 
 void updateBattery();
 
@@ -109,14 +116,14 @@ static void clearStaleCoreDumpIfNeeded()
   Serial.printf("[BOOT][COREDUMP] erase result=%d\n", (int)er);
 }
 
-
 static void serialBootHandshake(uint32_t waitMs)
 {
   // CDC can take a moment; don't hang forever (battery / no host).
   Serial.setTxTimeoutMs(10);
 
   const uint32_t t0 = millis();
-  while (!Serial && (millis() - t0) < waitMs) {
+  while (!Serial && (millis() - t0) < waitMs)
+  {
     delay(10);
   }
 
@@ -125,7 +132,8 @@ static void serialBootHandshake(uint32_t waitMs)
   clearStaleCoreDumpIfNeeded();
 }
 
-void appSetup() {
+void appSetup()
+{
   Serial.begin(115200);
   runtimeLogInit();
   bootTime = millis();
@@ -133,14 +141,11 @@ void appSetup() {
   // Give USB stack a moment, then do a bounded handshake.
   delay(50);
   serialBootHandshake(2500);
-  
-  Serial.printf("[PSRAM] size=%u free=%u\n",
-    (unsigned)ESP.getPsramSize(),
-    (unsigned)ESP.getFreePsram());
 
-  Serial.printf("[HEAP] free=%u largest=%u\n",
-    (unsigned)ESP.getFreeHeap(),
-    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  Serial.printf("[PSRAM] size=%u free=%u\n", (unsigned)ESP.getPsramSize(), (unsigned)ESP.getFreePsram());
+
+  Serial.printf("[HEAP] free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   // DO NOT use 0 here; on some ESP32 CDC builds this can cause "no output ever".
   // Keep it small so we still don't block hard when host isn't ready.
@@ -152,30 +157,47 @@ void appSetup() {
   // Best-effort "wait for port open" (bounded, non-hanging).
   {
     const uint32_t t0 = millis();
-    while (!Serial && (millis() - t0) < 800) {
+    while (!Serial && (millis() - t0) < 800)
+    {
       delay(10);
     }
   }
 
-  auto bootPrintln = [&](const char* s) {
-    if (Serial) Serial.println(s);
+  auto bootPrintln = [&](const char *s)
+  {
+    if (Serial)
+      Serial.println(s);
   };
-  auto bootPrintf = [&](const char* fmt, auto... args) {
-    if (Serial) Serial.printf(fmt, args...);
+  auto bootPrintf = [&](const char *fmt, auto... args)
+  {
+    if (Serial)
+      Serial.printf(fmt, args...);
   };
 
-  auto resetReasonStr = [&](esp_reset_reason_t r) -> const char* {
-    switch (r) {
-      case ESP_RST_POWERON:   return "POWERON";
-      case ESP_RST_EXT:       return "EXT";
-      case ESP_RST_SW:        return "SW";
-      case ESP_RST_PANIC:     return "PANIC";
-      case ESP_RST_INT_WDT:   return "INT_WDT";
-      case ESP_RST_TASK_WDT:  return "TASK_WDT";
-      case ESP_RST_WDT:       return "WDT";
-      case ESP_RST_BROWNOUT:  return "BROWNOUT";
-      case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
-      default:                return "OTHER";
+  auto resetReasonStr = [&](esp_reset_reason_t r) -> const char *
+  {
+    switch (r)
+    {
+    case ESP_RST_POWERON:
+      return "POWERON";
+    case ESP_RST_EXT:
+      return "EXT";
+    case ESP_RST_SW:
+      return "SW";
+    case ESP_RST_PANIC:
+      return "PANIC";
+    case ESP_RST_INT_WDT:
+      return "INT_WDT";
+    case ESP_RST_TASK_WDT:
+      return "TASK_WDT";
+    case ESP_RST_WDT:
+      return "WDT";
+    case ESP_RST_BROWNOUT:
+      return "BROWNOUT";
+    case ESP_RST_DEEPSLEEP:
+      return "DEEPSLEEP";
+    default:
+      return "OTHER";
     }
   };
 
@@ -198,33 +220,30 @@ void appSetup() {
 
   {
     const esp_reset_reason_t rr = esp_reset_reason();
-  
+
     const bool brownoutReset = (rr == ESP_RST_BROWNOUT);
-    const bool criticalAtBoot = (!usbPowered && batteryVoltageMv > 0 && batteryVoltageMv <= 3475);
-  
+    const bool criticalAtBoot = (!usbPowered && batteryVoltageMv > 0 && batteryVoltageMv < kBootBatteryEnterGateMv);
     if (brownoutReset || criticalAtBoot)
     {
-      Serial.printf("[BAT][BOOT] entering charge gate mv=%d pct=%d usb=%d\n",
-                    batteryVoltageMv,
-                    batteryPercent,
+      Serial.printf("[BAT][BOOT] entering charge gate mv=%d pct=%d usb=%d\n", batteryVoltageMv, batteryPercent,
                     (int)usbPowered);
-  
+
       // Make sure screen is on
       SET_SCREEN_POWER(true);
       displayInit();
-  
+
       // Dim a bit to reduce load
       setBacklight(35);
-  
+
       uint32_t safeSince = 0;
-  
+
       for (;;)
       {
         M5Cardputer.update();
         updateBattery();
-  
-        const bool safeNow = (batteryVoltageMv >= 3625);
-  
+
+        const bool safeNow = (batteryVoltageMv >= kBootBatteryResumeMv);
+
         if (safeNow)
         {
           if (safeSince == 0)
@@ -234,58 +253,63 @@ void appSetup() {
         {
           safeSince = 0;
         }
-  
+
         const bool ready = (safeSince != 0) && (millis() - safeSince >= 1500);
-  
+
         // --- draw simple charging screen (buffered, no flicker) ---
         spr.fillScreen(TFT_BLACK);
         spr.setTextDatum(MC_DATUM);
         spr.setTextFont(2);
         spr.setTextSize(1);
-  
+
         spr.setTextColor(TFT_RED, TFT_BLACK);
         spr.drawString("LOW BATTERY", SCREEN_W / 2, 32);
-  
+
         spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  
+
         char buf[48];
-        snprintf(buf, sizeof(buf), "%d%%  %dmV", batteryPercent, batteryVoltageMv);
+        snprintf(buf, sizeof(buf), "%d%% (target: %d%%)", batteryPercent, kBootBatteryTargetPercent);
         spr.drawString(buf, SCREEN_W / 2, 56);
-  
+
         // Battery bar
         const int barW = 140;
         const int barH = 14;
         const int barX = (SCREEN_W - barW) / 2;
         const int barY = 72;
-  
+
         int pct = batteryPercent;
-        if (pct < 0) pct = 0;
-        if (pct > 100) pct = 100;
-  
+        if (pct < 0)
+          pct = 0;
+        if (pct > 100)
+          pct = 100;
+
         spr.drawRect(barX, barY, barW, barH, TFT_WHITE);
         spr.drawRect(barX + barW, barY + 4, 3, barH - 8, TFT_WHITE);
-  
+
         const int innerW = barW - 2;
         int fillW = (innerW * pct) / 100;
-        if (fillW < 0) fillW = 0;
-        if (fillW > innerW) fillW = innerW;
-  
+        if (fillW < 0)
+          fillW = 0;
+        if (fillW > innerW)
+          fillW = innerW;
+
         uint16_t fillColor = TFT_RED;
         if (pct >= 60)
           fillColor = TFT_GREEN;
         else if (pct >= 25)
           fillColor = TFT_YELLOW;
-  
+
         if (fillW > 0)
         {
           spr.fillRect(barX + 1, barY + 1, fillW, barH - 2, fillColor);
         }
-  
+
         if (ready)
         {
           spr.setTextColor(TFT_GREEN, TFT_BLACK);
           spr.drawString("Starting...", SCREEN_W / 2, 104);
         }
+        
         else if (usbPowered)
         {
           spr.setTextColor(TFT_YELLOW, TFT_BLACK);
@@ -299,19 +323,18 @@ void appSetup() {
           spr.drawString("Plug in USB", SCREEN_W / 2, 104);
           spr.drawString("to continue boot", SCREEN_W / 2, 124);
         }
-  
+
         spr.pushSprite(0, 0);
-                  
+
         if (ready)
         {
-          Serial.printf("[BAT][BOOT] charge gate cleared mv=%d -> continuing boot\n",
-                        batteryVoltageMv);
-  
+          Serial.printf("[BAT][BOOT] charge gate cleared mv=%d -> continuing boot\n", batteryVoltageMv);
+
           // Restore brightness
           setBacklight((uint8_t)brightnessValues[brightnessLevel]);
           break;
         }
-  
+
         delay(250);
       }
     }
@@ -339,7 +362,7 @@ void appSetup() {
   applyBrightnessLevel(brightnessLevel);
   randomSeed((uint32_t)esp_random());
 
-  g_app.uiState    = UIState::BOOT;
+  g_app.uiState = UIState::BOOT;
   g_app.currentTab = Tab::TAB_PET;
 
   SET_SCREEN_POWER(true);
@@ -350,7 +373,7 @@ void appSetup() {
   const uint32_t now = millis();
   const bool usbOpen = (bool)Serial;
   bootPipelineKick(now, usbOpen);
-  
+
   assetOtaInit();
 
   {
@@ -370,8 +393,7 @@ void appSetup() {
 #else
                   "DEV",
 #endif
-                  (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC",
-                  manifestUrl ? manifestUrl : "(null)");
+                  (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC", manifestUrl ? manifestUrl : "(null)");
   }
 
   bootPrintln("[BOOT] setup complete");

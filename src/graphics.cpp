@@ -118,6 +118,10 @@ static void drawPetPerfHud();
 static void drawBackupPetListScreen(bool redrawBg);
 static void drawImportPetListScreen(bool redrawBg);
 
+// --- Graphics and Runtime
+void resetPetScreenPositionToHome();
+void startPetIntroWalkFromLeft();
+
 // --- Compatibility wrappers / missing helpers (compile fix) ---
 static void drawSettingsScreen();
 static void drawInventoryScreen();
@@ -151,6 +155,19 @@ static bool g_levelUpPopupActive = false;
 static uint16_t g_levelUpPopupLevel = 0;
 void uiInitLevelPopupTracker();
 void uiResetLevelUpPopupState();
+
+// ---------------------------------------------------------------------------
+// Pet screen position (anchor-based, bottom-center)
+// ---------------------------------------------------------------------------
+
+static int s_petScreenX = 0; // anchored center X
+static int s_petScreenY = 0; // anchored bottom Y
+static bool s_petScreenPosInitialized = false;
+
+static bool s_petIntroWalkActive = false;
+static uint32_t s_petIntroWalkLastStepMs = 0;
+static constexpr int kPetIntroWalkStepPx = 3;
+static constexpr uint32_t kPetIntroWalkStepMs = 40;
 
 void uiResetLevelUpPopupState()
 {
@@ -1470,7 +1487,8 @@ static void drawPlaceholderMenu(const char *title);
 static void drawCreditsScreen();
 static void uiDrawToastOverlay();
 
-void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot);void drawChoosePetScreen(bool redrawBg);
+void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot);
+void drawChoosePetScreen(bool redrawBg);
 void drawTitleMenuScreen(bool redrawBg);
 void drawPowerMenu(); // non-static (renderUI calls it)
 void ui_drawMessageWindow(const char *title, const char *line1, const char *line2, bool maskLine2, bool showCursor);
@@ -4266,6 +4284,82 @@ static inline const PetRenderProfile &getPetProfile(PetType t)
   return kPetProfile[idx];
 }
 
+static void getPetHomeScreenPosition(int &outX, int &outY)
+{
+  const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
+  const int petAreaX = 0;
+
+  const PetRenderProfile &prof = getPetProfile(pet.type);
+
+  outX = petAreaX + (petAreaW / 2) + prof.xOff;
+  outY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
+}
+
+void resetPetScreenPositionToHome()
+{
+  int homeX = 0;
+  int homeY = 0;
+  getPetHomeScreenPosition(homeX, homeY);
+
+  s_petScreenX = homeX;
+  s_petScreenY = homeY;
+  s_petScreenPosInitialized = true;
+  s_petIntroWalkActive = false;
+}
+
+void startPetIntroWalkFromLeft()
+{
+  int homeX = 0;
+  int homeY = 0;
+  getPetHomeScreenPosition(homeX, homeY);
+
+  // Start fully offscreen to the left using the pet sprite width as margin.
+  s_petScreenX = -PET_SPR_W;
+  s_petScreenY = homeY;
+  s_petScreenPosInitialized = true;
+
+  s_petIntroWalkActive = true;
+  s_petIntroWalkLastStepMs = millis();
+}
+
+static void tickPetIntroWalk()
+{
+  if (!s_petIntroWalkActive)
+    return;
+
+  if (g_app.uiState != UIState::PET_SCREEN)
+    return;
+
+  int homeX = 0;
+  int homeY = 0;
+  getPetHomeScreenPosition(homeX, homeY);
+
+  s_petScreenY = homeY;
+
+  const uint32_t now = millis();
+  if ((now - s_petIntroWalkLastStepMs) < kPetIntroWalkStepMs)
+    return;
+
+  s_petIntroWalkLastStepMs = now;
+
+  if (s_petScreenX < homeX)
+  {
+    s_petScreenX += kPetIntroWalkStepPx;
+    if (s_petScreenX > homeX)
+      s_petScreenX = homeX;
+
+    requestUIRedraw();
+  }
+
+  if (s_petScreenX >= homeX)
+  {
+    s_petScreenX = homeX;
+    s_petScreenY = homeY;
+    s_petIntroWalkActive = false;
+    requestUIRedraw();
+  }
+}
+
 static void drawPetScreenImpl(bool redrawBg)
 {
   if (!isScreenOn())
@@ -4305,15 +4399,19 @@ static void drawPetScreenImpl(bool redrawBg)
 
   drawTopBar();
 
-  const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
-  const int petAreaX = 0;
+  int homeCenterX = 0;
+  int homeBottomY = 0;
+  getPetHomeScreenPosition(homeCenterX, homeBottomY);
 
-  const PetRenderProfile &prof = getPetProfile(pet.type);
+  // Initialize runtime position once
+  if (!s_petScreenPosInitialized)
+  {
+    s_petScreenX = homeCenterX;
+    s_petScreenY = homeBottomY;
+    s_petScreenPosInitialized = true;
+  }
 
-  const int centerX = petAreaX + (petAreaW / 2) + prof.xOff;
-  const int bottomY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
-
-  animDrawPetFrameAnchoredBottom(centerX, bottomY);
+  animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
 
   drawMiniStatPreview();
   drawTabBar();
@@ -6175,7 +6273,8 @@ void renderUI()
 
   // Update pet intro fade state before drawing/presenting this frame.
   tickPetScreenIntroFade();
-
+  tickPetIntroWalk();
+  
   drawCurrentScreen(redrawBg);
 
   if (g_app.uiState == UIState::POWER_MENU)

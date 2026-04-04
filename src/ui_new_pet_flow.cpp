@@ -61,12 +61,13 @@ void finalizeNewPetFromName(InputState& in)
   // Enter PET screen first
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
   
+  startPetIntroWalkFromLeft();
   // Now force black AFTER anything else had a chance to touch brightness
   setBacklight(0);
   
   // Arm fade to begin on next frame
   g_app.petScreenIntroFadePending = true;
-              
+
   requestUIRedraw();
   invalidateBackgroundCache();
   requestUIRedraw();
