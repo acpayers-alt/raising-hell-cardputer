@@ -26,4 +26,8 @@ extern bool motionAvailable;
 
 void motionResetShakeDetector(uint32_t cooldownMs = 0);
 
+uint8_t motionGetShakeSensitivity();
+void motionSetShakeSensitivity(uint8_t sel);
+const char *motionShakeSensitivityToText(uint8_t sel);
+
 #endif

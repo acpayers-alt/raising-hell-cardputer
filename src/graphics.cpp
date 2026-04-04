@@ -13,6 +13,7 @@
 #include "sdcard.h"
 #include "tft_compat.h"
 #include <ctype.h>
+#include "motion.h"
 
 // -----------------------------------------------------------------------------
 // Arduino / Std Libs
@@ -2737,10 +2738,13 @@ static void drawScreenSettingsMenu()
   char aLine[28];
   snprintf(aLine, sizeof(aLine), "Auto Screen: %s", autoScreenToText((uint8_t)autoScreenTimeoutSel));
 
-  const char *labels[] = {bLine, aLine};
-  const int totalItems = 2;
+  char sLine[32];
+snprintf(sLine, sizeof(sLine), "Shake to Wake: %s", motionShakeSensitivityToText(motionGetShakeSensitivity()));
 
-  g_app.screenSettingsIndex = clampi(g_app.screenSettingsIndex, 0, totalItems - 1);
+const char *labels[] = {bLine, aLine, sLine};
+const int totalItems = 3;
+
+g_app.screenSettingsIndex = clampi(g_app.screenSettingsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;

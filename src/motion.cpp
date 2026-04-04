@@ -1,7 +1,7 @@
 #include "motion.h"
 
-#include <Arduino.h>
 #include "M5Cardputer.h"
+#include <Arduino.h>
 #include <math.h>
 
 // -----------------------------------------------------------------------------
@@ -14,16 +14,74 @@ bool motionAvailable = false;
 static bool g_inited = false;
 
 // Shake detector state
-static float    g_lpMag = 1.0f;          // low-pass magnitude (g)
+static float g_lpMag = 1.0f; // low-pass magnitude (g)
 static uint32_t g_windowStartMs = 0;
-static int      g_shakeHits = 0;
+static int g_shakeHits = 0;
 static uint32_t g_cooldownUntilMs = 0;
 
 // Tunables (tweak if needed)
-static constexpr float    SHAKE_DELTA_G     = 0.55f;  // |mag - lpMag| threshold (g)
-static constexpr int      SHAKE_HITS_N      = 3;      // hits needed
-static constexpr uint32_t SHAKE_WINDOW_MS   = 650;    // hits must occur within this window
-static constexpr uint32_t SHAKE_COOLDOWN_MS = 1200;   // ignore shakes after trigger
+static uint8_t g_shakeSensitivitySel = 1;   // 0=Off, 1=Low, 2=Medium, 3=High
+static constexpr uint32_t SHAKE_COOLDOWN_MS = 1200;
+
+static float shakeDeltaForSel(uint8_t sel)
+{
+  switch (sel)
+  {
+  case 0: return 999.0f; // Off
+  case 1: return 1.35f;  // Low  = hardest to trigger
+  case 2: return 0.90f;  // Medium
+  case 3: return 0.45f;  // High = easiest to trigger
+  default: return 1.35f;
+  }
+}
+
+static int shakeHitsForSel(uint8_t sel)
+{
+  switch (sel)
+  {
+  case 0: return 999; // Off
+  case 1: return 6;   // Low
+  case 2: return 4;   // Medium
+  case 3: return 2;   // High
+  default: return 6;
+  }
+}
+
+static uint32_t shakeWindowForSel(uint8_t sel)
+{
+  switch (sel)
+  {
+  case 0: return 1;    // Off
+  case 1: return 450;  // Low = tighter window, harder
+  case 2: return 650;  // Medium
+  case 3: return 900;  // High = easier
+  default: return 450;
+  }
+}
+
+uint8_t motionGetShakeSensitivity()
+{
+  return g_shakeSensitivitySel;
+}
+
+void motionSetShakeSensitivity(uint8_t sel)
+{
+  if (sel > 3)
+    sel = 1;
+  g_shakeSensitivitySel = sel;
+}
+
+const char *motionShakeSensitivityToText(uint8_t sel)
+{
+  switch (sel)
+  {
+  case 0: return "Off";
+  case 1: return "Low";
+  case 2: return "Medium";
+  case 3: return "High";
+  default: return "Low";
+  }
+}
 
 void motionResetShakeDetector(uint32_t cooldownMs)
 {
@@ -35,8 +93,10 @@ void motionResetShakeDetector(uint32_t cooldownMs)
   g_cooldownUntilMs = now + cooldownMs;
 }
 
-void initMotion() {
-  if (g_inited) return;
+void initMotion()
+{
+  if (g_inited)
+    return;
   g_inited = true;
 
   // M5Cardputer.begin(cfg, ...) should already prep M5Unified,
@@ -49,9 +109,11 @@ void initMotion() {
   g_cooldownUntilMs = 0;
 }
 
-MotionData readMotion() {
+MotionData readMotion()
+{
   MotionData out{};
-  if (!motionAvailable) return out;
+  if (!motionAvailable)
+    return out;
 
   M5.Imu.update();
   m5::imu_data_t d = M5.Imu.getImuData();
@@ -69,20 +131,26 @@ MotionData readMotion() {
   return out;
 }
 
-bool motionShakeDetected() {
-  if (!motionAvailable) return false;
+bool motionShakeDetected()
+{
+  if (!motionAvailable)
+    return false;
 
   const uint32_t now = millis();
-  if (now < g_cooldownUntilMs) return false;
+  if (now < g_cooldownUntilMs)
+    return false;
 
-  M5.Imu.update();
+    if (g_shakeSensitivitySel == 0)
+    return false;
+
+      M5.Imu.update();
   m5::imu_data_t d = M5.Imu.getImuData();
 
   const float ax = d.accel.x;
   const float ay = d.accel.y;
   const float az = d.accel.z;
 
-  const float mag = sqrtf(ax*ax + ay*ay + az*az);
+  const float mag = sqrtf(ax * ax + ay * ay + az * az);
 
   // Low-pass the magnitude so gravity + slow movement doesn't trigger.
   g_lpMag = (g_lpMag * 0.92f) + (mag * 0.08f);
@@ -90,16 +158,23 @@ bool motionShakeDetected() {
   const float delta = fabsf(mag - g_lpMag);
 
   // Maintain a short window of "hits"
-  if (g_windowStartMs == 0 || (now - g_windowStartMs) > SHAKE_WINDOW_MS) {
+  const float shakeDeltaG = shakeDeltaForSel(g_shakeSensitivitySel);
+  const int shakeHitsN = shakeHitsForSel(g_shakeSensitivitySel);
+  const uint32_t shakeWindowMs = shakeWindowForSel(g_shakeSensitivitySel);
+  
+  if (g_windowStartMs == 0 || (now - g_windowStartMs) > shakeWindowMs)
+  {
     g_windowStartMs = now;
     g_shakeHits = 0;
   }
 
-  if (delta >= SHAKE_DELTA_G) {
+  if (delta >= shakeDeltaG)
+  {
     g_shakeHits++;
   }
 
-  if (g_shakeHits >= SHAKE_HITS_N) {
+  if (g_shakeHits >= shakeHitsN)
+  {
     g_windowStartMs = 0;
     g_shakeHits = 0;
     g_cooldownUntilMs = now + SHAKE_COOLDOWN_MS;

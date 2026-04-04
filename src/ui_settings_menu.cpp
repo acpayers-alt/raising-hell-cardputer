@@ -12,6 +12,7 @@
 #include "auto_screen.h"
 #include "brightness_state.h"
 #include "display.h"
+#include "motion.h"
 #include "save_manager.h"
 #include "sdcard.h"
 #include "sound.h"
@@ -20,10 +21,10 @@
 #include "ui_actions.h"
 #include "ui_input_common.h"
 #include "ui_input_utils.h" // uiDrainKb
+#include "ui_input_utils.h"
 #include "ui_runtime.h"
 #include "ui_settings_actions.h"
 #include "ui_settings_pages.h"
-#include "ui_input_utils.h"
 
 // --- UI / Flow ---
 #include "menu_actions.h"
@@ -311,6 +312,38 @@ static void actScreen_AutoScreenSelect(InputState &)
   clearInputLatch();
 }
 
+static void actScreen_ShakeSensitivityLeft(InputState &)
+{
+  int sel = (int)motionGetShakeSensitivity();
+  sel += (rightPulse ? 1 : -1);
+
+  if (sel < 0)
+    sel = 3;
+  if (sel > 3)
+    sel = 0;
+
+  motionSetShakeSensitivity(sel);
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actScreen_ShakeSensitivityRight(InputState &)
+{
+  int sel = (int)motionGetShakeSensitivity() + 1;
+  if (sel > 2)
+    sel = 0;
+
+  motionSetShakeSensitivity((uint8_t)sel);
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 // ------------------------------------------------------------
 // WIFI page actions
 // ------------------------------------------------------------
@@ -319,10 +352,8 @@ static void actWifi_Toggle(InputState &)
   const bool en = !wifiIsEnabled();
 
   wifiSetEnabled(en);
-  Serial.printf("[WIFI PREF WRITE] source=ui_settings_menu en=%d state=%d tab=%d\n",
-    en ? 1 : 0,
-    (int)g_app.uiState,
-    (int)g_app.currentTab);
+  Serial.printf("[WIFI PREF WRITE] source=ui_settings_menu en=%d state=%d tab=%d\n", en ? 1 : 0, (int)g_app.uiState,
+                (int)g_app.currentTab);
   settingsSetWifiEnabled(en);
   applyWifiPower(en);
 
@@ -628,6 +659,7 @@ static MenuItem kTopItems[] = {
 static MenuItem kScreenItems[] = {
     {"Brightness", nullptr, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
     {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
+    {"Shake Sensitivity", nullptr, actScreen_ShakeSensitivityLeft, actScreen_ShakeSensitivityRight, nullptr},
 };
 
 static void actWifi_AssetOtaChannelToggle(InputState &)

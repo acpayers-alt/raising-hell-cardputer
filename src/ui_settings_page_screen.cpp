@@ -8,6 +8,7 @@
 #include "sound.h"
 #include "sdcard.h"
 #include "save_manager.h"
+#include "motion.h"
 
 #include "display.h"
 #include "auto_screen.h"
@@ -17,7 +18,7 @@ namespace UiSettingsPages {
 
 void Handle_SCREEN(InputState& input, int move) {
   if (move != 0) {
-    const int totalItems = 2;
+    const int totalItems = 3;
     g_app.screenSettingsIndex += move;
     if (g_app.screenSettingsIndex < 0) g_app.screenSettingsIndex = totalItems - 1;
     if (g_app.screenSettingsIndex > totalItems - 1) g_app.screenSettingsIndex = 0;
@@ -49,6 +50,21 @@ void Handle_SCREEN(InputState& input, int move) {
     g_app.autoScreenIndex             = (int)autoScreenTimeoutSel;
     g_settingsFlow.settingsReturnPage = SettingsPage::SCREEN;
     g_settingsFlow.settingsPage       = SettingsPage::AUTO_SCREEN;
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
+    return;
+  }
+  if (g_app.screenSettingsIndex == 2 && (leftPulse || rightPulse)) {
+    int sel = (int)motionGetShakeSensitivity();
+    sel += (rightPulse ? 1 : -1);
+    if (sel < 0) sel = 3;
+    if (sel > 3) sel = 0;
+  
+    motionSetShakeSensitivity((uint8_t)sel);
+  
+    saveSettingsToSD();
+    saveManagerMarkDirty();
     requestUIRedraw();
     playBeep();
     clearInputLatch();

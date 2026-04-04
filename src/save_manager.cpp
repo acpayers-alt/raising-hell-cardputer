@@ -68,6 +68,7 @@
 #include "asset_ota.h"
 #include "brightness_state.h"
 #include "input.h"
+#include "motion.h"
 #include "version.h"
 
 // Include End Here
@@ -1236,6 +1237,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   const size_t OLD_SZ_5 = 5;
   const size_t OLD_SZ_7 = 7;
   const size_t OLD_SZ_8 = 8;
+  const size_t OLD_SZ_11 = 11;
 
   SettingsData tmp{};
   bool ok = false;
@@ -1254,7 +1256,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
         tmp.tzIndex = 2;
       if (tmp.autoScreenTimeoutSel > 3)
         tmp.autoScreenTimeoutSel = 0;
-
+      if (tmp.shakeSensitivitySel > 3)
+        tmp.shakeSensitivitySel = 1;
       tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
 
       tmp.soundEnabled = (tmp.soundEnabled != 0);
@@ -1263,6 +1266,38 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
       tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
       tmp.petScreenIntroFadeBootFlag = (tmp.petScreenIntroFadeBootFlag != 0);
+    }
+  }
+  else if (sz == OLD_SZ_11)
+  {
+    uint8_t old[OLD_SZ_11];
+    const int r = f.read(old, OLD_SZ_11);
+    if (r == (int)OLD_SZ_11)
+    {
+      tmp.brightnessLevel = old[0];
+      tmp.autoScreenOffEnabled = (old[1] != 0);
+      tmp.soundEnabled = (old[2] != 0);
+      tmp.wifiEnabled = (old[3] != 0);
+      tmp.tzIndex = old[4];
+      tmp.autoScreenTimeoutSel = old[5];
+      tmp.petDeathEnabled = (old[6] != 0);
+      tmp.ledAlertsEnabled = (old[7] != 0);
+      tmp.controlsHelpSeen = (old[8] != 0);
+      tmp.petPerfHudEnabled = (old[9] != 0);
+      tmp.petScreenIntroFadeBootFlag = (old[10] != 0);
+      tmp.shakeSensitivitySel = 1; // default old behavior = Low
+
+      if (tmp.brightnessLevel > 2)
+        tmp.brightnessLevel = 1;
+      if (tmp.tzIndex > 64)
+        tmp.tzIndex = 2;
+      if (tmp.autoScreenTimeoutSel > 3)
+        tmp.autoScreenTimeoutSel = 0;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+
+      ok = true;
+      loadedOld = true;
     }
   }
   else if (sz == OLD_SZ_7)
@@ -1279,6 +1314,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.autoScreenTimeoutSel = old[5];
       tmp.petDeathEnabled = (old[6] != 0);
 
+      tmp.shakeSensitivitySel = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
       tmp.petScreenIntroFadeBootFlag = 0;
@@ -1311,6 +1347,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.ledAlertsEnabled = (old[7] != 0);
 
       tmp.controlsHelpSeen = 0;
+      tmp.shakeSensitivitySel = 1;
       tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
@@ -1342,6 +1379,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
+      tmp.shakeSensitivitySel = 1;
       tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
@@ -1369,6 +1407,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
+      tmp.shakeSensitivitySel = 1;
       tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
@@ -1401,7 +1440,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   autoScreenTimeoutSel = g_settings.autoScreenTimeoutSel;
   g_app.autoScreenOffEnabled = (autoScreenTimeoutSel != 0);
-
+  motionSetShakeSensitivity(g_settings.shakeSensitivitySel);
+  
   petDeathEnabled = (g_settings.petDeathEnabled != 0);
   ledAlertsEnabled = (g_settings.ledAlertsEnabled != 0);
 
@@ -1456,6 +1496,7 @@ static bool saveSettingsToSD_internal()
 
   g_settings.brightnessLevel = brightnessLevel;
   g_settings.autoScreenOffEnabled = g_app.autoScreenOffEnabled;
+  g_settings.shakeSensitivitySel = motionGetShakeSensitivity();
   g_settings.soundEnabled = soundEnabled;
   g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
   Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
@@ -1816,7 +1857,8 @@ void saveManagerBegin()
   g_settings.soundEnabled = true;
   g_settings.wifiEnabled = 1;
   g_settings.tzIndex = 2;
-
+  g_settings.shakeSensitivitySel = 1; // Low = current behavior
+  motionSetShakeSensitivity(1);
   gameoptDefaults();
 
   DBG_ON("[SAVE] begin sizeof(SavePayload)=%u sizeof(PetPersist)=%u sizeof(InvPersist)=%u sizeof(SettingsData)=%u\n",
@@ -2435,15 +2477,14 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   profile["xp"] = pet.xp;
   profile["evoStage"] = pet.evoStage;
   profile["birthEpoch"] = g_birthEpoch;
-  
+
   char petIdBuf[24];
   snprintf(petIdBuf, sizeof(petIdBuf), "%016llX", (unsigned long long)pet.petId);
   profile["petId"] = petIdBuf;
-  
-  profile["isSleeping"] =
-      (pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
-       g_app.sleepUntilRested || g_app.sleepUntilAwakened);
-  
+
+  profile["isSleeping"] = (pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
+                           g_app.sleepUntilAwakened);
+
   JsonObject stats = profile.createNestedObject("stats");
   stats["hunger"] = pet.hunger;
   stats["happiness"] = pet.happiness;
@@ -2668,7 +2709,7 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
   pet.clampStats();
   clearNamePendingFlag();
   g_app.inventory.syncEepromNoDirty();
-  
+
   // Restore runtime sleep state from imported backup
   pet.isSleeping = importedSleeping;
   g_app.isSleeping = importedSleeping;
@@ -2678,12 +2719,12 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
   g_app.sleepTargetEnergy = 0;
   g_app.sleepStartTime = 0;
   g_app.sleepDurationMs = 0;
-  
+
   if (importedSleeping)
     saveManagerSetSleepPendingFlag();
   else
     saveManagerClearSleepPendingFlag();
-  
+
   saveManagerMarkDirty();
   saveManagerForce();
   return true;
