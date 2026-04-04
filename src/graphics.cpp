@@ -1496,7 +1496,7 @@ static constexpr int NONPET_TILE_H = 70;
 
 static bool s_petScreenIntroFadeActive = false;
 static uint32_t s_petScreenIntroFadeStartMs = 0;
-static constexpr uint32_t kPetScreenIntroFadeMs = 800;
+static constexpr uint32_t kPetScreenIntroFadeMs = 1000;
 void startPetScreenIntroFadeNow();
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
@@ -5799,13 +5799,13 @@ static void tickPetScreenIntroFade()
     g_app.petScreenIntroFadePending = false;
     s_petScreenIntroFadeActive = true;
     s_petScreenIntroFadeStartMs = millis();
-  
+
     // Ensure we start from black
-    setBacklight(0);
+    forceBacklightDuringFade(0);
     requestUIRedraw();
     return;
   }
-  
+
   if (!s_petScreenIntroFadeActive)
     return;
 
@@ -5815,21 +5815,17 @@ static void tickPetScreenIntroFade()
   if (elapsed >= kPetScreenIntroFadeMs)
   {
     s_petScreenIntroFadeActive = false;
-    setBacklight(targetBrightness);
+    forceBacklightDuringFade(targetBrightness);
     return;
   }
 
-  const uint8_t fadeBrightness =
-      (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
+  const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
 
-  setBacklight(fadeBrightness);
+  forceBacklightDuringFade(fadeBrightness);
   requestUIRedraw();
 }
 
-bool isPetScreenIntroFadeActive()
-{
-  return s_petScreenIntroFadeActive;
-}
+bool isPetScreenIntroFadeActive() { return s_petScreenIntroFadeActive; }
 
 void forceRenderUIOnce()
 {
@@ -6112,8 +6108,7 @@ void renderUI()
   // BUT if someone requested a redraw (sleep anim heartbeat, etc) we must not skip it.
   const bool redrawRequested = consumeUIRedrawRequest();
   const bool petIntroAnimating =
-      (g_app.uiState == UIState::PET_SCREEN) &&
-      (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive());
+      (g_app.uiState == UIState::PET_SCREEN) && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive());
 
   if (!tabChanged && !stateChanged && !bgInvalid && !redrawRequested && !petIntroAnimating)
   {
@@ -6129,7 +6124,7 @@ void renderUI()
     // or the pet intro wipe is animating — don't throttle.
     lastRenderTimeMs = millis();
   }
-  
+
   lastTab = tabNow;
 
   const bool redrawBg = (!bgDrawnForState) || bgInvalid;
@@ -7157,7 +7152,7 @@ static void drawDeathScreen(bool redrawBg)
   {
     s_deathScreenFadeInActive = true;
     s_deathScreenFadeInStartMs = millis();
-    setBacklight(0);
+    forceBacklightDuringFade(0);
   }
 
   if (s_deathScreenFadeInActive)
@@ -7173,7 +7168,7 @@ static void drawDeathScreen(bool redrawBg)
       applyBrightnessLevel(brightnessLevel);
 
       const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
-      setBacklight(targetBrightness);
+      forceBacklightDuringFade(targetBrightness);
     }
     else
     {
@@ -7182,7 +7177,7 @@ static void drawDeathScreen(bool redrawBg)
       Serial.printf("[DEATHX] death fade-in done targetBrightness=%u level=%d\n",
                     (unsigned)brightnessValues[brightnessLevel], (int)brightnessLevel);
 
-      setBacklight(fadeBrightness);
+      forceBacklightDuringFade(fadeBrightness);
       requestUIRedraw();
     }
   }

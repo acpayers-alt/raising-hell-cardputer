@@ -120,15 +120,12 @@ void initBacklight()
   // Cardputer backlight is handled by M5GFX; no pin init needed.
 }
 
-void setBacklight(uint8_t level)
+static void applyBacklightRaw(uint8_t level)
 {
   static uint8_t s_lastLevel = 255;
 
   if (level == s_lastLevel)
-  {
-    // No change → suppress spam
     return;
-  }
 
   s_lastLevel = level;
 
@@ -142,6 +139,24 @@ void setBacklight(uint8_t level)
   }
 
   M5Cardputer.Display.setBrightness(level);
+}
+
+void forceBacklightDuringFade(uint8_t level)
+{
+  applyBacklightRaw(level);
+}
+
+void setBacklight(uint8_t level)
+{
+  // During the pet intro fade, block outside attempts to brighten the screen.
+  // The fade code itself must use forceBacklightDuringFade().
+  if (g_app.uiState == UIState::PET_SCREEN && isPetScreenIntroFadeActive())
+  {
+    if (level > 0)
+      return;
+  }
+
+  applyBacklightRaw(level);
 }
 
 void setScreenPower(bool on)

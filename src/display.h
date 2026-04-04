@@ -77,3 +77,5 @@ void displayRememberUserBrightness(uint8_t level);
 
 uint8_t displayGetUserBrightnessLevel();
 void displayRememberUserBrightness(uint8_t level);
+
+void forceBacklightDuringFade(uint8_t level);
