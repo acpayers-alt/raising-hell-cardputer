@@ -11,21 +11,21 @@
 #include "system_status_state.h"
 
 // --- Display / UI -------------------------------------------------------------
-#include "display_state.h"
 #include "display_dims_state.h"
-#include "ui_runtime.h"
+#include "display_state.h"
 #include "ui_menu_state.h"
+#include "ui_runtime.h"
 
 // --- Rendering / animation ----------------------------------------------------
-#include "graphics.h"
 #include "anim_engine.h"
+#include "graphics.h"
 
 // --- Input / interaction ------------------------------------------------------
 #include "input.h"
 
 // --- Gameplay -----------------------------------------------------------------
-#include "pet.h"
 #include "feed.h"
+#include "pet.h"
 
 // --- Audio / feedback ---------------------------------------------------------
 #include "sound.h"
@@ -40,6 +40,10 @@
 
 // end of includes
 
+static uint8_t s_lastUserBrightnessLevel = 1;
+static bool s_batteryDimActive = false;
+static uint8_t s_batteryDimLevel = 0;         // protective dim target
+static bool s_batteryWifiForcedOff = false;   // only restore Wi-Fi if we disabled it
 
 // --- Battery smoothing + curve helpers --------------------------------------
 
@@ -160,6 +164,31 @@ void setScreenPower(bool on)
   sleepBgNotifyScreenWake();
 }
 
+static uint8_t effectiveBrightnessLevel() { return s_batteryDimActive ? s_batteryDimLevel : brightnessLevel; }
+
+static void applyEffectiveBrightness()
+{
+  const uint8_t level = effectiveBrightnessLevel();
+  applyBrightnessLevel(level);
+}
+
+static void setBatteryDimActive(bool active, uint8_t dimLevel = 0)
+{
+  s_batteryDimActive = active;
+  s_batteryDimLevel = dimLevel;
+  applyEffectiveBrightness();
+}
+
+void displayRememberUserBrightness(uint8_t level)
+{
+  s_lastUserBrightnessLevel = level;
+}
+
+uint8_t displayGetUserBrightnessLevel()
+{
+  return s_lastUserBrightnessLevel;
+}
+
 void setScreenPowerTagged(bool on, const char *file, int line)
 {
   if (Serial && Serial.availableForWrite() >= 120)
@@ -239,8 +268,8 @@ void backlightPulseEnd()
 
 // --- Battery filter state ----------------------------------------------------
 static bool s_batLogPrintedOnce = false;
-static int  s_lastLoggedPct = -999;
-static int  s_lastLoggedMv = -999;
+static int s_lastLoggedPct = -999;
+static int s_lastLoggedMv = -999;
 static bool s_lastLoggedUsb = false;
 
 static int s_hist[5] = {0};
@@ -251,32 +280,37 @@ static float s_mvEma = 0.0f;
 // USB heuristic (fast, non-sticky)
 static int s_prevMv = 0;
 static bool s_havePrevMv = false;
-static int  s_attachEvidence = 0;
-static int  s_detachEvidence = 0;
+static int s_attachEvidence = 0;
+static int s_detachEvidence = 0;
 static uint32_t s_lastUsbFlipMs = 0;
 
 void updateBattery()
 {
   static uint32_t nextMs = 0;
   const uint32_t now = millis();
-  if (now < nextMs) return;
+  if (now < nextMs)
+    return;
   nextMs = now + 250; // 4 Hz
 
   const int rawMv = (int)M5Cardputer.Power.getBatteryVoltage();
   const bool mvValid = (rawMv >= 2500 && rawMv <= 5000);
-  if (!mvValid) return;
+  if (!mvValid)
+    return;
 
   // --- smoothing pipeline ----------------------------------------------------
   s_hist[s_histIdx] = rawMv;
   s_histIdx = (s_histIdx + 1) % 5;
-  if (s_histN < 5) s_histN++;
+  if (s_histN < 5)
+    s_histN++;
 
   int mvMed = rawMv;
-  if (s_histN == 5) {
+  if (s_histN == 5)
+  {
     mvMed = median5(s_hist[0], s_hist[1], s_hist[2], s_hist[3], s_hist[4]);
   }
 
-  if (s_mvEma <= 0.0f) s_mvEma = (float)mvMed;
+  if (s_mvEma <= 0.0f)
+    s_mvEma = (float)mvMed;
   s_mvEma = s_mvEma * 0.75f + (float)mvMed * 0.25f;
 
   const int mvFilt = (int)(s_mvEma + 0.5f);
@@ -288,7 +322,8 @@ void updateBattery()
   const int pct = voltageToPercent(mvFilt);
 
   // --- USB / external power heuristic ---------------------------------------
-  if (!s_havePrevMv) {
+  if (!s_havePrevMv)
+  {
     s_prevMv = mvFilt;
     s_havePrevMv = true;
   }
@@ -298,38 +333,57 @@ void updateBattery()
 
   bool usb = usbPowered;
 
-  const bool nearTop     = (mvFilt >= 4140);
-  const bool risingHard  = (dv >= 6);
-  const bool risingSoft  = (dv >= 3);
+  const bool nearTop = (mvFilt >= 4140);
+  const bool risingHard = (dv >= 6);
+  const bool risingSoft = (dv >= 3);
   const bool fallingHard = (dv <= -8);
   const bool fallingSoft = (dv <= -4);
 
-  if (nearTop || risingHard) {
-    if (s_attachEvidence < 8) s_attachEvidence += 2;
-  } else if (risingSoft) {
-    if (s_attachEvidence < 8) s_attachEvidence += 1;
-  } else if (s_attachEvidence > 0) {
+  if (nearTop || risingHard)
+  {
+    if (s_attachEvidence < 8)
+      s_attachEvidence += 2;
+  }
+  else if (risingSoft)
+  {
+    if (s_attachEvidence < 8)
+      s_attachEvidence += 1;
+  }
+  else if (s_attachEvidence > 0)
+  {
     s_attachEvidence -= 1;
   }
 
-  if (fallingHard) {
-    if (s_detachEvidence < 8) s_detachEvidence += 2;
-  } else if (fallingSoft) {
-    if (s_detachEvidence < 8) s_detachEvidence += 1;
-  } else if (s_detachEvidence > 0) {
+  if (fallingHard)
+  {
+    if (s_detachEvidence < 8)
+      s_detachEvidence += 2;
+  }
+  else if (fallingSoft)
+  {
+    if (s_detachEvidence < 8)
+      s_detachEvidence += 1;
+  }
+  else if (s_detachEvidence > 0)
+  {
     s_detachEvidence -= 1;
   }
 
-  if (!usb) {
-    if (s_attachEvidence >= 4) {
+  if (!usb)
+  {
+    if (s_attachEvidence >= 4)
+    {
       usb = true;
       s_lastUsbFlipMs = now;
       s_attachEvidence = 0;
       s_detachEvidence = 0;
     }
-  } else {
+  }
+  else
+  {
     const bool holdElapsed = (now - s_lastUsbFlipMs) >= 1500;
-    if (holdElapsed && s_detachEvidence >= 4 && !nearTop) {
+    if (holdElapsed && s_detachEvidence >= 4 && !nearTop)
+    {
       usb = false;
       s_lastUsbFlipMs = now;
       s_attachEvidence = 0;
@@ -338,14 +392,15 @@ void updateBattery()
   }
 
   // boot-time guess so first reading is sane
-  if (!s_batLogPrintedOnce) {
+  if (!s_batLogPrintedOnce)
+  {
     usb = (mvFilt >= 4140);
     usbPowered = usb;
 
-    if (Serial.availableForWrite() >= 160) {
-      Serial.printf("[BAT] init raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d\n",
-                    rawMv, mvMed, mvFilt, dv, pct, (int)usb,
-                    s_attachEvidence, s_detachEvidence);
+    if (Serial.availableForWrite() >= 160)
+    {
+      Serial.printf("[BAT] init raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d\n", rawMv, mvMed, mvFilt,
+                    dv, pct, (int)usb, s_attachEvidence, s_detachEvidence);
     }
 
     s_batLogPrintedOnce = true;
@@ -360,7 +415,8 @@ void updateBattery()
   static bool lastUsb = false;
 
   const bool changed = (pct != lastPct) || (mvFilt != lastMv) || (usb != lastUsb);
-  if (changed) {
+  if (changed)
+  {
     batteryPercent = pct;
     usbPowered = usb;
 
@@ -383,31 +439,40 @@ void updateBattery()
   bool shouldLog = false;
   const char *reason = "";
 
-  if (usbChanged) {
+  if (usbChanged)
+  {
     shouldLog = true;
     reason = "usb";
-  } else if (pctChangedOnBattery) {
+  }
+  else if (pctChangedOnBattery)
+  {
     shouldLog = true;
     reason = "pct";
-  } else if (pctChangedOnUsb) {
+  }
+  else if (pctChangedOnUsb)
+  {
     shouldLog = true;
     reason = "pct";
-  } else if (meaningfulMvChange) {
+  }
+  else if (meaningfulMvChange)
+  {
     shouldLog = true;
     reason = "mv";
   }
 
-  if (shouldLog) {
-    if (Serial.availableForWrite() >= 160) {
-      Serial.printf("[BAT] change raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d reason=%s\n",
-                    rawMv, mvMed, mvFilt, dv, pct, (int)usb,
-                    s_attachEvidence, s_detachEvidence, reason);
+  if (shouldLog)
+  {
+    if (Serial.availableForWrite() >= 160)
+    {
+      Serial.printf("[BAT] change raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d reason=%s\n", rawMv,
+                    mvMed, mvFilt, dv, pct, (int)usb, s_attachEvidence, s_detachEvidence, reason);
     }
 
     s_lastLoggedPct = pct;
     s_lastLoggedMv = mvFilt;
     s_lastLoggedUsb = usb;
-  }}
+  }
+}
 
 void batteryProtectionTick(uint32_t now)
 {
@@ -416,31 +481,57 @@ void batteryProtectionTick(uint32_t now)
 
   const int mv = batteryVoltageMv;
 
-  const bool lowNow  = (!usbPowered && mv > 0 && mv <= 3550);
+  const bool lowNow = (!usbPowered && mv > 0 && mv <= 3550);
   const bool critNow = (!usbPowered && mv > 0 && mv <= 3475);
 
-  if (lowNow) {
-    if (!lowSinceMs) lowSinceMs = now;
-  } else {
+  if (lowNow)
+  {
+    if (!lowSinceMs)
+      lowSinceMs = now;
+  }
+  else
+  {
     lowSinceMs = 0;
   }
 
-  if (critNow) {
-    if (!critSinceMs) critSinceMs = now;
-  } else {
+  if (critNow)
+  {
+    if (!critSinceMs)
+      critSinceMs = now;
+  }
+  else
+  {
     critSinceMs = 0;
   }
 
   batteryLow = lowSinceMs && (now - lowSinceMs >= 5000);
   batteryCritical = critSinceMs && (now - critSinceMs >= 2000);
 
-  if (batteryLow) {
-    applyWifiPower(false);
-    applyBrightnessLevel(0);
+  if (batteryLow)
+  {
+    setBatteryDimActive(true, 0);
+
+    if (!s_batteryWifiForcedOff)
+    {
+      applyWifiPower(false);
+      s_batteryWifiForcedOff = true;
+    }
   }
 
-  if (batteryCritical) {
+  if (batteryCritical)
+  {
     emergencyBatteryShutdown();
+  }
+  if (!batteryLow && (now - lowSinceMs > 2000))  {
+    // Restore brightness
+    setBatteryDimActive(false);
+
+    // Restore Wi-Fi ONLY if we turned it off
+    if (s_batteryWifiForcedOff)
+    {
+      applyWifiPower(true);
+      s_batteryWifiForcedOff = false;
+    }
   }
 }
 

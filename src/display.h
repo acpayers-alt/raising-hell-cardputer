@@ -72,3 +72,8 @@ void markScreenPowerManualToggle(uint32_t now);
 
 uint32_t screenPowerLastManualToggleMs();
 void markScreenPowerManualToggle(uint32_t now);
+
+void displayRememberUserBrightness(uint8_t level);
+
+uint8_t displayGetUserBrightnessLevel();
+void displayRememberUserBrightness(uint8_t level);

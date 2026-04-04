@@ -84,6 +84,26 @@ static int titleStepEnabled(int startIdx, int dir)
 
 static void titleActivateContinue(InputState &in)
 {
+  refreshTitleMenuAvailability();
+
+  // No live save: row 0 means NEW PET, not Continue.
+  if (!s_titleHasSave)
+  {
+    saveManagerDeletePetOnly();
+    g_app.newPetFlowActive = false;
+    saveManagerClearNamePendingFlag();
+    saveManagerClearSleepPendingFlag();
+
+    uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+    requestFullUIRedraw();
+    requestUIRedraw();
+
+    inputForceClear();
+    clearInputLatch();
+    (void)in;
+    return;
+  }
+
   const bool shouldEnterSleeping =
       pet.isSleeping ||
       g_app.isSleeping ||

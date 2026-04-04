@@ -398,7 +398,7 @@ static bool bootAssetProvisionMandatory()
 
 bool g_bootUiBlockedForAssetProvision = false;
 
-static bool bootAssetProvisionRequired()
+bool bootAssetProvisionRequired()
 {
   // Never allow the boot provisioning pipeline to re-arm itself once we are
   // already past boot and assets disappear at runtime. Runtime missing-assets
@@ -949,13 +949,26 @@ void postBootInitTick()
     uiInitLevelPopupTracker();
 
     const bool setupPending = appLifecycleHasPendingOnboarding();
-    const bool firstBootWizard = !settingsLoaded || forcedFirstRun || setupPending;
-    (void)saveFileExistsNow;
 
     // Post-provision help is a UI detour only.
     // It must never erase the fact that a valid save was loaded.
     const bool loadedSaveExists = loadedFromSD;
-
+    const bool noLiveSave = !loadedSaveExists;
+    
+    // IMPORTANT:
+    // A no-save boot must land at the title menu, not get forced into the old
+    // first-boot wizard just because onboarding/time setup is pending.
+    // Keep the wizard for:
+    //   - missing settings
+    //   - explicit forced first run
+    //   - pending onboarding only when a live save actually exists
+    const bool firstBootWizard =
+        !settingsLoaded ||
+        forcedFirstRun ||
+        (setupPending && !noLiveSave);
+    
+    (void)saveFileExistsNow;
+    
     UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
 
     s_bootFinalLandingState = afterOk;
@@ -1119,67 +1132,115 @@ void postBootInitTick()
       if (!g_bootLandingDone)
       {
         Serial.printf("[BOOT] finalize direct landing=%d postBootInitDone=1 wifiApplied=%d\n",
-                      (int)s_bootFinalLandingState,
-                      g_wifiApplied ? 1 : 0);
-    
+                      (int)s_bootFinalLandingState, g_wifiApplied ? 1 : 0);
+
         finalizeBootLanding();
         return;
       }
-    
+
       g_postBootInitDone = true;
     }
-    
-    // ---------------------------------------------------------------------------
-    // Stage 3.5: Deferred boot asset provisioning
-    // ---------------------------------------------------------------------------
-    // HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
-    if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stage 3.5: Deferred boot asset provisioning
+  // ---------------------------------------------------------------------------
+  // HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
+  if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
+  {
+    g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
+    g_bootAssetProvisionMustComplete = false;
+    return;
+  }
+
+  if (bootAssetProvisionRequired())
+  {
+    const int wifiNow = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
+    const int uiNow = (int)g_app.uiState;
+    const int onboardingNow = g_bootProvisionWifiOnboardingStarted ? 1 : 0;
+    const int activeNow = g_bootAssetProvisionActive ? 1 : 0;
+  
+    static int s_prevAssetStage35Ui = -1;
+    static int s_prevAssetStage35Wifi = -1;
+    static int s_prevAssetStage35Onboarding = -1;
+    static int s_prevAssetStage35Active = -1;
+  
+    const bool changed =
+        (uiNow != s_prevAssetStage35Ui) ||
+        (wifiNow != s_prevAssetStage35Wifi) ||
+        (onboardingNow != s_prevAssetStage35Onboarding) ||
+        (activeNow != s_prevAssetStage35Active);
+  
+    if (changed)
     {
-      g_bootAssetProvisionActive = false;
-      g_bootUiBlockedForAssetProvision = false;
-      g_bootAssetProvisionMustComplete = false;
+      Serial.printf(
+          "[BOOT][ASSET_STAGE35] required=%d deferred=%d must=%d blocked=%d active=%d wifi=%d ui=%d onboarding=%d\n",
+          bootAssetProvisionRequired() ? 1 : 0,
+          g_bootLandingDeferredForAssetProvision ? 1 : 0,
+          g_bootAssetProvisionMustComplete ? 1 : 0,
+          g_bootUiBlockedForAssetProvision ? 1 : 0,
+          activeNow,
+          wifiNow,
+          uiNow,
+          onboardingNow);
+  
+      s_prevAssetStage35Ui = uiNow;
+      s_prevAssetStage35Wifi = wifiNow;
+      s_prevAssetStage35Onboarding = onboardingNow;
+      s_prevAssetStage35Active = activeNow;
+    }
+  
+    if (bootAssetProvisionRequired() &&
+        g_bootLandingDeferredForAssetProvision &&
+        !g_bootAssetProvisionActive &&
+        !g_bootProvisionWifiOnboardingStarted &&
+        WiFi.status() == WL_CONNECTED &&
+        g_app.uiState != UIState::BOOT)
+    {
+      Serial.printf("[BOOT][ASSET_STAGE35] forcing return to BOOT from ui=%d\n", (int)g_app.uiState);
+      uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
       return;
     }
+  
+    // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
+    if (bootAssetProvisionWifiOnboardingActive())
+      return;
+  
+    // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
+    if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
+      return;
+  
+    if (runBootAssetProvision())
+      return;
+  }
 
-    if (bootAssetProvisionRequired())
+  if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
+  {
+    g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
+    finalizeBootLanding();
+    return;
+  }
+
+    //   // ---------------------------------------------------------------------------
+  // Stage 4: Persist time anchor once we have synced time
+  // ---------------------------------------------------------------------------
+  if (!g_ntpSaved && timeIsSynced())
+  {
+    g_ntpSaved = true;
+    saveTimeAnchor();
+
+    // If boot was paused for time recovery, time is now valid and we may still
+    // be sitting on the splash/BOOT state without ever completing the normal
+    // post-boot landing. Finish that handoff now.
+    if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
     {
-      // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
-      if (bootAssetProvisionWifiOnboardingActive())
-        return;
-
-      // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
-      if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
-        return;
-
-      if (runBootAssetProvision())
-        return;
-    }
-
-    if (g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
-    {
-      g_bootAssetProvisionActive = false;
-      g_bootUiBlockedForAssetProvision = false;
+      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
       finalizeBootLanding();
       return;
-    }
-
-    // ---------------------------------------------------------------------------
-    // Stage 4: Persist time anchor once we have synced time
-    // ---------------------------------------------------------------------------
-    if (!g_ntpSaved && timeIsSynced())
-    {
-      g_ntpSaved = true;
-      saveTimeAnchor();
-
-      // If boot was paused for time recovery, time is now valid and we may still
-      // be sitting on the splash/BOOT state without ever completing the normal
-      // post-boot landing. Finish that handoff now.
-      if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
-      {
-        Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
-        finalizeBootLanding();
-        return;
-      }
     }
   }
 }

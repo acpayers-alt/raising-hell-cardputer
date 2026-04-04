@@ -19,15 +19,9 @@ namespace UiSettingsPages
 static bool s_newPetConfirmActive = false;
 static int s_newPetConfirmIndex = 0; // 0 = YES (store first), 1 = NO
 
-bool GameNewPetConfirmActive()
-{
-  return s_newPetConfirmActive;
-}
+bool GameNewPetConfirmActive() { return s_newPetConfirmActive; }
 
-int GameNewPetConfirmIndex()
-{
-  return s_newPetConfirmIndex;
-}
+int GameNewPetConfirmIndex() { return s_newPetConfirmIndex; }
 
 void ShowGameNewPetConfirm()
 {
@@ -35,15 +29,9 @@ void ShowGameNewPetConfirm()
   s_newPetConfirmIndex = 0;
 }
 
-void HideGameNewPetConfirm()
-{
-  s_newPetConfirmActive = false;
-}
+void HideGameNewPetConfirm() { s_newPetConfirmActive = false; }
 
-void SetGameNewPetConfirmIndex(int idx)
-{
-  s_newPetConfirmIndex = (idx != 0) ? 1 : 0;
-}
+void SetGameNewPetConfirmIndex(int idx) { s_newPetConfirmIndex = (idx != 0) ? 1 : 0; }
 
 void Handle_GAME(InputState &input, int move)
 {
@@ -100,7 +88,9 @@ void Handle_GAME(InputState &input, int move)
 
       s_newPetConfirmActive = false;
       playBeep();
-      saveManagerStartFreshPetFlow();
+      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
       clearInputLatch();
       return;
     }

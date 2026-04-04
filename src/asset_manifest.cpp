@@ -316,17 +316,59 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
 
   uint8_t buf[1024];
   size_t total = 0;
+  uint32_t idleStartMs = 0;
+
   while (true)
   {
-    size_t n = stream->readBytes((char *)buf, sizeof(buf));
-    if (n == 0)
+    const size_t toRead =
+        (contentLen > 0)
+            ? min(sizeof(buf), (size_t)max(0, contentLen - (int)total))
+            : sizeof(buf);
+
+    if (contentLen > 0 && total >= (size_t)contentLen)
       break;
+
+    size_t n = stream->readBytes((char *)buf, toRead);
+
+    if (n == 0)
+    {
+      if (idleStartMs == 0)
+        idleStartMs = millis();
+
+      // If server gave us a content length, do not accept a short file.
+      if (contentLen > 0)
+      {
+        if ((millis() - idleStartMs) < 5000)
+        {
+          delay(10);
+          continue;
+        }
+
+        Serial.printf("[OTA WL] fail: truncated download total=%u expected=%u\n",
+                      (unsigned)total, (unsigned)contentLen);
+        out.close();
+        SD.remove(tmpManifestPath);
+        http.end();
+        return false;
+      }
+
+      // Unknown length: allow a short idle period before treating it as EOF.
+      if ((millis() - idleStartMs) < 1000)
+      {
+        delay(10);
+        continue;
+      }
+
+      break;
+    }
+
+    idleStartMs = 0;
 
     size_t wrote = out.write(buf, n);
     if (wrote != n)
     {
-      Serial.printf("[OTA WL] fail: temp write total=%u wrote=%u want=%u\n", (unsigned)total, (unsigned)wrote,
-                    (unsigned)n);
+      Serial.printf("[OTA WL] fail: temp write total=%u wrote=%u want=%u\n",
+                    (unsigned)total, (unsigned)wrote, (unsigned)n);
       out.close();
       SD.remove(tmpManifestPath);
       http.end();
@@ -336,7 +378,8 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
     total += n;
     if ((total % 8192) == 0)
     {
-      Serial.printf("[OTA WL] download progress=%u/%u\n", (unsigned)total,
+      Serial.printf("[OTA WL] download progress=%u/%u\n",
+                    (unsigned)total,
                     (unsigned)((contentLen > 0) ? contentLen : 0));
     }
   }
@@ -345,7 +388,17 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
   out.close();
   http.end();
 
-  Serial.printf("[OTA WL] temp saved bytes=%u\n", (unsigned)total);
+  Serial.printf("[OTA WL] temp saved bytes=%u expected=%u\n",
+                (unsigned)total,
+                (unsigned)((contentLen > 0) ? contentLen : 0));
+
+  if (contentLen > 0 && total != (size_t)contentLen)
+  {
+    Serial.printf("[OTA WL] fail: saved size mismatch total=%u expected=%u\n",
+                  (unsigned)total, (unsigned)contentLen);
+    SD.remove(tmpManifestPath);
+    return false;
+  }
 
   File mf = SD.open(tmpManifestPath, FILE_READ);
   if (!mf)
@@ -473,11 +526,50 @@ static bool saveStreamToFile(Stream &input, const char *path, size_t contentLen)
   uint8_t buf[kBufSize];
   size_t total = 0;
 
+  uint32_t idleStartMs = 0;
+
   while (true)
   {
-    size_t n = input.readBytes((char *)buf, sizeof(buf));
-    if (n == 0)
+    const size_t toRead =
+        (contentLen > 0)
+            ? min(sizeof(buf), (size_t)max((size_t)0, contentLen - total))
+            : sizeof(buf);
+
+    if (contentLen > 0 && total >= contentLen)
       break;
+
+    size_t n = input.readBytes((char *)buf, toRead);
+
+    if (n == 0)
+    {
+      if (idleStartMs == 0)
+        idleStartMs = millis();
+
+      if (contentLen > 0)
+      {
+        if ((millis() - idleStartMs) < 5000)
+        {
+          delay(10);
+          continue;
+        }
+
+        Serial.printf("[OTA] manifest temp save truncated total=%u expected=%u\n",
+                      (unsigned)total, (unsigned)contentLen);
+        f.close();
+        SD.remove(path);
+        return false;
+      }
+
+      if ((millis() - idleStartMs) < 1000)
+      {
+        delay(10);
+        continue;
+      }
+
+      break;
+    }
+
+    idleStartMs = 0;
 
     size_t wrote = f.write(buf, n);
     if (wrote != n)
@@ -492,16 +584,26 @@ static bool saveStreamToFile(Stream &input, const char *path, size_t contentLen)
 
     if ((total % 8192) == 0)
     {
-      Serial.printf("[OTA] manifest download progress=%u/%u\n", (unsigned)total, (unsigned)contentLen);
+      Serial.printf("[OTA] manifest download progress=%u/%u\n",
+                    (unsigned)total, (unsigned)contentLen);
     }
   }
 
   f.flush();
   f.close();
 
-  Serial.printf("[OTA] manifest temp file saved bytes=%u\n", (unsigned)total);
-  return total > 0;
-}
+  Serial.printf("[OTA] manifest temp file saved bytes=%u expected=%u\n",
+                (unsigned)total, (unsigned)contentLen);
+
+  if (contentLen > 0 && total != contentLen)
+  {
+    Serial.printf("[OTA] manifest temp file size mismatch total=%u expected=%u\n",
+                  (unsigned)total, (unsigned)contentLen);
+    SD.remove(path);
+    return false;
+  }
+
+  return total > 0;}
 
 static bool parseManifestJson(Stream &input, size_t contentLen, AssetManifestData *out)
 {

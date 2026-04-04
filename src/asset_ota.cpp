@@ -26,10 +26,7 @@
 // Worklist helpers
 // -----------------------------------------------------------------------------
 
-const char *assetOtaWorklistPath()
-{
-  return "/raising_hell/ota/worklist.txt";
-}
+const char *assetOtaWorklistPath() { return "/raising_hell/ota/worklist.txt"; }
 
 bool assetOtaWorklistClear()
 {
@@ -40,7 +37,8 @@ bool assetOtaWorklistClear()
 
 bool assetOtaWorklistOpenRead(File *out)
 {
-  if (!out) return false;
+  if (!out)
+    return false;
   *out = SD.open(assetOtaWorklistPath(), FILE_READ);
   return (bool)(*out);
 }
@@ -68,13 +66,14 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
     while (true)
     {
       int c = in.read();
-      if (c < 0) break;
-      if (c == '\n') break;
+      if (c < 0)
+        break;
+      if (c == '\n')
+        break;
 
       if (line.length() >= 255)
       {
-        Serial.printf("[OTA WL READ] ERROR: line too long pos=%ld size=%u\n",
-                      (long)in.position(), (unsigned)in.size());
+        Serial.printf("[OTA WL READ] ERROR: line too long pos=%ld size=%u\n", (long)in.position(), (unsigned)in.size());
         return false;
       }
 
@@ -83,16 +82,14 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 
     if (line.length() == 0)
     {
-      Serial.printf("[OTA WL READ] stop: empty read pos=%ld size=%u\n",
-                    (long)in.position(), (unsigned)in.size());
+      Serial.printf("[OTA WL READ] stop: empty read pos=%ld size=%u\n", (long)in.position(), (unsigned)in.size());
       return false;
     }
 
     line.trim();
     if (line.length() == 0)
     {
-      Serial.printf("[OTA WL READ] stop: blank line pos=%ld size=%u\n",
-                    (long)in.position(), (unsigned)in.size());
+      Serial.printf("[OTA WL READ] stop: blank line pos=%ld size=%u\n", (long)in.position(), (unsigned)in.size());
       return false;
     }
 
@@ -101,14 +98,14 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 
     if (tab1 <= 0 || tab2 <= tab1)
     {
-      Serial.printf("[OTA WL READ] malformed line pos=%ld size=%u line='%s'\n",
-                    (long)in.position(), (unsigned)in.size(), line.c_str());
+      Serial.printf("[OTA WL READ] malformed line pos=%ld size=%u line='%s'\n", (long)in.position(),
+                    (unsigned)in.size(), line.c_str());
       return false;
     }
 
-    String path    = line.substring(0, tab1);
+    String path = line.substring(0, tab1);
     String sizeStr = line.substring(tab1 + 1, tab2);
-    String sha     = line.substring(tab2 + 1);
+    String sha = line.substring(tab2 + 1);
 
     path.trim();
     sizeStr.trim();
@@ -116,8 +113,7 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 
     if (sha.length() != 64)
     {
-      Serial.printf("[OTA WL READ] bad sha len=%u path='%s'\n",
-                    (unsigned)sha.length(), path.c_str());
+      Serial.printf("[OTA WL READ] bad sha len=%u path='%s'\n", (unsigned)sha.length(), path.c_str());
       return false;
     }
 
@@ -135,10 +131,10 @@ bool assetOtaWorklistReadNext(File &in, AssetManifestFile *out)
 // -----------------------------------------------------------------------------
 
 static AssetOtaConfig s_cfg{};
-static AssetOtaState  s_state{};
+static AssetOtaState s_state{};
 
 static AssetOtaStatus s_status = AssetOtaStatus::IDLE;
-static AssetOtaError  s_lastErr = AssetOtaError::NONE;
+static AssetOtaError s_lastErr = AssetOtaError::NONE;
 
 static String s_installedVersion;
 
@@ -151,8 +147,7 @@ static bool s_assetOtaConfirmActive = false;
 // URL resolution
 // -----------------------------------------------------------------------------
 
-static String assetFileResolvedUrl(const String &packVersion,
-                                   const AssetManifestFile &f)
+static String assetFileResolvedUrl(const String &packVersion, const AssetManifestFile &f)
 {
   String url;
 
@@ -163,12 +158,14 @@ static String assetFileResolvedUrl(const String &packVersion,
   else
     url = "https://assets.raisinghellgame.com/assets/";
 
-  if (!url.endsWith("/")) url += "/";
+  if (!url.endsWith("/"))
+    url += "/";
 
   if (packVersion.length())
   {
     url += packVersion;
-    if (!url.endsWith("/")) url += "/";
+    if (!url.endsWith("/"))
+      url += "/";
   }
 
   url += f.path;
@@ -824,9 +821,8 @@ bool assetOtaCheckNow(String *outMessage)
     const char *tmpManifestPath = assetManifestTempPath();
     const char *localManifestPath = assetOtaLocalManifestPath();
 
-    Serial.printf("[OTA] pre-promote tmp exists=%d local exists=%d\n",
-      SD.exists(tmpManifestPath) ? 1 : 0,
-      SD.exists(assetOtaLocalManifestPath()) ? 1 : 0);
+    Serial.printf("[OTA] pre-promote tmp exists=%d local exists=%d\n", SD.exists(tmpManifestPath) ? 1 : 0,
+                  SD.exists(assetOtaLocalManifestPath()) ? 1 : 0);
 
     if (!SD.exists(tmpManifestPath))
     {
@@ -988,6 +984,10 @@ bool assetOtaCheckNow(String *outMessage)
 
         Serial.printf("[OTA] file attempt %d/3: %s\n", attempt, rel.c_str());
 
+        // Force heap churn to avoid TLS reuse bugs
+        delay(1);
+        yield();
+
         String url = assetFileResolvedUrl(remotePackVersion, dlFile);
         if (assetDownloadToStaging(url, dlFile, &stagingPath, &dlErr))
         {
@@ -997,11 +997,29 @@ bool assetOtaCheckNow(String *outMessage)
 
         Serial.printf("[OTA] file attempt failed: %s\n", dlErr.c_str());
 
-        delay(500);
+        if (dlErr.indexOf("HTTP -1") >= 0)
+        {
+          Serial.println("[OTA] detected connection-level failure, extending recovery window");
+          delay(800);
+          yield();
+        }
 
+        // --- HARD RESET GAP BETWEEN ATTEMPTS ---
+        int backoff = 200 * attempt; // 200ms, 400ms, 600ms
+        delay(backoff);
+        yield();
+
+        // Let WiFi/TCP stack stabilize
         uint32_t waitStart = millis();
         while (!wifiIsConnectedNow() && (millis() - waitStart) < 5000)
-          delay(100);
+        {
+          delay(50);
+          yield();
+        }
+
+        // Extra settle time EVEN IF CONNECTED (important)
+        delay(200);
+        yield();
       }
 
       if (!dlOk)

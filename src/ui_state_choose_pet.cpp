@@ -14,6 +14,7 @@
 #include "graphics.h"
 #include "ui_actions.h"
 #include "save_manager.h"
+#include "ui_level_popup.h"
 
 static bool s_prevSelectHeld = false;
 
@@ -178,8 +179,26 @@ void uiChoosePetHandle(InputState& in)
   }
 
   // Select to proceed to HATCHING (NOT directly to name)
-  if (enterEdge)
+  if (enterEdge || in.selectOnce || in.encoderPressOnce)
   {
+    // Seed a REAL newborn pet payload here.
+    saveManagerDeletePetOnly();
+    saveManagerNewPetNoSave();
+
+    petResetUpdateTimers();
+    uiInitLevelPopupTracker();
+    uiResetLevelUpPopupState();
+
+    // Apply the chosen egg type on top of the newborn defaults.
+    pet.type = g_pendingPetType;
+    pet.evoStage = 0;
+    pet.level = 1;
+    pet.xp = 0;
+    pet.clampStats();
+
+    // Name flow is still pending after hatch.
+    g_app.newPetFlowActive = true;
+
     // Ensure text capture is off while hatching (name flow enables it later)
     inputSetTextCapture(false);
     g_textCaptureMode = false;

@@ -314,15 +314,11 @@ static void actScreen_AutoScreenSelect(InputState &)
 
 static void actScreen_ShakeSensitivityLeft(InputState &)
 {
-  int sel = (int)motionGetShakeSensitivity();
-  sel += (rightPulse ? 1 : -1);
-
+  int sel = (int)motionGetShakeSensitivity() - 1;
   if (sel < 0)
     sel = 3;
-  if (sel > 3)
-    sel = 0;
 
-  motionSetShakeSensitivity(sel);
+  motionSetShakeSensitivity((uint8_t)sel);
   saveSettingsToSD();
   saveManagerMarkDirty();
   requestUIRedraw();
@@ -333,7 +329,7 @@ static void actScreen_ShakeSensitivityLeft(InputState &)
 static void actScreen_ShakeSensitivityRight(InputState &)
 {
   int sel = (int)motionGetShakeSensitivity() + 1;
-  if (sel > 2)
+  if (sel > 3)
     sel = 0;
 
   motionSetShakeSensitivity((uint8_t)sel);
@@ -813,7 +809,7 @@ bool Handle(InputState &input, int move)
   // ------------------------------------------------------------
   // New Pet confirm modal (Pet Options)
   // ------------------------------------------------------------
-  if (g_settingsFlow.settingsPage == SettingsPage::PET && UiSettingsPages::GameNewPetConfirmActive())
+  if (UiSettingsPages::GameNewPetConfirmActive())
   {
     if (input.leftOnce || input.upOnce)
     {
@@ -861,7 +857,18 @@ bool Handle(InputState &input, int move)
 
       UiSettingsPages::HideGameNewPetConfirm();
       playBeep();
-      saveManagerStartFreshPetFlow();
+      
+      // wipe any existing runtime pet BEFORE starting new flow
+      saveManagerDeletePetOnly();
+
+      g_app.newPetFlowActive = false;
+      saveManagerClearNamePendingFlag();
+            
+      // Now enter egg selection clean
+      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+      
+      requestFullUIRedraw();
+      requestUIRedraw();
       clearInputLatch();
       return true;
     }

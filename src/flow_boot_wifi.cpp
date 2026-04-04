@@ -28,9 +28,9 @@
 #include "launcher_wifi_import.h"
 #include "save_manager.h"
 #include "settings_state.h"
+#include "ui_state_wifi_connect_wait.h"
 #include "wifi_setup_state.h"
 #include "wifi_store.h"
-#include "ui_state_wifi_connect_wait.h"
 
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
@@ -42,6 +42,7 @@ extern Tab g_bootWizardAfterOkTab;
 static bool s_bootWifiImported = false;
 static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
+bool bootAssetProvisionRequired();
 
 void bootWifiSetImportedInfo(const char *ssid)
 {
@@ -485,10 +486,7 @@ void uiBootWifiWaitHandle(InputState &in)
     else
     {
       Serial.printf("[WIFI] boot flow skip save: setupPassLen=%u gpassLen=%u setupSsid='%s' gssid='%s'\n",
-                    (unsigned)strlen(wifiSetupPass),
-                    (unsigned)strlen(g_wifi.pass),
-                    wifiSetupSsid,
-                    g_wifi.ssid);
+                    (unsigned)strlen(wifiSetupPass), (unsigned)strlen(g_wifi.pass), wifiSetupSsid, g_wifi.ssid);
     }
 
     const bool tzDetected = bootTryDetectTimezoneFromWifi();
@@ -540,23 +538,35 @@ void uiBootNtpWaitHandle(InputState &in)
 
   if (timeIsSynced())
   {
-    Serial.printf("[BOOTWIFI] NTP synced -> returning to final state afterOk=%d\n",
-                  (int)g_bootWizardAfterOkState);
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
 
     bootSetupClearPendingFlag();
     Serial.println("[BOOTWIFI] cleared boot setup pending");
 
     ui_setBootSplashActive(false);
 
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
+    if (bootAssetProvisionRequired())
+    {
+      Serial.printf("[BOOTWIFI] NTP synced -> returning to BOOT for deferred asset provisioning afterOk=%d\n",
+                    (int)g_bootWizardAfterOkState);
+
+      g_bootProvisionWifiOnboardingStarted = false;
+
+      uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
+      return;
+    }
+
+    Serial.printf("[BOOTWIFI] NTP synced -> returning to final state afterOk=%d\n", (int)g_bootWizardAfterOkState);
 
     uiActionEnterState(g_bootWizardAfterOkState, g_bootWizardAfterOkTab, true);
     requestFullUIRedraw();
     requestUIRedraw();
     return;
   }
-        
+
   uiActionSwallowAll(in);
 }

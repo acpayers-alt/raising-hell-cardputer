@@ -49,6 +49,7 @@
 
 // UI / rendering
 #include "display_state.h"
+#include "display.h"
 #include "graphics.h"
 #include "ui_actions.h"
 #include "ui_invalidate.h"
@@ -737,32 +738,29 @@ static void rotateSaveBackups()
 
 static void forceChoosePetFlowFromBoot()
 {
-  // Starting a brand-new pet lifecycle.
-  // Reset *all* runtime state (including inventory) to defaults so nothing can
-  // carry over from a previous pet (death path, deleted saves, etc.).
-  newPetInternalNoSave(/*resetName=*/true);
+  // Clean slate: absolutely no live pet should exist before egg selection.
+  saveManagerDeletePetOnly();
+
+  g_app.newPetFlowActive = false;
+  clearNamePendingFlag();
+  clearSleepPendingFlag();
 
   inputSetTextCapture(false);
   g_textCaptureMode = false;
 
-  // IMPORTANT:
-  // Do NOT clear the pending-name flag here.
-  // Choose-pet is still part of the unfinished first-boot/new-pet flow.
-  // The pending-name flag must survive until the pet is actually finalized
-  // from NAME_PET.
-  // clearNamePendingFlag();
-
   g_choosePetInputUnlockMs = millis() + 350;
   g_choosePetBlockHatchUntilRelease = true;
-  // Go to Choose Pet flow state
+
   uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
   g_app.uiNeedsRedraw = true;
 
-  // Clear latches
   clearInputLatch();
 }
 
-void saveManagerStartFreshPetFlow() { forceChoosePetFlowFromBoot(); }
+void saveManagerStartFreshPetFlow()
+{
+  forceChoosePetFlowFromBoot();
+}
 
 void saveManagerAbortFreshPetFlow()
 {
@@ -1436,12 +1434,13 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   g_settings = tmp;
 
   brightnessLevel = g_settings.brightnessLevel;
+  displayRememberUserBrightness(brightnessLevel);
   soundEnabled = (g_settings.soundEnabled != 0);
 
   autoScreenTimeoutSel = g_settings.autoScreenTimeoutSel;
   g_app.autoScreenOffEnabled = (autoScreenTimeoutSel != 0);
   motionSetShakeSensitivity(g_settings.shakeSensitivitySel);
-  
+
   petDeathEnabled = (g_settings.petDeathEnabled != 0);
   ledAlertsEnabled = (g_settings.ledAlertsEnabled != 0);
 
@@ -1494,7 +1493,7 @@ static bool saveSettingsToSD_internal()
   if (!ensureSaveDir())
     return false;
 
-  g_settings.brightnessLevel = brightnessLevel;
+  g_settings.brightnessLevel = displayGetUserBrightnessLevel();
   g_settings.autoScreenOffEnabled = g_app.autoScreenOffEnabled;
   g_settings.shakeSensitivitySel = motionGetShakeSensitivity();
   g_settings.soundEnabled = soundEnabled;
@@ -1560,19 +1559,48 @@ static void newPetInternalNoSave(bool resetName)
 
 static void resetRuntimeToCleanNoSaveState(bool resetName)
 {
-  SavePayload p = makeDefaultSavePayload();
-  unpack(p);
+  (void)resetName;
 
-  // This is NOT an active new-pet flow.
-  // Do not arm name-pending, do not create a resumable flow state.
-  if (resetName)
-  {
-    pet.name[0] = '\0';
-  }
+  // ------------------------------------------------------------------
+  // TRUE no-save state:
+  // No pet payload, no stats, nothing that could be persisted.
+  // ------------------------------------------------------------------
 
-  // Keep decay mode sane for a clean no-save boot.
+  // Completely clear pet runtime
+  pet = Pet();
+
+  // Clear all sleep/runtime flags
+  g_app.isSleeping = false;
+  g_app.sleepingByTimer = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+
+  // No birth time
+  g_birthEpoch = 0;
+
+  // Clean inventory
+  g_app.inventory.init();
+  g_app.inventory.selectedIndex = 0;
+  g_app.inventory.syncEepromNoDirty();
+
+  // Not in new pet flow
+  g_app.newPetFlowActive = false;
+
+  // Ensure no pending flags exist
+  clearNamePendingFlag();
+  clearSleepPendingFlag();
+
+  // Keep decay sane
   g_gameopt.decayMode = 2;
   saveGameOptionsToSD_internal();
+
+  // CRITICAL: do NOT mark dirty
+  dirty = false;
+
+  Serial.println("[SAVE] runtime reset to TRUE no-save state");
 }
 
 static void clearNamePendingFlag()
@@ -1796,6 +1824,13 @@ static bool saveSaveToSD_internal()
   // CHOOSE_PET / NAME_PET is still in progress, so save.bin must not be created.
   // Never persist during new-pet flow.
   // If name_pending.flag exists, the pet is not finalized yet.
+  // HARD BLOCK: do not save if there is no valid pet
+  if (g_birthEpoch == 0)
+  {
+    Serial.println("[SAVE] SKIP (no active pet)");
+    return true;
+  }
+
   if (namePendingFlagExists())
   {
     static uint32_t lastSkipLogMs = 0;

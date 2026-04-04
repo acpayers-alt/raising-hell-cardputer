@@ -149,6 +149,14 @@ static void drawButton(int x, int y, int w, int h, const char *label, bool selec
 // Level-Up Popup helpers
 static bool g_levelUpPopupActive = false;
 static uint16_t g_levelUpPopupLevel = 0;
+void uiInitLevelPopupTracker();
+void uiResetLevelUpPopupState();
+
+void uiResetLevelUpPopupState()
+{
+  g_levelUpPopupActive = false;
+  g_levelUpPopupLevel = 0;
+}
 
 // Utility: toast message overlay (timed)
 static bool g_toastActive = false;
@@ -5778,15 +5786,13 @@ static void tickPetScreenIntroFade()
 {
   if (g_app.uiState != UIState::PET_SCREEN)
   {
-    if (s_petScreenIntroFadeActive)
-    {
-      s_petScreenIntroFadeActive = false;
-      applyBrightnessLevel(brightnessLevel);
-    }
+    // Do NOT cancel the fade during transient state changes.
+    // Early boot / landing can briefly bounce through other states, and
+    // canceling here causes a snap to full brightness that looks like flashing.
     return;
   }
 
-  if (g_app.petScreenIntroFadePending)
+  if (g_app.petScreenIntroFadePending && !s_petScreenIntroFadeActive)
   {
     g_app.petScreenIntroFadePending = false;
     s_petScreenIntroFadeActive = true;
@@ -5804,15 +5810,18 @@ static void tickPetScreenIntroFade()
   if (elapsed >= kPetScreenIntroFadeMs)
   {
     s_petScreenIntroFadeActive = false;
-    applyBrightnessLevel(brightnessLevel);
     setBacklight(targetBrightness);
     return;
   }
 
-  const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
+  uint8_t fadeBrightness =
+      (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
+
+  // Avoid spending too long at absolute black once fade has started.
+  if (fadeBrightness == 0 && elapsed > 0)
+    fadeBrightness = 1;
 
   setBacklight(fadeBrightness);
-  requestUIRedraw();
 }
 
 void forceRenderUIOnce()

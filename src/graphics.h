@@ -68,6 +68,7 @@ void drawTitleMenuScreen(bool redrawBg);
 void controlsHelpResetScroll();
 bool controlsHelpScrollUp();
 bool controlsHelpScrollDown();
+void uiResetLevelUpPopupState();
 
 // Console
 void drawConsoleMenu();
