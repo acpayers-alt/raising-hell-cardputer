@@ -13,6 +13,7 @@
 #include "save_manager.h"
 #include "boot_pipeline.h"
 #include "ui_actions.h"
+#include "display.h"
 
 void beginNamePetFlow()
 {
@@ -56,10 +57,8 @@ void finalizeNewPetFromName(InputState& in)
 
   g_app.newPetFlowActive = false;
   g_app.petScreenIntroFadePending = true;
-
-  // Leave NAME flow and go back to pet screen
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-  
+        
   requestUIRedraw();
   invalidateBackgroundCache();
   requestUIRedraw();

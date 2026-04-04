@@ -10,10 +10,10 @@
 #include "boot_pipeline.h"
 #include "display.h"
 #include "display_dims_state.h"
+#include "motion.h"
 #include "sdcard.h"
 #include "tft_compat.h"
 #include <ctype.h>
-#include "motion.h"
 
 // -----------------------------------------------------------------------------
 // Arduino / Std Libs
@@ -1458,6 +1458,7 @@ static void drawPetScreenImpl(bool redrawBg);
 static void drawMiniStatPreview();
 static void listWindow(int total, int current, int maxVisible, int &start, int &count);
 static void drawCurrentScreen(bool redrawBg);
+static void drawPetScreenIntroFadeOverlay();
 static void drawDeathScreen(bool redrawBg);
 static void drawDeathTransitionScreen(bool redrawBg);
 static void drawWifiSetupScreen();
@@ -1494,9 +1495,8 @@ static PetType s_nonPetTileCachedType = (PetType)255;
 static constexpr int NONPET_TILE_W = 35;
 static constexpr int NONPET_TILE_H = 70;
 
-static bool s_petScreenIntroFadeActive = false;
 static uint32_t s_petScreenIntroFadeStartMs = 0;
-static constexpr uint32_t kPetScreenIntroFadeMs = 700;
+static constexpr uint32_t kPetScreenIntroFadeMs = 800;
 
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
@@ -2747,12 +2747,12 @@ static void drawScreenSettingsMenu()
   snprintf(aLine, sizeof(aLine), "Auto Screen: %s", autoScreenToText((uint8_t)autoScreenTimeoutSel));
 
   char sLine[32];
-snprintf(sLine, sizeof(sLine), "Shake to Wake: %s", motionShakeSensitivityToText(motionGetShakeSensitivity()));
+  snprintf(sLine, sizeof(sLine), "Shake to Wake: %s", motionShakeSensitivityToText(motionGetShakeSensitivity()));
 
-const char *labels[] = {bLine, aLine, sLine};
-const int totalItems = 3;
+  const char *labels[] = {bLine, aLine, sLine};
+  const int totalItems = 3;
 
-g_app.screenSettingsIndex = clampi(g_app.screenSettingsIndex, 0, totalItems - 1);
+  g_app.screenSettingsIndex = clampi(g_app.screenSettingsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;
@@ -4989,9 +4989,7 @@ static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, u
   Serial.println("[SLEEP CACHE] disabled on no-PSRAM build");
   return false;
 
-  if (s_sleepAnimFrameCacheReady &&
-      s_sleepAnimFrameCache &&
-      s_sleepAnimFrameCacheMode == mode &&
+  if (s_sleepAnimFrameCacheReady && s_sleepAnimFrameCache && s_sleepAnimFrameCacheMode == mode &&
       s_sleepAnimFrameCacheCnt == frameCount)
   {
     return true;
@@ -5001,8 +4999,7 @@ static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, u
   const size_t bufBytes = pxCount * sizeof(uint16_t);
   const size_t totalNeeded = bufBytes * frameCount;
 
-  if (ESP.getPsramSize() == 0 ||
-      heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) < (totalNeeded + 4096))
+  if (ESP.getPsramSize() == 0 || heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) < (totalNeeded + 4096))
   {
     return false;
   }
@@ -5236,7 +5233,7 @@ static void drawSleepScreenImpl(bool redrawBg)
     Serial.printf("[HEAPCHK] sleep-draw pre-bg free=%u largest=%u\n",
                   (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
-                  
+
     if (s_mode != 0 && frames && frameCount > 0)
     {
       if (ensureSleepAnimFrameCache(s_mode, frames, frameCount, 0, 18))
@@ -5786,9 +5783,8 @@ static void tickPetScreenIntroFade()
 {
   if (g_app.uiState != UIState::PET_SCREEN)
   {
-    // Do NOT cancel the fade during transient state changes.
-    // Early boot / landing can briefly bounce through other states, and
-    // canceling here causes a snap to full brightness that looks like flashing.
+    s_petScreenIntroFadeActive = false;
+    g_app.petScreenIntroFadePending = false;
     return;
   }
 
@@ -5797,31 +5793,67 @@ static void tickPetScreenIntroFade()
     g_app.petScreenIntroFadePending = false;
     s_petScreenIntroFadeActive = true;
     s_petScreenIntroFadeStartMs = millis();
-    setBacklight(0);
+
+    // PET screen should already be using the normal target brightness.
+    setBacklight((uint8_t)brightnessValues[brightnessLevel]);
+
+    requestUIRedraw();
+    return;
   }
 
   if (!s_petScreenIntroFadeActive)
     return;
 
-  const uint32_t now = millis();
-  const uint32_t elapsed = now - s_petScreenIntroFadeStartMs;
-  const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
-
+  const uint32_t elapsed = millis() - s_petScreenIntroFadeStartMs;
   if (elapsed >= kPetScreenIntroFadeMs)
   {
     s_petScreenIntroFadeActive = false;
-    setBacklight(targetBrightness);
+    requestUIRedraw();
     return;
   }
 
-  uint8_t fadeBrightness =
-      (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
+  // Keep redraws flowing while the software overlay fades out.
+  requestUIRedraw();
+}
 
-  // Avoid spending too long at absolute black once fade has started.
-  if (fadeBrightness == 0 && elapsed > 0)
-    fadeBrightness = 1;
+static void drawPetScreenIntroFadeOverlay()
+{
+  if (!s_petScreenIntroFadeActive)
+    return;
 
-  setBacklight(fadeBrightness);
+  if (g_app.uiState != UIState::PET_SCREEN)
+    return;
+
+  const uint32_t elapsed = millis() - s_petScreenIntroFadeStartMs;
+  if (elapsed >= kPetScreenIntroFadeMs)
+    return;
+
+  // Center the wipe on the actual PET content area, not the full screen.
+  const int contentTop = TOP_BAR_H;
+  const int contentBottom = SCREEN_H - TAB_BAR_H;
+  const int contentH = contentBottom - contentTop;
+  const int contentCenterY = contentTop + (contentH / 2);
+
+  const int visibleH = (int)(((uint32_t)contentH * elapsed) / kPetScreenIntroFadeMs);
+  const int revealTop = contentCenterY - (visibleH / 2);
+  const int revealBottom = revealTop + visibleH;
+
+  // Cover everything above the revealed band.
+  if (revealTop > 0)
+  {
+    spr.fillRect(0, 0, SCREEN_W, revealTop, TFT_BLACK);
+  }
+
+  // Cover everything below the revealed band.
+  if (revealBottom < SCREEN_H)
+  {
+    spr.fillRect(0, revealBottom, SCREEN_W, SCREEN_H - revealBottom, TFT_BLACK);
+  }
+}
+
+bool isPetScreenIntroFadeActive()
+{
+  return s_petScreenIntroFadeActive;
 }
 
 void forceRenderUIOnce()
@@ -6076,6 +6108,7 @@ void renderUI()
     spr.pushSprite(0, 0);
     return;
   }
+
   static int lastTab = -1;
 
   const int tabNow = (int)g_app.currentTab;
@@ -6103,8 +6136,11 @@ void renderUI()
   // If nothing changed, we normally throttle renders…
   // BUT if someone requested a redraw (sleep anim heartbeat, etc) we must not skip it.
   const bool redrawRequested = consumeUIRedrawRequest();
+  const bool petIntroAnimating =
+      (g_app.uiState == UIState::PET_SCREEN) &&
+      (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive());
 
-  if (!tabChanged && !stateChanged && !bgInvalid && !redrawRequested)
+  if (!tabChanged && !stateChanged && !bgInvalid && !redrawRequested && !petIntroAnimating)
   {
     const uint32_t now = millis();
     const uint32_t gateMs = consoleIsOpen() ? 16 : 50;
@@ -6114,13 +6150,17 @@ void renderUI()
   }
   else
   {
-    // Something changed or a redraw was explicitly requested — don't throttle.
+    // Something changed, a redraw was explicitly requested,
+    // or the pet intro wipe is animating — don't throttle.
     lastRenderTimeMs = millis();
   }
 
   lastTab = tabNow;
 
   const bool redrawBg = (!bgDrawnForState) || bgInvalid;
+
+  // Update pet intro fade state before drawing/presenting this frame.
+  tickPetScreenIntroFade();
 
   drawCurrentScreen(redrawBg);
 
@@ -6142,7 +6182,8 @@ void renderUI()
     drawAssetOtaConfirmOverlay();
   }
 
-  tickPetScreenIntroFade();
+  // Software fade overlay for hatch -> pet screen transition.
+  drawPetScreenIntroFadeOverlay();
 
   spr.pushSprite(0, 0);
 

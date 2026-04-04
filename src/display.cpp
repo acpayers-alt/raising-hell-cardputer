@@ -40,10 +40,12 @@
 
 // end of includes
 
+static bool g_backlightPulseActive = false;
+
 static uint8_t s_lastUserBrightnessLevel = 1;
 static bool s_batteryDimActive = false;
-static uint8_t s_batteryDimLevel = 0;         // protective dim target
-static bool s_batteryWifiForcedOff = false;   // only restore Wi-Fi if we disabled it
+static uint8_t s_batteryDimLevel = 0;       // protective dim target
+static bool s_batteryWifiForcedOff = false; // only restore Wi-Fi if we disabled it
 
 // --- Battery smoothing + curve helpers --------------------------------------
 
@@ -118,7 +120,29 @@ void initBacklight()
   // Cardputer backlight is handled by M5GFX; no pin init needed.
 }
 
-void setBacklight(uint8_t level) { M5Cardputer.Display.setBrightness(level); }
+void setBacklight(uint8_t level)
+{
+  static uint8_t s_lastLevel = 255;
+
+  if (level == s_lastLevel)
+  {
+    // No change → suppress spam
+    return;
+  }
+
+  s_lastLevel = level;
+
+  if (Serial && Serial.availableForWrite() >= 96)
+  {
+    Serial.printf("[BL] setBacklight(%u) screenOn=%d pulse=%d ui=%d\n",
+                  (unsigned)level,
+                  isScreenOn() ? 1 : 0,
+                  g_backlightPulseActive ? 1 : 0,
+                  (int)g_app.uiState);
+  }
+
+  M5Cardputer.Display.setBrightness(level);
+}
 
 void setScreenPower(bool on)
 {
@@ -134,9 +158,13 @@ void setScreenPower(bool on)
   if (!on)
   {
     // --- going OFF ---
+    g_backlightPulseActive = false;
+
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     SET_BACKLIGHT(0);
+    delay(10);
     M5Cardputer.Display.sleep();
+
     screenJustWentOff = true;
     return;
   }
@@ -144,13 +172,17 @@ void setScreenPower(bool on)
   // --- going ON / waking ---
   M5Cardputer.Display.wakeup();
 
-  // Apply brightness immediately
-  int b = brightnessValues[brightnessLevel];
-  if (b < 0)
-    b = 0;
-  if (b > 255)
-    b = 255;
-  setBacklight((uint16_t)b);
+  // Apply brightness immediately unless the pet-screen intro fade is about to own
+  // the backlight ramp.
+  if (!(g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive())))
+  {
+    int b = brightnessValues[brightnessLevel];
+    if (b < 0)
+      b = 0;
+    if (b > 255)
+      b = 255;
+    setBacklight((uint16_t)b);
+  }
 
   // Force redraw after wake
   requestUIRedraw();
@@ -168,6 +200,9 @@ static uint8_t effectiveBrightnessLevel() { return s_batteryDimActive ? s_batter
 
 static void applyEffectiveBrightness()
 {
+  if (!isScreenOn())
+    return;
+
   const uint8_t level = effectiveBrightnessLevel();
   applyBrightnessLevel(level);
 }
@@ -179,15 +214,9 @@ static void setBatteryDimActive(bool active, uint8_t dimLevel = 0)
   applyEffectiveBrightness();
 }
 
-void displayRememberUserBrightness(uint8_t level)
-{
-  s_lastUserBrightnessLevel = level;
-}
+void displayRememberUserBrightness(uint8_t level) { s_lastUserBrightnessLevel = level; }
 
-uint8_t displayGetUserBrightnessLevel()
-{
-  return s_lastUserBrightnessLevel;
-}
+uint8_t displayGetUserBrightnessLevel() { return s_lastUserBrightnessLevel; }
 
 void setScreenPowerTagged(bool on, const char *file, int line)
 {
@@ -232,34 +261,15 @@ void displayInit()
     Serial.printf("[displayInit] Cardputer backend done (%dx%d)\n", w, h);
 }
 
-static bool g_backlightPulseActive = false;
-
 void backlightPulseBegin(uint8_t level)
 {
-  // Pulse only when screen is OFF (rail-power hack for LED)
-  if (isScreenOn())
-    return;
-
-  if (g_backlightPulseActive)
-    return;
-  g_backlightPulseActive = true;
-
-  M5Cardputer.Display.wakeup();
-  setBacklight(level);
+  (void)level;
+  return;
 }
 
 void backlightPulseEnd()
 {
-  if (!g_backlightPulseActive)
-    return;
-  g_backlightPulseActive = false;
-
-  // Only end pulse / sleep LCD when screen is OFF
-  if (isScreenOn())
-    return;
-
-  setBacklight(0);
-  M5Cardputer.Display.sleep();
+  return;
 }
 
 // ============================================================================
@@ -522,7 +532,8 @@ void batteryProtectionTick(uint32_t now)
   {
     emergencyBatteryShutdown();
   }
-  if (!batteryLow && (now - lowSinceMs > 2000))  {
+  if (!batteryLow && (now - lowSinceMs > 2000))
+  {
     // Restore brightness
     setBatteryDimActive(false);
 

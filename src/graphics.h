@@ -69,6 +69,7 @@ void controlsHelpResetScroll();
 bool controlsHelpScrollUp();
 bool controlsHelpScrollDown();
 void uiResetLevelUpPopupState();
+bool isPetScreenIntroFadeActive();
 
 // Console
 void drawConsoleMenu();
