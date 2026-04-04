@@ -244,32 +244,64 @@ void appSetup() {
         spr.setTextSize(1);
   
         spr.setTextColor(TFT_RED, TFT_BLACK);
-        spr.drawString("LOW BATTERY", SCREEN_W / 2, 40);
+        spr.drawString("LOW BATTERY", SCREEN_W / 2, 32);
   
         spr.setTextColor(TFT_WHITE, TFT_BLACK);
   
         char buf[48];
         snprintf(buf, sizeof(buf), "%d%%  %dmV", batteryPercent, batteryVoltageMv);
-        spr.drawString(buf, SCREEN_W / 2, 70);
+        spr.drawString(buf, SCREEN_W / 2, 56);
+  
+        // Battery bar
+        const int barW = 140;
+        const int barH = 14;
+        const int barX = (SCREEN_W - barW) / 2;
+        const int barY = 72;
+  
+        int pct = batteryPercent;
+        if (pct < 0) pct = 0;
+        if (pct > 100) pct = 100;
+  
+        spr.drawRect(barX, barY, barW, barH, TFT_WHITE);
+        spr.drawRect(barX + barW, barY + 4, 3, barH - 8, TFT_WHITE);
+  
+        const int innerW = barW - 2;
+        int fillW = (innerW * pct) / 100;
+        if (fillW < 0) fillW = 0;
+        if (fillW > innerW) fillW = innerW;
+  
+        uint16_t fillColor = TFT_RED;
+        if (pct >= 60)
+          fillColor = TFT_GREEN;
+        else if (pct >= 25)
+          fillColor = TFT_YELLOW;
+  
+        if (fillW > 0)
+        {
+          spr.fillRect(barX + 1, barY + 1, fillW, barH - 2, fillColor);
+        }
   
         if (ready)
         {
           spr.setTextColor(TFT_GREEN, TFT_BLACK);
-          spr.drawString("Starting...", SCREEN_W / 2, 100);
+          spr.drawString("Starting...", SCREEN_W / 2, 104);
         }
         else if (usbPowered)
         {
           spr.setTextColor(TFT_YELLOW, TFT_BLACK);
-          spr.drawString("Charging...", SCREEN_W / 2, 100);
+          spr.drawString("Charging...", SCREEN_W / 2, 104);
+          spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+          spr.drawString("Waiting for safe voltage", SCREEN_W / 2, 124);
         }
         else
         {
           spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-          spr.drawString("Plug in USB", SCREEN_W / 2, 100);
+          spr.drawString("Plug in USB", SCREEN_W / 2, 104);
+          spr.drawString("to continue boot", SCREEN_W / 2, 124);
         }
   
         spr.pushSprite(0, 0);
-          
+                  
         if (ready)
         {
           Serial.printf("[BAT][BOOT] charge gate cleared mv=%d -> continuing boot\n",

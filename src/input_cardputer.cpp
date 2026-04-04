@@ -20,11 +20,8 @@ static uint32_t goPressMs = 0;
 
 static inline bool isDeleteToken(uint8_t uc, char c)
 {
-  // 0x2A = HID Backspace
-  // 0x4C = HID Delete (forward delete)
-  // 0x7F = ASCII DEL
-  // 0x08 = ASCII Backspace
-  return (uc == 0x2A) || (uc == 0x4C) || (uc == 0x7F) || (uc == 0x08) || (c == '\b');
+  // Character-stream safe delete tokens only.
+  return (uc == 0x7F) || (uc == 0x08) || (c == '\b');
 }
 
 // -----------------------------------------------------------------------------
@@ -87,7 +84,7 @@ static inline bool kbHeldEscKey()
     return true;
 
   // Some firmwares expose HID usage IDs / ASCII ESC in isKeyPressed().
-  if (kbHeldKey(0x29) || kbHeldKey(0x1B))
+  if (kbHeldKey(0x1B))
     return true;
 
   // Some layouts/fonts report this key as degree in the word stream; held-probe is best-effort.
@@ -900,22 +897,6 @@ static void readKeyboard(InputState &out)
           out.hotSettings = true;
           continue;
         }
-
-      // Enter HID usage 0x28
-      if ((uint8_t)c == 0x28)
-      {
-        if (g_textCaptureMode)
-        {
-          out.kbPush((uint8_t)'\n');
-        }
-        else
-        {
-          if (!s_enterLatched && acceptNav(s_navSelMs))
-            out.selectOnce = true;
-          s_enterLatched = true;
-        }
-        continue;
-      }
 
       // Backspace/Delete/ASCII DEL -> console delete OR UI menu/back
       const uint8_t uc = (uint8_t)c;
