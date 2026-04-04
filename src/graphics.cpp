@@ -1468,14 +1468,13 @@ static void drawSystemSettingsMenu();
 static void drawWifiSettingsMenu();
 static void drawPlaceholderMenu(const char *title);
 static void drawCreditsScreen();
+static void uiDrawToastOverlay();
 
-void drawConsoleMenu();
-void drawChoosePetScreen(bool redrawBg);
+void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot);void drawChoosePetScreen(bool redrawBg);
 void drawTitleMenuScreen(bool redrawBg);
 void drawPowerMenu(); // non-static (renderUI calls it)
 void ui_drawMessageWindow(const char *title, const char *line1, const char *line2, bool maskLine2, bool showCursor);
 void ui_showMessage(const char *msg);
-static void uiDrawToastOverlay();
 
 static bool ensurePetLayer();
 static void cachePetAreaBackgroundIfNeeded(bool needPetBg);
@@ -1496,7 +1495,7 @@ static constexpr int NONPET_TILE_H = 70;
 
 static bool s_petScreenIntroFadeActive = false;
 static uint32_t s_petScreenIntroFadeStartMs = 0;
-static constexpr uint32_t kPetScreenIntroFadeMs = 1000;
+static constexpr uint32_t kPetScreenIntroFadeMs = 1200;
 void startPetScreenIntroFadeNow();
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
@@ -1509,6 +1508,51 @@ static int clampi(int v, int lo, int hi)
   if (v > hi)
     return hi;
   return v;
+}
+
+// -----------------------------------------------------------------------------
+// Low Battery Screen
+// -----------------------------------------------------------------------------
+
+void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot)
+{
+  spr.fillScreen(TFT_BLACK);
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  spr.setTextColor(TFT_RED, TFT_BLACK);
+  spr.drawString("Battery Too Low", 10, 10);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("Raising Hell needs more", 10, 34);
+  spr.drawString("power before it can boot.", 10, 52);
+
+  char batBuf[40];
+  snprintf(batBuf, sizeof(batBuf), "Battery: %d%%  %dmV", pct, mv);
+  spr.drawString(batBuf, 10, 78);
+
+  spr.drawString(usb ? "USB: Connected" : "USB: Not connected", 10, 96);
+
+  if (readyToBoot)
+  {
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawString("Battery OK - starting...", 10, 122);
+  }
+  else if (usb)
+  {
+    spr.setTextColor(TFT_YELLOW, TFT_BLACK);
+    spr.drawString("Charging... waiting for safe", 10, 122);
+    spr.drawString("voltage to continue boot.", 10, 140);
+  }
+  else
+  {
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Plug in USB to charge and", 10, 122);
+    spr.drawString("boot automatically.", 10, 140);
+  }
+
+  spr.pushSprite(0, 0);
 }
 
 // -----------------------------------------------------------------------------

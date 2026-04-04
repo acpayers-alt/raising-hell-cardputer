@@ -198,8 +198,90 @@ void appSetup() {
 
   {
     const esp_reset_reason_t rr = esp_reset_reason();
-    if (rr == ESP_RST_BROWNOUT || batteryVoltageMv <= 3475) {
-      emergencyBatteryShutdown();
+  
+    const bool brownoutReset = (rr == ESP_RST_BROWNOUT);
+    const bool criticalAtBoot = (!usbPowered && batteryVoltageMv > 0 && batteryVoltageMv <= 3475);
+  
+    if (brownoutReset || criticalAtBoot)
+    {
+      Serial.printf("[BAT][BOOT] entering charge gate mv=%d pct=%d usb=%d\n",
+                    batteryVoltageMv,
+                    batteryPercent,
+                    (int)usbPowered);
+  
+      // Make sure screen is on
+      SET_SCREEN_POWER(true);
+      displayInit();
+  
+      // Dim a bit to reduce load
+      setBacklight(35);
+  
+      uint32_t safeSince = 0;
+  
+      for (;;)
+      {
+        M5Cardputer.update();
+        updateBattery();
+  
+        const bool safeNow = (batteryVoltageMv >= 3625);
+  
+        if (safeNow)
+        {
+          if (safeSince == 0)
+            safeSince = millis();
+        }
+        else
+        {
+          safeSince = 0;
+        }
+  
+        const bool ready = (safeSince != 0) && (millis() - safeSince >= 1500);
+  
+        // --- draw simple charging screen (buffered, no flicker) ---
+        spr.fillScreen(TFT_BLACK);
+        spr.setTextDatum(MC_DATUM);
+        spr.setTextFont(2);
+        spr.setTextSize(1);
+  
+        spr.setTextColor(TFT_RED, TFT_BLACK);
+        spr.drawString("LOW BATTERY", SCREEN_W / 2, 40);
+  
+        spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  
+        char buf[48];
+        snprintf(buf, sizeof(buf), "%d%%  %dmV", batteryPercent, batteryVoltageMv);
+        spr.drawString(buf, SCREEN_W / 2, 70);
+  
+        if (ready)
+        {
+          spr.setTextColor(TFT_GREEN, TFT_BLACK);
+          spr.drawString("Starting...", SCREEN_W / 2, 100);
+        }
+        else if (usbPowered)
+        {
+          spr.setTextColor(TFT_YELLOW, TFT_BLACK);
+          spr.drawString("Charging...", SCREEN_W / 2, 100);
+        }
+        else
+        {
+          spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+          spr.drawString("Plug in USB", SCREEN_W / 2, 100);
+        }
+  
+        spr.pushSprite(0, 0);
+          
+        if (ready)
+        {
+          Serial.printf("[BAT][BOOT] charge gate cleared mv=%d -> continuing boot\n",
+                        batteryVoltageMv);
+  
+          // Restore brightness
+          setBacklight((uint8_t)brightnessValues[brightnessLevel]);
+          break;
+        }
+  
+        delay(250);
+      }
     }
   }
 
