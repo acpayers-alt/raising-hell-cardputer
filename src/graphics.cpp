@@ -1458,7 +1458,6 @@ static void drawPetScreenImpl(bool redrawBg);
 static void drawMiniStatPreview();
 static void listWindow(int total, int current, int maxVisible, int &start, int &count);
 static void drawCurrentScreen(bool redrawBg);
-static void drawPetScreenIntroFadeOverlay();
 static void drawDeathScreen(bool redrawBg);
 static void drawDeathTransitionScreen(bool redrawBg);
 static void drawWifiSetupScreen();
@@ -1495,9 +1494,10 @@ static PetType s_nonPetTileCachedType = (PetType)255;
 static constexpr int NONPET_TILE_W = 35;
 static constexpr int NONPET_TILE_H = 70;
 
+static bool s_petScreenIntroFadeActive = false;
 static uint32_t s_petScreenIntroFadeStartMs = 0;
 static constexpr uint32_t kPetScreenIntroFadeMs = 800;
-
+void startPetScreenIntroFadeNow();
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
 static constexpr int MINI_STAT_PAD = 4;
@@ -5779,6 +5779,12 @@ static void drawWifiConnectWaitScreen()
 // ============================================================================
 // MAIN RENDER DISPATCHER HELPER
 // ============================================================================
+void startPetScreenIntroFadeNow()
+{
+  s_petScreenIntroFadeActive = true;
+  s_petScreenIntroFadeStartMs = millis();
+}
+
 static void tickPetScreenIntroFade()
 {
   if (g_app.uiState != UIState::PET_SCREEN)
@@ -5793,62 +5799,31 @@ static void tickPetScreenIntroFade()
     g_app.petScreenIntroFadePending = false;
     s_petScreenIntroFadeActive = true;
     s_petScreenIntroFadeStartMs = millis();
-
-    // PET screen should already be using the normal target brightness.
-    setBacklight((uint8_t)brightnessValues[brightnessLevel]);
-
+  
+    // Ensure we start from black
+    setBacklight(0);
     requestUIRedraw();
     return;
   }
-
+  
   if (!s_petScreenIntroFadeActive)
     return;
 
   const uint32_t elapsed = millis() - s_petScreenIntroFadeStartMs;
+  const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
+
   if (elapsed >= kPetScreenIntroFadeMs)
   {
     s_petScreenIntroFadeActive = false;
-    requestUIRedraw();
+    setBacklight(targetBrightness);
     return;
   }
 
-  // Keep redraws flowing while the software overlay fades out.
+  const uint8_t fadeBrightness =
+      (uint8_t)(((uint32_t)targetBrightness * elapsed) / kPetScreenIntroFadeMs);
+
+  setBacklight(fadeBrightness);
   requestUIRedraw();
-}
-
-static void drawPetScreenIntroFadeOverlay()
-{
-  if (!s_petScreenIntroFadeActive)
-    return;
-
-  if (g_app.uiState != UIState::PET_SCREEN)
-    return;
-
-  const uint32_t elapsed = millis() - s_petScreenIntroFadeStartMs;
-  if (elapsed >= kPetScreenIntroFadeMs)
-    return;
-
-  // Center the wipe on the actual PET content area, not the full screen.
-  const int contentTop = TOP_BAR_H;
-  const int contentBottom = SCREEN_H - TAB_BAR_H;
-  const int contentH = contentBottom - contentTop;
-  const int contentCenterY = contentTop + (contentH / 2);
-
-  const int visibleH = (int)(((uint32_t)contentH * elapsed) / kPetScreenIntroFadeMs);
-  const int revealTop = contentCenterY - (visibleH / 2);
-  const int revealBottom = revealTop + visibleH;
-
-  // Cover everything above the revealed band.
-  if (revealTop > 0)
-  {
-    spr.fillRect(0, 0, SCREEN_W, revealTop, TFT_BLACK);
-  }
-
-  // Cover everything below the revealed band.
-  if (revealBottom < SCREEN_H)
-  {
-    spr.fillRect(0, revealBottom, SCREEN_W, SCREEN_H - revealBottom, TFT_BLACK);
-  }
 }
 
 bool isPetScreenIntroFadeActive()
@@ -6154,7 +6129,7 @@ void renderUI()
     // or the pet intro wipe is animating — don't throttle.
     lastRenderTimeMs = millis();
   }
-
+  
   lastTab = tabNow;
 
   const bool redrawBg = (!bgDrawnForState) || bgInvalid;
@@ -6181,9 +6156,6 @@ void renderUI()
   {
     drawAssetOtaConfirmOverlay();
   }
-
-  // Software fade overlay for hatch -> pet screen transition.
-  drawPetScreenIntroFadeOverlay();
 
   spr.pushSprite(0, 0);
 

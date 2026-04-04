@@ -56,9 +56,17 @@ void finalizeNewPetFromName(InputState& in)
   bootSetupClearPendingFlag();
 
   g_app.newPetFlowActive = false;
-  g_app.petScreenIntroFadePending = true;
+
+  // Immediately arm AND start the fade BEFORE state change
+  // Enter PET screen first
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-        
+  
+  // Now force black AFTER anything else had a chance to touch brightness
+  setBacklight(0);
+  
+  // Arm fade to begin on next frame
+  g_app.petScreenIntroFadePending = true;
+              
   requestUIRedraw();
   invalidateBackgroundCache();
   requestUIRedraw();
