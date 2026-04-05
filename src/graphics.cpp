@@ -134,7 +134,6 @@ static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static bool getPngWH(const char *path, int &outW, int &outH);
 static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static void drawCrackedEggBig(int cx, int topY, const char *path);
-static bool sprDrawPngFromSDMirrored(const char *path, int x, int y, int w, int h);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
@@ -189,35 +188,42 @@ static int s_petHomeY = 0;
 enum class PetWanderState : uint8_t
 {
   HOME_IDLE = 0,
-  MOVING_OUT,
-  PAUSE_AWAY,
+  MOVING_TO_SIDE_A,
+  PAUSE_AWAY_1,
+  MOVING_TO_SIDE_B,
+  PAUSE_AWAY_2,
   RETURNING_HOME
 };
 
 static PetWanderState s_petWanderState = PetWanderState::HOME_IDLE;
 static int s_petWanderTargetX = 0;
+static int s_petWanderSideAX = 0;
+static int s_petWanderSideBX = 0;
 static uint32_t s_petWanderUntilMs = 0;
 static uint32_t s_petWanderLastStepMs = 0;
 
-static constexpr int kPetWanderRangePx = 18;
-static constexpr int kPetWanderMinMovePx = 8;
-static constexpr int kPetWanderStepPx = 2;
-static constexpr uint32_t kPetWanderStepMs = 35;
-static constexpr uint32_t kPetWanderPauseAwayMs = 650;
-static constexpr uint32_t kPetWanderMinIdleMs = 5000;
-static constexpr uint32_t kPetWanderMaxIdleMs = 11000;
+static constexpr int kPetWanderRangePx = 60;
+static constexpr int kPetWanderMinMovePx = 28;
+static constexpr int kPetWanderStepPx = 3;
+static constexpr uint32_t kPetWanderStepMs = 30;
+static constexpr uint32_t kPetWanderPauseAwayMs = 900;
+static constexpr uint32_t kPetWanderMinIdleMs = 1000;
+static constexpr uint32_t kPetWanderMaxIdleMs = 2000;
 
 static bool petWalkOverrideActive()
 {
   return s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
-         s_petWanderState == PetWanderState::MOVING_OUT || s_petWanderState == PetWanderState::RETURNING_HOME;
+         s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
+         s_petWanderState == PetWanderState::RETURNING_HOME;
 }
 
-// -- Pet Walk-On Paths
+// -- Pet Walking Paths
 static const char *PATH_DEV_BB_STAND = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev-bb-stand.png";
 static const char *PATH_DEV_BB_TURN = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev-bb-turn.png";
 static const char *PATH_DEV_BB_WALK1 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
 static const char *PATH_DEV_BB_WALK2 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
+static const char *PATH_DEV_BB_WALK1_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft1.png";
+static const char *PATH_DEV_BB_WALK2_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft2.png";
 
 void uiResetLevelUpPopupState()
 {
@@ -320,46 +326,6 @@ bool sprDrawPngFromSD(const char *path, int x, int y)
   return spr.drawPngFile(path, x, y);
 }
 
-static bool sprDrawPngFromSDMirrored(const char *path, int x, int y, int w, int h)
-{
-  if (!g_sdReady || !path || !*path || w <= 0 || h <= 0)
-    return false;
-
-  M5Canvas tmp(&spr);
-  tmp.setColorDepth(16);
-
-  if (!tmp.createSprite(w, h))
-    return false;
-
-  const uint16_t key = TFT_MAGENTA;
-  tmp.fillSprite(key);
-
-  tmp.setFileStorage(SD);
-  const bool ok = tmp.drawPngFile(path, 0, 0);
-  if (!ok)
-  {
-    tmp.deleteSprite();
-    return false;
-  }
-
-  for (int sy = 0; sy < h; ++sy)
-  {
-    for (int sx = 0; sx < w; ++sx)
-    {
-      const uint16_t px = tmp.readPixel(sx, sy);
-      if (px == key)
-        continue;
-
-      const int dx = x + (w - 1 - sx);
-      const int dy = y + sy;
-      spr.drawPixel(dx, dy, px);
-    }
-  }
-
-  tmp.deleteSprite();
-  return true;
-}
-
 bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y)
 {
   canvas.setFileStorage(SD);
@@ -429,7 +395,6 @@ static constexpr int PET_SPR_H = 84;
 // Optional offscreen layer (kept; not required for current draw path)
 static M5Canvas petLayer(&spr);
 static bool petLayerReady = false;
-
 static void drawSetTimeScreen();
 
 // -----------------------------------------------------------------------------
@@ -1602,6 +1567,7 @@ static constexpr int NONPET_TILE_W = 35;
 static constexpr int NONPET_TILE_H = 70;
 
 static bool s_petScreenIntroFadeActive = false;
+static bool s_petScreenWasActiveLastFrame = false;
 static uint32_t s_petScreenIntroFadeStartMs = 0;
 static constexpr uint32_t kPetScreenIntroFadeMs = 1200;
 void startPetScreenIntroFadeNow();
@@ -4399,15 +4365,14 @@ void resetPetScreenPositionToHome()
   s_petScreenPosInitialized = true;
 
   s_petIntroWalkActive = false;
+  s_petIntroWalkLastStepMs = 0;
   s_petIntroArriveTurnActive = false;
+  s_petIntroArriveTurnStartMs = 0;
   s_petIntroStandHoldActive = false;
+  s_petIntroStandHoldStartMs = 0;
   s_petIntroHandoffActive = false;
 
   resetPetWanderToHome();
-
-  s_petIntroArriveTurnActive = false;
-  s_petIntroStandHoldActive = false;
-  s_petIntroHandoffActive = false;
 }
 
 static void scheduleNextPetWander()
@@ -4422,6 +4387,8 @@ static void resetPetWanderToHome()
   s_petScreenX = s_petHomeX;
   s_petScreenY = s_petHomeY;
   s_petWanderTargetX = s_petHomeX;
+  s_petWanderSideAX = s_petHomeX;
+  s_petWanderSideBX = s_petHomeX;
   s_petWanderState = PetWanderState::HOME_IDLE;
   s_petWanderLastStepMs = 0;
   scheduleNextPetWander();
@@ -4518,36 +4485,52 @@ static void tickPetIntroWalk()
 static void tickPetWander()
 {
   // Never wander while the scripted intro is still owning the pet.
-  if (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive)
+  if (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive)
     return;
 
+  // Handoff is only meant to protect the first frame after the scripted intro.
+  // Do not let it block wandering indefinitely.
+  if (s_petIntroHandoffActive)
+  {
+    s_petIntroHandoffActive = false;
+    requestUIRedraw();
+  }
+
+  const bool wanderActive = (s_petWanderState != PetWanderState::HOME_IDLE);
+
   // Only wander on the main PET tab.
+  // IMPORTANT: do not hard-reset an active wander.
   if (g_app.uiState != UIState::PET_SCREEN || g_app.currentTab != Tab::TAB_PET)
   {
-    resetPetWanderToHome();
+    if (!wanderActive)
+      resetPetWanderToHome();
     return;
   }
 
   // Keep the pet grounded at home Y.
   s_petScreenY = s_petHomeY;
 
-  // Don't wander while sleeping.
+  // Don't start a new wander while sleeping, but don't interrupt one already in progress.
   if (pet.isSleeping)
   {
-    resetPetWanderToHome();
+    if (!wanderActive)
+      resetPetWanderToHome();
     return;
   }
 
-  // Only happy or bored pets should wander.
+  // Only happy or bored pets should START wandering.
+  // If a wander is already active, let it finish naturally.
   const PetMood mood = petResolveMood(pet);
-  if (mood != MOOD_HAPPY && mood != MOOD_BORED)
+  const bool wanderAllowed = (mood == MOOD_HAPPY || mood == MOOD_BORED);
+  if (!wanderAllowed && !wanderActive)
   {
-    resetPetWanderToHome();
+    s_petScreenX = s_petHomeX;
+    s_petScreenY = s_petHomeY;
     return;
   }
 
   const uint32_t now = millis();
-  
+
   switch (s_petWanderState)
   {
   case PetWanderState::HOME_IDLE:
@@ -4558,96 +4541,135 @@ static void tickPetWander()
     if ((int32_t)(now - s_petWanderUntilMs) < 0)
       return;
 
-    int offset = 0;
+    int offsetA = 0;
     for (int tries = 0; tries < 8; ++tries)
     {
-      offset = (int)random(-kPetWanderRangePx, kPetWanderRangePx + 1);
-      if (abs(offset) >= kPetWanderMinMovePx)
+      offsetA = (int)random(-kPetWanderRangePx, kPetWanderRangePx + 1);
+      if (abs(offsetA) >= kPetWanderMinMovePx)
         break;
     }
 
-    if (abs(offset) < kPetWanderMinMovePx)
+    if (abs(offsetA) < kPetWanderMinMovePx)
     {
       scheduleNextPetWander();
       return;
     }
 
-    s_petWanderTargetX = s_petHomeX + offset;
-    s_petWanderState = PetWanderState::MOVING_OUT;
-    s_petWanderLastStepMs = now;
-    requestUIRedraw();
-    return;
+    const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
+
+    // Keep the full 84px sprite visible inside the PET area.
+    const int minAnchorX = PET_SPR_W / 2;
+    const int maxAnchorX = petAreaW - (PET_SPR_W / 2);
+
+    s_petWanderSideAX = clampi(s_petHomeX + offsetA, minAnchorX, maxAnchorX);
+
+    int offsetB = -offsetA;
+    if (abs(offsetB) < kPetWanderMinMovePx)
+      offsetB = (offsetB < 0) ? -kPetWanderMinMovePx : kPetWanderMinMovePx;
+
+    s_petWanderSideBX = clampi(s_petHomeX + offsetB, minAnchorX, maxAnchorX);
+
+    // If clamping collapsed either target into a tiny move, skip this wander
+    // and schedule another one.
+    if (abs(s_petWanderSideAX - s_petHomeX) < kPetWanderMinMovePx ||
+        abs(s_petWanderSideBX - s_petHomeX) < kPetWanderMinMovePx)
+    {
+      scheduleNextPetWander();
+      return;
+    }
   }
 
-  case PetWanderState::MOVING_OUT:
+  case PetWanderState::MOVING_TO_SIDE_A:
   {
-    if ((now - s_petWanderLastStepMs) < kPetWanderStepMs)
+    if ((int32_t)(now - s_petWanderLastStepMs) < (int32_t)kPetWanderStepMs)
       return;
 
     s_petWanderLastStepMs = now;
 
-    if (s_petScreenX < s_petWanderTargetX)
+    if (abs(s_petScreenX - s_petWanderTargetX) <= kPetWanderStepPx)
     {
-      s_petScreenX += kPetWanderStepPx;
-      if (s_petScreenX > s_petWanderTargetX)
-        s_petScreenX = s_petWanderTargetX;
-    }
-    else if (s_petScreenX > s_petWanderTargetX)
-    {
-      s_petScreenX -= kPetWanderStepPx;
-      if (s_petScreenX < s_petWanderTargetX)
-        s_petScreenX = s_petWanderTargetX;
-    }
-
-    requestUIRedraw();
-
-    if (s_petScreenX == s_petWanderTargetX)
-    {
-      s_petWanderState = PetWanderState::PAUSE_AWAY;
+      s_petScreenX = s_petWanderTargetX;
+      s_petWanderState = PetWanderState::PAUSE_AWAY_1;
       s_petWanderUntilMs = now + kPetWanderPauseAwayMs;
+      return;
     }
+
+    s_petScreenX += (s_petScreenX < s_petWanderTargetX) ? kPetWanderStepPx : -kPetWanderStepPx;
+    requestUIRedraw();
     return;
   }
 
-  case PetWanderState::PAUSE_AWAY:
+  case PetWanderState::PAUSE_AWAY_1:
   {
     if ((int32_t)(now - s_petWanderUntilMs) < 0)
       return;
 
-    s_petWanderTargetX = s_petHomeX;
-    s_petWanderState = PetWanderState::RETURNING_HOME;
+    s_petWanderTargetX = s_petWanderSideBX;
+    s_petWanderState = PetWanderState::MOVING_TO_SIDE_B;
     s_petWanderLastStepMs = now;
+    requestUIRedraw();
+    return;
+  }
+
+  case PetWanderState::MOVING_TO_SIDE_B:
+  {
+    if ((int32_t)(now - s_petWanderLastStepMs) < (int32_t)kPetWanderStepMs)
+      return;
+
+    s_petWanderLastStepMs = now;
+
+    if (abs(s_petScreenX - s_petWanderTargetX) <= kPetWanderStepPx)
+    {
+      s_petScreenX = s_petWanderTargetX;
+      s_petWanderState = PetWanderState::PAUSE_AWAY_2;
+      s_petWanderUntilMs = now + kPetWanderPauseAwayMs;
+      return;
+    }
+
+    s_petScreenX += (s_petScreenX < s_petWanderTargetX) ? kPetWanderStepPx : -kPetWanderStepPx;
+    requestUIRedraw();
+    return;
+  }
+
+  case PetWanderState::PAUSE_AWAY_2:
+  {
+    if ((int32_t)(now - s_petWanderUntilMs) < 0)
+      return;
+
+    // Intentionally end the wander wherever the pet currently is.
+    s_petWanderState = PetWanderState::HOME_IDLE;
+    scheduleNextPetWander();
     requestUIRedraw();
     return;
   }
 
   case PetWanderState::RETURNING_HOME:
   {
-    if ((now - s_petWanderLastStepMs) < kPetWanderStepMs)
+    if (now - s_petWanderLastStepMs < kPetWanderStepMs)
       return;
 
     s_petWanderLastStepMs = now;
 
-    if (s_petScreenX < s_petHomeX)
-    {
-      s_petScreenX += kPetWanderStepPx;
-      if (s_petScreenX > s_petHomeX)
-        s_petScreenX = s_petHomeX;
-    }
-    else if (s_petScreenX > s_petHomeX)
-    {
-      s_petScreenX -= kPetWanderStepPx;
-      if (s_petScreenX < s_petHomeX)
-        s_petScreenX = s_petHomeX;
-    }
+    int dx = s_petHomeX - s_petScreenX;
 
-    requestUIRedraw();
-
-    if (s_petScreenX == s_petHomeX)
+    // Close enough → snap ONLY position, do NOT reset state logic
+    if (abs(dx) <= kPetWanderStepPx)
     {
+      s_petScreenX = s_petHomeX;
+      s_petScreenY = s_petHomeY;
+
+      // Transition cleanly to idle WITHOUT teleport helper
       s_petWanderState = PetWanderState::HOME_IDLE;
-      scheduleNextPetWander();
+
+      // Schedule next wander
+      s_petWanderUntilMs = now + random(kPetWanderMinIdleMs, kPetWanderMaxIdleMs);
+
+      return;
     }
+
+    // Step toward home
+    s_petScreenX += (dx > 0) ? kPetWanderStepPx : -kPetWanderStepPx;
+    requestUIRedraw();
     return;
   }
   }
@@ -4658,21 +4680,40 @@ static bool drawIntroWalkingPetOverride()
   if (!g_sdReady)
     return false;
 
+  const bool walking = s_petIntroWalkActive || s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
+                       s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
+                       s_petWanderState == PetWanderState::RETURNING_HOME;
+
+  bool facingLeft = false;
+
+  if (s_petIntroWalkActive)
+  {
+    facingLeft = false;
+  }
+  else if (s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B)
+  {
+    facingLeft = (s_petWanderTargetX < s_petScreenX);
+  }
+  else if (s_petWanderState == PetWanderState::RETURNING_HOME)
+  {
+    facingLeft = (s_petHomeX < s_petScreenX);
+  }
+
   const char *path = nullptr;
 
-  // WALKING (intro OR wander)
-  if (s_petIntroWalkActive || s_petWanderState == PetWanderState::MOVING_OUT ||
-      s_petWanderState == PetWanderState::RETURNING_HOME)
+  if (walking)
   {
     const uint32_t frame = (millis() / kPetIntroWalkFrameMs) & 1U;
-    path = frame ? PATH_DEV_BB_WALK2 : PATH_DEV_BB_WALK1;
+
+    if (facingLeft)
+      path = frame ? PATH_DEV_BB_WALK2_L : PATH_DEV_BB_WALK1_L;
+    else
+      path = frame ? PATH_DEV_BB_WALK2 : PATH_DEV_BB_WALK1;
   }
-  // TURN
   else if (s_petIntroArriveTurnActive)
   {
     path = PATH_DEV_BB_TURN;
   }
-  // STAND HOLD
   else if (s_petIntroStandHoldActive)
   {
     path = PATH_DEV_BB_STAND;
@@ -4682,36 +4723,22 @@ static bool drawIntroWalkingPetOverride()
     return false;
   }
 
-  if (!path)
+  if (!path || !path[0])
     return false;
 
-  const int w = PET_SPR_W;
-  const int h = PET_SPR_H;
+  int w = PET_SPR_W;
+  int h = PET_SPR_H;
+  (void)getPngWH(path, w, h);
 
   const int drawX = s_petScreenX - (w / 2);
   const int drawY = s_petScreenY - h + kPetIntroYOffset;
 
-  bool facingLeft = false;
-
-  if (s_petIntroWalkActive)
+  const bool ok = sprDrawPngFromSD(path, drawX, drawY);
+  if (!ok)
   {
-    // Hatch intro always walks in from the left side of the screen toward home,
-    // so it should face right.
-    facingLeft = false;
+    Serial.printf("[PET WALK] draw failed path='%s' x=%d y=%d w=%d h=%d\n", path, drawX, drawY, w, h);
   }
-  else if (s_petWanderState == PetWanderState::MOVING_OUT)
-  {
-    facingLeft = (s_petWanderTargetX < s_petScreenX);
-  }
-  else if (s_petWanderState == PetWanderState::RETURNING_HOME)
-  {
-    facingLeft = (s_petHomeX < s_petScreenX);
-  }
-
-  if (facingLeft)
-    return sprDrawPngFromSDMirrored(path, drawX, drawY, w, h);
-
-  return sprDrawPngFromSD(path, drawX, drawY);
+  return ok;
 }
 
 static void drawPetScreenImpl(bool redrawBg)
@@ -4776,8 +4803,8 @@ static void drawPetScreenImpl(bool redrawBg)
   }
   else if (!petWalkOverrideActive() && g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET)
   {
-    s_petScreenX = homeCenterX;
-    s_petScreenY = homeBottomY;
+    // Do not forcibly snap here.
+    // Let the wander / intro state machine own the final position.
   }
 
   if (petWalkOverrideActive())
@@ -6632,7 +6659,8 @@ void renderUI()
       (g_app.uiState == UIState::PET_SCREEN) &&
       (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive() || s_petIntroWalkActive ||
        s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
-       s_petWanderState == PetWanderState::MOVING_OUT || s_petWanderState == PetWanderState::RETURNING_HOME);
+       s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
+       s_petWanderState == PetWanderState::RETURNING_HOME);
 
   if (!tabChanged && !stateChanged && !bgInvalid && !redrawRequested && !petAnimating)
   {
@@ -6651,8 +6679,28 @@ void renderUI()
 
   lastTab = tabNow;
 
+  const bool petScreenNow = (g_app.uiState == UIState::PET_SCREEN);
+  const bool petScreenJustEntered = petScreenNow && !s_petScreenWasActiveLastFrame;
+  s_petScreenWasActiveLastFrame = petScreenNow;
+
+  // Existing pets should start at home in their normal mood animation.
+  // Only preserve offscreen/intro positioning when the scripted hatch intro
+  // is actually active.
+  if (petScreenJustEntered)
+  {
+    const bool scriptedIntroActive =
+        s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive;
+
+    if (!scriptedIntroActive)
+    {
+      resetPetScreenPositionToHome();
+      requestUIRedraw();
+    }
+  }
+
   const bool petMotionActive = s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive ||
-                               s_petIntroHandoffActive || s_petWanderState == PetWanderState::MOVING_OUT ||
+                               s_petIntroHandoffActive || s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
+                               s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
                                s_petWanderState == PetWanderState::RETURNING_HOME;
 
   const bool redrawBg = (!bgDrawnForState) || bgInvalid || petMotionActive;
