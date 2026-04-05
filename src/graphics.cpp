@@ -134,6 +134,7 @@ static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static bool getPngWH(const char *path, int &outW, int &outH);
 static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static void drawCrackedEggBig(int cx, int topY, const char *path);
+static bool sprDrawPngFromSDMirrored(const char *path, int x, int y, int w, int h);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
@@ -208,12 +209,8 @@ static constexpr uint32_t kPetWanderMaxIdleMs = 11000;
 
 static bool petWalkOverrideActive()
 {
-  return s_petIntroWalkActive ||
-         s_petIntroArriveTurnActive ||
-         s_petIntroStandHoldActive ||
-         s_petIntroHandoffActive ||
-         s_petWanderState == PetWanderState::MOVING_OUT ||
-         s_petWanderState == PetWanderState::RETURNING_HOME;
+  return s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
+         s_petWanderState == PetWanderState::MOVING_OUT || s_petWanderState == PetWanderState::RETURNING_HOME;
 }
 
 // -- Pet Walk-On Paths
@@ -321,6 +318,46 @@ bool sprDrawPngFromSD(const char *path, int x, int y)
     return false;
   ensureSprFileStorage();
   return spr.drawPngFile(path, x, y);
+}
+
+static bool sprDrawPngFromSDMirrored(const char *path, int x, int y, int w, int h)
+{
+  if (!g_sdReady || !path || !*path || w <= 0 || h <= 0)
+    return false;
+
+  M5Canvas tmp(&spr);
+  tmp.setColorDepth(16);
+
+  if (!tmp.createSprite(w, h))
+    return false;
+
+  const uint16_t key = TFT_MAGENTA;
+  tmp.fillSprite(key);
+
+  tmp.setFileStorage(SD);
+  const bool ok = tmp.drawPngFile(path, 0, 0);
+  if (!ok)
+  {
+    tmp.deleteSprite();
+    return false;
+  }
+
+  for (int sy = 0; sy < h; ++sy)
+  {
+    for (int sx = 0; sx < w; ++sx)
+    {
+      const uint16_t px = tmp.readPixel(sx, sy);
+      if (px == key)
+        continue;
+
+      const int dx = x + (w - 1 - sx);
+      const int dy = y + sy;
+      spr.drawPixel(dx, dy, px);
+    }
+  }
+
+  tmp.deleteSprite();
+  return true;
 }
 
 bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y)
@@ -4501,8 +4538,16 @@ static void tickPetWander()
     return;
   }
 
-  const uint32_t now = millis();
+  // Only happy or bored pets should wander.
+  const PetMood mood = petResolveMood(pet);
+  if (mood != MOOD_HAPPY && mood != MOOD_BORED)
+  {
+    resetPetWanderToHome();
+    return;
+  }
 
+  const uint32_t now = millis();
+  
   switch (s_petWanderState)
   {
   case PetWanderState::HOME_IDLE:
@@ -4616,8 +4661,7 @@ static bool drawIntroWalkingPetOverride()
   const char *path = nullptr;
 
   // WALKING (intro OR wander)
-  if (s_petIntroWalkActive ||
-      s_petWanderState == PetWanderState::MOVING_OUT ||
+  if (s_petIntroWalkActive || s_petWanderState == PetWanderState::MOVING_OUT ||
       s_petWanderState == PetWanderState::RETURNING_HOME)
   {
     const uint32_t frame = (millis() / kPetIntroWalkFrameMs) & 1U;
@@ -4646,6 +4690,26 @@ static bool drawIntroWalkingPetOverride()
 
   const int drawX = s_petScreenX - (w / 2);
   const int drawY = s_petScreenY - h + kPetIntroYOffset;
+
+  bool facingLeft = false;
+
+  if (s_petIntroWalkActive)
+  {
+    // Hatch intro always walks in from the left side of the screen toward home,
+    // so it should face right.
+    facingLeft = false;
+  }
+  else if (s_petWanderState == PetWanderState::MOVING_OUT)
+  {
+    facingLeft = (s_petWanderTargetX < s_petScreenX);
+  }
+  else if (s_petWanderState == PetWanderState::RETURNING_HOME)
+  {
+    facingLeft = (s_petHomeX < s_petScreenX);
+  }
+
+  if (facingLeft)
+    return sprDrawPngFromSDMirrored(path, drawX, drawY, w, h);
 
   return sprDrawPngFromSD(path, drawX, drawY);
 }
@@ -4731,7 +4795,7 @@ static void drawPetScreenImpl(bool redrawBg)
   drawMiniStatPreview();
   drawTabBar();
 
-  drawPetPerfHud(); 
+  drawPetPerfHud();
 }
 
 // -----------------------------------------------------------------------------
