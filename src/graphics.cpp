@@ -178,9 +178,8 @@ static bool s_petIntroStandHoldActive = false;
 static uint32_t s_petIntroStandHoldStartMs = 0;
 static constexpr int kPetIntroYOffset = -10;  // tune this
 static constexpr uint32_t kPetIntroStandHoldMs = 300;
-
+static bool s_petIntroHandoffActive = false;
 static constexpr uint32_t kPetIntroWalkFrameMs = 120;
-const int drawY = s_petScreenY - h + kPetIntroYOffset;
 
 // -- Pet Walk-On Paths
 static const char *PATH_DEV_BB_STAND = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev-bb-stand.png";
