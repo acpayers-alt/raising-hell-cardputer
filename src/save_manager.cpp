@@ -1005,8 +1005,8 @@ SavePayload makeDefaultSavePayload()
   p.version = SAVE_VERSION;
 
   p.pet.hunger = 50;
-  p.pet.happiness = 50;
-  p.pet.energy = 50;
+  p.pet.happiness = 100;
+  p.pet.energy = 100;
   p.pet.health = 100;
 
   p.pet.petType = 0;

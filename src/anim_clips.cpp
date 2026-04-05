@@ -13,6 +13,7 @@
 // Devil baby HAPPY Ball (your new animation)
 // (moved from graphics.cpp into the clip registry)
 // ---------------------------
+
 static const char *kDevBabyHappyBall[] = {
     "/raising_hell/graphics/pet/anim/dev/bb/hpy/dev_baby_hpy_ball1.png",
     "/raising_hell/graphics/pet/anim/dev/bb/hpy/dev_baby_hpy_ball2.png",

@@ -121,6 +121,7 @@ static void drawImportPetListScreen(bool redrawBg);
 // --- Graphics and Runtime
 void resetPetScreenPositionToHome();
 void startPetIntroWalkFromLeft();
+static bool drawIntroWalkingPetOverride();
 
 // --- Compatibility wrappers / missing helpers (compile fix) ---
 static void drawSettingsScreen();
@@ -160,14 +161,32 @@ void uiResetLevelUpPopupState();
 // Pet screen position (anchor-based, bottom-center)
 // ---------------------------------------------------------------------------
 
-static int s_petScreenX = 0; // anchored center X
-static int s_petScreenY = 0; // anchored bottom Y
+static int s_petScreenX = 0;
+static int s_petScreenY = 0;
 static bool s_petScreenPosInitialized = false;
 
 static bool s_petIntroWalkActive = false;
 static uint32_t s_petIntroWalkLastStepMs = 0;
 static constexpr int kPetIntroWalkStepPx = 3;
 static constexpr uint32_t kPetIntroWalkStepMs = 40;
+
+static bool s_petIntroArriveTurnActive = false;
+static uint32_t s_petIntroArriveTurnStartMs = 0;
+static constexpr uint32_t kPetIntroArriveTurnMs = 180;
+
+static bool s_petIntroStandHoldActive = false;
+static uint32_t s_petIntroStandHoldStartMs = 0;
+static constexpr int kPetIntroYOffset = -10;  // tune this
+static constexpr uint32_t kPetIntroStandHoldMs = 300;
+
+static constexpr uint32_t kPetIntroWalkFrameMs = 120;
+const int drawY = s_petScreenY - h + kPetIntroYOffset;
+
+// -- Pet Walk-On Paths
+static const char *PATH_DEV_BB_STAND = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev-bb-stand.png";
+static const char *PATH_DEV_BB_TURN = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev-bb-turn.png";
+static const char *PATH_DEV_BB_WALK1 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
+static const char *PATH_DEV_BB_WALK2 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
 
 void uiResetLevelUpPopupState()
 {
@@ -4305,6 +4324,9 @@ void resetPetScreenPositionToHome()
   s_petScreenY = homeY;
   s_petScreenPosInitialized = true;
   s_petIntroWalkActive = false;
+  s_petIntroArriveTurnActive = false;
+  s_petIntroStandHoldActive = false;
+  s_petIntroHandoffActive = false;
 }
 
 void startPetIntroWalkFromLeft()
@@ -4320,12 +4342,37 @@ void startPetIntroWalkFromLeft()
 
   s_petIntroWalkActive = true;
   s_petIntroWalkLastStepMs = millis();
+  s_petIntroArriveTurnActive = false;
+  s_petIntroStandHoldActive = false;
+  s_petIntroHandoffActive = false;
 }
 
 static void tickPetIntroWalk()
 {
   if (!s_petIntroWalkActive)
+  {
+    if (s_petIntroArriveTurnActive)
+    {
+      if (s_petIntroStandHoldActive)
+      {
+        if ((millis() - s_petIntroStandHoldStartMs) >= kPetIntroStandHoldMs)
+        {
+          s_petIntroStandHoldActive = false;
+          s_petIntroHandoffActive = true;
+          requestUIRedraw();
+        }
+        return;
+      }
+      if ((millis() - s_petIntroArriveTurnStartMs) >= kPetIntroArriveTurnMs)
+      {
+        s_petIntroArriveTurnActive = false;
+        s_petIntroStandHoldActive = true;
+        s_petIntroStandHoldStartMs = millis();
+        requestUIRedraw();
+      }
+    }
     return;
+  }
 
   if (g_app.uiState != UIState::PET_SCREEN)
     return;
@@ -4356,8 +4403,66 @@ static void tickPetIntroWalk()
     s_petScreenX = homeX;
     s_petScreenY = homeY;
     s_petIntroWalkActive = false;
+
+    s_petIntroArriveTurnActive = true;
+    s_petIntroArriveTurnStartMs = millis();
+
     requestUIRedraw();
   }
+}
+
+static bool drawIntroWalkingPetOverride()
+{
+  if (pet.type != PET_DEVIL || pet.evoStage != 0)
+    return false;
+
+  const char *path = nullptr;
+
+  if (s_petIntroWalkActive)
+  {
+    const uint32_t framePhase = (millis() / kPetIntroWalkFrameMs) & 1U;
+    path = framePhase ? PATH_DEV_BB_WALK2 : PATH_DEV_BB_WALK1;
+  }
+  else if (s_petIntroArriveTurnActive)
+  {
+    path = PATH_DEV_BB_TURN;
+  }
+  else if (s_petIntroStandHoldActive || s_petIntroHandoffActive)
+  {
+    path = PATH_DEV_BB_STAND;
+  }
+  else
+  {
+    return false;
+  }
+
+  if (!path || !*path)
+  {
+    Serial.println("[PET INTRO] missing path");
+    return false;
+  }
+
+  if (!g_sdReady)
+  {
+    Serial.println("[PET INTRO] SD not ready");
+    return false;
+  }
+
+  const int w = PET_SPR_W;
+  const int h = PET_SPR_H;
+
+  const int drawX = s_petScreenX - (w / 2);
+  const int drawY = s_petScreenY - h + kPetIntroYOffset;
+
+  const bool ok = sprDrawPngFromSD(path, drawX, drawY);
+  if (!ok)
+  {
+    Serial.printf("[PET INTRO] draw failed path='%s' x=%d y=%d walk=%d turn=%d\n", path, drawX, drawY,
+                  s_petIntroWalkActive ? 1 : 0, s_petIntroArriveTurnActive ? 1 : 0);
+    return false;
+  }
+
+  return true;
 }
 
 static void drawPetScreenImpl(bool redrawBg)
@@ -4389,6 +4494,12 @@ static void drawPetScreenImpl(bool redrawBg)
 
   const bool needRestore = redrawBg || animChanged || needPetBg;
 
+  if (s_petIntroHandoffActive && animChanged)
+  {
+    s_petIntroHandoffActive = false;
+    requestUIRedraw();
+  }
+
   cachePetAreaBackgroundIfNeeded(needPetBg);
   g_forcePetBgCache = false;
 
@@ -4411,7 +4522,20 @@ static void drawPetScreenImpl(bool redrawBg)
     s_petScreenPosInitialized = true;
   }
 
+if (s_petIntroWalkActive ||
+    s_petIntroArriveTurnActive ||
+    s_petIntroStandHoldActive ||
+    s_petIntroHandoffActive)
+{
+  if (!drawIntroWalkingPetOverride())
+  {
+    animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+  }
+}
+else
+{
   animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+}
 
   drawMiniStatPreview();
   drawTabBar();
@@ -6269,12 +6393,13 @@ void renderUI()
 
   lastTab = tabNow;
 
-  const bool redrawBg = (!bgDrawnForState) || bgInvalid;
+  const bool introPetMoving = s_petIntroWalkActive || s_petIntroArriveTurnActive;
+  const bool redrawBg = (!bgDrawnForState) || bgInvalid || introPetMoving;
 
   // Update pet intro fade state before drawing/presenting this frame.
   tickPetScreenIntroFade();
   tickPetIntroWalk();
-  
+
   drawCurrentScreen(redrawBg);
 
   if (g_app.uiState == UIState::POWER_MENU)
