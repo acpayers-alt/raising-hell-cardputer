@@ -202,13 +202,13 @@ static int s_petWanderSideBX = 0;
 static uint32_t s_petWanderUntilMs = 0;
 static uint32_t s_petWanderLastStepMs = 0;
 
-static constexpr int kPetWanderRangePx = 44;
+static constexpr int kPetWanderRangePx = 55;
 static constexpr int kPetWanderMinMovePx = 28;
 static constexpr int kPetWanderStepPx = 2;
 static constexpr uint32_t kPetWanderStepMs = 30;
-static constexpr uint32_t kPetWanderPauseAwayMs = 850;
-static constexpr uint32_t kPetWanderMinIdleMs = 7000;
-static constexpr uint32_t kPetWanderMaxIdleMs = 11000;
+static constexpr uint32_t kPetWanderPauseAwayMs = 5000;
+static constexpr uint32_t kPetWanderMinIdleMs = 5000;
+static constexpr uint32_t kPetWanderMaxIdleMs = 7000;
 
 static bool petWalkOverrideActive()
 {
@@ -403,7 +403,7 @@ private:
 // -----------------------------------------------------------------------------
 // Nudge offsets (tweak as desired)
 // -----------------------------------------------------------------------------
-static constexpr int PET_X_OFFSET = -20;
+static constexpr int PET_X_OFFSET = 2;
 static constexpr int PET_Y_OFFSET = 8;
 
 // Pet sprite expected size
@@ -4575,10 +4575,12 @@ static void tickPetWander()
 
     const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
 
-    // Keep the full 84px sprite visible inside the PET area.
+    // Keep the full sprite visible, but reserve a little extra space away from
+    // the mini-stat cluster on the right so the pet doesn't crowd it.
     const int minAnchorX = PET_SPR_W / 2;
-    const int maxAnchorX = petAreaW - (PET_SPR_W / 2);
-
+    const int rightClearancePx = 12;
+    const int maxAnchorX = petAreaW - (PET_SPR_W / 2) - rightClearancePx;
+    
     const int originX = s_petScreenX;
 
     s_petWanderSideAX = clampi(originX + offsetA, minAnchorX, maxAnchorX);
