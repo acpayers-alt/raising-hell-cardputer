@@ -219,6 +219,7 @@ static bool petWalkOverrideActive()
 
 // -- Pet Walking Paths
 
+// -- Devil
 // -- Devil Baby
 static const char *PATH_DEV_BB_WALK1 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
 static const char *PATH_DEV_BB_WALK2 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
@@ -242,6 +243,13 @@ static const char *PATH_DEV_EL_WALK1 = "/raising_hell/graphics/pet/anim/dev/ed/w
 static const char *PATH_DEV_EL_WALK2 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk2.png";
 static const char *PATH_DEV_EL_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft1.png";
 static const char *PATH_DEV_EL_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft2.png";
+
+// -- Eldritch
+// -- Eldritch Baby
+static const char *PATH_ELD_BB_WALK1 = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk1.png";
+static const char *PATH_ELD_BB_WALK2 = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk2.png";
+static const char *PATH_ELD_BB_WALK1_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft1.png";
+static const char *PATH_ELD_BB_WALK2_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft2.png";
 
 void uiResetLevelUpPopupState()
 {
@@ -555,27 +563,6 @@ static const char *PATH_BG_SLEEP = "/raising_hell/graphics/background/sleep_bg.j
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
 static const char *PATH_BG_NONPET_TILE_DEV = "/raising_hell/graphics/background/flow/dev_tab_bg.png";
 static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/flow/eld_tab_bg.png";
-static const char *PATH_STAT_KAIJU = "/raising_hell/graphics/pet/kai_stat.png";
-static const char *PATH_STAT_AXOLOTL = "/raising_hell/graphics/pet/axo_stat.png";
-static const char *PATH_STAT_ANUBIS = "/raising_hell/graphics/pet/anu_stat.png";
-static const char *PATH_STAT_ALIEN = "/raising_hell/graphics/pet/al_stat.png";
-
-static const char *PATH_STAT_ELDRITCH = "/raising_hell/graphics/pet/eld_stat.png";
-static const char *PATH_STAT_ELDRITCH_BABY = "/raising_hell/graphics/pet/eld_stat.png";
-static const char *PATH_STAT_ELDRITCH_TEEN = "/raising_hell/graphics/pet/eld_teen_stat.png";
-static const char *PATH_STAT_ELDRITCH_ADULT = "/raising_hell/graphics/pet/eld_ad_stat.png";
-static const char *PATH_STAT_ELDRITCH_ELDER = "/raising_hell/graphics/pet/eld_el_stat.png";
-
-static const char *PATH_STAT_DEVIL_BABY = "/raising_hell/graphics/pet/dev_stat.png";
-static const char *PATH_STAT_DEVIL_TEEN = "/raising_hell/graphics/pet/dev_teen_stat.png";
-static const char *PATH_STAT_DEVIL_ADULT = "/raising_hell/graphics/pet/dev_ad_stat.png";
-static const char *PATH_STAT_DEVIL_ELDER = "/raising_hell/graphics/pet/dev_el_stat.png";
-static const char *PATH_STAT_DEFAULT = "/raising_hell/graphics/pet/dev_stat.png";
-
-static const char *DEV_FACE_HAPPY_BABY = "/raising_hell/graphics/pet/face/dev_face_hpy.png";
-static const char *DEV_FACE_HAPPY_TEEN = "/raising_hell/graphics/pet/face/dev_teen_face_hpy.png";
-static const char *DEV_FACE_HAPPY_ADULT = "/raising_hell/graphics/pet/face/dev_ad_face_hpy.png";
-static const char *DEV_FACE_HAPPY_ELDER = "/raising_hell/graphics/pet/face/dev_el_face_hpy.png";
 
 static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
 static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
@@ -4763,6 +4750,16 @@ static bool drawIntroWalkingPetOverride()
           path = frame ? PATH_DEV_EL_WALK2 : PATH_DEV_EL_WALK1;
       }
     }
+    else if (pet.type == PET_ELDRITCH)
+    {
+      if (pet.evoStage == 0)
+      {
+        if (facingLeft)
+          path = frame ? PATH_ELD_BB_WALK2_L : PATH_ELD_BB_WALK1_L;
+        else
+          path = frame ? PATH_ELD_BB_WALK2 : PATH_ELD_BB_WALK1;
+      }
+    }
   }
 
   if (!path || !path[0])
@@ -4868,7 +4865,7 @@ static void drawPetScreenImpl(bool redrawBg)
 }
 
 // -----------------------------------------------------------------------------
-// Missing wrappers + helpers (linker fix)
+// Draw Wrappers
 // -----------------------------------------------------------------------------
 void drawPetScreen() { drawPetScreenImpl(true); }
 
