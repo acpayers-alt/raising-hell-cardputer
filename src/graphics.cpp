@@ -238,10 +238,10 @@ static const char *PATH_DEV_AD_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ad
 static const char *PATH_DEV_AD_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft2.png";
 
 // -- Devil Elder
-static const char *PATH_DEV_EL_WALK1 = "/raising_hell/graphics/pet/anim/dev/el/wlk/dev_el_walk1.png";
-static const char *PATH_DEV_EL_WALK2 = "/raising_hell/graphics/pet/anim/dev/el/wlk/dev_el_walk2.png";
-static const char *PATH_DEV_EL_WALK1_L = "/raising_hell/graphics/pet/anim/dev/el/wlk/dev_el_walkleft1.png";
-static const char *PATH_DEV_EL_WALK2_L = "/raising_hell/graphics/pet/anim/dev/el/wlk/dev_el_walkleft2.png";
+static const char *PATH_DEV_EL_WALK1 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk1.png";
+static const char *PATH_DEV_EL_WALK2 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk2.png";
+static const char *PATH_DEV_EL_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft1.png";
+static const char *PATH_DEV_EL_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft2.png";
 
 void uiResetLevelUpPopupState()
 {
@@ -4580,7 +4580,7 @@ static void tickPetWander()
     const int minAnchorX = PET_SPR_W / 2;
     const int rightClearancePx = 12;
     const int maxAnchorX = petAreaW - (PET_SPR_W / 2) - rightClearancePx;
-    
+
     const int originX = s_petScreenX;
 
     s_petWanderSideAX = clampi(originX + offsetA, minAnchorX, maxAnchorX);
