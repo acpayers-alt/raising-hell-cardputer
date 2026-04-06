@@ -161,7 +161,7 @@ static const char* mgItemName(ItemType t)
 
 static int rollMiniGameInfReward()
 {
-  return 25;
+  return 10;
 }
 
 static bool tryAwardWinItem_1in4(ItemType* outType)
@@ -226,7 +226,7 @@ void mgApplyResultAndShowReward(bool won)
 
   if (won)
   {
-    pet.addXP(25);
+    pet.addXP(20);
 
     const int infReward = rollMiniGameInfReward();
     addInf(infReward);
@@ -242,7 +242,7 @@ void mgApplyResultAndShowReward(bool won)
       snprintf(
         s_rewardMsg,
         sizeof(s_rewardMsg),
-        "You win! XP +25  INF +%d  MOOD +20\nRandom Reward: %s +1",
+        "You win! XP +20  INF +%d  MOOD +20\nRandom Reward: %s +1",
         infReward,
         (nm && nm[0]) ? nm : "ITEM");
     }
@@ -251,7 +251,7 @@ void mgApplyResultAndShowReward(bool won)
       snprintf(
         s_rewardMsg,
         sizeof(s_rewardMsg),
-        "You win! XP +25  INF +%d  MOOD +20",
+        "You win! XP +20  INF +%d  MOOD +20",
         infReward);
     }
   }

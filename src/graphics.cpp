@@ -4427,18 +4427,19 @@ static void tickPetIntroWalk()
 {
   if (!s_petIntroWalkActive)
   {
+    if (s_petIntroStandHoldActive)
+    {
+      if ((millis() - s_petIntroStandHoldStartMs) >= kPetIntroStandHoldMs)
+      {
+        s_petIntroStandHoldActive = false;
+        s_petIntroHandoffActive = true;
+        requestUIRedraw();
+      }
+      return;
+    }
+
     if (s_petIntroArriveTurnActive)
     {
-      if (s_petIntroStandHoldActive)
-      {
-        if ((millis() - s_petIntroStandHoldStartMs) >= kPetIntroStandHoldMs)
-        {
-          s_petIntroStandHoldActive = false;
-          s_petIntroHandoffActive = true;
-          requestUIRedraw();
-        }
-        return;
-      }
       if ((millis() - s_petIntroArriveTurnStartMs) >= kPetIntroArriveTurnMs)
       {
         s_petIntroArriveTurnActive = false;
@@ -4446,7 +4447,9 @@ static void tickPetIntroWalk()
         s_petIntroStandHoldStartMs = millis();
         requestUIRedraw();
       }
+      return;
     }
+
     return;
   }
 
@@ -6691,8 +6694,11 @@ void renderUI()
     requestUIRedraw();
   }
 
-  // If nothing changed, we normally throttle renders…
-  // BUT if someone requested a redraw (sleep anim heartbeat, etc) we must not skip it.
+  // Always advance pet-side timers/state before deciding whether to throttle.
+  tickPetScreenIntroFade();
+  tickPetIntroWalk();
+  tickPetWander();
+  
   const bool redrawRequested = consumeUIRedrawRequest();
   const bool petAnimating =
       (g_app.uiState == UIState::PET_SCREEN) &&
@@ -6700,7 +6706,7 @@ void renderUI()
        s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
        s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
        s_petWanderState == PetWanderState::RETURNING_HOME);
-
+  
   if (!tabChanged && !stateChanged && !bgInvalid && !redrawRequested && !petAnimating)
   {
     const uint32_t now = millis();
@@ -6711,11 +6717,9 @@ void renderUI()
   }
   else
   {
-    // Something changed, a redraw was explicitly requested,
-    // or the pet intro wipe is animating — don't throttle.
     lastRenderTimeMs = millis();
   }
-
+  
   lastTab = tabNow;
 
   const bool petScreenNow = (g_app.uiState == UIState::PET_SCREEN);
