@@ -75,11 +75,12 @@ static const char *kDevBabySickCrawl[] = {
 };
 
 // ---------------------------
-// Devil teen HAPPY pose (your new 2-frame animation)
+// Devil teen HAPPY pose (your new 3-frame animation)
 // ---------------------------
 static const char *kDevTeenHappyPose[] = {
     "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_pose1.png",
     "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_pose2.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_pose3.png",
 };
 
 // ---------------------------
@@ -511,7 +512,7 @@ static const AnimClip kClips[] = {
     {ANIM_DEV_BABY_SICK_CRAWL, kDevBabySickCrawl, 3, 220, true},
     {ANIM_DEV_BABY_HAPPY_BALL, kDevBabyHappyBall, 4, 220, true},
 
-    {ANIM_DEV_TEEN_HAPPY_POSE, kDevTeenHappyPose, 2, 220, true},
+    {ANIM_DEV_TEEN_HAPPY_POSE, kDevTeenHappyPose, 3, 220, true},
     {ANIM_DEV_TEEN_HUNGRY_RUB, kDevTeenHungryRub, 2, 220, true},
     {ANIM_DEV_TEEN_ANGRY_CLAW, kDevTeenAngryClaw, 4, 120, true},
     {ANIM_DEV_TEEN_SLEEPY_BOB, kDevTeenSleepyBob, 4, 260, true},
