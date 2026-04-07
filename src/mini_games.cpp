@@ -3853,7 +3853,7 @@ static DodgerPhase s_dodgerPhase = DODGER_PHASE_FIREBALLS;
 static uint32_t s_dodgerPhaseStartMs = 0;
 
 static constexpr uint32_t kDodgerGoalSpawnMs = 12000;
-static constexpr uint32_t kDodgerCoastMs = 1400;
+static constexpr uint32_t kDodgerCoastMs = 700;
 static constexpr uint32_t kDodgerImpactHoldMs = 120;
 static int s_dodgerCarExitVy = 2;
 static constexpr uint32_t kDodgerGoalHoldMs = 900;
