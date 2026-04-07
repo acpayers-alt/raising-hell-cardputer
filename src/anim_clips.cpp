@@ -75,12 +75,12 @@ static const char *kDevBabySickCrawl[] = {
 };
 
 // ---------------------------
-// Devil teen HAPPY pose (your new 3-frame animation)
+// Devil teen HAPPY play (your new 3-frame animation)
 // ---------------------------
 static const char *kDevTeenHappyPose[] = {
-    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_pose1.png",
-    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_pose2.png",
-    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_pose3.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_play1.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_play2.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/hpy/dev_tn_hpy_play3.png",
 };
 
 // ---------------------------
@@ -122,13 +122,14 @@ static const char *kDevTeenSickBob[] = {
 };
 
 // ---------------------------
-// Devil teen BORED play (3-frame)
+// Devil teen BORED play (4-frame)
 // ---------------------------
 static const char *kDevTeenBoredPlay[] = {
-    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_teen_brd_play1.png",
-    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_teen_brd_play2.png",
-    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_teen_brd_play3.png",
-};
+    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink1.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink2.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink3.png",
+    "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink4.png",
+  };
 
 // ---------------------------
 // Devil adult HAPPY tail wag
@@ -319,13 +320,12 @@ static const char *kEldBabySleepyYawn[] = {
 };
 
 // ---------------------------
-// Eldritch teen HAPPY bob (4-frame)
+// Eldritch teen HAPPY thumb (3-frame)
 // ---------------------------
 static const char *kEldTeenHappyBob[] = {
-    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_bob1.png",
-    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_bob2.png",
-    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_bob3.png",
-    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_bob4.png",
+    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_thumb1.png",
+    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_thumb2.png",
+    "/raising_hell/graphics/pet/anim/eld/tn/hpy/eld_tn_hpy_thumb3.png",
 };
 
 // ---------------------------
@@ -517,7 +517,7 @@ static const AnimClip kClips[] = {
     {ANIM_DEV_TEEN_ANGRY_CLAW, kDevTeenAngryClaw, 4, 120, true},
     {ANIM_DEV_TEEN_SLEEPY_BOB, kDevTeenSleepyBob, 4, 260, true},
     {ANIM_DEV_TEEN_SICK_BOB, kDevTeenSickBob, 4, 220, true},
-    {ANIM_DEV_TEEN_BORED_PLAY, kDevTeenBoredPlay, 3, 220, true},
+    {ANIM_DEV_TEEN_BORED_PLAY, kDevTeenBoredPlay, 4, 220, true},
 
     {ANIM_DEV_ADULT_HAPPY_TAIL, kDevAdultHappyTail, 4, 220, true},
     {ANIM_DEV_ADULT_HUNGRY_BEND, kDevAdultHungryBend, 4, 220, true},
@@ -542,7 +542,7 @@ static const AnimClip kClips[] = {
     {ANIM_ELD_BABY_SLEEPY_YAWN, kEldBabySleepyYawn, 4, 260, true},
     {ANIM_ELD_BABY_SICK_BOB, kEldBabySickBob, 3, 220, true},
 
-    {ANIM_ELD_TEEN_HAPPY_BOB, kEldTeenHappyBob, 4, 220, true},
+    {ANIM_ELD_TEEN_HAPPY_THUMB, kEldTeenHappyBob, 3, 220, true},
     {ANIM_ELD_TEEN_HUNGRY_BITE, kEldTeenHungryBite, 6, 180, true},
     {ANIM_ELD_TEEN_ANGRY_POSE, kEldTeenAngryPose, 4, 180, true},
     {ANIM_ELD_TEEN_BORED_DRIB, kEldTeenBoredDrib, 4, 220, true},
@@ -731,9 +731,9 @@ static AnimId eldTeenClipForMood(PetMood mood)
   case MOOD_BORED:
     return ANIM_ELD_TEEN_BORED_DRIB;
   case MOOD_HAPPY:
-    return ANIM_ELD_TEEN_HAPPY_BOB;
+    return ANIM_ELD_TEEN_HAPPY_THUMB;
   default:
-    return ANIM_ELD_TEEN_HAPPY_BOB;
+    return ANIM_ELD_TEEN_HAPPY_THUMB;
   }
 }
 

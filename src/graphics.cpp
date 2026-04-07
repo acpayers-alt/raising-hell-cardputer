@@ -251,6 +251,24 @@ static const char *PATH_ELD_BB_WALK2 = "/raising_hell/graphics/pet/anim/eld/bb/w
 static const char *PATH_ELD_BB_WALK1_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft1.png";
 static const char *PATH_ELD_BB_WALK2_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft2.png";
 
+// -- Eldritch Teen
+static const char *PATH_ELD_TN_WALK1 = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk1.png";
+static const char *PATH_ELD_TN_WALK2 = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk2.png";
+static const char *PATH_ELD_TN_WALK1_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft1.png";
+static const char *PATH_ELD_TN_WALK2_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft2.png";
+
+// -- Eldritch Adult
+static const char *PATH_ELD_AD_WALK1 = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk1.png";
+static const char *PATH_ELD_AD_WALK2 = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk2.png";
+static const char *PATH_ELD_AD_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft1.png";
+static const char *PATH_ELD_AD_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft2.png";
+
+// -- Eldritch Elder
+static const char *PATH_ELD_EL_WALK1 = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk1.png";
+static const char *PATH_ELD_EL_WALK2 = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk2.png";
+static const char *PATH_ELD_EL_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft1.png";
+static const char *PATH_ELD_EL_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft2.png";
+
 void uiResetLevelUpPopupState()
 {
   g_levelUpPopupActive = false;
@@ -302,7 +320,7 @@ static AnimId evoHappyClipFor(PetType type, uint8_t stage)
     case 0:
       return ANIM_ELD_BABY_HAPPY_SIT;
     case 1:
-      return ANIM_ELD_TEEN_HAPPY_BOB;
+      return ANIM_ELD_TEEN_HAPPY_THUMB;
     case 2:
       return ANIM_ELD_ADULT_HAPPY_SPIN;
     default:
@@ -4762,9 +4780,30 @@ static bool drawIntroWalkingPetOverride()
         else
           path = frame ? PATH_ELD_BB_WALK2 : PATH_ELD_BB_WALK1;
       }
+      else if (pet.evoStage == 1)
+      {
+        if (facingLeft)
+          path = frame ? PATH_ELD_TN_WALK2_L : PATH_ELD_TN_WALK1_L;
+        else
+          path = frame ? PATH_ELD_TN_WALK2 : PATH_ELD_TN_WALK1;
+      }
+      else if (pet.evoStage == 2)
+      {
+        if (facingLeft)
+          path = frame ? PATH_ELD_AD_WALK2_L : PATH_ELD_AD_WALK1_L;
+        else
+          path = frame ? PATH_ELD_AD_WALK2 : PATH_ELD_AD_WALK1;
+      }
+      else
+      {
+        if (facingLeft)
+          path = frame ? PATH_ELD_EL_WALK2_L : PATH_ELD_EL_WALK1_L;
+        else
+          path = frame ? PATH_ELD_EL_WALK2 : PATH_ELD_EL_WALK1;
+      }
     }
   }
-
+  
   if (!path || !path[0])
     return false;
 
@@ -6698,7 +6737,7 @@ void renderUI()
   tickPetScreenIntroFade();
   tickPetIntroWalk();
   tickPetWander();
-  
+
   const bool redrawRequested = consumeUIRedrawRequest();
   const bool petAnimating =
       (g_app.uiState == UIState::PET_SCREEN) &&
@@ -6706,7 +6745,7 @@ void renderUI()
        s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
        s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
        s_petWanderState == PetWanderState::RETURNING_HOME);
-  
+
   if (!tabChanged && !stateChanged && !bgInvalid && !redrawRequested && !petAnimating)
   {
     const uint32_t now = millis();
@@ -6719,7 +6758,7 @@ void renderUI()
   {
     lastRenderTimeMs = millis();
   }
-  
+
   lastTab = tabNow;
 
   const bool petScreenNow = (g_app.uiState == UIState::PET_SCREEN);
