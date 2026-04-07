@@ -43,8 +43,6 @@
 static bool g_backlightPulseActive = false;
 
 static uint8_t s_lastUserBrightnessLevel = 1;
-static bool s_batteryDimActive = false;
-static uint8_t s_batteryDimLevel = 0;       // protective dim target
 static bool s_batteryWifiForcedOff = false; // only restore Wi-Fi if we disabled it
 
 // --- Battery smoothing + curve helpers --------------------------------------
@@ -122,29 +120,29 @@ void initBacklight()
 
 static void applyBacklightRaw(uint8_t level)
 {
-  static uint8_t s_lastLevel = 255;
+  static uint8_t s_lastLevel = 255; // impossible value so first call always applies
 
-  if (level == s_lastLevel)
+  const uint8_t finalLevel = clampU8((int)level);
+
+  if (finalLevel == s_lastLevel)
     return;
 
-  s_lastLevel = level;
+  s_lastLevel = finalLevel;
 
-  if (Serial && Serial.availableForWrite() >= 96)
+  if (Serial && Serial.availableForWrite() >= 120)
   {
-    Serial.printf("[BL] setBacklight(%u) screenOn=%d pulse=%d ui=%d\n",
+    Serial.printf("[BL] setBacklight(req=%u final=%u) screenOn=%d pulse=%d ui=%d\n",
                   (unsigned)level,
+                  (unsigned)finalLevel,
                   isScreenOn() ? 1 : 0,
                   g_backlightPulseActive ? 1 : 0,
                   (int)g_app.uiState);
   }
 
-  M5Cardputer.Display.setBrightness(level);
+  M5Cardputer.Display.setBrightness(finalLevel);
 }
 
-void forceBacklightDuringFade(uint8_t level)
-{
-  applyBacklightRaw(level);
-}
+void forceBacklightDuringFade(uint8_t level) { applyBacklightRaw(level); }
 
 void setBacklight(uint8_t level)
 {
@@ -196,7 +194,7 @@ void setScreenPower(bool on)
       b = 0;
     if (b > 255)
       b = 255;
-    setBacklight((uint16_t)b);
+    SET_BACKLIGHT((uint8_t)b);
   }
 
   // Force redraw after wake
@@ -209,24 +207,6 @@ void setScreenPower(bool on)
   // Rebase animation timers so long screen-off intervals don't stall animation.
   animNotifyScreenWake();
   sleepBgNotifyScreenWake();
-}
-
-static uint8_t effectiveBrightnessLevel() { return s_batteryDimActive ? s_batteryDimLevel : brightnessLevel; }
-
-static void applyEffectiveBrightness()
-{
-  if (!isScreenOn())
-    return;
-
-  const uint8_t level = effectiveBrightnessLevel();
-  applyBrightnessLevel(level);
-}
-
-static void setBatteryDimActive(bool active, uint8_t dimLevel = 0)
-{
-  s_batteryDimActive = active;
-  s_batteryDimLevel = dimLevel;
-  applyEffectiveBrightness();
 }
 
 void displayRememberUserBrightness(uint8_t level) { s_lastUserBrightnessLevel = level; }
@@ -282,10 +262,7 @@ void backlightPulseBegin(uint8_t level)
   return;
 }
 
-void backlightPulseEnd()
-{
-  return;
-}
+void backlightPulseEnd() { return; }
 
 // ============================================================================
 // Battery polling (Cardputer) - robust (voltage -> percent)
@@ -308,6 +285,21 @@ static bool s_havePrevMv = false;
 static int s_attachEvidence = 0;
 static int s_detachEvidence = 0;
 static uint32_t s_lastUsbFlipMs = 0;
+
+bool displayUsbPowerLikely()
+{
+  const int mv = batteryVoltageMv;
+
+  // Only trust committed USB state, or a clearly-high battery voltage.
+  // Do NOT treat one weak piece of attach evidence as USB-present.
+  if (usbPowered)
+    return true;
+
+  if (mv >= 4140)
+    return true;
+
+  return false;
+}
 
 void updateBattery()
 {
@@ -356,9 +348,10 @@ void updateBattery()
   const int dv = mvFilt - s_prevMv;
   s_prevMv = mvFilt;
 
-  bool usb = usbPowered;
+  bool usb = usbPowered || (mvFilt >= 4140);
 
   const bool nearTop = (mvFilt >= 4140);
+  const bool lowBand = (mvFilt > 0 && mvFilt <= 3800);
   const bool risingHard = (dv >= 6);
   const bool risingSoft = (dv >= 3);
   const bool fallingHard = (dv <= -8);
@@ -394,9 +387,11 @@ void updateBattery()
     s_detachEvidence -= 1;
   }
 
+  const int attachThreshold = 4;
+
   if (!usb)
   {
-    if (s_attachEvidence >= 4)
+    if (s_attachEvidence >= attachThreshold)
     {
       usb = true;
       s_lastUsbFlipMs = now;
@@ -416,10 +411,10 @@ void updateBattery()
     }
   }
 
-  // boot-time guess so first reading is sane
+  // First pass: keep the full heuristic result. Do not clobber it back down to
+  // only "mv >= 4140", because that breaks low-battery-on-USB cases.
   if (!s_batLogPrintedOnce)
   {
-    usb = (mvFilt >= 4140);
     usbPowered = usb;
 
     if (Serial.availableForWrite() >= 160)
@@ -440,6 +435,7 @@ void updateBattery()
   static bool lastUsb = false;
 
   const bool changed = (pct != lastPct) || (mvFilt != lastMv) || (usb != lastUsb);
+
   if (changed)
   {
     batteryPercent = pct;
@@ -453,7 +449,7 @@ void updateBattery()
   }
 
   // --- quiet logging ---------------------------------------------------------
-  const bool usbChanged = (usb != s_lastLoggedUsb);
+  const bool usbLogChanged = (usb != s_lastLoggedUsb);
   const int pctDelta = pct - s_lastLoggedPct;
   const int mvDelta = mvFilt - s_lastLoggedMv;
 
@@ -464,7 +460,7 @@ void updateBattery()
   bool shouldLog = false;
   const char *reason = "";
 
-  if (usbChanged)
+  if (usbLogChanged)
   {
     shouldLog = true;
     reason = "usb";
@@ -505,9 +501,27 @@ void batteryProtectionTick(uint32_t now)
   static uint32_t critSinceMs = 0;
 
   const int mv = batteryVoltageMv;
+  const bool usbLikely = displayUsbPowerLikely();
 
-  const bool lowNow = (!usbPowered && mv > 0 && mv <= 3550);
-  const bool critNow = (!usbPowered && mv > 0 && mv <= 3475);
+  // On external power, battery protection stands down.
+  if (usbLikely)
+  {
+    lowSinceMs = 0;
+    critSinceMs = 0;
+    batteryLow = false;
+    batteryCritical = false;
+
+    if (s_batteryWifiForcedOff)
+    {
+      applyWifiPower(true);
+      s_batteryWifiForcedOff = false;
+    }
+
+    return;
+  }
+
+  const bool lowNow = (mv > 0 && mv <= 3550);
+  const bool critNow = (mv > 0 && mv <= 3475);
 
   if (lowNow)
   {
@@ -534,12 +548,18 @@ void batteryProtectionTick(uint32_t now)
 
   if (batteryLow)
   {
-    setBatteryDimActive(true, 0);
-
     if (!s_batteryWifiForcedOff)
     {
       applyWifiPower(false);
       s_batteryWifiForcedOff = true;
+    }
+  }
+  else
+  {
+    if (s_batteryWifiForcedOff)
+    {
+      applyWifiPower(true);
+      s_batteryWifiForcedOff = false;
     }
   }
 
@@ -547,33 +567,25 @@ void batteryProtectionTick(uint32_t now)
   {
     emergencyBatteryShutdown();
   }
-  if (!batteryLow && (now - lowSinceMs > 2000))
-  {
-    // Restore brightness
-    setBatteryDimActive(false);
-
-    // Restore Wi-Fi ONLY if we turned it off
-    if (s_batteryWifiForcedOff)
-    {
-      applyWifiPower(true);
-      s_batteryWifiForcedOff = false;
-    }
-  }
 }
 
 void setBacklightTagged(uint8_t level, const char *file, int line)
 {
   static uint8_t s_lastLevel = 255; // impossible value so first call always applies
 
-  // If we’re already at this brightness, do nothing (prevents spam + extra work).
   if (level == s_lastLevel)
     return;
   s_lastLevel = level;
 
-  if (Serial && Serial.availableForWrite() >= 120)
+  if (Serial && Serial.availableForWrite() >= 160)
   {
-    Serial.printf("[BL] setBacklight(%u) @ %s:%d t=%lu ui=%d tab=%d\n", (unsigned)level, file, line,
-                  (unsigned long)millis(), (int)g_app.uiState, (int)g_app.currentTab);
+    Serial.printf("[BL SRC] req=%u @ %s:%d t=%lu ui=%d tab=%d\n",
+                  (unsigned)level,
+                  file,
+                  line,
+                  (unsigned long)millis(),
+                  (int)g_app.uiState,
+                  (int)g_app.currentTab);
   }
 
   setBacklight(level);

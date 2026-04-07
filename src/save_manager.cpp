@@ -1431,11 +1431,15 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   if (outLoadedOld)
     *outLoadedOld = loadedOld;
 
-  g_settings = tmp;
+    g_settings = tmp;
 
-  brightnessLevel = g_settings.brightnessLevel;
-  displayRememberUserBrightness(brightnessLevel);
-  soundEnabled = (g_settings.soundEnabled != 0);
+    brightnessLevel = g_settings.brightnessLevel;
+    if (brightnessLevel > 2)
+      brightnessLevel = 1;
+  
+    displayRememberUserBrightness(brightnessLevel);
+
+    soundEnabled = (g_settings.soundEnabled != 0);
 
   autoScreenTimeoutSel = g_settings.autoScreenTimeoutSel;
   g_app.autoScreenOffEnabled = (autoScreenTimeoutSel != 0);
@@ -1498,6 +1502,7 @@ static bool saveSettingsToSD_internal()
   g_settings.shakeSensitivitySel = motionGetShakeSensitivity();
   g_settings.soundEnabled = soundEnabled;
   g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
+ 
   Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
                 wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
   g_settings.tzIndex = tzIndex;

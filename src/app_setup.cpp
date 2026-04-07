@@ -91,6 +91,7 @@ static constexpr int kBootBatteryResumeMv = 3650;
 static constexpr uint32_t kBootBatteryStableMs = 1500;
 static constexpr uint32_t kBootBatteryPollMs = 250;
 static constexpr int kBootBatteryTargetPercent = 5;
+static constexpr uint8_t kBootChargeGateDimBacklight = 35;
 
 void updateBattery();
 
@@ -222,7 +223,10 @@ void appSetup()
     const esp_reset_reason_t rr = esp_reset_reason();
 
     const bool brownoutReset = (rr == ESP_RST_BROWNOUT);
-    const bool criticalAtBoot = (!usbPowered && batteryVoltageMv > 0 && batteryVoltageMv < kBootBatteryEnterGateMv);
+    const bool externalPowerAtBoot = displayUsbPowerLikely();
+    const bool criticalAtBoot =
+        (!externalPowerAtBoot && batteryVoltageMv > 0 && batteryVoltageMv < kBootBatteryEnterGateMv);
+
     if (brownoutReset || criticalAtBoot)
     {
       Serial.printf("[BAT][BOOT] entering charge gate mv=%d pct=%d usb=%d\n", batteryVoltageMv, batteryPercent,
@@ -232,8 +236,8 @@ void appSetup()
       SET_SCREEN_POWER(true);
       displayInit();
 
-      // Dim a bit to reduce load
-      setBacklight(35);
+      // Start dim while gated on low battery.
+      setBacklight(kBootChargeGateDimBacklight);
 
       uint32_t safeSince = 0;
 
@@ -241,6 +245,12 @@ void appSetup()
       {
         M5Cardputer.update();
         updateBattery();
+
+        const bool usbNow = displayUsbPowerLikely();
+        const uint8_t normalBacklight = (uint8_t)brightnessValues[brightnessLevel];
+        const uint8_t desiredBacklight = usbNow ? normalBacklight : kBootChargeGateDimBacklight;
+
+        setBacklight(desiredBacklight);
 
         const bool safeNow = (batteryVoltageMv >= kBootBatteryResumeMv);
 
@@ -268,7 +278,7 @@ void appSetup()
         spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
         char buf[48];
-        snprintf(buf, sizeof(buf), "%d%% (target: %d%%)", batteryPercent, kBootBatteryTargetPercent);
+        snprintf(buf, sizeof(buf), "%d%%", batteryPercent);
         spr.drawString(buf, SCREEN_W / 2, 56);
 
         // Battery bar
@@ -309,8 +319,8 @@ void appSetup()
           spr.setTextColor(TFT_GREEN, TFT_BLACK);
           spr.drawString("Starting...", SCREEN_W / 2, 104);
         }
-        
-        else if (usbPowered)
+
+        else if (usbNow)
         {
           spr.setTextColor(TFT_YELLOW, TFT_BLACK);
           spr.drawString("Charging...", SCREEN_W / 2, 104);
@@ -335,7 +345,7 @@ void appSetup()
           break;
         }
 
-        delay(250);
+        delay(kBootBatteryPollMs);
       }
     }
   }

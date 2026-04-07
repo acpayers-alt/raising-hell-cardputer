@@ -7,6 +7,7 @@
 #include "display_dims_state.h"
 
 void updateBattery();
+bool displayUsbPowerLikely();
 
 // Public API
 void setScreenPower(bool on);
@@ -14,7 +15,7 @@ void setBacklight(uint8_t level);
 
 // Debug-tagged variants (if you have them)
 void setScreenPowerTagged(bool on, const char* file, int line);
-void setBacklightTagged(uint8_t level, const char* file, int line);
+void setBacklightTagged(uint8_t level, const char *file, int line);
 
 // Macros used across codebase
 #ifndef SET_SCREEN_POWER
@@ -79,3 +80,4 @@ uint8_t displayGetUserBrightnessLevel();
 void displayRememberUserBrightness(uint8_t level);
 
 void forceBacklightDuringFade(uint8_t level);
+bool displayUsbPowerLikely();

@@ -19,7 +19,5 @@ void applyBrightnessLevel(int level)
 {
   brightnessLevel = (uint8_t)clampi(level, 0, 2);
   displayRememberUserBrightness(brightnessLevel);
-  setBacklight((uint8_t)brightnessValues[brightnessLevel]);
-  // Optional:
-  // DBG_ON("[BRIGHT] level=%u val=%u\n", (unsigned)brightnessLevel, (unsigned)brightnessValues[brightnessLevel]);
+  SET_BACKLIGHT((uint8_t)brightnessValues[brightnessLevel]);
 }

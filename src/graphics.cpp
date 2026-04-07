@@ -1640,16 +1640,16 @@ void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoo
   else if (usb)
   {
     spr.setTextColor(TFT_YELLOW, TFT_BLACK);
-    spr.drawString("Charging... waiting for safe", 10, 122);
-    spr.drawString("voltage to continue boot.", 10, 140);
+    spr.drawString("Charging...", 10, 122);
+    spr.drawString("Current battery shown above.", 10, 140);
   }
   else
   {
     spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawString("Plug in USB to charge and", 10, 122);
-    spr.drawString("boot automatically.", 10, 140);
+    spr.drawString("Plug in USB to charge.", 10, 122);
+    spr.drawString("Current battery shown above.", 10, 140);
   }
-
+  
   spr.pushSprite(0, 0);
 }
 
@@ -5027,7 +5027,7 @@ static void drawClockModeScreen(bool redrawBg)
       }
     }
   }
-    
+
   // Clock Mode should not use the PET-tab home helper.
   // That helper reserves room for the mini-stat cluster and places the
   // bottom anchor too low for this mode.
