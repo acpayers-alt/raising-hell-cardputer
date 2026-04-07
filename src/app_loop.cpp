@@ -751,13 +751,13 @@ void appMainLoopTick()
   // Don't allow ESC/Q/tab jumps to steal focus on New Pet flow screens
   else if (g_app.uiState == UIState::CHOOSE_PET)
   {
-    input.escOnce = false;
+    // Allow ESC to back out of egg select, but still block global menu/tab steals.
     input.hotSettings = false;
     input.menuOnce = false;
     input.homeOnce = false;
     input.tabJump = 255;
   }
-  else
+    else
   {
     // Bottom-row tab hotkeys (z x c v b n m) — only when not in restricted screens
     if (g_app.uiState != UIState::NAME_PET && g_app.uiState != UIState::SET_TIME)

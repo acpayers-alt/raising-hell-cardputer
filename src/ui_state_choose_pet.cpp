@@ -1,45 +1,48 @@
 #include "ui_state_choose_pet.h"
 #include <Arduino.h>
 
-#include <string.h>
-#include "build_flags.h"
 #include "app_state.h"
+#include "build_flags.h"
+#include "graphics.h"
 #include "input.h"
 #include "name_entry_state.h"
 #include "new_pet_flow_state.h"
 #include "pet.h"
+#include "save_manager.h"
 #include "sound.h"
+#include "ui_actions.h"
+#include "ui_level_popup.h"
 #include "ui_new_pet_flow.h"
 #include "ui_runtime.h"
-#include "graphics.h"
-#include "ui_actions.h"
-#include "save_manager.h"
-#include "ui_level_popup.h"
+#include <string.h>
 
 static bool s_prevSelectHeld = false;
 
-void uiChoosePetOnEnter(InputState& in)
+void uiChoosePetOnEnter(InputState &in)
 {
   // Reset derived Enter-edge state so we do not create a fake edge
   // from whatever the previous state was doing.
   s_prevSelectHeld = in.selectHeld;
 
+  // Always default to DEVIL egg on entry
+  g_pendingPetType = PET_DEVIL;
+  pet.type = g_pendingPetType; // keep preview consistent
+
   // Any fresh entry into CHOOSE_PET should require a clean release first.
   g_choosePetBlockHatchUntilRelease = true;
 
   // Give the state a clean input surface.
-  while (in.kbHasEvent()) (void)in.kbPop();
+  while (in.kbHasEvent())
+    (void)in.kbPop();
   in.clearEdges();
   inputForceClear();
   clearInputLatch();
 
-  Serial.printf("[EGG] onEnter selectHeld=%d unlockMs=%lu blockUntilRelease=%d\n",
-    (int)in.selectHeld,
-    (unsigned long)g_choosePetInputUnlockMs,
-    (int)g_choosePetBlockHatchUntilRelease);
+  Serial.printf("[EGG] onEnter selectHeld=%d unlockMs=%lu blockUntilRelease=%d\n", (int)in.selectHeld,
+                (unsigned long)g_choosePetInputUnlockMs, (int)g_choosePetBlockHatchUntilRelease);
 }
 
-void uiChoosePetHandle(InputState& in)
+void uiChoosePetHandle(InputState &in)
 {
   // Reliable Enter edge (press-level -> edge) for Cardputer:
   // Sometimes selectOnce is missed depending on keyboard change detection.
@@ -53,12 +56,12 @@ void uiChoosePetHandle(InputState& in)
   {
     if ((int32_t)(g_choosePetInputUnlockMs - now) > 0)
     {
-      while (in.kbHasEvent()) (void)in.kbPop();
+      while (in.kbHasEvent())
+        (void)in.kbPop();
       in.clearEdges();
       clearInputLatch();
-      Serial.printf("[EGG] BLOCKED unlockMs still active now=%lu unlockMs=%lu\n",
-        (unsigned long)now,
-        (unsigned long)g_choosePetInputUnlockMs);
+      Serial.printf("[EGG] BLOCKED unlockMs still active now=%lu unlockMs=%lu\n", (unsigned long)now,
+                    (unsigned long)g_choosePetInputUnlockMs);
       return;
     }
 
@@ -68,30 +71,47 @@ void uiChoosePetHandle(InputState& in)
   // ---------------------------------------------------------------------------
   // Entry gate to prevent instant hatch
   // ---------------------------------------------------------------------------
-  if (g_choosePetBlockHatchUntilRelease)
+if (g_choosePetBlockHatchUntilRelease)
+{
+  // Always allow ESC to escape, even while blocked
+  if (in.escOnce)
   {
-    if (!in.selectHeld)
-    {
-      g_choosePetBlockHatchUntilRelease = false;
-    }
-    else
-    {
-      // swallow everything while held
-      while (in.kbHasEvent()) (void)in.kbPop();
-      in.clearEdges();
-      inputForceClear();
-      clearInputLatch();
-      Serial.println("[EGG] BLOCKED waiting for release");
-      return;
-    }
+    playBeep();
+
+    saveManagerAbortFreshPetFlow();
+
+    uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
+    requestFullUIRedraw();
+
+    while (in.kbHasEvent())
+      (void)in.kbPop();
+    inputForceClear();
+    clearInputLatch();
+    return;
   }
+
+  if (!in.selectHeld)
+  {
+    g_choosePetBlockHatchUntilRelease = false;
+  }
+  else
+  {
+    // swallow only select-related noise, not ESC
+    while (in.kbHasEvent())
+      (void)in.kbPop();
+    in.clearEdges();
+    inputForceClear();
+    clearInputLatch();
+    Serial.println("[EGG] BLOCKED waiting for release");
+    return;
+  }
+}
 
   // Enter edge derived from held state (more reliable than selectOnce)
   const bool enterEdge = (in.selectHeld && !s_prevSelectHeld);
-  if (enterEdge) {
-    Serial.printf("[EGG] enterEdge DETECTED selectHeld=%d prev=%d\n",
-                  (int)in.selectHeld,
-                  (int)s_prevSelectHeld);
+  if (enterEdge)
+  {
+    Serial.printf("[EGG] enterEdge DETECTED selectHeld=%d prev=%d\n", (int)in.selectHeld, (int)s_prevSelectHeld);
   }
 
   s_prevSelectHeld = in.selectHeld;
@@ -106,39 +126,41 @@ void uiChoosePetHandle(InputState& in)
     uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
     requestFullUIRedraw();
 
-    while (in.kbHasEvent()) (void)in.kbPop();
+    while (in.kbHasEvent())
+      (void)in.kbPop();
     inputForceClear();
     clearInputLatch();
     return;
   }
-  
+
   int move = 0;
 
   // Choose-egg should support left/right + up/down + encoder
-  if (in.leftOnce)  move = -1;
-  if (in.rightOnce) move = +1;
+  if (in.leftOnce)
+    move = -1;
+  if (in.rightOnce)
+    move = +1;
 
-  if (in.upOnce)    move = -1;
-  if (in.downOnce)  move = +1;
+  if (in.upOnce)
+    move = -1;
+  if (in.downOnce)
+    move = +1;
 
-  if (in.encoderDelta < 0) move = -1;
-  if (in.encoderDelta > 0) move = +1;
+  if (in.encoderDelta < 0)
+    move = -1;
+  if (in.encoderDelta > 0)
+    move = +1;
 
-  // This is your existing choice list ordering.
-  // Keep identical to legacy:
-  #if PUBLIC_BUILD
+// This is your existing choice list ordering.
+// Keep identical to legacy:
+#if PUBLIC_BUILD
   static const PetType kChoices[] = {
-    PET_DEVIL,
-    PET_ELDRITCH,
+      PET_DEVIL,
+      PET_ELDRITCH,
   };
 #else
   static const PetType kChoices[] = {
-    PET_DEVIL,
-    PET_ELDRITCH,
-    PET_ALIEN,
-    PET_KAIJU,
-    PET_ANUBIS,
-    PET_AXOLOTL,
+      PET_DEVIL, PET_ELDRITCH, PET_ALIEN, PET_KAIJU, PET_ANUBIS, PET_AXOLOTL,
   };
 #endif
 
@@ -158,8 +180,10 @@ void uiChoosePetHandle(InputState& in)
   if (move != 0)
   {
     int nextIdx = curIdx + (move > 0 ? 1 : -1);
-    if (nextIdx < 0) nextIdx = choiceCount - 1;
-    if (nextIdx >= choiceCount) nextIdx = 0;
+    if (nextIdx < 0)
+      nextIdx = choiceCount - 1;
+    if (nextIdx >= choiceCount)
+      nextIdx = 0;
 
     const PetType nextType = kChoices[nextIdx];
     if (nextType != g_pendingPetType)
@@ -217,13 +241,15 @@ void uiChoosePetHandle(InputState& in)
     requestFullUIRedraw();
 
     // Swallow any stray edges/typing so we don't instantly skip phases
-    while (in.kbHasEvent()) (void)in.kbPop();
+    while (in.kbHasEvent())
+      (void)in.kbPop();
     inputForceClear();
     clearInputLatch();
     return;
   }
 
   // swallow typing
-  while (in.kbHasEvent()) (void)in.kbPop();
+  while (in.kbHasEvent())
+    (void)in.kbPop();
   clearInputLatch();
 }

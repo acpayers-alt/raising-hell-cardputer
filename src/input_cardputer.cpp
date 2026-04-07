@@ -759,13 +759,12 @@ static void readKeyboard(InputState &out)
     switch (s)
     {
     case UIState::NAME_PET:
-    case UIState::CHOOSE_PET:
       return true;
     default:
       return false;
     }
   };
-
+  
   const bool escBlockedNow = escBlockedInState(g_app.uiState);
 
   // Cooldown: prevents menu flicker if some code clears the latch while ESC is still held.
