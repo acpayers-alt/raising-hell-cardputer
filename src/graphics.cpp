@@ -2884,19 +2884,22 @@ static void drawScreenSettingsMenu()
 
   char bLine[28];
   snprintf(bLine, sizeof(bLine), "Brightness: %s", brightnessToText(brightnessLevel));
-
+  
   char aLine[28];
   snprintf(aLine, sizeof(aLine), "Auto Screen: %s", autoScreenToText((uint8_t)autoScreenTimeoutSel));
-
+  
+  char cLine[20];
+  snprintf(cLine, sizeof(cLine), "Clock Mode");
+  
   char sLine[32];
   snprintf(sLine, sizeof(sLine), "Shake to Wake: %s", motionShakeSensitivityToText(motionGetShakeSensitivity()));
-
-  const char *labels[] = {bLine, aLine, sLine};
-  const int totalItems = 3;
+  
+  const char *labels[] = {bLine, aLine, cLine, sLine};
+  const int totalItems = 4;
 
   g_app.screenSettingsIndex = clampi(g_app.screenSettingsIndex, 0, totalItems - 1);
 
-  constexpr int MAX_VISIBLE = 3;
+  constexpr int MAX_VISIBLE = 4;
   int start = 0, visCount = 0;
   listWindow(totalItems, g_app.screenSettingsIndex, MAX_VISIBLE, start, visCount);
 
@@ -4990,7 +4993,7 @@ static void drawClockModeScreen(bool redrawBg)
   s_lastBgEvoStage = pet.evoStage;
 
   const bool animChanged = animConsumeFrameChanged();
-  const bool needRestore = true;
+  const bool needRestore = redrawBg || animChanged || needPetBg;
 
   if (s_petIntroHandoffActive && animChanged)
   {
@@ -5003,10 +5006,28 @@ static void drawClockModeScreen(bool redrawBg)
 
   if (needRestore)
   {
-    spr.fillScreen(TFT_BLACK);
-    restorePetAreaFromCache();
-  }
+    // Clock Mode owns the full frame. Always repaint the non-pet regions so
+    // transient UI like the power menu cannot bleed through.
+    spr.fillRect(0, 0, SCREEN_W, PET_AREA_Y, TFT_BLACK);
+    spr.fillRect(0, PET_AREA_Y + PET_AREA_H, SCREEN_W, SCREEN_H - (PET_AREA_Y + PET_AREA_H), TFT_BLACK);
 
+    if (petLayerReady)
+    {
+      restorePetAreaFromCache();
+    }
+    else
+    {
+      // Fallback: repaint just the pet area from the current pet background.
+      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+
+      const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
+      if (bgPath)
+      {
+        (void)sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+      }
+    }
+  }
+    
   // Clock Mode should not use the PET-tab home helper.
   // That helper reserves room for the mini-stat cluster and places the
   // bottom anchor too low for this mode.
