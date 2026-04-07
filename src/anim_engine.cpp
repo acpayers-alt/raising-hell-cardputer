@@ -539,10 +539,14 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
 
   // Clamp anchor so sprite bottoms never go under the tab bar.
   // This is the actual bottom of the pet area.
-  const int petBottom = SCREEN_H - TAB_BAR_H;
+  // Clamp anchor so sprite bottoms never go under the active bottom UI.
+  // Clock Mode has no tab bar, so let it use the full screen height.
+  const int petBottom = (g_app.uiState == UIState::CLOCK_MODE)
+                            ? SCREEN_H
+                            : (SCREEN_H - TAB_BAR_H);
   if (bottomY > petBottom)
     bottomY = petBottom;
-
+    
   AnimId id = s_baseId;
   uint8_t idx = s_baseIdx;
 

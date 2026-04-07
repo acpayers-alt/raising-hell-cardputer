@@ -781,10 +781,12 @@ static AnimId eldElderClipForMood(PetMood mood)
 
 AnimId animSelectPetScreen()
 {
-  // Animate whenever the UI is showing a "tab" surface that still displays the pet.
-  // (Stats/Feed/Play are also PET_SCREEN with different currentTab.)
-  const bool petVisibleUi = (g_app.uiState == UIState::PET_SCREEN) || (g_app.uiState == UIState::SLEEP_MENU) ||
-                            (g_app.uiState == UIState::INVENTORY) || (g_app.uiState == UIState::SHOP);
+  // Animate whenever the UI is showing a surface that still displays the pet.
+  const bool petVisibleUi = (g_app.uiState == UIState::PET_SCREEN) ||
+                            (g_app.uiState == UIState::CLOCK_MODE) ||
+                            (g_app.uiState == UIState::SLEEP_MENU) ||
+                            (g_app.uiState == UIState::INVENTORY) ||
+                            (g_app.uiState == UIState::SHOP);
 
   if (!petVisibleUi)
     return ANIM_NONE;
@@ -792,7 +794,6 @@ AnimId animSelectPetScreen()
   // Devil uses its existing routing.
   if (pet.type == PET_DEVIL)
   {
-    // Keep returning a loop even while sleeping so it doesn't "freeze" after long idle.
     if (pet.isSleeping)
     {
       switch (pet.evoStage)
@@ -810,10 +811,8 @@ AnimId animSelectPetScreen()
     return devClipForMood(pet.evoStage, pet.getMood());
   }
 
-  // Eldritch routing (baby + teen clips, placeholders for later stages).
   if (pet.type == PET_ELDRITCH)
   {
-    // While sleeping, force a loop that still animates.
     if (pet.isSleeping)
     {
       switch (pet.evoStage)
@@ -833,16 +832,12 @@ AnimId animSelectPetScreen()
     {
     case 0:
       return eldBabyClipForMood(pet.getMood());
-
     case 1:
       return eldTeenClipForMood(pet.getMood());
-
     case 2:
       return eldAdultClipForMood(pet.getMood());
-
     case 3:
       return eldElderClipForMood(pet.getMood());
-
     default:
       return ANIM_ELD_ELDER_IDLE_1F;
     }

@@ -4838,8 +4838,9 @@ static bool drawIntroWalkingPetOverride()
   (void)getPngWH(path, w, h);
 
   const int drawX = s_petScreenX - (w / 2);
-  const int drawY = s_petScreenY - h + kPetIntroYOffset;
-
+  const int yOffset = s_petIntroWalkActive ? kPetIntroYOffset : 0;
+  const int drawY = s_petScreenY - h + yOffset;
+  
   const bool ok = sprDrawPngFromSD(path, drawX, drawY);
   if (!ok)
   {
@@ -4965,14 +4966,16 @@ static void drawClockModeScreen(bool redrawBg)
     restorePetAreaFromCache();
   }
 
-  int homeCenterX = 0;
-  int homeBottomY = 0;
-  getPetHomeScreenPosition(homeCenterX, homeBottomY);
+  // Clock Mode should not use the PET-tab home helper.
+  // That helper reserves room for the mini-stat cluster and places the
+  // bottom anchor too low for this mode.
+  const int homeCenterX = (SCREEN_W / 2) - 65;
+  const int homeBottomY = SCREEN_H - 22;
 
   s_petHomeX = homeCenterX;
   s_petHomeY = homeBottomY;
 
-  if (!s_petScreenPosInitialized || redrawBg)
+  if (!s_petScreenPosInitialized)
   {
     s_petScreenX = homeCenterX;
     s_petScreenY = homeBottomY;
@@ -4980,17 +4983,26 @@ static void drawClockModeScreen(bool redrawBg)
     resetPetWanderToHome();
   }
 
-  // In Clock Mode, always use the normal anchored pet draw.
-  // Do not honor stale PET-screen intro override ownership here.
-  animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+  const PetMood mood = petResolveMood(pet);
+  const bool wanderAllowed = (mood == MOOD_HAPPY || mood == MOOD_BORED);
+
+  if (!wanderAllowed)
+  {
+    s_petScreenX = homeCenterX;
+    s_petScreenY = homeBottomY;
+  }
 
   time_t now = time(nullptr);
   tm tmNow = {};
   localtime_r(&now, &tmNow);
 
+  int hour12 = tmNow.tm_hour % 12;
+  if (hour12 == 0)
+    hour12 = 12;
+  
   char timeBuf[8];
-  snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", tmNow.tm_hour, tmNow.tm_min);
-
+  snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
+  
   static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
   static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
@@ -5007,6 +5019,18 @@ static void drawClockModeScreen(bool redrawBg)
 
   spr.setTextDatum(TC_DATUM);
   spr.drawString(dateBuf, SCREEN_W / 2, 20, 4);
+
+  // Draw the pet after the clock text so it appears in front.
+  // Only use the walking override while Clock Mode wandering is actually allowed.
+  if (wanderAllowed && petWalkOverrideActive())
+  {
+    if (!drawIntroWalkingPetOverride())
+      animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+  }
+  else
+  {
+    animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+  }
 
   spr.setTextDatum(BC_DATUM);
   spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);
