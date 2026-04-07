@@ -71,6 +71,7 @@ bool controlsHelpScrollDown();
 void uiResetLevelUpPopupState();
 bool isPetScreenIntroFadeActive();
 void startPetScreenIntroFadeNow();
+void resetClockModePetPresentation();
 
 // Console
 void drawConsoleMenu();

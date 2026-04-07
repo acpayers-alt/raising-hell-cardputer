@@ -2,6 +2,9 @@
 
 #include "flow_power_menu.h"
 #include "input.h"
+#include "ui_actions.h"
+#include "ui_runtime.h"
+#include "graphics.h"
 
 namespace {
 
@@ -9,6 +12,12 @@ struct MenuItem {
   const char* label;
   void (*onSelect)(InputState&);
 };
+
+static void actClockMode(InputState& in)
+{
+  resetClockModePetPresentation();
+  uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, in, 120);
+}
 
 static void actReboot(InputState& in)
 {
@@ -23,8 +32,9 @@ static void actShutdown(InputState& in)
 }
 
 static const MenuItem kItems[] = {
-  {"Reboot",    actReboot},
-  {"Shut Down", actShutdown},
+  {"Clock Mode", actClockMode},
+  {"Reboot",     actReboot},
+  {"Shut Down",  actShutdown},
 };
 
 } // namespace

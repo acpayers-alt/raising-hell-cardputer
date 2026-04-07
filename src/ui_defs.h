@@ -53,6 +53,7 @@ enum class UIState : uint8_t {
   TITLE_MENU       = 29,
   IMPORT_PET_LIST  = 30,
   BACKUP_PET_LIST  = 31,
+  CLOCK_MODE       = 32,
 };
 
 // --------------------

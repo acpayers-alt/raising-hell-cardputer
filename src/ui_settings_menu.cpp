@@ -312,6 +312,13 @@ static void actScreen_AutoScreenSelect(InputState &)
   clearInputLatch();
 }
 
+static void actScreen_ClockMode(InputState &input)
+{
+  playBeep();
+  uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, input, 120);
+  requestFullUIRedraw();
+}
+
 static void actScreen_ShakeSensitivityLeft(InputState &)
 {
   int sel = (int)motionGetShakeSensitivity() - 1;
@@ -653,9 +660,10 @@ static MenuItem kTopItems[] = {
 };
 
 static MenuItem kScreenItems[] = {
-    {"Brightness", nullptr, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
-    {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
-    {"Shake Sensitivity", nullptr, actScreen_ShakeSensitivityLeft, actScreen_ShakeSensitivityRight, nullptr},
+  {"Brightness", nullptr, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
+  {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
+  {"Clock Mode", actScreen_ClockMode, nullptr, nullptr, nullptr},
+  {"Shake Sensitivity", nullptr, actScreen_ShakeSensitivityLeft, actScreen_ShakeSensitivityRight, nullptr},
 };
 
 static void actWifi_AssetOtaChannelToggle(InputState &)

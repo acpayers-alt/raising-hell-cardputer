@@ -123,6 +123,7 @@ void resetPetScreenPositionToHome();
 void startPetIntroWalkFromLeft();
 static bool drawIntroWalkingPetOverride();
 static void resetPetWanderToHome();
+void resetClockModePetPresentation();
 
 // --- Compatibility wrappers / missing helpers (compile fix) ---
 static void drawSettingsScreen();
@@ -4417,6 +4418,25 @@ static void resetPetWanderToHome()
   scheduleNextPetWander();
 }
 
+void resetClockModePetPresentation()
+{
+  // Clear any scripted intro ownership so Clock Mode can draw the pet normally.
+  s_petIntroWalkActive = false;
+  s_petIntroArriveTurnActive = false;
+  s_petIntroStandHoldActive = false;
+  s_petIntroHandoffActive = false;
+
+  // Reset wander state so Clock Mode starts from a clean home position.
+  s_petWanderState = PetWanderState::HOME_IDLE;
+  s_petWanderTargetX = 0;
+  s_petWanderSideAX = 0;
+  s_petWanderSideBX = 0;
+  s_petWanderUntilMs = 0;
+  s_petWanderLastStepMs = 0;
+
+  s_petScreenPosInitialized = false;
+}
+
 void startPetIntroWalkFromLeft()
 {
   int homeX = 0;
@@ -4471,7 +4491,10 @@ static void tickPetIntroWalk()
     return;
   }
 
-  if (g_app.uiState != UIState::PET_SCREEN)
+  const bool freeRoamState = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
+                              (g_app.uiState == UIState::CLOCK_MODE));
+
+  if (!freeRoamState)
     return;
 
   int homeX = 0;
@@ -4524,9 +4547,12 @@ static void tickPetWander()
 
   const bool wanderActive = (s_petWanderState != PetWanderState::HOME_IDLE);
 
-  // Only wander on the main PET tab.
+  // Only wander on the main PET tab or in Clock Mode.
   // IMPORTANT: do not hard-reset an active wander.
-  if (g_app.uiState != UIState::PET_SCREEN || g_app.currentTab != Tab::TAB_PET)
+  const bool freeRoamState = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
+                              (g_app.uiState == UIState::CLOCK_MODE));
+
+  if (!freeRoamState)
   {
     if (!wanderActive)
       resetPetWanderToHome();
@@ -4803,7 +4829,7 @@ static bool drawIntroWalkingPetOverride()
       }
     }
   }
-  
+
   if (!path || !path[0])
     return false;
 
@@ -4904,6 +4930,88 @@ static void drawPetScreenImpl(bool redrawBg)
   drawTabBar();
 
   drawPetPerfHud();
+}
+
+static void drawClockModeScreen(bool redrawBg)
+{
+  if (!isScreenOn())
+    return;
+
+  static PetType s_lastBgPetType = (PetType)255;
+  static uint8_t s_lastBgEvoStage = 255;
+
+  const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
+  const bool cacheMissing = (g_petBgCachedPath == nullptr);
+  const bool needPetBg = redrawBg || petChanged || cacheMissing || g_forcePetBgCache;
+
+  s_lastBgPetType = pet.type;
+  s_lastBgEvoStage = pet.evoStage;
+
+  const bool animChanged = animConsumeFrameChanged();
+  const bool needRestore = true;
+
+  if (s_petIntroHandoffActive && animChanged)
+  {
+    s_petIntroHandoffActive = false;
+    requestUIRedraw();
+  }
+
+  cachePetAreaBackgroundIfNeeded(needPetBg);
+  g_forcePetBgCache = false;
+
+  if (needRestore)
+  {
+    spr.fillScreen(TFT_BLACK);
+    restorePetAreaFromCache();
+  }
+
+  int homeCenterX = 0;
+  int homeBottomY = 0;
+  getPetHomeScreenPosition(homeCenterX, homeBottomY);
+
+  s_petHomeX = homeCenterX;
+  s_petHomeY = homeBottomY;
+
+  if (!s_petScreenPosInitialized || redrawBg)
+  {
+    s_petScreenX = homeCenterX;
+    s_petScreenY = homeBottomY;
+    s_petScreenPosInitialized = true;
+    resetPetWanderToHome();
+  }
+
+  // In Clock Mode, always use the normal anchored pet draw.
+  // Do not honor stale PET-screen intro override ownership here.
+  animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+
+  time_t now = time(nullptr);
+  tm tmNow = {};
+  localtime_r(&now, &tmNow);
+
+  char timeBuf[8];
+  snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", tmNow.tm_hour, tmNow.tm_min);
+
+  static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+  const char *weekday = (tmNow.tm_wday >= 0 && tmNow.tm_wday < 7) ? kWeekdays[tmNow.tm_wday] : "---";
+  const char *month = (tmNow.tm_mon >= 0 && tmNow.tm_mon < 12) ? kMonths[tmNow.tm_mon] : "---";
+
+  char dateBuf[24];
+  snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
+
+  spr.setTextColor(TFT_WHITE);
+
+  spr.setTextDatum(TC_DATUM);
+  spr.drawString(timeBuf, SCREEN_W / 2, SCREEN_H / 2 - 20, 7);
+
+  spr.setTextDatum(TC_DATUM);
+  spr.drawString(dateBuf, SCREEN_W / 2, 20, 4);
+
+  spr.setTextDatum(BC_DATUM);
+  spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 // -----------------------------------------------------------------------------
@@ -6495,6 +6603,7 @@ static bool uiStateBlocksOverlays(UIState s)
   case UIState::CHOOSE_PET:
   case UIState::NAME_PET:
   case UIState::EVOLUTION:
+  case UIState::CLOCK_MODE:
     return true;
   default:
     return false;
@@ -6573,6 +6682,10 @@ static void drawCurrentScreen(bool redrawBg)
 
   case UIState::TITLE_MENU:
     drawTitleMenuScreen(redrawBg);
+    return;
+
+  case UIState::CLOCK_MODE:
+    drawClockModeScreen(redrawBg);
     return;
 
   case UIState::IMPORT_PET_LIST:
@@ -6739,8 +6852,11 @@ void renderUI()
   tickPetWander();
 
   const bool redrawRequested = consumeUIRedrawRequest();
+  const bool petFreeRoamScreen = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
+                                  (g_app.uiState == UIState::CLOCK_MODE));
+
   const bool petAnimating =
-      (g_app.uiState == UIState::PET_SCREEN) &&
+      petFreeRoamScreen &&
       (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive() || s_petIntroWalkActive ||
        s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
        s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
@@ -6761,7 +6877,9 @@ void renderUI()
 
   lastTab = tabNow;
 
-  const bool petScreenNow = (g_app.uiState == UIState::PET_SCREEN);
+  const bool petScreenNow = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
+                             (g_app.uiState == UIState::CLOCK_MODE));
+
   const bool petScreenJustEntered = petScreenNow && !s_petScreenWasActiveLastFrame;
   s_petScreenWasActiveLastFrame = petScreenNow;
 

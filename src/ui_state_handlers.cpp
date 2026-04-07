@@ -30,6 +30,7 @@
 #include "ui_state_sleep_menu.h"      // uiSleepMenuHandle
 #include "ui_state_tab_driven.h"      // uiTabDrivenHandle
 #include "ui_state_title_menu.h"      // uiTitleMenuHandle
+#include "ui_state_clock_mode.h"
 
 // -----------------------------------------------------------------------------
 // WiFi states
@@ -37,7 +38,7 @@
 #include "ui_state_wifi_connect_wait.h" // uiWifiConnectWaitHandle
 #include "ui_state_wifi_setup.h"        // uiWifiSetupHandle
 
-static constexpr int kUiStateCount = 32;
+static constexpr int kUiStateCount = 33;
 
 static inline int toIndex(UIState s) { return (int)s; }
 
@@ -74,7 +75,8 @@ static StateHandlerFn kHandlers[kUiStateCount] = {
     /* 29 TITLE_MENU                 */ uiTitleMenuHandle,
     /* 30 IMPORT_PET_LIST            */ uiImportPetListHandle,
     /* 31 BACKUP_PET_LIST            */ uiBackupPetListHandle,
-};
+    /* 32 CLOCK_MODE                 */ uiClockModeHandle,
+  };
 
 StateHandlerFn uiGetStateHandler(UIState state)
 {
