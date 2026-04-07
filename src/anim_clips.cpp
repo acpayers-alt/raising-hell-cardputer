@@ -129,7 +129,7 @@ static const char *kDevTeenBoredPlay[] = {
     "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink2.png",
     "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink3.png",
     "/raising_hell/graphics/pet/anim/dev/tn/brd/dev_tn_brd_drink4.png",
-  };
+};
 
 // ---------------------------
 // Devil adult HAPPY tail wag
@@ -782,18 +782,24 @@ static AnimId eldElderClipForMood(PetMood mood)
 AnimId animSelectPetScreen()
 {
   // Animate whenever the UI is showing a surface that still displays the pet.
-  const bool petVisibleUi = (g_app.uiState == UIState::PET_SCREEN) ||
-                            (g_app.uiState == UIState::CLOCK_MODE) ||
-                            (g_app.uiState == UIState::SLEEP_MENU) ||
-                            (g_app.uiState == UIState::INVENTORY) ||
+  const bool petVisibleUi = (g_app.uiState == UIState::PET_SCREEN) || (g_app.uiState == UIState::CLOCK_MODE) ||
+                            (g_app.uiState == UIState::SLEEP_MENU) || (g_app.uiState == UIState::INVENTORY) ||
                             (g_app.uiState == UIState::SHOP);
 
   if (!petVisibleUi)
     return ANIM_NONE;
 
+  // Clock Mode should never use the dedicated sleeping clips.
+  // Some pet/evo combinations do not have a valid sleeping sprite there,
+  // so force the tired pose instead.
+  const bool clockModeSleepingOverride = (g_app.uiState == UIState::CLOCK_MODE) && pet.isSleeping;
+
   // Devil uses its existing routing.
   if (pet.type == PET_DEVIL)
   {
+    if (clockModeSleepingOverride)
+      return devClipForMood(pet.evoStage, MOOD_TIRED);
+
     if (pet.isSleeping)
     {
       switch (pet.evoStage)
@@ -813,6 +819,22 @@ AnimId animSelectPetScreen()
 
   if (pet.type == PET_ELDRITCH)
   {
+    if (clockModeSleepingOverride)
+    {
+      switch (pet.evoStage)
+      {
+      case 0:
+        return eldBabyClipForMood(MOOD_TIRED);
+      case 1:
+        return eldTeenClipForMood(MOOD_TIRED);
+      case 2:
+        return eldAdultClipForMood(MOOD_TIRED);
+      case 3:
+      default:
+        return eldElderClipForMood(MOOD_TIRED);
+      }
+    }
+
     if (pet.isSleeping)
     {
       switch (pet.evoStage)
@@ -837,11 +859,24 @@ AnimId animSelectPetScreen()
     case 2:
       return eldAdultClipForMood(pet.getMood());
     case 3:
+    default:
+      return eldElderClipForMood(pet.getMood());
+    }
+  }
+
+    switch (pet.evoStage)
+    {
+    case 0:
+      return eldBabyClipForMood(pet.getMood());
+    case 1:
+      return eldTeenClipForMood(pet.getMood());
+    case 2:
+      return eldAdultClipForMood(pet.getMood());
+    case 3:
       return eldElderClipForMood(pet.getMood());
     default:
       return ANIM_ELD_ELDER_IDLE_1F;
     }
-  }
-
+  
   return ANIM_NONE;
 }
