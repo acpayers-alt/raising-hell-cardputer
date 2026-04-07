@@ -25,6 +25,7 @@
 #include "ui_runtime.h"
 #include "ui_settings_actions.h"
 #include "ui_settings_pages.h"
+#include "ui_state_clock_mode.h"
 
 // --- UI / Flow ---
 #include "menu_actions.h"
@@ -315,6 +316,7 @@ static void actScreen_AutoScreenSelect(InputState &)
 static void actScreen_ClockMode(InputState &input)
 {
   playBeep();
+  uiClockModeSetReturnState(g_app.uiState, g_app.currentTab);
   uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, input, 120);
   requestFullUIRedraw();
 }

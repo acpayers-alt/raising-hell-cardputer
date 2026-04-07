@@ -10,10 +10,12 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 #include "ui_state_settings.h"
+#include "return_target.h"
 
 // Entry guard to prevent "carried-held ENTER" from instantly waking the pet.
 static uint32_t s_enterSleepUiMs = 0;
 static bool s_prevSelectHeld = false;
+static ReturnTarget s_petSleepingReturn{UIState::PET_SCREEN, Tab::TAB_PET};
 
 void uiPetSleepingOnEnter(const InputState &in)
 {
@@ -42,11 +44,17 @@ void uiPetSleepingBootEnter()
   inputForceClear();
 }
 
+void uiPetSleepingSetReturnState(UIState state, Tab tab)
+{
+  s_petSleepingReturn.state = state;
+  s_petSleepingReturn.tab = tab;
+}
+
 void uiPetSleepingHandle(InputState &in)
 {
   if (!isPetSleepingNow())
   {
-    uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+    uiActionEnterStateClean(s_petSleepingReturn.state, s_petSleepingReturn.tab, true, in, 200);
     invalidateBackgroundCache();
     requestUIRedraw();
     return;
@@ -87,10 +95,10 @@ void uiPetSleepingHandle(InputState &in)
 
     graphicsReleaseUiCachesForMiniGame();
 
-    uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+    uiActionEnterStateClean(s_petSleepingReturn.state, s_petSleepingReturn.tab, true, in, 200);
     requestFullUIRedraw();
     forceRenderUIOnce();
     return;
-  }
+    }
   return;
 }

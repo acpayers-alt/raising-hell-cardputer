@@ -5,6 +5,11 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 #include "graphics.h"
+#include "ui_state_clock_mode.h"
+#include "app_state.h"
+#include "pet.h"
+#include "settings_flow_state.h"
+#include "save_manager.h"
 
 namespace {
 
@@ -13,9 +18,14 @@ struct MenuItem {
   void (*onSelect)(InputState&);
 };
 
-static void actClockMode(InputState& in)
+static void actClockMode(InputState &in)
 {
   resetClockModePetPresentation();
+
+  // Return to whatever screen was underneath the power menu.
+  uiClockModeSetReturnState(g_settingsFlow.powerMenuReturn.state,
+                            g_settingsFlow.powerMenuReturn.tab);
+
   uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, in, 120);
 }
 

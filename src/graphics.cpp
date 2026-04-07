@@ -4840,7 +4840,7 @@ static bool drawIntroWalkingPetOverride()
   const int drawX = s_petScreenX - (w / 2);
   const int yOffset = s_petIntroWalkActive ? kPetIntroYOffset : 0;
   const int drawY = s_petScreenY - h + yOffset;
-  
+
   const bool ok = sprDrawPngFromSD(path, drawX, drawY);
   if (!ok)
   {
@@ -4938,6 +4938,47 @@ static void drawClockModeScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
+  const bool hasLivePet = saveManagerSaveFileExists();
+
+  if (!hasLivePet)
+  {
+    spr.fillScreen(TFT_BLACK);
+
+    time_t now = time(nullptr);
+    tm tmNow = {};
+    localtime_r(&now, &tmNow);
+
+    int hour12 = tmNow.tm_hour % 12;
+    if (hour12 == 0)
+      hour12 = 12;
+
+    char timeBuf[8];
+    snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
+
+    static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+    const char *weekday = (tmNow.tm_wday >= 0 && tmNow.tm_wday < 7) ? kWeekdays[tmNow.tm_wday] : "---";
+    const char *month = (tmNow.tm_mon >= 0 && tmNow.tm_mon < 12) ? kMonths[tmNow.tm_mon] : "---";
+
+    char dateBuf[24];
+    snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
+
+    spr.setTextColor(TFT_WHITE);
+
+    spr.setTextDatum(TC_DATUM);
+    spr.drawString(timeBuf, SCREEN_W / 2, SCREEN_H / 2 - 20, 7);
+
+    spr.setTextDatum(TC_DATUM);
+    spr.drawString(dateBuf, SCREEN_W / 2, 20, 4);
+
+    spr.setTextDatum(BC_DATUM);
+    spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);
+
+    spr.setTextDatum(TL_DATUM);
+    return;
+  }
+
   static PetType s_lastBgPetType = (PetType)255;
   static uint8_t s_lastBgEvoStage = 255;
 
@@ -4999,10 +5040,10 @@ static void drawClockModeScreen(bool redrawBg)
   int hour12 = tmNow.tm_hour % 12;
   if (hour12 == 0)
     hour12 = 12;
-  
+
   char timeBuf[8];
   snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
-  
+
   static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
   static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 

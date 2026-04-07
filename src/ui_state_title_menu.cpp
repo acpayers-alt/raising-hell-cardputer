@@ -5,15 +5,14 @@
 #include "app_state.h"
 #include "graphics.h"
 #include "input.h"
+#include "pet.h"
 #include "save_manager.h"
 #include "settings_flow_state.h"
 #include "sound.h"
 #include "ui_actions.h"
-#include "ui_runtime.h"
 #include "ui_input_common.h"
-#include "pet.h"
+#include "ui_runtime.h"
 #include "ui_state_pet_sleeping.h"
-#include "ui_actions.h"
 
 int g_titleMenuIndex = 0;
 
@@ -104,20 +103,17 @@ static void titleActivateContinue(InputState &in)
     return;
   }
 
-  const bool shouldEnterSleeping =
-      pet.isSleeping ||
-      g_app.isSleeping ||
-      g_app.sleepingByTimer ||
-      g_app.sleepUntilRested ||
-      g_app.sleepUntilAwakened ||
-      saveManagerSleepPendingFlagExists();
-
-  uiActionEnterState(shouldEnterSleeping ? UIState::PET_SLEEPING : UIState::PET_SCREEN,
-                     Tab::TAB_PET,
-                     true);
+  const bool shouldEnterSleeping = pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
+                                   g_app.sleepUntilRested || g_app.sleepUntilAwakened ||
+                                   saveManagerSleepPendingFlagExists();
 
   if (shouldEnterSleeping)
   {
+    // 🔥 CRITICAL FIX: remember we came from TITLE MENU
+    uiPetSleepingSetReturnState(UIState::TITLE_MENU, Tab::TAB_PET);
+
+    uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
+
     uiPetSleepingBootEnter();
     requestFullUIRedraw();
     sleepBgKickNow();
@@ -125,6 +121,7 @@ static void titleActivateContinue(InputState &in)
   }
   else
   {
+    uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
     requestUIRedraw();
   }
 
@@ -149,7 +146,7 @@ void uiTitleMenuOnEnter(InputState &in)
   swallowTitleInput(in);
   refreshTitleMenuAvailability();
 
-  //If no save exists, always focus "New Pet" (row 0)
+  // If no save exists, always focus "New Pet" (row 0)
   if (!s_titleHasSave)
   {
     g_titleMenuIndex = TITLE_CONTINUE;

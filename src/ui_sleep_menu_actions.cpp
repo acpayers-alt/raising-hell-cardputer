@@ -11,6 +11,7 @@
 #include "ui_runtime.h"
 #include "ui_suppress.h"
 #include "ui_actions.h"
+#include "ui_state_pet_sleeping.h"
 
 void uiSleepMenuSetUntilAwakened(uint32_t nowMs)
 {
@@ -40,10 +41,12 @@ void uiSleepMenuEnterSleep(uint32_t nowMs)
 {
   (void)nowMs;
 
+  uiPetSleepingSetReturnState(g_app.uiState, g_app.currentTab);
+
   pet.isSleeping   = true;
   g_app.isSleeping = true;
   uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
-
+  
   requestUIRedraw();
 
   // Suppress wake detection so the same Enter press that selected
