@@ -25,5 +25,6 @@ void animForceStop();
 // Draw frame anchored so the sprite's bottom touches bottomY.
 // centerX is the horizontal center point for the sprite.
 void animDrawPetFrameAnchoredBottom(int centerX, int bottomY);
+void animDrawPetFrameAnchoredNominalBottom(int centerX, int nominalBottomY, int nominalH, int yAdjust);
 
 void animNotifyScreenWake();

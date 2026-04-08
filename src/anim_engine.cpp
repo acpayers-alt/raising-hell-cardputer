@@ -526,6 +526,62 @@ void animDrawPetFrame(int x, int y)
   s_petPerfStats.petFrameMs = smoothPerfMs(s_petPerfStats.petFrameMs, sample);
 }
 
+void animDrawPetFrameAnchoredNominalBottom(int centerX, int nominalBottomY, int nominalH, int yAdjust)
+{
+  const uint32_t frameStartMs = millis();
+
+  if (!g_sdReady)
+  {
+    const uint16_t sample = (uint16_t)(millis() - frameStartMs);
+    s_petPerfStats.petFrameMs = smoothPerfMs(s_petPerfStats.petFrameMs, sample);
+    return;
+  }
+
+  const int petBottom = (g_app.uiState == UIState::CLOCK_MODE)
+                            ? SCREEN_H
+                            : (SCREEN_H - TAB_BAR_H);
+  if (nominalBottomY > petBottom)
+    nominalBottomY = petBottom;
+
+  AnimId id = s_baseId;
+  uint8_t idx = s_baseIdx;
+
+  if (s_overridePlaying)
+  {
+    id = s_overrideId;
+    idx = s_overrideIdx;
+  }
+
+  const AnimClip *clip = animGetClip(id);
+  if (!clip || clip->frameCount == 0)
+  {
+    const uint16_t sample = (uint16_t)(millis() - frameStartMs);
+    s_petPerfStats.petFrameMs = smoothPerfMs(s_petPerfStats.petFrameMs, sample);
+    return;
+  }
+
+  if (idx >= clip->frameCount)
+    idx = 0;
+  const char *path = clip->frames[idx];
+
+  int w = 0;
+  int h = 0;
+  const int drawY = nominalBottomY - nominalH + yAdjust;
+
+  if (pngReadWHCached(path, &w, &h))
+  {
+    const int drawX = centerX - (w / 2);
+    (void)drawPngPathAnim(path, drawX, drawY);
+  }
+  else
+  {
+    (void)drawPngPathAnim(path, centerX, drawY);
+  }
+
+  const uint16_t sample = (uint16_t)(millis() - frameStartMs);
+  s_petPerfStats.petFrameMs = smoothPerfMs(s_petPerfStats.petFrameMs, sample);
+}
+
 void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
 {
   const uint32_t frameStartMs = millis();

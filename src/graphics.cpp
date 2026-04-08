@@ -181,7 +181,7 @@ static uint32_t s_petIntroStandHoldStartMs = 0;
 static constexpr int kPetIntroYOffset = -10; // tune this
 static constexpr uint32_t kPetIntroStandHoldMs = 300;
 static bool s_petIntroHandoffActive = false;
-static constexpr uint32_t kPetIntroWalkFrameMs = 60;
+static constexpr uint32_t kPetIntroWalkFrameMs = 45;
 
 static int s_petHomeX = 0;
 static int s_petHomeY = 0;
@@ -1649,7 +1649,7 @@ void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoo
     spr.drawString("Plug in USB to charge.", 10, 122);
     spr.drawString("Current battery shown above.", 10, 140);
   }
-  
+
   spr.pushSprite(0, 0);
 }
 
@@ -2884,16 +2884,16 @@ static void drawScreenSettingsMenu()
 
   char bLine[28];
   snprintf(bLine, sizeof(bLine), "Brightness: %s", brightnessToText(brightnessLevel));
-  
+
   char aLine[28];
   snprintf(aLine, sizeof(aLine), "Auto Screen: %s", autoScreenToText((uint8_t)autoScreenTimeoutSel));
-  
+
   char cLine[20];
   snprintf(cLine, sizeof(cLine), "Clock Mode");
-  
+
   char sLine[32];
   snprintf(sLine, sizeof(sLine), "Shake to Wake: %s", motionShakeSensitivityToText(motionGetShakeSensitivity()));
-  
+
   const char *labels[] = {bLine, aLine, cLine, sLine};
   const int totalItems = 4;
 
@@ -4612,11 +4612,26 @@ static void tickPetWander()
 
     const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
 
-    // Keep the full sprite visible, but reserve a little extra space away from
-    // the mini-stat cluster on the right so the pet doesn't crowd it.
+    const bool inClockMode = (g_app.uiState == UIState::CLOCK_MODE);
+
     const int minAnchorX = PET_SPR_W / 2;
     const int rightClearancePx = 12;
-    const int maxAnchorX = petAreaW - (PET_SPR_W / 2) - rightClearancePx;
+
+    int maxAnchorX = 0;
+
+    if (inClockMode)
+    {
+      // Clock Mode has no mini-stat cluster on the right, so let the pet use
+      // the full screen width (minus sprite visibility padding).
+      maxAnchorX = SCREEN_W - (PET_SPR_W / 2) - rightClearancePx;
+    }
+    else
+    {
+      const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
+
+      // PET tab still reserves space for the mini-stat cluster.
+      maxAnchorX = petAreaW - (PET_SPR_W / 2) - rightClearancePx;
+    }
 
     const int originX = s_petScreenX;
 
@@ -4739,6 +4754,75 @@ static void tickPetWander()
   }
 }
 
+static int getWalkBaselineAdjustForPet()
+{
+  switch (pet.type)
+  {
+  case PET_DEVIL:
+    switch (pet.evoStage)
+    {
+    case 0: return -9; // baby
+    case 1: return -9; // teen
+    case 2: return -20; // adult
+    case 3: return -18; // elder
+    default: return -2;
+    }
+
+  case PET_ELDRITCH:
+    switch (pet.evoStage)
+    {
+    case 0: return -2; // baby
+    case 1: return -6; // teen
+    case 2: return -18; // adult
+    case 3: return -19; // elder
+    default: return -6;
+    }
+
+  case PET_ALIEN:
+    switch (pet.evoStage)
+    {
+    case 0: return -2;
+    case 1: return -2;
+    case 2: return -2;
+    case 3: return -2;
+    default: return -2;
+    }
+
+  case PET_KAIJU:
+    switch (pet.evoStage)
+    {
+    case 0: return -2;
+    case 1: return -2;
+    case 2: return -2;
+    case 3: return -2;
+    default: return -2;
+    }
+
+  case PET_ANUBIS:
+    switch (pet.evoStage)
+    {
+    case 0: return -2;
+    case 1: return -2;
+    case 2: return -2;
+    case 3: return -2;
+    default: return -2;
+    }
+
+  case PET_AXOLOTL:
+    switch (pet.evoStage)
+    {
+    case 0: return -2;
+    case 1: return -2;
+    case 2: return -2;
+    case 3: return -2;
+    default: return -2;
+    }
+
+  default:
+    return -2;
+  }
+}
+
 static bool drawIntroWalkingPetOverride()
 {
   if (!g_sdReady)
@@ -4836,15 +4920,24 @@ static bool drawIntroWalkingPetOverride()
   if (!path || !path[0])
     return false;
 
-  int w = PET_SPR_W;
-  int h = PET_SPR_H;
-  (void)getPngWH(path, w, h);
+    int w = PET_SPR_W;
+    int h = PET_SPR_H;
+    (void)getPngWH(path, w, h);
+  
+    const int drawX = s_petScreenX - (w / 2);
+  
+    const int yOffset =
+        (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive) ? kPetIntroYOffset : 0;
+  
+    // Anchor walking frames to the same nominal sprite box as static frames.
+    // If a walking PNG is shorter than PET_SPR_H, don't let that pull it lower.
+    const int anchorH = PET_SPR_H;
+    const int walkBaselineAdjust = getWalkBaselineAdjustForPet();
+    
+    const int drawY = s_petScreenY - anchorH + yOffset + walkBaselineAdjust;
 
-  const int drawX = s_petScreenX - (w / 2);
-  const int yOffset = s_petIntroWalkActive ? kPetIntroYOffset : 0;
-  const int drawY = s_petScreenY - h + yOffset;
+    const bool ok = sprDrawPngFromSD(path, drawX, drawY);
 
-  const bool ok = sprDrawPngFromSD(path, drawX, drawY);
   if (!ok)
   {
     Serial.printf("[PET WALK] draw failed path='%s' x=%d y=%d w=%d h=%d\n", path, drawX, drawY, w, h);
@@ -5028,11 +5121,11 @@ static void drawClockModeScreen(bool redrawBg)
     }
   }
 
-  // Clock Mode should not use the PET-tab home helper.
-  // That helper reserves room for the mini-stat cluster and places the
-  // bottom anchor too low for this mode.
+  // Keep Clock Mode on the same vertical baseline as the PET screen.
+  // Only override X here; Y should match the normal pet home anchor.
+  const PetRenderProfile &prof = getPetProfile(pet.type);
   const int homeCenterX = (SCREEN_W / 2) - 65;
-  const int homeBottomY = SCREEN_H - 22;
+  const int homeBottomY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
 
   s_petHomeX = homeCenterX;
   s_petHomeY = homeBottomY;
@@ -5084,14 +5177,16 @@ static void drawClockModeScreen(bool redrawBg)
 
   // Draw the pet after the clock text so it appears in front.
   // Only use the walking override while Clock Mode wandering is actually allowed.
+  const int clockStaticBaselineAdjust = getWalkBaselineAdjustForPet();
+
   if (wanderAllowed && petWalkOverrideActive())
   {
     if (!drawIntroWalkingPetOverride())
-      animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+      animDrawPetFrameAnchoredNominalBottom(s_petScreenX, s_petScreenY, PET_SPR_H, clockStaticBaselineAdjust);
   }
   else
   {
-    animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
+    animDrawPetFrameAnchoredNominalBottom(s_petScreenX, s_petScreenY, PET_SPR_H, clockStaticBaselineAdjust);
   }
 
   spr.setTextDatum(BC_DATUM);
