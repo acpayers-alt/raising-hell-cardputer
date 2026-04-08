@@ -4777,7 +4777,7 @@ static int getWalkBaselineAdjustForPet()
     switch (pet.evoStage)
     {
     case 0:
-      return -5; // baby
+      return -1; // baby
     case 1:
       return -9; // teen
     case 2:
@@ -5259,7 +5259,7 @@ static void drawClockModeScreen(bool redrawBg)
   {
     animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
   }
-    
+
   // Always repaint the footer strip in Clock Mode.
   // Do not rely on the pet-area restore path to preserve it.
   spr.fillRect(0, SCREEN_H - TAB_BAR_H, SCREEN_W, TAB_BAR_H, TFT_BLACK);
@@ -7792,15 +7792,15 @@ void drawTitleMenuScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
-  if (redrawBg)
-  {
-    bool ok = false;
-    if (g_sdReady)
-      ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
+bool ok = false;
+if (redrawBg || !bgDrawnForState || lastDrawnState != UIState::TITLE_MENU)
+{
+  if (g_sdReady)
+    ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
 
-    if (!ok)
-      spr.fillSprite(TFT_BLACK);
-  }
+  if (!ok)
+    spr.fillSprite(TFT_BLACK);
+}
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
