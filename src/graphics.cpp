@@ -4771,8 +4771,8 @@ static int getWalkBaselineAdjustForPet()
   case PET_ELDRITCH:
     switch (pet.evoStage)
     {
-    case 0: return -2; // baby
-    case 1: return -6; // teen
+    case 0: return -5; // baby
+    case 1: return -9; // teen
     case 2: return -18; // adult
     case 3: return -19; // elder
     default: return -6;
