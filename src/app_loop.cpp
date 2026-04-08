@@ -279,12 +279,20 @@ void appMainLoopTick()
 
     if (motionAvailable && motionShakeDetected())
     {
-      SET_SCREEN_POWER(true);
+      screenWake();
       motionResetShakeDetector(2500);
-      noteUserActivity();
+      setLastInputActivityMs(now);
       invalidateBackgroundCache();
-      requestUIRedraw();
+      requestFullUIRedraw();
+      inputForceClear();
       clearInputLatch();
+
+#if LED_STATUS_ENABLED
+      ledSetScreenOff(false);
+      ledUpdatePetStatus(computeLedMode());
+#endif
+
+      return;
     }
 
 #if LED_STATUS_ENABLED
@@ -748,12 +756,6 @@ void appMainLoopTick()
     input.tabJump = 255;
   }
 
-  else if (g_app.uiState == UIState::CLOCK_MODE)
-  {
-    input.hotSettings = false;
-    input.homeOnce = false;
-    input.tabJump = 255;
-  }
   // Don't allow ESC/Q/tab jumps to steal focus on New Pet flow screens
   else if (g_app.uiState == UIState::CHOOSE_PET)
   {

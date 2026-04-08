@@ -14,13 +14,33 @@ bool wifiStoreHasCreds() {
   return s.length() > 0;
 }
 
-bool wifiStoreLoad(String& ssid, String& pass) {
+bool wifiStoreLoad(String& ssid, String& pass)
+{
+  ssid = "";
+  pass = "";
+
   Preferences p;
-  if (!p.begin(NS, true)) return false;
+
+  // Read-only open can fail if the namespace does not exist yet.
+  // Treat that as "no stored creds", not as a fatal Wi-Fi error.
+  if (!p.begin(NS, true))
+  {
+    Serial.println("[WIFI STORE] load: namespace missing or prefs open failed");
+    return false;
+  }
+
   ssid = p.getString(K_SSID, "");
   pass = p.getString(K_PASS, "");
   p.end();
-  return ssid.length() > 0;
+
+  const bool ok = ssid.length() > 0;
+
+  Serial.printf("[WIFI STORE] load ok=%d ssid='%s' passLen=%u\n",
+                ok ? 1 : 0,
+                ok ? ssid.c_str() : "",
+                ok ? (unsigned)pass.length() : 0);
+
+  return ok;
 }
 
 void wifiStoreSave(const String& ssid, const String& pass) {

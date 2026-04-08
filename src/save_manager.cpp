@@ -2187,6 +2187,19 @@ bool saveManagerLoad()
   }
   const bool saveOk = loadSaveFromSD_internal();
 
+  // Migration / recovery case:
+// if a real pet save exists but settings.bin was missing, synthesize sane
+// defaults now and persist them immediately so boot/finalize sees the right
+// Wi-Fi preference on this same boot and future boots.
+if (saveOk && !settingsOk)
+{
+  settingsSetWifiEnabled(true);
+  g_settings.wifiEnabled = 1;
+
+  Serial.println("[SAVE] loaded pet with missing settings -> writing default settings (wifi on)");
+  saveSettingsToSD_internal();
+}
+
   Serial.printf("[SAVE] load result=%d err=%u size=%lu\n", saveOk ? 1 : 0, (unsigned)g_lastLoadErr,
                 (unsigned long)g_lastLoadSize);
 

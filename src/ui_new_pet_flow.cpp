@@ -44,6 +44,14 @@ void finalizeNewPetFromName(InputState& in)
   // Commit chosen type into the final saved pet
   pet.type = g_pendingPetType;
 
+  // New pet type is now final. Blow away any cached presentation from the
+  // previous pet immediately so PET / clock / sleep screens rebuild using the
+  // new type on the very first frame.
+  graphicsReleaseUiCachesForMiniGame();
+  resetClockModePetPresentation();
+  sleepBgKickNow();
+  invalidateBackgroundCache();
+
   // New pet must start with the canonical starter inventory, regardless of
   // what the previous pet had (death / factory reset / flow restart, etc.).
   g_app.inventory.resetToDefaults();
@@ -51,10 +59,13 @@ void finalizeNewPetFromName(InputState& in)
   // Birth time starts when the pet is actually named/finalized.
   saveManagerStampBirthNow();
 
-  saveManagerForce();
+  // The pet is finalized now, so clear pending-flow flags BEFORE forcing the
+  // first live save. Otherwise saveManagerForce() will skip save.bin creation.
   saveManagerClearNamePendingFlag();
   bootSetupClearPendingFlag();
 
+  saveManagerForce();
+  
   g_app.newPetFlowActive = false;
 
   // Immediately arm AND start the fade BEFORE state change
@@ -68,7 +79,7 @@ void finalizeNewPetFromName(InputState& in)
   // Arm fade to begin on next frame
   g_app.petScreenIntroFadePending = true;
 
-  requestUIRedraw();
+  requestFullUIRedraw();
   invalidateBackgroundCache();
   requestUIRedraw();
 

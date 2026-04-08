@@ -5,7 +5,7 @@
 #define RH_VERSION_PATCH 0
 
 #define RH_VERSION_LABEL "eldritch"
-#define RH_VERSION_STRING "1.1.0"
+#define RH_VERSION_STRING "2.0.0"
 
 #ifndef PUBLIC_BUILD
 #define PUBLIC_BUILD 0

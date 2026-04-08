@@ -2,24 +2,21 @@
 
 #include "M5Cardputer.h"
 
-#include <SD.h>
 #include <FS.h>
+#include <SD.h>
 #include <lgfx/v1/misc/DataWrapper.hpp>
 
-#include "sdcard.h"
+#include "anim_clips.h"
+#include "app_state.h"
 #include "display.h"
 #include "graphics.h"
-#include "anim_clips.h"
-#include "ui_invalidate.h"
 #include "runtime_flags_state.h"
-#include "app_state.h"
+#include "sdcard.h"
+#include "ui_invalidate.h"
 
 static PetPerfStats s_petPerfStats;
 
-const PetPerfStats &petPerfStats()
-{
-  return s_petPerfStats;
-}
+const PetPerfStats &petPerfStats() { return s_petPerfStats; }
 
 void petPerfResetStats()
 {
@@ -28,10 +25,7 @@ void petPerfResetStats()
   s_petPerfStats.animStepMs = 0;
 }
 
-static uint16_t smoothPerfMs(uint16_t oldValue, uint16_t sample)
-{
-  return (uint16_t)((oldValue * 3u + sample) / 4u);
-}
+static uint16_t smoothPerfMs(uint16_t oldValue, uint16_t sample) { return (uint16_t)((oldValue * 3u + sample) / 4u); }
 
 // -----------------------------------------------------------------------------
 // Arduino File -> LovyanGFX DataWrapper (same as pet_anim.cpp, but centralized)
@@ -121,9 +115,7 @@ static bool pngReadWH(const char *path, int *outW, int *outH)
 
   auto be32 = [&](int off) -> int
   {
-    return (int)((uint32_t)buf[off] << 24 |
-                 (uint32_t)buf[off + 1] << 16 |
-                 (uint32_t)buf[off + 2] << 8 |
+    return (int)((uint32_t)buf[off] << 24 | (uint32_t)buf[off + 1] << 16 | (uint32_t)buf[off + 2] << 8 |
                  (uint32_t)buf[off + 3]);
   };
 
@@ -537,9 +529,10 @@ void animDrawPetFrameAnchoredNominalBottom(int centerX, int nominalBottomY, int 
     return;
   }
 
-  const int petBottom = (g_app.uiState == UIState::CLOCK_MODE)
-                            ? SCREEN_H
-                            : (SCREEN_H - TAB_BAR_H);
+  // Clock Mode still has a footer area for the ESC hint.
+  // Reserve that strip so tall sprites never draw into it.
+  const int petBottom = SCREEN_H - TAB_BAR_H;
+
   if (nominalBottomY > petBottom)
     nominalBottomY = petBottom;
 
@@ -597,12 +590,12 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
   // This is the actual bottom of the pet area.
   // Clamp anchor so sprite bottoms never go under the active bottom UI.
   // Clock Mode has no tab bar, so let it use the full screen height.
-  const int petBottom = (g_app.uiState == UIState::CLOCK_MODE)
-                            ? SCREEN_H
-                            : (SCREEN_H - TAB_BAR_H);
+  // Clock Mode still has a footer area for the ESC hint.
+  // Reserve that strip so tall sprites never draw into it.
+  const int petBottom = SCREEN_H - TAB_BAR_H;
   if (bottomY > petBottom)
     bottomY = petBottom;
-    
+
   AnimId id = s_baseId;
   uint8_t idx = s_baseIdx;
 

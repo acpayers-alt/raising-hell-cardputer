@@ -39,6 +39,4 @@ void uiClockModeHandle(InputState &in)
 
     return;
   }
-
-  clearInputLatch();
 }

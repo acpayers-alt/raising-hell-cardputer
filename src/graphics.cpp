@@ -178,7 +178,7 @@ static constexpr uint32_t kPetIntroArriveTurnMs = 180;
 
 static bool s_petIntroStandHoldActive = false;
 static uint32_t s_petIntroStandHoldStartMs = 0;
-static constexpr int kPetIntroYOffset = -10; // tune this
+static constexpr int kPetIntroYOffset = 0;
 static constexpr uint32_t kPetIntroStandHoldMs = 300;
 static bool s_petIntroHandoffActive = false;
 static constexpr uint32_t kPetIntroWalkFrameMs = 45;
@@ -4761,65 +4761,134 @@ static int getWalkBaselineAdjustForPet()
   case PET_DEVIL:
     switch (pet.evoStage)
     {
-    case 0: return -9; // baby
-    case 1: return -9; // teen
-    case 2: return -20; // adult
-    case 3: return -18; // elder
-    default: return -2;
+    case 0:
+      return -9; // baby
+    case 1:
+      return -9; // teen
+    case 2:
+      return -20; // adult
+    case 3:
+      return -18; // elder
+    default:
+      return -2;
     }
 
   case PET_ELDRITCH:
     switch (pet.evoStage)
     {
-    case 0: return -5; // baby
-    case 1: return -9; // teen
-    case 2: return -18; // adult
-    case 3: return -19; // elder
-    default: return -6;
+    case 0:
+      return -5; // baby
+    case 1:
+      return -9; // teen
+    case 2:
+      return -18; // adult
+    case 3:
+      return -19; // elder
+    default:
+      return -6;
     }
 
   case PET_ALIEN:
     switch (pet.evoStage)
     {
-    case 0: return -2;
-    case 1: return -2;
-    case 2: return -2;
-    case 3: return -2;
-    default: return -2;
+    case 0:
+      return -2;
+    case 1:
+      return -2;
+    case 2:
+      return -2;
+    case 3:
+      return -2;
+    default:
+      return -2;
     }
 
   case PET_KAIJU:
     switch (pet.evoStage)
     {
-    case 0: return -2;
-    case 1: return -2;
-    case 2: return -2;
-    case 3: return -2;
-    default: return -2;
+    case 0:
+      return -2;
+    case 1:
+      return -2;
+    case 2:
+      return -2;
+    case 3:
+      return -2;
+    default:
+      return -2;
     }
 
   case PET_ANUBIS:
     switch (pet.evoStage)
     {
-    case 0: return -2;
-    case 1: return -2;
-    case 2: return -2;
-    case 3: return -2;
-    default: return -2;
+    case 0:
+      return -2;
+    case 1:
+      return -2;
+    case 2:
+      return -2;
+    case 3:
+      return -2;
+    default:
+      return -2;
     }
 
   case PET_AXOLOTL:
     switch (pet.evoStage)
     {
-    case 0: return -2;
-    case 1: return -2;
-    case 2: return -2;
-    case 3: return -2;
-    default: return -2;
+    case 0:
+      return -2;
+    case 1:
+      return -2;
+    case 2:
+      return -2;
+    case 3:
+      return -2;
+    default:
+      return -2;
     }
 
   default:
     return -2;
+  }
+}
+
+static int getClockModeBaselineDeltaForPet()
+{
+  switch (pet.type)
+  {
+  case PET_DEVIL:
+    switch (pet.evoStage)
+    {
+    case 0:
+      return TAB_BAR_H; // baby
+    case 1:
+      return TAB_BAR_H; // teen
+    case 2:
+      return TAB_BAR_H; // adult
+    case 3:
+      return TAB_BAR_H; // elder
+    default:
+      return TAB_BAR_H;
+    }
+
+  case PET_ELDRITCH:
+    switch (pet.evoStage)
+    {
+    case 0:
+      return TAB_BAR_H;     // baby
+    case 1:
+      return TAB_BAR_H;     // teen
+    case 2:
+      return TAB_BAR_H + 1; // adult tentacles hang a hair lower
+    case 3:
+      return TAB_BAR_H + 1; // elder too
+    default:
+      return TAB_BAR_H;
+    }
+
+  default:
+    return TAB_BAR_H;
   }
 }
 
@@ -4920,23 +4989,23 @@ static bool drawIntroWalkingPetOverride()
   if (!path || !path[0])
     return false;
 
-    int w = PET_SPR_W;
-    int h = PET_SPR_H;
-    (void)getPngWH(path, w, h);
-  
-    const int drawX = s_petScreenX - (w / 2);
-  
-    const int yOffset =
-        (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive) ? kPetIntroYOffset : 0;
-  
-    // Anchor walking frames to the same nominal sprite box as static frames.
-    // If a walking PNG is shorter than PET_SPR_H, don't let that pull it lower.
-    const int anchorH = PET_SPR_H;
-    const int walkBaselineAdjust = getWalkBaselineAdjustForPet();
-    
-    const int drawY = s_petScreenY - anchorH + yOffset + walkBaselineAdjust;
+  int w = PET_SPR_W;
+  int h = PET_SPR_H;
+  (void)getPngWH(path, w, h);
 
-    const bool ok = sprDrawPngFromSD(path, drawX, drawY);
+  const int drawX = s_petScreenX - (w / 2);
+
+  const int yOffset =
+      (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive) ? kPetIntroYOffset : 0;
+
+  // Anchor walking frames to the same nominal sprite box as static frames.
+  // If a walking PNG is shorter than PET_SPR_H, don't let that pull it lower.
+  const int anchorH = PET_SPR_H;
+  const int walkBaselineAdjust = getWalkBaselineAdjustForPet();
+
+  const int drawY = s_petScreenY - anchorH + yOffset + walkBaselineAdjust;
+
+  const bool ok = sprDrawPngFromSD(path, drawX, drawY);
 
   if (!ok)
   {
@@ -5034,7 +5103,7 @@ static void drawClockModeScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
-  const bool hasLivePet = saveManagerSaveFileExists();
+  const bool hasLivePet = saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
 
   if (!hasLivePet)
   {
@@ -5110,13 +5179,16 @@ static void drawClockModeScreen(bool redrawBg)
     }
     else
     {
-      // Fallback: repaint just the pet area from the current pet background.
+      // Fallback: repaint only the pet area from the current pet background.
+      // Clip so the full-frame JPG cannot spill into the footer strip.
       spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
 
       const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
       if (bgPath)
       {
+        spr.setClipRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H);
         (void)sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+        spr.clearClipRect();
       }
     }
   }
@@ -5175,19 +5247,22 @@ static void drawClockModeScreen(bool redrawBg)
   spr.setTextDatum(TC_DATUM);
   spr.drawString(dateBuf, SCREEN_W / 2, 20, 4);
 
-  // Draw the pet after the clock text so it appears in front.
-  // Only use the walking override while Clock Mode wandering is actually allowed.
-  const int clockStaticBaselineAdjust = getWalkBaselineAdjustForPet();
-
+  // Match PET-tab static placement exactly in Clock Mode.
+  // Walking override keeps its existing path; static fallback uses the same
+  // anchored-bottom renderer as the PET screen.
   if (wanderAllowed && petWalkOverrideActive())
   {
     if (!drawIntroWalkingPetOverride())
-      animDrawPetFrameAnchoredNominalBottom(s_petScreenX, s_petScreenY, PET_SPR_H, clockStaticBaselineAdjust);
+      animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
   }
   else
   {
-    animDrawPetFrameAnchoredNominalBottom(s_petScreenX, s_petScreenY, PET_SPR_H, clockStaticBaselineAdjust);
+    animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
   }
+    
+  // Always repaint the footer strip in Clock Mode.
+  // Do not rely on the pet-area restore path to preserve it.
+  spr.fillRect(0, SCREEN_H - TAB_BAR_H, SCREEN_W, TAB_BAR_H, TFT_BLACK);
 
   spr.setTextDatum(BC_DATUM);
   spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);

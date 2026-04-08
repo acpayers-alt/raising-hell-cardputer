@@ -654,6 +654,26 @@ static void finalizeBootLanding()
   Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n", (int)s_bootFinalLandingState,
                 g_controlsHelpSeen ? 1 : 0, g_postProvisionControlsHelpPending ? 1 : 0);
 
+  // Ensure Wi-Fi is actually applied before any early-return landing detours
+  // like controls help.
+  if (!g_wifiApplied)
+  {
+    const bool pref = settingsWifiEnabled();
+  
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n",
+                  pref ? 1 : 0,
+                  (WiFi.getMode() == WIFI_OFF ? 0 : 1));
+  
+    wifiSetEnabled(pref);
+    applyWifiPower(pref);
+  
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n",
+                  pref ? 1 : 0,
+                  (WiFi.getMode() == WIFI_OFF ? 0 : 1));
+  
+    g_wifiApplied = true;
+  }
+  
   // If we are landing on the title screen with no save file, this is a
   // "no-save title menu" landing, not an active new-pet flow.
   //
@@ -717,24 +737,6 @@ static void finalizeBootLanding()
   {
     EEPROM.put(SEED_MARK_ADDR, (uint16_t)SEED_MARK);
     EEPROM.commit();
-  }
-
-  // Ensure Wi-Fi is actually applied before leaving boot
-  if (!g_wifiApplied)
-  {
-    const bool pref = settingsWifiEnabled();
-
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n", pref ? 1 : 0, wifiIsEnabled() ? 1 : 0);
-
-    wifiSetEnabled(false);
-    applyWifiPower(false);
-
-    wifiSetEnabled(pref);
-    applyWifiPower(pref);
-
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n", pref ? 1 : 0, wifiIsEnabled() ? 1 : 0);
-
-    g_wifiApplied = true;
   }
 
   if (g_app.uiState == UIState::BOOT)
@@ -906,8 +908,10 @@ void postBootInitTick()
     if (g_sdReady)
     {
       settingsLoaded = loadSettingsFromSD();
-      if (!settingsLoaded)
-        saveSettingsToSD();
+
+      // Do NOT immediately persist defaults here.
+      // If a real save exists, saveManagerLoad() may repair missing settings
+      // (including Wi-Fi preference) and then write the correct defaults.
     }
 
     // FIRST RUN FLAG (from factory reset)
@@ -953,28 +957,13 @@ void postBootInitTick()
     // Post-provision help is a UI detour only.
     // It must never erase the fact that a valid save was loaded.
     const bool loadedSaveExists = loadedFromSD;
-    const bool noLiveSave = !loadedSaveExists;
-    
-    // IMPORTANT:
-    // A no-save boot must land at the title menu, not get forced into the old
-    // first-boot wizard just because onboarding/time setup is pending.
-    // Keep the wizard for:
-    //   - missing settings
-    //   - explicit forced first run
-    //   - pending onboarding only when a live save actually exists
-   
+
     // If we have a real save, NEVER go to first boot wizard.
     // Missing settings will be regenerated elsewhere.
-    const bool firstBootWizard =
-        (!loadedSaveExists) &&
-        (
-          !settingsLoaded ||
-          forcedFirstRun ||
-          setupPending
-        );
+    const bool firstBootWizard = (!loadedSaveExists) && (!settingsLoaded || forcedFirstRun || setupPending);
 
     (void)saveFileExistsNow;
-    
+
     UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);
 
     s_bootFinalLandingState = afterOk;
@@ -1166,43 +1155,31 @@ void postBootInitTick()
     const int uiNow = (int)g_app.uiState;
     const int onboardingNow = g_bootProvisionWifiOnboardingStarted ? 1 : 0;
     const int activeNow = g_bootAssetProvisionActive ? 1 : 0;
-  
+
     static int s_prevAssetStage35Ui = -1;
     static int s_prevAssetStage35Wifi = -1;
     static int s_prevAssetStage35Onboarding = -1;
     static int s_prevAssetStage35Active = -1;
-  
-    const bool changed =
-        (uiNow != s_prevAssetStage35Ui) ||
-        (wifiNow != s_prevAssetStage35Wifi) ||
-        (onboardingNow != s_prevAssetStage35Onboarding) ||
-        (activeNow != s_prevAssetStage35Active);
-  
+
+    const bool changed = (uiNow != s_prevAssetStage35Ui) || (wifiNow != s_prevAssetStage35Wifi) ||
+                         (onboardingNow != s_prevAssetStage35Onboarding) || (activeNow != s_prevAssetStage35Active);
+
     if (changed)
     {
       Serial.printf(
           "[BOOT][ASSET_STAGE35] required=%d deferred=%d must=%d blocked=%d active=%d wifi=%d ui=%d onboarding=%d\n",
-          bootAssetProvisionRequired() ? 1 : 0,
-          g_bootLandingDeferredForAssetProvision ? 1 : 0,
-          g_bootAssetProvisionMustComplete ? 1 : 0,
-          g_bootUiBlockedForAssetProvision ? 1 : 0,
-          activeNow,
-          wifiNow,
-          uiNow,
+          bootAssetProvisionRequired() ? 1 : 0, g_bootLandingDeferredForAssetProvision ? 1 : 0,
+          g_bootAssetProvisionMustComplete ? 1 : 0, g_bootUiBlockedForAssetProvision ? 1 : 0, activeNow, wifiNow, uiNow,
           onboardingNow);
-  
+
       s_prevAssetStage35Ui = uiNow;
       s_prevAssetStage35Wifi = wifiNow;
       s_prevAssetStage35Onboarding = onboardingNow;
       s_prevAssetStage35Active = activeNow;
     }
-  
-    if (bootAssetProvisionRequired() &&
-        g_bootLandingDeferredForAssetProvision &&
-        !g_bootAssetProvisionActive &&
-        !g_bootProvisionWifiOnboardingStarted &&
-        WiFi.status() == WL_CONNECTED &&
-        g_app.uiState != UIState::BOOT)
+
+    if (bootAssetProvisionRequired() && g_bootLandingDeferredForAssetProvision && !g_bootAssetProvisionActive &&
+        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED && g_app.uiState != UIState::BOOT)
     {
       Serial.printf("[BOOT][ASSET_STAGE35] forcing return to BOOT from ui=%d\n", (int)g_app.uiState);
       uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
@@ -1210,15 +1187,15 @@ void postBootInitTick()
       requestUIRedraw();
       return;
     }
-  
+
     // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
     if (bootAssetProvisionWifiOnboardingActive())
       return;
-  
+
     // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
     if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
       return;
-  
+
     if (runBootAssetProvision())
       return;
   }
@@ -1231,7 +1208,7 @@ void postBootInitTick()
     return;
   }
 
-    //   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Stage 4: Persist time anchor once we have synced time
   // ---------------------------------------------------------------------------
   if (!g_ntpSaved && timeIsSynced())

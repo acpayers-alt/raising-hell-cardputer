@@ -5,9 +5,11 @@
 #include "input.h"                // inputForceClear(), clearInputLatch()
 #include "input_activity_state.h" // setLastInputActivityMs(now)
 #include "menu_actions.h"         // openPowerMenuFromHere(now)
+#include "motion.h"
 #include "ui_invalidate.h"
 #include <Arduino.h>
-#include "motion.h"
+#include "graphics.h"
+#include "ui_runtime.h"
 
 static constexpr int GO_BTN_PIN = 0;
 static constexpr bool GO_ACTIVE_LOW = true;
@@ -146,16 +148,22 @@ void powerButtonTick(uint32_t now)
     markScreenPowerManualToggle(now);
     toggleScreenPower();
 
+    // GO can also surface as keyboard Enter on Cardputer.
+    // Consume exactly one Enter->select mapping so waking/toggling the screen
+    // does not leak into UI actions.
+    inputConsumeEnterOnce();
+
     if (!isScreenOn())
-  motionResetShakeDetector(1200);
-  
+      motionResetShakeDetector(1200);
+
     inputForceClear();
     clearInputLatch();
 
     if (!wasOn && isScreenOn())
     {
       setLastInputActivityMs(now);
-      requestUIRedraw();
+      invalidateBackgroundCache();
+      requestFullUIRedraw();
     }
   }
 }
