@@ -48,8 +48,8 @@
 #include "wifi_store.h"
 
 // UI / rendering
-#include "display_state.h"
 #include "display.h"
+#include "display_state.h"
 #include "graphics.h"
 #include "ui_actions.h"
 #include "ui_invalidate.h"
@@ -757,10 +757,7 @@ static void forceChoosePetFlowFromBoot()
   clearInputLatch();
 }
 
-void saveManagerStartFreshPetFlow()
-{
-  forceChoosePetFlowFromBoot();
-}
+void saveManagerStartFreshPetFlow() { forceChoosePetFlowFromBoot(); }
 
 void saveManagerAbortFreshPetFlow()
 {
@@ -1094,7 +1091,7 @@ static void migrateV3ToRuntime(const SavePayloadV3 &p3)
   p4.energy = p3.pet.energy;
   p4.health = p3.pet.health;
   p4.petType = p3.pet.petType;
-  p4.isSleeping = 0;
+  p4.isSleeping = p3.pet.isSleeping;
   p4.lastFedTimeMs = p3.pet.lastFedTimeMs;
   p4.inf = p3.pet.inf;
   p4.birth_epoch = p3.pet.birth_epoch;
@@ -1103,14 +1100,16 @@ static void migrateV3ToRuntime(const SavePayloadV3 &p3)
   p4.name[PET_NAME_MAX] = '\0';
 
   p4.petId = generatePetId();
-  p4.level = p3.pet.level;
+
+  // True 1.0.3 layout decode
+  p4.level = (p3.pet.level == 0) ? 1 : p3.pet.level;
   p4.xp = p3.pet.xp;
-  p4.evoStage = p3.pet.evoStage;
+  p4.evoStage = (p3.pet.evoStage > 3) ? 0 : p3.pet.evoStage;
 
   pet.fromPersist(p4);
 
-  pet.isSleeping = false;
-  g_app.isSleeping = false;
+  pet.isSleeping = p3.pet.isSleeping;
+  g_app.isSleeping = pet.isSleeping;
   g_app.sleepingByTimer = false;
   g_app.sleepUntilRested = false;
   g_app.sleepUntilAwakened = false;
@@ -1125,7 +1124,33 @@ static void migrateV3ToRuntime(const SavePayloadV3 &p3)
 
   applySleepStateFromBootFlag();
 
-  g_app.inventory.fromPersist(p3.inv);
+  g_app.inventory.clear();
+
+  for (int i = 0; i < SAVE_INV_MAX_ITEMS_V3; ++i)
+  {
+    const uint8_t t = p3.inv.slots[i].type;
+    const uint8_t q = p3.inv.slots[i].qty;
+
+    if (t == (uint8_t)ITEM_NONE || q == 0)
+      continue;
+
+    if (t > (uint8_t)ITEM_ELDRITCH_EYE)
+    {
+      Serial.printf("[SAVE][V3] skip invalid inv slot=%d type=%u qty=%u\n", i, (unsigned)t, (unsigned)q);
+      continue;
+    }
+
+    g_app.inventory.addItem((ItemType)t, (int)q);
+  }
+
+  const int invCount = g_app.inventory.countItems();
+  if (invCount <= 0)
+    g_app.inventory.selectedIndex = 0;
+  else
+    g_app.inventory.selectedIndex = constrain((int)p3.inv.selectedIndex, 0, invCount - 1);
+
+  g_app.inventory.syncEepromNoDirty();
+
   g_birthEpoch = (p3.birth_epoch != 0) ? p3.birth_epoch : p3.pet.birth_epoch;
 
   saveManagerMarkDirty();
@@ -1431,15 +1456,15 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   if (outLoadedOld)
     *outLoadedOld = loadedOld;
 
-    g_settings = tmp;
+  g_settings = tmp;
 
-    brightnessLevel = g_settings.brightnessLevel;
-    if (brightnessLevel > 2)
-      brightnessLevel = 1;
-  
-    displayRememberUserBrightness(brightnessLevel);
+  brightnessLevel = g_settings.brightnessLevel;
+  if (brightnessLevel > 2)
+    brightnessLevel = 1;
 
-    soundEnabled = (g_settings.soundEnabled != 0);
+  displayRememberUserBrightness(brightnessLevel);
+
+  soundEnabled = (g_settings.soundEnabled != 0);
 
   autoScreenTimeoutSel = g_settings.autoScreenTimeoutSel;
   g_app.autoScreenOffEnabled = (autoScreenTimeoutSel != 0);
@@ -1502,7 +1527,7 @@ static bool saveSettingsToSD_internal()
   g_settings.shakeSensitivitySel = motionGetShakeSensitivity();
   g_settings.soundEnabled = soundEnabled;
   g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
- 
+
   Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
                 wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
   g_settings.tzIndex = tzIndex;
@@ -1683,6 +1708,22 @@ static bool loadSaveFileInternal(const char *path)
                     (unsigned)SAVE_VERSION, (unsigned long)sz);
       return false;
     }
+    // Reject obviously malformed payloads before they touch runtime.
+    if (p.pet.petType >= PET_TYPE_COUNT)
+    {
+      g_lastLoadErr = SLE_VERSION_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=pet_type_bad got=%u size=%lu\n", path, (unsigned)p.pet.petType,
+                    (unsigned long)sz);
+      return false;
+    }
+
+    if (p.pet.evoStage > 3)
+    {
+      g_lastLoadErr = SLE_VERSION_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=evo_bad got=%u size=%lu\n", path, (unsigned)p.pet.evoStage,
+                    (unsigned long)sz);
+      return false;
+    }
 
     unpack(p);
   }
@@ -1711,6 +1752,7 @@ static bool loadSaveFileInternal(const char *path)
       return false;
     }
 
+    // STRICT: only true V3 layout allowed here
     if (p3.version != 3)
     {
       g_lastLoadErr = SLE_VERSION_BAD;
@@ -2166,10 +2208,15 @@ bool saveManagerLoad()
     const bool namePending = namePendingFlagExists();
     const bool blankPetName = isBlankName(pet.name);
 
-    if (healed)
-    {
-      Serial.println("[SAVE] auto-heal changed loaded payload");
-    }
+if (healed)
+{
+  Serial.println("[SAVE] auto-heal changed loaded payload");
+
+  // TEMP DEBUG GUARD:
+  // Do not allow immediate persistence of a legacy V3 migration result while
+  // we are still validating raw XP decode offsets.
+  dirty = false;
+}
 
     Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
                   blankPetName ? 1 : 0, pet.name);

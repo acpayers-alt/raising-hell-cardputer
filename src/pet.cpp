@@ -79,12 +79,15 @@ void petResetUpdateTimers()
 // ------------------------------------------------------------
 // Pet-O-Matic
 // ------------------------------------------------------------
+
+static const char *getSpritePathForTypeAndStage(PetType type, uint8_t stage);
+
 Pet::Pet()
     : type(PET_DEVIL), hunger(0), happiness(100), energy(100), health(100), inf(0), birth_epoch(0), petId(0),
-      isSleeping(false)
+      isSleeping(false), lastFedTime(0), x(0), y(0), width(0), height(0), level(1), xp(0), evoStage(0)
 {
   name[0] = '\0';
-  strncpy(spritePath, "/graphics/pet/devil_baby_normal.raw", sizeof(spritePath));
+  strncpy(spritePath, getSpritePathForTypeAndStage(PET_DEVIL, 0), sizeof(spritePath));
   spritePath[sizeof(spritePath) - 1] = '\0';
 }
 
@@ -269,13 +272,9 @@ void Pet::petSleepTick()
   // Sleep transitions are owned by explicit UI/state actions.
   // Do not auto-wake here just because we are temporarily not in PET_SLEEPING.
   const UIState ui = g_app.uiState;
-  const bool allowSleepUi =
-  (ui == UIState::PET_SLEEPING) ||
-  (ui == UIState::POWER_MENU) ||
-  (ui == UIState::PET_SCREEN) ||
-  (ui == UIState::TITLE_MENU) ||
-  isSettingsState(ui);
-  
+  const bool allowSleepUi = (ui == UIState::PET_SLEEPING) || (ui == UIState::POWER_MENU) ||
+                            (ui == UIState::PET_SCREEN) || (ui == UIState::TITLE_MENU) || isSettingsState(ui);
+
   if (!allowSleepUi)
   {
     return;
@@ -293,7 +292,7 @@ void Pet::petSleepTick()
   //   - a sleep restored from boot, or
   //   - an already-established sleeping session.
   // In either case, do NOT re-set the flag or mark dirty again.
-     
+
   if (saveManagerSleepPendingFlagExists())
   {
     s_sleepFlagLatched = true;
@@ -611,8 +610,8 @@ void Pet::update()
   const bool sleepingNow = this->isSleeping || g_app.isSleeping || g_app.sleepingByTimer || g_app.sleepUntilRested ||
                            g_app.sleepUntilAwakened;
 
-                           // Do NOT force-exit sleep here.
-                           // UI/state system owns sleep transitions.
+  // Do NOT force-exit sleep here.
+  // UI/state system owns sleep transitions.
   // Do NOT force-exit sleep from update loop.
   // Sleep transitions must be handled explicitly via UI/state logic.
   // This avoids breaking rendering/caches during state transitions.
@@ -876,13 +875,13 @@ void Pet::fromPersist(const PetPersist &in)
 
   type = (PetType)in.petType;
 
-// Do NOT blindly restore sleep state from persist.
-// Sleep state is owned by sleep_pending.flag (boot restore logic).
-// This avoids overwriting a restored sleeping state.
-if (!saveManagerSleepPendingFlagExists())
-{
-  this->isSleeping = (in.isSleeping != 0);
-}
+  // Do NOT blindly restore sleep state from persist.
+  // Sleep state is owned by sleep_pending.flag (boot restore logic).
+  // This avoids overwriting a restored sleeping state.
+  if (!saveManagerSleepPendingFlagExists())
+  {
+    this->isSleeping = (in.isSleeping != 0);
+  }
 
   lastFedTime = (unsigned long)in.lastFedTimeMs;
   inf = (int)in.inf;

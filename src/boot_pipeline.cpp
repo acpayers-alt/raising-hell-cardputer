@@ -962,11 +962,17 @@ void postBootInitTick()
     //   - missing settings
     //   - explicit forced first run
     //   - pending onboarding only when a live save actually exists
+   
+    // If we have a real save, NEVER go to first boot wizard.
+    // Missing settings will be regenerated elsewhere.
     const bool firstBootWizard =
-        !settingsLoaded ||
-        forcedFirstRun ||
-        (setupPending && !noLiveSave);
-    
+        (!loadedSaveExists) &&
+        (
+          !settingsLoaded ||
+          forcedFirstRun ||
+          setupPending
+        );
+
     (void)saveFileExistsNow;
     
     UIState afterOk = appLifecycleResolveBootAfterOkState(loadedSaveExists);

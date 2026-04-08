@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
-#include "pet_defs.h" 
+#include "pet_defs.h"
 
 // ============================================================
 // SAVE FILE FORMAT
@@ -126,6 +126,15 @@ struct PetPersistV2 {
   char     name[PET_NAME_MAX + 1];
 };
 
+// ============================================================
+// V3 BACK-COMPAT PAYLOAD (true 1.0.3 layout)
+// IMPORTANT: this must match the exact 1.0.3 compiler-written struct.
+// ============================================================
+
+static constexpr int SAVE_INV_MAX_ITEMS_V3 = 16;
+static constexpr int LEGACY_PET_NAME_MAX_V3 = 24;
+static constexpr int LEGACY_PET_NAME_LEN_V3 = LEGACY_PET_NAME_MAX_V3 + 1;
+
 struct PetPersistV3 {
   uint8_t  hunger;
   uint8_t  happiness;
@@ -136,11 +145,16 @@ struct PetPersistV3 {
   uint32_t lastFedTimeMs;
   int32_t  inf;
   uint32_t birth_epoch;
-  char     name[PET_NAME_MAX + 1];
+  char     name[LEGACY_PET_NAME_LEN_V3];
 
   uint16_t level;
   uint32_t xp;
   uint8_t  evoStage;
+};
+
+struct InvPersistV3 {
+  InvSlotPersist slots[SAVE_INV_MAX_ITEMS_V3];
+  int16_t        selectedIndex;
 };
 
 struct SavePayloadV3 {
@@ -148,9 +162,13 @@ struct SavePayloadV3 {
   uint16_t version;
 
   PetPersistV3 pet;
-  InvPersist   inv;
+  InvPersistV3 inv;
   uint32_t     birth_epoch;
 };
+
+static_assert(sizeof(PetPersistV3) == 56, "PetPersistV3 must match 1.0.3 56-byte layout");
+static_assert(sizeof(InvPersistV3) == 34, "InvPersistV3 must match 1.0.3 34-byte layout");
+static_assert(sizeof(SavePayloadV3) == 104, "SavePayloadV3 must match 1.0.3 104-byte layout");
 
 struct SavePayloadV2 {
   uint32_t magic;
@@ -160,4 +178,3 @@ struct SavePayloadV2 {
   InvPersist   inv;
   uint32_t     birth_epoch;
 };
-
