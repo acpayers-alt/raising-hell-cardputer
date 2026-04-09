@@ -86,8 +86,8 @@
 #include "sleep_state.h"
 
 //-- Battery Constants
-static constexpr int kBootBatteryEnterGateMv = 3600;
-static constexpr int kBootBatteryResumeMv = 3650;
+static constexpr int kBootBatteryEnterGateMv = 3200;
+static constexpr int kBootBatteryResumeMv = 3250;
 static constexpr uint32_t kBootBatteryStableMs = 1500;
 static constexpr uint32_t kBootBatteryPollMs = 250;
 static constexpr int kBootBatteryTargetPercent = 5;

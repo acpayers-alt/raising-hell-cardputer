@@ -33,7 +33,7 @@
 // --- Power / system control ---------------------------------------------------
 #include "brightness_state.h"
 #include "flow_power_menu.h"
-#include "wifi_power.h"
+#include "time_persist.h"
 
 // --- Debug --------------------------------------------------------------------
 #include "debug_state.h"
@@ -43,7 +43,6 @@
 static bool g_backlightPulseActive = false;
 
 static uint8_t s_lastUserBrightnessLevel = 1;
-static bool s_batteryWifiForcedOff = false; // only restore Wi-Fi if we disabled it
 
 // --- Battery smoothing + curve helpers --------------------------------------
 
@@ -531,13 +530,6 @@ void batteryProtectionTick(uint32_t now)
     critSinceMs = 0;
     batteryLow = false;
     batteryCritical = false;
-
-    if (s_batteryWifiForcedOff)
-    {
-      applyWifiPower(true);
-      s_batteryWifiForcedOff = false;
-    }
-
     return;
   }
 
@@ -567,23 +559,7 @@ void batteryProtectionTick(uint32_t now)
   batteryLow = lowSinceMs && (now - lowSinceMs >= 5000);
   batteryCritical = critSinceMs && (now - critSinceMs >= 2000);
 
-  if (batteryLow)
-  {
-    if (!s_batteryWifiForcedOff)
-    {
-      applyWifiPower(false);
-      s_batteryWifiForcedOff = true;
-    }
-  }
-  else
-  {
-    if (s_batteryWifiForcedOff)
-    {
-      applyWifiPower(true);
-      s_batteryWifiForcedOff = false;
-    }
-  }
-
+  // No low-battery Wi-Fi shutoff. Just track battery state and only hard-stop on critical.
   if (batteryCritical)
   {
     emergencyBatteryShutdown();

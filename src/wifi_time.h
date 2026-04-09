@@ -24,6 +24,7 @@ void wifiSetEnabled(bool en);
 bool wifiIsConnected();
 int  wifiRssi();
 bool timeIsSynced();
+bool timeIsNtpSyncedStrict();
 
 // Instant status check (polls WiFi.status())
 // Prefer wifiIsConnected() for UI; prefer this for one-shot guards.

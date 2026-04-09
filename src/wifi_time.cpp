@@ -492,3 +492,8 @@ bool timeIsSynced()
   time_t t = time(nullptr);
   return s_timeSynced || (t > 1704067200);
 }
+
+bool timeIsNtpSyncedStrict()
+{
+  return s_timeSynced;
+}
