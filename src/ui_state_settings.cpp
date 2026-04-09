@@ -124,6 +124,31 @@ void uiSettingsHandle(InputState &input)
     }
   }
 
+  if (UiSettingsPages::GameNewPetConfirmActive())
+  {
+    // Capture state BEFORE handling
+    const bool wasActive = UiSettingsPages::GameNewPetConfirmActive();
+  
+    UiSettingsPages::Handle_GAME(input, move);
+  
+    // If modal was closed this frame → swallow input so it doesn't leak
+    if (wasActive && !UiSettingsPages::GameNewPetConfirmActive())
+    {
+      input.menuOnce = false;
+      input.escOnce = false;
+      input.selectOnce = false;
+      input.leftOnce = false;
+      input.rightOnce = false;
+      input.upOnce = false;
+      input.downOnce = false;
+  
+      inputForceClear();
+      clearInputLatch();
+    }
+  
+    return;
+  }
+    
   if (input.menuOnce || input.escOnce)
   {
     if (backToReturnPage())
@@ -136,12 +161,6 @@ void uiSettingsHandle(InputState &input)
     return;
   }
 
-  if (g_settingsFlow.settingsPage == SettingsPage::GAME &&
-    UiSettingsPages::GameNewPetConfirmActive())
-{
-  UiSettingsPages::Handle_GAME(input, move);
-  return;
-}
   if (UiSettingsMenu::Handle(input, move))
   {
     return;

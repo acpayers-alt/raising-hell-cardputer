@@ -889,6 +889,8 @@ bool Handle(InputState &input, int move)
     {
       UiSettingsPages::HideGameNewPetConfirm();
       requestUIRedraw();
+      uiDrainKb(input);
+      inputForceClear();
       clearInputLatch();
       return true;
     }
