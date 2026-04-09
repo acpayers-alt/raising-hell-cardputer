@@ -14,16 +14,26 @@
 static constexpr int GO_BTN_PIN = 0;
 static constexpr bool GO_ACTIVE_LOW = true;
 
-static volatile bool g_goEdgeFlag = false;
-static volatile bool g_goEdgeLevel = false;
-static volatile uint32_t g_goEdgeMs = 0;
+static volatile bool g_goPressPending = false;
+static volatile bool g_goReleasePending = false;
+static volatile uint32_t g_goPressMs = 0;
+static volatile uint32_t g_goReleaseMs = 0;
 
 static void IRAM_ATTR onGoEdge()
 {
   const bool raw = GO_ACTIVE_LOW ? (digitalRead(GO_BTN_PIN) == LOW) : (digitalRead(GO_BTN_PIN) == HIGH);
-  g_goEdgeLevel = raw;
-  g_goEdgeMs = millis();
-  g_goEdgeFlag = true;
+  const uint32_t nowMs = millis();
+
+  if (raw)
+  {
+    g_goPressPending = true;
+    g_goPressMs = nowMs;
+  }
+  else
+  {
+    g_goReleasePending = true;
+    g_goReleaseMs = nowMs;
+  }
 }
 
 // --- GO button (Cardputer spec: GPIO0) ---
@@ -58,26 +68,26 @@ void powerButtonTick(uint32_t now)
 
   const bool raw = readGoRaw();
 
-  // --- consume interrupt edge if one happened ---
-  bool irqEdge = false;
-  bool irqLevel = raw;
-  uint32_t irqMs = now;
+  // --- consume interrupt edges if they happened ---
+  bool pressPending = false;
+  bool releasePending = false;
+  uint32_t pressMs = now;
+  uint32_t releaseMs = now;
 
   noInterrupts();
-  if (g_goEdgeFlag)
+  if (g_goPressPending)
   {
-    irqEdge = true;
-    irqLevel = g_goEdgeLevel;
-    irqMs = g_goEdgeMs;
-    g_goEdgeFlag = false;
+    pressPending = true;
+    pressMs = g_goPressMs;
+    g_goPressPending = false;
+  }
+  if (g_goReleasePending)
+  {
+    releasePending = true;
+    releaseMs = g_goReleaseMs;
+    g_goReleasePending = false;
   }
   interrupts();
-
-  if (irqEdge)
-  {
-    s_lastRaw = irqLevel;
-    s_lastEdgeMs = irqMs;
-  }
 
   if (!s_inited)
   {
@@ -87,7 +97,24 @@ void powerButtonTick(uint32_t now)
     return;
   }
 
-  if (!irqEdge && raw != s_lastRaw)
+  // If a press happened between ticks, latch it even if the button has already been released.
+  if (pressPending && !s_pressLatched)
+  {
+    s_pressLatched = true;
+    s_pressStartMs = pressMs;
+    s_shortArmed = false;
+    s_longFired = false;
+    s_lastRaw = true;
+    s_lastEdgeMs = pressMs;
+  }
+
+  if (releasePending)
+  {
+    s_lastRaw = false;
+    s_lastEdgeMs = releaseMs;
+  }
+
+if (raw != s_lastRaw)
   {
     s_lastRaw = raw;
     s_lastEdgeMs = now;
