@@ -281,6 +281,29 @@ static bool g_toastActive = false;
 static uint32_t g_toastUntilMs = 0;
 static char g_toastMsg[64] = {0};
 
+static bool g_alertScreenFlashActive = false;
+static uint32_t g_alertScreenFlashUntilMs = 0;
+static uint16_t g_alertScreenFlashColor = TFT_BLACK;
+
+static bool g_alertScreenFlashLatched = false;
+
+void uiBeginAlertScreenFlash(uint8_t r, uint8_t g, uint8_t b)
+{
+  g_alertScreenFlashColor = spr.color565(r, g, b);
+  g_alertScreenFlashActive = true;
+  g_alertScreenFlashLatched = true;
+  g_alertScreenFlashUntilMs = 0;
+  requestUIRedraw();
+}
+
+void uiEndAlertScreenFlash()
+{
+  g_alertScreenFlashActive = false;
+  g_alertScreenFlashLatched = false;
+  g_alertScreenFlashUntilMs = 0;
+  requestFullUIRedraw();
+}
+
 static void uiDrawToastOverlay();
 // Sleep Graphics Kick
 static volatile bool g_sleepBgKick = false;
@@ -1565,6 +1588,7 @@ static void drawWifiSettingsMenu();
 static void drawPlaceholderMenu(const char *title);
 static void drawCreditsScreen();
 static void uiDrawToastOverlay();
+static void uiDrawAlertScreenFlashOverlay();
 
 void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot);
 void drawChoosePetScreen(bool redrawBg);
@@ -7172,6 +7196,17 @@ void renderUI()
     uiDrawLevelUpPopup();
   }
 
+  uiDrawAlertScreenFlashOverlay();
+  uiDrawToastOverlay();
+
+  // draw overlays
+  if (assetOtaConfirmActive())
+  {
+    drawAssetOtaConfirmOverlay();
+  }
+
+  spr.pushSprite(0, 0);
+
   uiDrawToastOverlay();
 
   // draw overlays
@@ -7365,6 +7400,32 @@ void ui_showMessage(const char *msg) { uiShowToastInternal(msg, 900); }
 void ui_showTimedMessage(const char *msg, uint32_t durationMs) { uiShowToastInternal(msg, durationMs); }
 
 void ui_showSuccessMessage(const char *msg) { uiShowToastInternal(msg, 1200); }
+
+void uiBeginAlertScreenFlash(uint8_t r, uint8_t g, uint8_t b);
+void uiEndAlertScreenFlash();
+
+static void uiDrawAlertScreenFlashOverlay()
+{
+  if (!g_alertScreenFlashActive)
+    return;
+
+  if (!g_alertScreenFlashLatched)
+  {
+    const uint32_t now = millis();
+    if ((int32_t)(now - g_alertScreenFlashUntilMs) >= 0)
+    {
+      g_alertScreenFlashActive = false;
+      g_alertScreenFlashUntilMs = 0;
+      requestFullUIRedraw();
+      return;
+    }
+  }
+
+  if (!isScreenOn())
+    return;
+
+  spr.fillRect(0, 0, SCREEN_W, SCREEN_H, g_alertScreenFlashColor);
+}
 
 static void uiDrawToastOverlay()
 {
