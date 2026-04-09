@@ -1038,11 +1038,13 @@ static const HelpLine kControlsManual[] = {
     {HelpLineType::BODY, "UP/DOWN     Move selection"},
     {HelpLineType::BODY, "ENTER/G     Confirm / interact"},
     {HelpLineType::BODY, "DEL/Q       Back / home"},
-    {HelpLineType::BODY, "ESC         Open Settings / cancel"},
+    {HelpLineType::BODY, "ESC       Open Settings / cancel"},
     {HelpLineType::BODY, "Z-M         Jump to tab"},
     {HelpLineType::BODY, "GO          Toggle screen on/off"},
+    {HelpLineType::BODY, "Shake       Wake screen"},
     {HelpLineType::BODY, "\\           Console"},
-    {HelpLineType::BODY, "Shake       Wake console"},
+    {HelpLineType::GAP, nullptr},
+    {HelpLineType::BODY, "Shake the device to wake screen"},
     {HelpLineType::GAP, nullptr},
 
     {HelpLineType::SECTION, "Alt Navigation Clusters"},
@@ -1053,11 +1055,109 @@ static const HelpLine kControlsManual[] = {
     {HelpLineType::BODY, "You summoned something from"},
     {HelpLineType::BODY, "beyond our mortal plane."},
     {HelpLineType::BODY, "Now it's your problem!."},
-
     {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Care for Your Pet"},
+    {HelpLineType::BODY, "Your Pet needs care!"},
+    {HelpLineType::BODY, "Take this very seriously"},
+    {HelpLineType::BODY, "You have been warned!"},
+    {HelpLineType::BODY, "If your pet dies, nothing short"},
+    {HelpLineType::BODY, "of apocalypse will bring it"},
+    {HelpLineType::BODY, "back to life."},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Stats"},
+    {HelpLineType::BODY, "Keep the bars full, or else!"},
+    {HelpLineType::BODY, "Feed when hunger bar is low"},
+    {HelpLineType::BODY, "Play when mood bar is low"},
+    {HelpLineType::BODY, "Sleep when rest bar is low"},
+    {HelpLineType::BODY, "If your pet is hungry for a"},
+    {HelpLineType::BODY, "while, it will start to lose HP"},
+    {HelpLineType::BODY, "soon it will die."},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Death and Resurrection"},
+    {HelpLineType::BODY, "Death is not the end for your"},
+    {HelpLineType::BODY, "creature from the beyond. Rip"},
+    {HelpLineType::BODY, "your companion from the jaws of"},
+    {HelpLineType::BODY, "death by completing a ritual"},
+    {HelpLineType::BODY, "or bury him and face the"},
+    {HelpLineType::BODY, "consequences (there aren't any)"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Mini Games"},
+    {HelpLineType::BODY, "Play mini games to earn cash"},
+    {HelpLineType::BODY, "XP, and valuable prizes. Games"},
+    {HelpLineType::BODY, "amuse your pet, keep it happy"},
+    {HelpLineType::BODY, "Or your world is forfeit"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Currency and Items"},
+    {HelpLineType::BODY, "The currency of the underworld"},
+    {HelpLineType::BODY, "is Inferium.  It can be used"},
+    {HelpLineType::BODY, "to buy food, stat buffs, and"},
+    {HelpLineType::BODY, "other mysterious artifacts"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "XP, Levels, and Evolution"},
+    {HelpLineType::BODY, "Play Mini Games to Earn XP."},
+    {HelpLineType::BODY, "XP will make your pet level up!"},
+    {HelpLineType::BODY, "Level up enough, and your pet"},
+    {HelpLineType::BODY, "can evolve!  Who knows what"},
+    {HelpLineType::BODY, "abomination you will nurture!"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Multiple Pets!"},
+    {HelpLineType::BODY, "If one pet is not enough, you"},
+    {HelpLineType::BODY, "can have all the pets you want!"},
+    {HelpLineType::BODY, "Simply store the pet in the menu"},
+    {HelpLineType::BODY, "You can create another, recall"},
+    {HelpLineType::BODY, "your stored pets at any time."},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Clock Mode!"},
+    {HelpLineType::BODY, "Time is ticking, the end is near."},
+    {HelpLineType::BODY, "You cannot stop it, but you can"},
+    {HelpLineType::BODY, "watch it happen. Use clock mode!"},
+    {HelpLineType::BODY, "available in the settings menu"},
+    {HelpLineType::GAP, nullptr},
+
+    {HelpLineType::SECTION, "Raising Hell"},
+    {HelpLineType::BODY, "Made by: Aaron Ayers"},
+    {HelpLineType::BODY, "Written by: Finley Ayers"},
+    {HelpLineType::BODY, "Beta Testing by: Lincoln Ayers"},
+    {HelpLineType::BODY, "Patience by: Nicci Ayers"},
+    {HelpLineType::GAP, nullptr},
+
 };
 
 static constexpr int kControlsManualCount = (int)(sizeof(kControlsManual) / sizeof(kControlsManual[0]));
+
+static int getControlsManualTotalHeight()
+{
+  int y = 0;
+
+  for (size_t i = 0; i < sizeof(kControlsManual) / sizeof(kControlsManual[0]); i++)
+  {
+    switch (kControlsManual[i].type)
+    {
+    case HelpLineType::TITLE:
+      y += 20;
+      break;
+    case HelpLineType::SECTION:
+      y += 18;
+      break;
+    case HelpLineType::BODY:
+      y += 14;
+      break;
+    case HelpLineType::GAP:
+      y += 8;
+      break;
+    }
+  }
+
+  return y;
+}
 
 static int g_controlsHelpScroll = 0;
 
@@ -1082,33 +1182,22 @@ static int controlsHelpMaxScroll()
 {
   const int topY = 6;
   const int bottomHelpH = 14;
-  const int viewY = topY;
   const int viewH = SCREEN_H - topY - bottomHelpH - 4;
 
-  int lastValidStart = 0;
-
+  // Find the earliest line index such that everything from that line
+  // to the end fits in the viewport. That is the true last scroll position.
   for (int start = 0; start < kControlsManualCount; ++start)
   {
-    int y = viewY;
-    bool drewAnything = false;
+    int totalRemainingH = 0;
 
     for (int i = start; i < kControlsManualCount; ++i)
-    {
-      const int lineH = controlsHelpLineHeight(kControlsManual[i]);
-      if (y + lineH > viewY + viewH)
-        break;
+      totalRemainingH += controlsHelpLineHeight(kControlsManual[i]);
 
-      y += lineH;
-      drewAnything = true;
-    }
-
-    if (!drewAnything)
-      break;
-
-    lastValidStart = start;
+    if (totalRemainingH <= viewH)
+      return start;
   }
 
-  return lastValidStart;
+  return 0;
 }
 
 void controlsHelpResetScroll() { g_controlsHelpScroll = 0; }
@@ -1129,7 +1218,9 @@ bool controlsHelpScrollDown()
   if (g_controlsHelpScroll >= maxScroll)
     return false;
 
-  ++g_controlsHelpScroll;
+  g_controlsHelpScroll++;
+  if (g_controlsHelpScroll > maxScroll)
+    g_controlsHelpScroll = maxScroll;
   requestUIRedraw();
   return true;
 }
@@ -1139,6 +1230,10 @@ bool controlsHelpScrollDown()
 // -----------------------------------------------------------------------------
 static void drawControlsHelpScreen()
 {
+  const int maxScroll = controlsHelpMaxScroll();
+  if (g_controlsHelpScroll > maxScroll)
+    g_controlsHelpScroll = maxScroll;
+
   drawNonPetTabBackground();
 
   const int screenW = SCREEN_W;
@@ -1238,7 +1333,7 @@ static void drawControlsHelpScreen()
   if (g_controlsHelpScroll > 0)
     spr.drawString("^", panelX + panelW - 12, panelY + 4, 1);
 
-  if (g_controlsHelpScroll + drawn < kControlsManualCount)
+  if (g_controlsHelpScroll < controlsHelpMaxScroll())
     spr.drawString("v", panelX + panelW - 12, panelY + panelH - 12, 1);
 }
 
