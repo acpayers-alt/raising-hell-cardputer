@@ -55,6 +55,7 @@
 
 // --- Graphics ---
 #include "graphics.h" // ui_showMessage
+#include "ui_state_choose_pet.h"
 
 // End of Evangelincludes
 
@@ -662,10 +663,10 @@ static MenuItem kTopItems[] = {
 };
 
 static MenuItem kScreenItems[] = {
-  {"Brightness", nullptr, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
-  {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
-  {"Clock Mode", actScreen_ClockMode, nullptr, nullptr, nullptr},
-  {"Shake Sensitivity", nullptr, actScreen_ShakeSensitivityLeft, actScreen_ShakeSensitivityRight, nullptr},
+    {"Brightness", nullptr, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
+    {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
+    {"Clock Mode", actScreen_ClockMode, nullptr, nullptr, nullptr},
+    {"Shake Sensitivity", nullptr, actScreen_ShakeSensitivityLeft, actScreen_ShakeSensitivityRight, nullptr},
 };
 
 static void actWifi_AssetOtaChannelToggle(InputState &)
@@ -867,16 +868,17 @@ bool Handle(InputState &input, int move)
 
       UiSettingsPages::HideGameNewPetConfirm();
       playBeep();
-      
+
       // wipe any existing runtime pet BEFORE starting new flow
       saveManagerDeletePetOnly();
 
       g_app.newPetFlowActive = false;
       saveManagerClearNamePendingFlag();
-            
+
       // Now enter egg selection clean
       uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
-      
+      uiChoosePetOnEnter(input);
+
       requestFullUIRedraw();
       requestUIRedraw();
       clearInputLatch();

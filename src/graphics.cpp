@@ -1798,8 +1798,6 @@ static bool ensureNonPetTileReady()
                   NONPET_TILE_W, NONPET_TILE_H);
   }
 
-  Serial.printf("[NONPET TILE] ready path='%s' w=%d h=%d\n", path ? path : "(null)", s_nonPetTileW, s_nonPetTileH);
-
   return s_nonPetTileReady;
 }
 
@@ -4876,9 +4874,9 @@ static int getClockModeBaselineDeltaForPet()
     switch (pet.evoStage)
     {
     case 0:
-      return TAB_BAR_H;     // baby
+      return TAB_BAR_H; // baby
     case 1:
-      return TAB_BAR_H;     // teen
+      return TAB_BAR_H; // teen
     case 2:
       return TAB_BAR_H + 1; // adult tentacles hang a hair lower
     case 3:
@@ -5979,7 +5977,6 @@ static bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, u
   // No PSRAM on this hardware. Full-screen cached sleep frames are too large
   // and can starve later graphics/WiFi allocations.
   // Fall back to drawing sleep frames live instead of caching snapshots.
-  Serial.println("[SLEEP CACHE] disabled on no-PSRAM build");
   return false;
 
   if (s_sleepAnimFrameCacheReady && s_sleepAnimFrameCache && s_sleepAnimFrameCacheMode == mode &&
@@ -6223,9 +6220,6 @@ static void drawSleepScreenImpl(bool redrawBg)
   if (needBgDraw)
   {
     bool ok = false;
-    Serial.printf("[HEAPCHK] sleep-draw pre-bg free=%u largest=%u\n",
-                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 
     if (s_mode != 0 && frames && frameCount > 0)
     {
@@ -6367,11 +6361,12 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
   // Bottom header: coin/count on left, heart/HP on right
   spr.setTextFont(2);
   spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
   const int headerY2 = headerY + 74;
   const int headerIconY = headerY2 + 0;
   const int topTextY = headerY2 + 1;
+
+  spr.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
 
   // Define the right-side heart anchor first so coin text can avoid it
   const int heartIconX = x0 + panelW - 2 - 16 - 28;
@@ -6401,8 +6396,6 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
     // fake-bold / slightly larger-looking text
     spr.drawString(infBuf, coinRightX, topTextY);
     spr.drawString(infBuf, coinRightX - 1, topTextY);
-
-    spr.setTextDatum(TL_DATUM);
   }
 
   // Right side: heart + HP
@@ -6410,11 +6403,12 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
     char hpBuf[16];
     snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
 
+    const int hpTextW = spr.textWidth(hpBuf);
+    const int hpTextX = x0 + panelW - 2 - hpTextW;
+
     drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
 
     spr.setTextDatum(TL_DATUM);
-
-    const int hpTextX = x0 + panelW - 2 - spr.textWidth(hpBuf);
 
     // fake-bold / slightly larger-looking text
     spr.drawString(hpBuf, hpTextX, topTextY);
@@ -6461,11 +6455,9 @@ static void drawMiniStatPreviewSleepLeft()
   drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
   drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
 
-  // Bottom footer: coin/count on left, heart/HP on right
-  // On the left-side cluster, both counts should expand to the right.
+  // Bottom footer: heart + HP only on the sleep-left panel.
   spr.setTextFont(2);
   spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
   const int headerY2 = headerY + 64;
   const int headerIconY = headerY2 + 0;
@@ -6474,13 +6466,15 @@ static void drawMiniStatPreviewSleepLeft()
   {
     const int heartIconX = x0 + 2;
 
-    drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
-
     char hpBuf[16];
     snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
 
     const int hpTextX = heartIconX + 18;
+    const int hpTextW = spr.textWidth(hpBuf);
 
+    drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
+
+    spr.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
     spr.setTextDatum(TL_DATUM);
 
     // fake-bold
@@ -7792,15 +7786,15 @@ void drawTitleMenuScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
-bool ok = false;
-if (redrawBg || !bgDrawnForState || lastDrawnState != UIState::TITLE_MENU)
-{
-  if (g_sdReady)
-    ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
+  bool ok = false;
+  if (redrawBg || !bgDrawnForState || lastDrawnState != UIState::TITLE_MENU)
+  {
+    if (g_sdReady)
+      ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
 
-  if (!ok)
-    spr.fillSprite(TFT_BLACK);
-}
+    if (!ok)
+      spr.fillSprite(TFT_BLACK);
+  }
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();

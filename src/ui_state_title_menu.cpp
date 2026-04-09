@@ -13,6 +13,7 @@
 #include "ui_input_common.h"
 #include "ui_runtime.h"
 #include "ui_state_pet_sleeping.h"
+#include "ui_state_choose_pet.h"
 
 int g_titleMenuIndex = 0;
 
@@ -94,12 +95,12 @@ static void titleActivateContinue(InputState &in)
     saveManagerClearSleepPendingFlag();
 
     uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+    uiChoosePetOnEnter(in);
     requestFullUIRedraw();
     requestUIRedraw();
 
     inputForceClear();
     clearInputLatch();
-    (void)in;
     return;
   }
 
@@ -109,7 +110,7 @@ static void titleActivateContinue(InputState &in)
 
   if (shouldEnterSleeping)
   {
-    // 🔥 CRITICAL FIX: remember we came from TITLE MENU
+    // CRITICAL FIX: remember we came from TITLE MENU
     uiPetSleepingSetReturnState(UIState::TITLE_MENU, Tab::TAB_PET);
 
     uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);

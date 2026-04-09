@@ -751,7 +751,11 @@ static void forceChoosePetFlowFromBoot()
   g_choosePetInputUnlockMs = millis() + 350;
   g_choosePetBlockHatchUntilRelease = true;
 
+  g_pendingPetType = PET_DEVIL;
+  pet.type = g_pendingPetType;
+
   uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+
   g_app.uiNeedsRedraw = true;
 
   clearInputLatch();
@@ -2188,17 +2192,17 @@ bool saveManagerLoad()
   const bool saveOk = loadSaveFromSD_internal();
 
   // Migration / recovery case:
-// if a real pet save exists but settings.bin was missing, synthesize sane
-// defaults now and persist them immediately so boot/finalize sees the right
-// Wi-Fi preference on this same boot and future boots.
-if (saveOk && !settingsOk)
-{
-  settingsSetWifiEnabled(true);
-  g_settings.wifiEnabled = 1;
+  // if a real pet save exists but settings.bin was missing, synthesize sane
+  // defaults now and persist them immediately so boot/finalize sees the right
+  // Wi-Fi preference on this same boot and future boots.
+  if (saveOk && !settingsOk)
+  {
+    settingsSetWifiEnabled(true);
+    g_settings.wifiEnabled = 1;
 
-  Serial.println("[SAVE] loaded pet with missing settings -> writing default settings (wifi on)");
-  saveSettingsToSD_internal();
-}
+    Serial.println("[SAVE] loaded pet with missing settings -> writing default settings (wifi on)");
+    saveSettingsToSD_internal();
+  }
 
   Serial.printf("[SAVE] load result=%d err=%u size=%lu\n", saveOk ? 1 : 0, (unsigned)g_lastLoadErr,
                 (unsigned long)g_lastLoadSize);
@@ -2221,15 +2225,15 @@ if (saveOk && !settingsOk)
     const bool namePending = namePendingFlagExists();
     const bool blankPetName = isBlankName(pet.name);
 
-if (healed)
-{
-  Serial.println("[SAVE] auto-heal changed loaded payload");
+    if (healed)
+    {
+      Serial.println("[SAVE] auto-heal changed loaded payload");
 
-  // TEMP DEBUG GUARD:
-  // Do not allow immediate persistence of a legacy V3 migration result while
-  // we are still validating raw XP decode offsets.
-  dirty = false;
-}
+      // TEMP DEBUG GUARD:
+      // Do not allow immediate persistence of a legacy V3 migration result while
+      // we are still validating raw XP decode offsets.
+      dirty = false;
+    }
 
     Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
                   blankPetName ? 1 : 0, pet.name);

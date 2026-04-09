@@ -35,17 +35,13 @@ static Adafruit_NeoPixel g_led(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 static bool g_inited = false;
 
 void ledSetScreenOff(bool isOff) {
-  const bool wasOff = s_screenIsOff;
-  s_screenIsOff = isOff;
+  // Ignore the temporary ON state created by the rail-power pulse.
+  // Otherwise the pulse teardown path gets disabled and the screen
+  // never turns back off after an LED alert.
+  if (s_pulseActive && !isOff)
+    return;
 
-  // Transition OFF -> ON: cancel any pending pulse immediately so it
-  // can't sleep the LCD mid-draw.
-  if (wasOff && !s_screenIsOff) {
-    if (s_pulseActive) {
-      s_pulseActive = false;
-      backlightPulseEnd();
-    }
-  }
+  s_screenIsOff = isOff;
 }
 
 bool ledIsSupported() { return true; }
@@ -294,13 +290,31 @@ LedPetMode computeLedMode() {
   static LedPetMode s_lastMood = LED_PET_OK;
 
   // Small hysteresis so the LED doesn't flicker at boundary.
-  static const int MAD_ON  = 25;
-  static const int MAD_OFF = 30;
+  static const int MAD_ON    = 25;
+  static const int MAD_OFF   = 30;
+  static const int BORED_ON  = 60;
+  static const int BORED_OFF = 65;
 
-  if (s_lastMood != LED_PET_MAD) {
-    if (pet.happiness <= MAD_ON) s_lastMood = LED_PET_MAD;
-  } else {
-    if (pet.happiness >= MAD_OFF) s_lastMood = LED_PET_OK;
+  if (s_lastMood == LED_PET_MAD)
+  {
+    if (pet.happiness >= MAD_OFF)
+      s_lastMood = LED_PET_OK;
+  }
+  else if (s_lastMood == LED_PET_BORED)
+  {
+    if (pet.happiness < MAD_ON)
+      s_lastMood = LED_PET_MAD;
+    else if (pet.happiness >= BORED_OFF)
+      s_lastMood = LED_PET_OK;
+  }
+  else
+  {
+    if (pet.happiness <= MAD_ON)
+      s_lastMood = LED_PET_MAD;
+    else if (pet.happiness <= BORED_ON)
+      s_lastMood = LED_PET_BORED;
+    else
+      s_lastMood = LED_PET_OK;
   }
 
   return s_lastMood;

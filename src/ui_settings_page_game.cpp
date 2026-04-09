@@ -12,6 +12,7 @@
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
+#include "ui_state_choose_pet.h"
 
 namespace UiSettingsPages
 {
@@ -89,6 +90,7 @@ void Handle_GAME(InputState &input, int move)
       s_newPetConfirmActive = false;
       playBeep();
       uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+      uiChoosePetOnEnter(input);
       requestFullUIRedraw();
       requestUIRedraw();
       clearInputLatch();

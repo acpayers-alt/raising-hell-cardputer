@@ -256,13 +256,39 @@ void displayInit()
     Serial.printf("[displayInit] Cardputer backend done (%dx%d)\n", w, h);
 }
 
+static bool s_backlightPulseWasScreenOn = false;
+static int s_backlightPulsePrevLevel = -1;
+
 void backlightPulseBegin(uint8_t level)
 {
-  (void)level;
-  return;
+  s_backlightPulseWasScreenOn = isScreenOn();
+  g_backlightPulseActive = true;
+
+  // Make sure the shared rail is actually powered for LED alerts.
+  if (!s_backlightPulseWasScreenOn)
+    SET_SCREEN_POWER(true);
+
+  SET_BACKLIGHT(level);
 }
 
-void backlightPulseEnd() { return; }
+void backlightPulseEnd()
+{
+  g_backlightPulseActive = false;
+
+  if (s_backlightPulseWasScreenOn)
+  {
+    // Restore the user's configured brightness level.
+    SET_BACKLIGHT((uint8_t)brightnessValues[brightnessLevel]);
+  }
+  else
+  {
+    // This pulse only existed to power the LED/shared rail while the screen was off.
+    SET_BACKLIGHT(0);
+    SET_SCREEN_POWER(false);
+  }
+
+  s_backlightPulseWasScreenOn = false;
+}
 
 // ============================================================================
 // Battery polling (Cardputer) - robust (voltage -> percent)
@@ -453,9 +479,9 @@ void updateBattery()
   const int pctDelta = pct - s_lastLoggedPct;
   const int mvDelta = mvFilt - s_lastLoggedMv;
 
-  const bool pctChangedOnBattery = (!usb && (pctDelta >= 1 || pctDelta <= -1));
-  const bool pctChangedOnUsb = (usb && pct < 95 && (pctDelta >= 2 || pctDelta <= -2));
-  const bool meaningfulMvChange = (mvDelta >= 12 || mvDelta <= -12);
+  const bool pctChangedOnBattery = (!usb && (pctDelta >= 2 || pctDelta <= -2));
+  const bool pctChangedOnUsb = (usb && pct < 95 && (pctDelta >= 3 || pctDelta <= -3));
+  const bool meaningfulMvChange = (mvDelta >= 25 || mvDelta <= -25);
 
   bool shouldLog = false;
   const char *reason = "";
@@ -474,11 +500,6 @@ void updateBattery()
   {
     shouldLog = true;
     reason = "pct";
-  }
-  else if (meaningfulMvChange)
-  {
-    shouldLog = true;
-    reason = "mv";
   }
 
   if (shouldLog)
