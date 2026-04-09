@@ -1716,7 +1716,7 @@ static const char *resRunSnakeWin1PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/snake_win1.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/worm_win1.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/snake_win1.png";
@@ -1728,7 +1728,7 @@ static const char *resRunSnakeWin2PathForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/snake_win2.png";
+    return "/raising_hell/graphics/mini_games/resrun/eld/worm_win2.png";
   case PET_DEVIL:
   default:
     return "/raising_hell/graphics/mini_games/resrun/dev/snake_win2.png";
