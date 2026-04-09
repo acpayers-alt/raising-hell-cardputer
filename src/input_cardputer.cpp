@@ -611,21 +611,6 @@ static void readKeyboard(InputState &out)
     out.selectHeld = st.enter;
   }
 
-  // Keyboard ENTER -> UI selectOnce edge (UI mode only)
-  if (!g_textCaptureMode && !inMiniGameUi)
-  {
-    if (st.enter)
-    {
-      if (!s_enterLatched)
-        out.selectOnce = true;
-      s_enterLatched = true;
-    }
-    else
-    {
-      s_enterLatched = false;
-    }
-  }
-
   // If nothing changed AND no keys are held, we can skip work.
   // IMPORTANT: include escAnyHeld so ESC never gets skipped by this early return.
   const bool heldSpecial = heldUp || heldDown || heldLeft || heldRight || escAnyHeld || heldEnter || heldG ||

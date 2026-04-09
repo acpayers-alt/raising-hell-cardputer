@@ -304,15 +304,37 @@ static void actScreen_BrightnessRight(InputState &)
   clearInputLatch();
 }
 
-static void actScreen_AutoScreenSelect(InputState &)
+static void actScreen_BrightnessSelect(InputState &input) { actScreen_BrightnessRight(input); }
+
+static void actScreen_AutoScreenLeft(InputState &)
 {
-  g_app.autoScreenIndex = (int)autoScreenTimeoutSel;
-  g_settingsFlow.settingsReturnPage = SettingsPage::SCREEN;
-  g_settingsFlow.settingsPage = SettingsPage::AUTO_SCREEN;
+  int sel = (int)autoScreenTimeoutSel - 1;
+  if (sel < 0)
+    sel = 3;
+
+  autoScreenTimeoutSel = (uint8_t)sel;
+  saveSettingsToSD();
+  saveManagerMarkDirty();
   requestUIRedraw();
   playBeep();
   clearInputLatch();
 }
+
+static void actScreen_AutoScreenRight(InputState &)
+{
+  int sel = (int)autoScreenTimeoutSel + 1;
+  if (sel > 3)
+    sel = 0;
+
+  autoScreenTimeoutSel = (uint8_t)sel;
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actScreen_AutoScreenSelect(InputState &input) { actScreen_AutoScreenRight(input); }
 
 static void actScreen_ClockMode(InputState &input)
 {
@@ -349,6 +371,8 @@ static void actScreen_ShakeSensitivityRight(InputState &)
   playBeep();
   clearInputLatch();
 }
+
+static void actScreen_ShakeSensitivitySelect(InputState &input) { actScreen_ShakeSensitivityRight(input); }
 
 // ------------------------------------------------------------
 // WIFI page actions
@@ -484,15 +508,35 @@ static void actGame_NewPet(InputState &)
   clearInputLatch();
 }
 
-static void actGame_DecayMode(InputState &)
+static void actGame_DecayModeLeft(InputState &)
 {
-  g_app.decayModeIndex = (int)saveManagerGetDecayMode();
-  g_settingsFlow.settingsReturnPage = SettingsPage::GAME;
-  g_settingsFlow.settingsPage = SettingsPage::DECAY_MODE;
+  int mode = (int)saveManagerGetDecayMode() - 1;
+  if (mode < 0)
+    mode = 5;
+
+  saveManagerSetDecayMode((uint8_t)mode);
+  saveSettingsToSD();
+  saveManagerMarkDirty();
   requestUIRedraw();
   playBeep();
   clearInputLatch();
 }
+
+static void actGame_DecayModeRight(InputState &)
+{
+  int mode = (int)saveManagerGetDecayMode() + 1;
+  if (mode > 5)
+    mode = 0;
+
+  saveManagerSetDecayMode((uint8_t)mode);
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actGame_DecayModeSelect(InputState &input) { actGame_DecayModeRight(input); }
 
 static void actGame_ToggleDeath(InputState &)
 {
@@ -663,10 +707,11 @@ static MenuItem kTopItems[] = {
 };
 
 static MenuItem kScreenItems[] = {
-    {"Brightness", nullptr, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
-    {"Auto Screen", actScreen_AutoScreenSelect, nullptr, nullptr, nullptr},
+    {"Brightness", actScreen_BrightnessSelect, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
+    {"Auto Screen", actScreen_AutoScreenSelect, actScreen_AutoScreenLeft, actScreen_AutoScreenRight, nullptr},
     {"Clock Mode", actScreen_ClockMode, nullptr, nullptr, nullptr},
-    {"Shake Sensitivity", nullptr, actScreen_ShakeSensitivityLeft, actScreen_ShakeSensitivityRight, nullptr},
+    {"Shake Sensitivity", actScreen_ShakeSensitivitySelect, actScreen_ShakeSensitivityLeft,
+     actScreen_ShakeSensitivityRight, nullptr},
 };
 
 static void actWifi_AssetOtaChannelToggle(InputState &)
@@ -714,7 +759,7 @@ static MenuItem kPetItems[] = {
 };
 
 static MenuItem kGameItems[] = {
-    {"Decay Mode", actGame_DecayMode, nullptr, nullptr, nullptr},
+    {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
     {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
     {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
