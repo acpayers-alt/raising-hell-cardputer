@@ -328,6 +328,11 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
+  #if LED_STATUS_ENABLED
+  ledSetScreenOff(false);
+  ledUpdatePetStatus(computeLedMode());
+#endif
+
   const bool allowRuntimeSdProbe = (g_app.uiState == UIState::PET_SCREEN) || (g_app.uiState == UIState::SLEEP_MENU) ||
                                    (g_app.uiState == UIState::INVENTORY) || (g_app.uiState == UIState::SHOP) ||
                                    (g_app.uiState == UIState::PET_SLEEPING);
