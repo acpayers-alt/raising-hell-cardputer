@@ -76,7 +76,7 @@
 
 // Forward declarations for internal helpers used before definition
 static void clearNamePendingFlag();
-static void resetRuntimeToCleanNoSaveState(bool resetName);
+void resetRuntimeToCleanNoSaveState(bool resetName);
 
 static const char *getFirmwareVersionString()
 {
@@ -1591,7 +1591,7 @@ static void newPetInternalNoSave(bool resetName)
   writeNamePendingFlag();
 }
 
-static void resetRuntimeToCleanNoSaveState(bool resetName)
+void resetRuntimeToCleanNoSaveState(bool resetName)
 {
   (void)resetName;
 

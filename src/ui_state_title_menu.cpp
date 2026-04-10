@@ -12,8 +12,8 @@
 #include "ui_actions.h"
 #include "ui_input_common.h"
 #include "ui_runtime.h"
-#include "ui_state_pet_sleeping.h"
 #include "ui_state_choose_pet.h"
+#include "ui_state_pet_sleeping.h"
 
 int g_titleMenuIndex = 0;
 
@@ -95,6 +95,7 @@ static void titleActivateContinue(InputState &in)
   if (!s_titleHasSave)
   {
     saveManagerDeletePetOnly();
+    resetRuntimeToCleanNoSaveState(/*resetName=*/true);
     g_app.newPetFlowActive = false;
     saveManagerClearNamePendingFlag();
     saveManagerClearSleepPendingFlag();
@@ -168,7 +169,7 @@ void uiTitleMenuOnEnter(InputState &in)
 void uiTitleMenuHandle(InputState &in)
 {
   refreshTitleMenuAvailability();
-  
+
   if (!titleItemEnabled(g_titleMenuIndex))
     g_titleMenuIndex = titleFirstEnabledItem();
 

@@ -96,3 +96,4 @@ void saveManagerClearSleepPendingFlag();
 bool saveManagerSleepPendingFlagExists();
 
 void saveManagerEnterSleepState();
+void resetRuntimeToCleanNoSaveState(bool resetName);

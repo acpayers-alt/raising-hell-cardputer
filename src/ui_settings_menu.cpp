@@ -52,6 +52,7 @@
 // --- Game / User Systems ---
 #include "game_options_state.h"
 #include "user_toggles_state.h"
+#include "save_manager.h"
 
 // --- Graphics ---
 #include "graphics.h" // ui_showMessage
@@ -598,6 +599,13 @@ static void actPet_StorePet(InputState &input)
 
   Serial.printf("[UI] Store Pet OK path=%s\n", boxedPath);
 
+  // Box/store succeeded, so there must no longer be an active runtime pet.
+  saveManagerDeletePetOnly();
+  resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+  g_app.newPetFlowActive = false;
+  saveManagerClearNamePendingFlag();
+  saveManagerClearSleepPendingFlag();
+
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
   g_settingsFlow.settingsReturnValid = false;
@@ -916,12 +924,14 @@ bool Handle(InputState &input, int move)
       UiSettingsPages::HideGameNewPetConfirm();
       playBeep();
 
-      // wipe any existing runtime pet BEFORE starting new flow
+      // Wipe live save and also clear runtime pet state so the title menu
+      // correctly shows "New Pet" after storing/removing the active pet.
       saveManagerDeletePetOnly();
-
+      resetRuntimeToCleanNoSaveState(/*resetName=*/true);
       g_app.newPetFlowActive = false;
       saveManagerClearNamePendingFlag();
-
+      saveManagerClearSleepPendingFlag();
+      
       // Now enter egg selection clean
       uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
       uiChoosePetOnEnter(input);
