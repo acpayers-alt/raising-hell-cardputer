@@ -57,6 +57,8 @@
 #include <Preferences.h>
 #include <SD.h>
 #include <esp_system.h>
+#include <nvs_flash.h>
+#include <esp_err.h>
 
 // -----------------------------------------------------------------------------
 // Standard Library
@@ -565,7 +567,8 @@ static void execLine(char *line)
     logLine("  fwmark clear        clear stored build id");
     logLine("  fwmark reprovision  clear marker + set asset flag");
     logLine("  reboot              reboot device");
-
+    logLine("  nvsclear            wipe NVS (factory clean) + reboot");
+    
     logLine("Logs:");
     logLine("  logdump             dump runtime log buffer");
     logLine("  logtail [n]         dump last n log lines");
@@ -1615,6 +1618,27 @@ static void execLine(char *line)
     return;
   }
 
+  if (!strcmp(argv[0], "nvsclear"))
+  {
+    logLine("[WARN] Erasing NVS partition...");
+    delay(50);
+
+    esp_err_t err = nvs_flash_erase();
+
+    if (err != ESP_OK)
+    {
+      logf("[ERR] nvs_flash_erase failed: %s", esp_err_to_name(err));
+      return;
+    }
+
+    logLine("[OK] NVS erased");
+    logLine("[OK] rebooting...");
+    delay(150);
+
+    ESP.restart();
+    return;
+  }
+  
   if (!strcmp(argv[0], "reboot"))
   {
     logLine("[OK] rebooting...");
