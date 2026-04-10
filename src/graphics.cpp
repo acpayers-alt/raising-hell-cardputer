@@ -1089,7 +1089,7 @@ static const HelpLine kControlsManual[] = {
     {HelpLineType::BODY, "Play mini games to earn cash"},
     {HelpLineType::BODY, "XP, and valuable prizes. Keep"},
     {HelpLineType::BODY, "your pet amused, keep it happy."},
-    {HelpLineType::BODY, "Else your world is forfeit"},
+    {HelpLineType::BODY, "Else your world is forfeit."},
     {HelpLineType::BODY, "Your otherworldly ward will"},
     {HelpLineType::BODY, "Soon grow tired of these games"},
     {HelpLineType::GAP, nullptr},
@@ -1938,10 +1938,10 @@ static void drawNonPetTabBackground()
 
   if (!ensureNonPetTileReady())
   {
-    spr.fillScreen(TFT_RED);
+    spr.fillScreen(TFT_BLACK);
     return;
   }
-
+  
   for (int y = 0; y < SCREEN_H; y += s_nonPetTileH)
   {
     for (int x = 0; x < SCREEN_W; x += s_nonPetTileW)
@@ -7966,10 +7966,10 @@ void drawTitleMenuScreen(bool redrawBg)
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
-  const char *petName = (hasSave && pet.getName()[0]) ? pet.getName() : "";
+  const bool hasRuntimePet = (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
 
   char row0Buf[80];
-  if (hasSave)
+  if (hasRuntimePet)
   {
     const char *typePretty = "Devil";
     switch (pet.type)
@@ -7983,13 +7983,18 @@ void drawTitleMenuScreen(bool redrawBg)
       break;
     }
 
-    snprintf(row0Buf, sizeof(row0Buf), "%s - lvl %u %s", petName, (unsigned)pet.level, typePretty);
+    snprintf(row0Buf, sizeof(row0Buf), "%s - lvl %u %s", pet.getName(), (unsigned)pet.level, typePretty);
+  }
+  else if (hasSave)
+  {
+    // Defensive fallback: save state says "continue", but runtime pet is not ready yet.
+    snprintf(row0Buf, sizeof(row0Buf), "Continue");
   }
   else
   {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }
-
+    
   const char *storageLabel = hasImport ? "Pet Storage" : "Pet Storage Empty";
   const char *labels[3] = {row0Buf, storageLabel, "Settings"};
   const bool enabled[3] = {true, true, true};

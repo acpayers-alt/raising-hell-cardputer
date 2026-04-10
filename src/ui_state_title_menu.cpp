@@ -26,9 +26,14 @@ static void swallowTitleInput(InputState &in);
 static bool s_titleHasSave = false;
 static bool s_titleHasImport = false;
 
+static bool titleHasLivePet()
+{
+  return saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
+}
+
 static void refreshTitleMenuAvailability()
 {
-  s_titleHasSave = saveManagerSaveFileExists();
+  s_titleHasSave = titleHasLivePet();
   s_titleHasImport = saveManagerHasImportableBubJson();
 }
 
@@ -162,6 +167,8 @@ void uiTitleMenuOnEnter(InputState &in)
 
 void uiTitleMenuHandle(InputState &in)
 {
+  refreshTitleMenuAvailability();
+  
   if (!titleItemEnabled(g_titleMenuIndex))
     g_titleMenuIndex = titleFirstEnabledItem();
 
