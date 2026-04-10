@@ -208,9 +208,16 @@ static uint8_t flashesForMode(LedPetMode mode)
 }
 
 // Heartbeat interval
-static uint32_t heartbeatIntervalMs(LedPetMode /*mode*/)
+static uint32_t heartbeatIntervalMs(LedPetMode mode)
 {
-  return 60000UL; // 1 minute
+  const uint8_t flashes = flashesForMode(mode);
+
+  // Urgent modes = 2 flashes
+  if (flashes > 1)
+    return 120000UL; // 2 minutes
+
+  // Everything else
+  return 600000UL; // 10 minutes
 }
 
 // LED on-time (you asked for “stay lit a little longer”)
