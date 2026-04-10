@@ -1941,7 +1941,7 @@ static void drawNonPetTabBackground()
     spr.fillScreen(TFT_BLACK);
     return;
   }
-  
+
   for (int y = 0; y < SCREEN_H; y += s_nonPetTileH)
   {
     for (int x = 0; x < SCREEN_W; x += s_nonPetTileW)
@@ -4897,7 +4897,7 @@ static int getWalkBaselineAdjustForPet()
     case 2:
       return -20; // adult
     case 3:
-      return -18; // elder
+      return -25; // elder
     default:
       return -2;
     }
