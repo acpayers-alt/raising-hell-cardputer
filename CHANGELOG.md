@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## 2.0.0
+
+### Added
+
+Eldritch pet line
+Pet Storage (store and recall pets)
+Clock Mode
+Pet walking and wandering behavior
+Expanded in-game manual with scrolling
+Screen flash alerts (paired with LED alerts)
+Shake-to-wake option
+Additional console/recovery tools
+
+### Changed
+
+Settings now use inline selection instead of popups
+Improved asset provisioning and upgrade handling
+Minimum asset pack updated to `1.1.9`
+Gameplay tuning (mood thresholds, mini-game rewards)
+Softer fallback for missing background assets
+
+### Fixed
+
+GO button not responding during walking animation
+Clock mode rendering and state issues
+Wi-Fi / time sync issues on boot
+First-boot and title menu edge cases
+Save/load and upgrade migration issues
+LED alerts not visible while screen is on
+
+### Animation & UI
+
+Added and refined walk animations across pet stages
+Added Eldritch Resurrection Run celebration visuals
+General sprite alignment and presentation improvements
+
+
 ---
 
 ## [1.0.1] - 2026-03-16
