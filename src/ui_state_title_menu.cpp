@@ -222,10 +222,9 @@ void uiTitleMenuHandle(InputState &in)
   {
     while (in.kbHasEvent())
       (void)in.kbPop();
-    clearInputLatch();
     return;
   }
-
+  
   switch (g_titleMenuIndex)
   {
   case TITLE_CONTINUE:
