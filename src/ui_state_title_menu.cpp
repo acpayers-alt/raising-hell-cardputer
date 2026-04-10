@@ -116,8 +116,8 @@ static void titleActivateContinue(InputState &in)
 
   if (shouldEnterSleeping)
   {
-    // CRITICAL FIX: remember we came from TITLE MENU
-    uiPetSleepingSetReturnState(UIState::TITLE_MENU, Tab::TAB_PET);
+    // Enter sleep screen, but when the pet wakes we should land on the live PET tab.
+    uiPetSleepingSetReturnState(UIState::PET_SCREEN, Tab::TAB_PET);
 
     uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
 
@@ -206,8 +206,7 @@ void uiTitleMenuHandle(InputState &in)
     if (s_titleHasSave)
     {
       playBeep();
-      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-      swallowTitleInput(in);
+      titleActivateContinue(in);
       return;
     }
 

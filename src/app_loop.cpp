@@ -43,6 +43,7 @@
 #include "ui_runtime.h"
 #include "ui_state_console.h"
 #include "ui_tabs.h"
+#include "ui_state_pet_sleeping.h"
 
 // -----------------------------------------------------------------------------
 // Input / interaction
@@ -328,7 +329,7 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-  #if LED_STATUS_ENABLED
+#if LED_STATUS_ENABLED
   ledSetScreenOff(false);
   ledUpdatePetStatus(computeLedMode());
 #endif
@@ -863,7 +864,21 @@ void appMainLoopTick()
     {
       noteUserActivity();
 
-      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 200);
+      const bool shouldEnterSleeping = pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
+                                       g_app.sleepUntilRested || g_app.sleepUntilAwakened ||
+                                       saveManagerSleepPendingFlagExists();
+
+      if (shouldEnterSleeping)
+      {
+        uiPetSleepingSetReturnState(UIState::TITLE_MENU, Tab::TAB_PET);
+        uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, false, input, 200);
+        uiPetSleepingBootEnter();
+        sleepBgKickNow();
+      }
+      else
+      {
+        uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 200);
+      }
 
       invalidateBackgroundCache();
       requestUIRedraw();

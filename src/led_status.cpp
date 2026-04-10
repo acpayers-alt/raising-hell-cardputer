@@ -219,15 +219,15 @@ static uint16_t onTimeMs(LedPetMode mode)
   switch (mode)
   {
   case LED_PET_SLEEPING:
-    return 650;
+    return 1100;
   case LED_PET_OK:
-    return 450;
+    return 800;
   default:
-    return 320;
+    return 700;
   }
 }
 
-static uint16_t gapTimeMs(LedPetMode /*mode*/) { return 220; }
+static uint16_t gapTimeMs(LedPetMode /*mode*/) { return 300; }
 
 static uint32_t totalBurstDurationMs(LedPetMode mode)
 {
@@ -340,7 +340,7 @@ void ledUpdatePetStatus(LedPetMode mode)
       uiBeginAlertScreenFlash(r, g, b);
     }
 
-    g_burstNextMs = now + 10;
+    g_burstNextMs = now + 120;
   }
 
   // Waiting for next toggle
@@ -368,7 +368,7 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     return;
   }
-  
+
   // Toggle
   g_burstLedOn = !g_burstLedOn;
 
