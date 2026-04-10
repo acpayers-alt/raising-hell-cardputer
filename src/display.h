@@ -42,9 +42,10 @@ void batteryProtectionTick(uint32_t now);
 // Cardputer canvas framebuffer
 extern M5Canvas spr;
 
-// Backlight (best-effort)
+// Backlight
 void initBacklight();
 void setBacklight(uint8_t level); // level 0..255
+bool isBacklightPulseActive();
 
 // Init / power helpers
 void displayInit();

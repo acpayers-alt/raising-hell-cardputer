@@ -88,6 +88,10 @@ void autoScreenTick() {
   if ((uint32_t)(now - screenPowerLastManualToggleMs()) < kManualToggleGuardMs)
     return;
 
+  // Do not let auto-screen immediately tear down a temporary alert pulse wake.
+  if (isBacklightPulseActive())
+    return;
+
   // If already off, nothing to do (wake is handled by noteUserActivity / shake-to-wake)
   if (!isScreenOn()) return;
 

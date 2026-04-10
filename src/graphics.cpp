@@ -1076,6 +1076,17 @@ static const HelpLine kControlsManual[] = {
     {HelpLineType::BODY, "soon it will die."},
     {HelpLineType::GAP, nullptr},
 
+    {HelpLineType::SECTION, "Alerts"},
+    {HelpLineType::BODY, "Red - Pet is in danger"},
+    {HelpLineType::BODY, "Yellow - Pet needs attention"},
+    {HelpLineType::BODY, "Blue - Pet is tired or sleeping"},
+    {HelpLineType::BODY, "Green - Pet is doing well"},
+    {HelpLineType::BODY, "Purple - Pet is amazing"},
+    {HelpLineType::BODY, "If the screen is off, alerts"},
+    {HelpLineType::BODY, "will briefly light it up."},
+    {HelpLineType::BODY, "Heed these warnings or else!"},
+    {HelpLineType::GAP, nullptr},
+
     {HelpLineType::SECTION, "Death and Resurrection"},
     {HelpLineType::BODY, "Death is not the end for your"},
     {HelpLineType::BODY, "creature from beyond. Rip"},
@@ -7994,7 +8005,7 @@ void drawTitleMenuScreen(bool redrawBg)
   {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }
-    
+
   const char *storageLabel = hasImport ? "Pet Storage" : "Pet Storage Empty";
   const char *labels[3] = {row0Buf, storageLabel, "Settings"};
   const bool enabled[3] = {true, true, true};

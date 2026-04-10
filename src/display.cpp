@@ -99,6 +99,11 @@ void toggleScreenPower() { SET_SCREEN_POWER(!isScreenOn()); }
 
 bool isScreenOn() { return g_app.screenOn; }
 
+bool isBacklightPulseActive()
+{
+  return g_backlightPulseActive;
+}
+
 uint32_t screenPowerLastManualToggleMs() { return s_lastManualScreenToggleMs; }
 
 void markScreenPowerManualToggle(uint32_t now) { s_lastManualScreenToggleMs = now; }
