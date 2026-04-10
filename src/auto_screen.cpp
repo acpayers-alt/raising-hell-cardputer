@@ -54,8 +54,6 @@ void screenWake() {
   if (isScreenOn()) return;
   SET_SCREEN_POWER(true);
   requestUIRedraw();
-  inputForceClear();
-  clearInputLatch();
 }
 
 void noteUserActivity() {
