@@ -271,13 +271,14 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     ledOff();
     pulseBacklightEndIfNeeded();
+    uiEndAlertScreenFlash();
 
     // Only force backlight low in true screen-off mode
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
     return;
   }
-
+  
   const uint32_t now = millis();
 
   // Mode change: restart soon
@@ -293,6 +294,7 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     ledOff();
     pulseBacklightEndIfNeeded();
+    uiEndAlertScreenFlash();
   }
 
   // OFF means fully off
@@ -302,10 +304,10 @@ void ledUpdatePetStatus(LedPetMode mode)
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
     pulseBacklightEndIfNeeded();
+    uiEndAlertScreenFlash();
     return;
   }
 
-  // Not bursting: wait for heartbeat time
   // Not bursting: wait for heartbeat time
   if (!g_burstActive)
   {
