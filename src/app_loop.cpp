@@ -42,8 +42,8 @@
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
 #include "ui_state_console.h"
-#include "ui_tabs.h"
 #include "ui_state_pet_sleeping.h"
+#include "ui_tabs.h"
 
 // -----------------------------------------------------------------------------
 // Input / interaction
@@ -285,8 +285,6 @@ void appMainLoopTick()
       setLastInputActivityMs(now);
       invalidateBackgroundCache();
       requestFullUIRedraw();
-      inputForceClear();
-      clearInputLatch();
 
 #if LED_STATUS_ENABLED
       ledSetScreenOff(false);
