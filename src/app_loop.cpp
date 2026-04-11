@@ -340,30 +340,32 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-#if LED_STATUS_ENABLED
-  // During a screen-off alert pulse, the panel is physically on, but the alert
-  // system must continue to behave as "screen off" so it keeps the solid alert
-  // color and shared-rail pulse semantics.
+  #if LED_STATUS_ENABLED
   if (ledInputLockActive())
   {
+    // Keep alert system in logical screen-off mode during the pulse.
     ledSetScreenOff(true);
     ledUpdatePetStatus(computeLedMode());
 
     if (motionAvailable && motionShakeDetected())
     {
       screenWake();
-      motionResetShakeDetector(2500);
+      motionResetShakeDetector(2500); 
       setLastInputActivityMs(now);
       invalidateBackgroundCache();
       requestFullUIRedraw();
 
       ledSetScreenOff(false);
       ledUpdatePetStatus(computeLedMode());
+      renderUI();
       return;
     }
 
     input = InputState{};
     clearInputLatch();
+
+    // IMPORTANT: the alert overlay requested a redraw; do it now before returning.
+    renderUI();
     delay(5);
     return;
   }
