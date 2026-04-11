@@ -230,8 +230,9 @@ void appMainLoopTick()
   appServicesTick(now);
 
   const bool inDeathFlow = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::DEATH_TRANSITION) ||
-                           (g_app.uiState == UIState::MINI_GAME) || (g_app.uiState == UIState::BURIAL_SCREEN);
-
+                           (g_app.uiState == UIState::MINI_GAME) || (g_app.uiState == UIState::MG_PAUSE) ||
+                           (g_app.uiState == UIState::BURIAL_SCREEN);
+                           
   const bool screenOnNow = isScreenOn();
 
   if (!s_prevScreenOn && screenOnNow)
@@ -240,7 +241,7 @@ void appMainLoopTick()
     requestUIRedraw();
     sleepBgNotifyScreenWake();
   }
-  
+
   s_prevScreenOn = screenOnNow;
 
   // ---------------------------------------------------------------------------
