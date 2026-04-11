@@ -48,25 +48,6 @@ Alternate Navigation - E,A,S,D and O,J,K,L - allows for one handed navigation
 
 
 ------------------------------------------------------------
-Planned Features
-------------------------------------------------------------
-
-loading screen for games
-
-shake sensitivity settings
-
-screen flashes same color as alert LED (maybe even shows pet status)
-
-create log file as txt on sdcard for user upload
-
-add heartbeat sequence to death flow
-
-Clock Mode
-
-Human reasable/editable settings file for easy recovery
-
-
-------------------------------------------------------------
 Project Structure
 ------------------------------------------------------------
 
