@@ -239,9 +239,8 @@ void appMainLoopTick()
     invalidateBackgroundCache();
     requestUIRedraw();
     sleepBgNotifyScreenWake();
-    clearInputLatch();
   }
-
+  
   s_prevScreenOn = screenOnNow;
 
   // ---------------------------------------------------------------------------
