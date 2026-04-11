@@ -37,3 +37,5 @@ void ledUpdatePetStatus(LedPetMode mode);
 
 // led_status.h
 void ledSetScreenOff(bool isOff);
+
+bool ledInputLockActive();

@@ -270,6 +270,19 @@ void appMainLoopTick()
       pet.update();
     }
 
+    if (pet.health <= 0 && petDeathEnabled && g_app.uiState != UIState::DEATH &&
+        g_app.uiState != UIState::DEATH_TRANSITION && g_app.uiState != UIState::BURIAL_SCREEN)
+    {
+      uiEndAlertScreenFlash();
+#if LED_STATUS_ENABLED
+      ledSetScreenOff(true);
+      ledUpdatePetStatus(LED_PET_OFF);
+#endif
+      petEnterDeathState();
+      clearInputLatch();
+      return;
+    }
+
     // Near-death beep MUST work even with screen off.
     if (g_app.uiState != UIState::DEATH_TRANSITION)
     {
@@ -328,6 +341,33 @@ void appMainLoopTick()
   InputState input = readInput();
 
 #if LED_STATUS_ENABLED
+  // During a screen-off alert pulse, the panel is physically on, but the alert
+  // system must continue to behave as "screen off" so it keeps the solid alert
+  // color and shared-rail pulse semantics.
+  if (ledInputLockActive())
+  {
+    ledSetScreenOff(true);
+    ledUpdatePetStatus(computeLedMode());
+
+    if (motionAvailable && motionShakeDetected())
+    {
+      screenWake();
+      motionResetShakeDetector(2500);
+      setLastInputActivityMs(now);
+      invalidateBackgroundCache();
+      requestFullUIRedraw();
+
+      ledSetScreenOff(false);
+      ledUpdatePetStatus(computeLedMode());
+      return;
+    }
+
+    input = InputState{};
+    clearInputLatch();
+    delay(5);
+    return;
+  }
+
   ledSetScreenOff(false);
   ledUpdatePetStatus(computeLedMode());
 #endif
@@ -889,6 +929,18 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   // Waking from sleep screen state
   // ---------------------------------------------------------------------------
+  if (g_app.uiState == UIState::PET_SCREEN && isPetSleepingNow())
+  {
+    uiPetSleepingSetReturnState(UIState::PET_SCREEN, Tab::TAB_PET);
+    uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, false, input, 200);
+    sleepBgKickNow();
+    invalidateBackgroundCache();
+    requestFullUIRedraw();
+    input = InputState{};
+    clearInputLatch();
+    return;
+  }
+
   if (g_app.uiState == UIState::PET_SLEEPING && !isPetSleepingNow())
   {
     petResetUpdateTimers();

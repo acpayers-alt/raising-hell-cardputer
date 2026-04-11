@@ -35,6 +35,11 @@ static Adafruit_NeoPixel g_led(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 static bool g_inited = false;
 
+bool ledInputLockActive()
+{
+  return s_screenIsOff && s_pulseActive;
+}
+
 void ledSetScreenOff(bool isOff)
 {
   // Ignore the temporary ON state created by the rail-power pulse.
