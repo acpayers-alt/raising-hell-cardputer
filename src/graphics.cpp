@@ -112,7 +112,6 @@ bool g_forcePetBgCache = false;
 void drawHatchingScreen(bool redrawBg);
 static void drawBurialScreen();
 static void drawEvolutionScreen();
-static void drawMiniStatPreview();
 static void drawMiniStatPreviewSleepLeft();
 static void drawPetPerfHud();
 static void drawBackupPetListScreen(bool redrawBg);
@@ -132,8 +131,6 @@ static void drawPetSleepingScreen();
 static void drawMiniGameScreen();
 static bool getPngWH(const char *path, int &outW, int &outH);
 static void drawCenteredImageSpr(const char *path, int cx, int cy);
-static bool getPngWH(const char *path, int &outW, int &outH);
-static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static void drawCrackedEggBig(int cx, int topY, const char *path);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
@@ -142,9 +139,6 @@ bool sprDrawPngFromSD(const char *path, int x, int y);
 bool canvasDrawPngFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 bool canvasDrawJpgFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 
-// Provide no-arg wrappers for existing bool-signature screens
-static void drawDeathScreen();   // calls drawDeathScreen(bool)
-static void drawNamePetScreen(); // calls drawNamePetScreen(bool)
 // Provide no-arg wrappers for existing bool-signature screens
 static void drawDeathScreen();   // calls drawDeathScreen(bool)
 static void drawNamePetScreen(); // calls drawNamePetScreen(bool)
@@ -308,7 +302,7 @@ static void uiDrawToastOverlay();
 // Sleep Graphics Kick
 static volatile bool g_sleepBgKick = false;
 
-// Random Shit
+// Misc Helpers
 static void drawNonPetTabBackground();
 
 void sleepBgKickNow()
@@ -7174,10 +7168,6 @@ static void drawCurrentScreen(bool redrawBg)
     drawBootSplash();
     return;
 
-  case UIState::HOME:
-    drawTabDrivenScreen(redrawBg);
-    break;
-
   case UIState::PET_SCREEN:
   default:
     drawTabDrivenScreen(redrawBg);
@@ -8235,7 +8225,7 @@ static void drawPetPerfHud()
   if (g_app.currentTab != Tab::TAB_PET)
     return;
 
-  if (g_app.uiState != UIState::HOME && g_app.uiState != UIState::PET_SCREEN)
+    if (g_app.uiState != UIState::PET_SCREEN)
     return;
 
   const PetPerfStats &ps = petPerfStats();

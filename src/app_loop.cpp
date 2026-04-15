@@ -759,7 +759,7 @@ void appMainLoopTick()
     const uint32_t nowMs = millis();
     if ((uint32_t)(nowMs - getLastInputActivityMs()) >= 60000UL)
     {
-      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, false);
+      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 120);
       clearInputLatch();
     }
   }
@@ -884,15 +884,29 @@ void appMainLoopTick()
   }
 
   // ---------------------------------------------------------------------------
-  // HOME KEY (Q): return to PET tab from anywhere reasonable
+  // HOME KEY (Q): unwind modal flows first, otherwise return to the main pet flow
   // IMPORTANT: this is separate from MENU/ESC which are for opening/dismissing menus.
-  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------  // ---------------------------------------------------------------------------
   if (input.homeOnce)
   {
-    if (g_app.uiState == UIState::SETTINGS && settingsHasReturnTarget())
+    const bool settingsOwnedFlow =
+        (g_app.uiState == UIState::SETTINGS) ||
+        (g_app.uiState == UIState::IMPORT_PET_LIST) ||
+        (g_app.uiState == UIState::BACKUP_PET_LIST);
+
+    if (settingsOwnedFlow && settingsHasReturnTarget())
     {
       noteUserActivity();
-      closeSettingsAndReturn(input);
+
+      if (g_app.uiState == UIState::SETTINGS)
+      {
+        closeSettingsAndReturn(input);
+      }
+      else
+      {
+        returnToSettingsPage(g_settingsFlow.settingsPage, g_app.currentTab, input);
+      }
+
       invalidateBackgroundCache();
       requestUIRedraw();
       input = InputState{};
