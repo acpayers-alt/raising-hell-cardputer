@@ -359,9 +359,11 @@ void uiImportPetListHandle(InputState &in)
     {
       g_settingsFlow.settingsPage = g_importPetListReturnPage;
       g_importPetListReturnToSettings = false;
-      uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+      uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
     }
-    else
+        else
     {
       uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
     }

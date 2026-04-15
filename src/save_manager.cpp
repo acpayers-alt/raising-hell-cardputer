@@ -627,8 +627,9 @@ void saveManagerFullWipe()
 
 // ------------------------------------------------------------
 // NEW PET FLOW BOOT RESUME FLAG
-//   - Present => user was mid "Name Pet" flow (resume NAME_PET on boot)
-//   - Missing => do NOT force NAME_PET; if name blank, go to CHOOSE_PET instead
+//   - Present => user was mid new-pet creation
+//   - Current policy does NOT resume NAME_PET on boot
+//   - If an incomplete/new-pet save is encountered, fall back to CHOOSE_PET
 // ------------------------------------------------------------
 
 static bool namePendingFlagExists()

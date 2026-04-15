@@ -70,7 +70,7 @@ void uiNamePetHandle(InputState &in)
     inputForceClear();
     clearInputLatch();
 
-    uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+    uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
     requestFullUIRedraw();
     requestUIRedraw();
     return;
@@ -103,11 +103,11 @@ void uiNamePetHandle(InputState &in)
 
         g_namePetRenameMode = false;
         g_namePetJustOpened = false;
-        uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+        uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
         requestFullUIRedraw();
         requestUIRedraw();
         invalidateBackgroundCache();
-
+        
         while (in.kbHasEvent())
           (void)in.kbPop();
         inputForceClear();

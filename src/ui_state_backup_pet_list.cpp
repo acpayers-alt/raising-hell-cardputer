@@ -70,7 +70,9 @@ static void reloadBackups()
 static void leaveBackupBrowser()
 {
   g_settingsFlow.settingsPage = SettingsPage::PET;
-  uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+  uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+  requestFullUIRedraw();
+  requestUIRedraw();
 }
 
 static void beginRestoreConfirm()
