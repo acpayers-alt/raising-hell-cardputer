@@ -61,12 +61,14 @@ void uiConsoleHandle(InputState &input)
       // Settings already knows where to exit to; we just want to go back into it.
       g_settingsFlow.settingsPage = g_consoleReturnPage;
 
-      uiActionEnterState(UIState::SETTINGS, g_consoleReturn.tab, true);      requestUIRedraw();
+      uiActionEnterStateClean(UIState::SETTINGS, g_consoleReturn.tab, true, input, 120);
+      requestUIRedraw();
       return;
     }
 
     // Normal behavior: return to the UI state we came from
-    uiActionEnterState(g_consoleReturn.state, g_consoleReturn.tab, true);    requestUIRedraw();
+    uiActionEnterStateClean(g_consoleReturn.state, g_consoleReturn.tab, true, input, 120);
+    requestUIRedraw();
     return;
   }
 
@@ -91,10 +93,12 @@ bool closeConsoleAndReturn(InputState &input)
     // Restore settings page only; do NOT touch settings return plumbing.
     g_settingsFlow.settingsPage = g_consoleReturnPage;
 
-    uiActionEnterState(UIState::SETTINGS, g_consoleReturn.tab, true);    requestUIRedraw();
+    uiActionEnterStateClean(UIState::SETTINGS, g_consoleReturn.tab, true, input, 120);
+    requestUIRedraw();
     return true;
   }
 
-  uiActionEnterState(g_consoleReturn.state, g_consoleReturn.tab, true);  requestUIRedraw();
+  uiActionEnterStateClean(g_consoleReturn.state, g_consoleReturn.tab, true, input, 120);
+  requestUIRedraw();
   return true;
 }

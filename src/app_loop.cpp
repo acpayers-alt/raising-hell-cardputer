@@ -819,7 +819,6 @@ void appMainLoopTick()
   else if (g_app.uiState == UIState::CLOCK_MODE)
   {
     input.hotSettings = false;
-    input.homeOnce = false;
     input.tabJump = 255;
   }
   else
@@ -886,13 +885,13 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   // HOME KEY (Q): unwind modal flows first, otherwise return to the main pet flow
   // IMPORTANT: this is separate from MENU/ESC which are for opening/dismissing menus.
-  // ---------------------------------------------------------------------------  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------  //
+  // ---------------------------------------------------------------------------
   if (input.homeOnce)
   {
-    const bool settingsOwnedFlow =
-        (g_app.uiState == UIState::SETTINGS) ||
-        (g_app.uiState == UIState::IMPORT_PET_LIST) ||
-        (g_app.uiState == UIState::BACKUP_PET_LIST);
+    const bool settingsOwnedFlow = (g_app.uiState == UIState::SETTINGS) ||
+                                   (g_app.uiState == UIState::IMPORT_PET_LIST) ||
+                                   (g_app.uiState == UIState::BACKUP_PET_LIST);
 
     if (settingsOwnedFlow && settingsHasReturnTarget())
     {
@@ -909,6 +908,38 @@ void appMainLoopTick()
 
       invalidateBackgroundCache();
       requestUIRedraw();
+      input = InputState{};
+      clearInputLatch();
+      return;
+    }
+
+    if (g_app.uiState == UIState::CLOCK_MODE)
+    {
+      noteUserActivity();
+      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 120);
+      invalidateBackgroundCache();
+      requestUIRedraw();
+      input = InputState{};
+      clearInputLatch();
+      return;
+    }
+
+    if (g_app.uiState == UIState::PET_SLEEPING)
+    {
+      noteUserActivity();
+      g_app.isSleeping = false;
+      g_app.sleepUntilAwakened = false;
+      g_app.sleepUntilRested = false;
+      g_app.sleepingByTimer = false;
+      g_app.sleepTargetEnergy = 0;
+      g_app.sleepStartTime = 0;
+      g_app.sleepDurationMs = 0;
+      pet.isSleeping = false;
+      saveManagerClearSleepPendingFlag();
+      saveManagerMarkDirty();
+      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 120);
+      invalidateBackgroundCache();
+      requestFullUIRedraw();
       input = InputState{};
       clearInputLatch();
       return;
