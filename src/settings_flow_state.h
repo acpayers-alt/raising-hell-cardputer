@@ -22,6 +22,7 @@ extern SettingsFlowState g_settingsFlow;
 void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage page = SettingsPage::TOP);
 void closeSettingsAndReturn(InputState& in);
 void returnToSettingsPage(SettingsPage page, Tab tab, InputState& in);
+void clearSettingsReturnTarget();
 bool settingsHasReturnTarget();
 UIState settingsReturnState();
 Tab settingsReturnTab();

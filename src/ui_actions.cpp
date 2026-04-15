@@ -1,8 +1,9 @@
-#include "ui_actions.h"
-
 #include <Arduino.h>
 
 #include "app_state.h"
+#include "settings_flow_state.h"
+
+#include "ui_actions.h"
 #include "ui_runtime.h"
 #include "ui_suppress.h"
 
@@ -26,9 +27,19 @@ static int s_returnTop = 0;
 
 void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
 {
+  const UIState prevState = g_app.uiState;
+  const Tab prevTab = g_app.currentTab;
+
   const bool changed =
       (g_app.uiState != state) ||
       (g_app.currentTab != tab);
+
+  if (state == UIState::SETTINGS && !settingsHasReturnTarget())
+  {
+    g_settingsFlow.settingsReturnValid = true;
+    g_settingsFlow.settingsReturnState = prevState;
+    g_settingsFlow.settingsReturnTab   = prevTab;
+  }
 
   g_app.uiState    = state;
   g_app.currentTab = tab;

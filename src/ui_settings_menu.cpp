@@ -232,7 +232,7 @@ static void actTop_MainMenu(InputState &in)
 {
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
-  g_settingsFlow.settingsReturnValid = false;
+  clearSettingsReturnTarget();
 
   playBeep();
   uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, in, 120);
@@ -609,8 +609,8 @@ static void actPet_StorePet(InputState &input)
 
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
-  g_settingsFlow.settingsReturnValid = false;
-
+  clearSettingsReturnTarget();
+  
   playBeep();
   uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
 }

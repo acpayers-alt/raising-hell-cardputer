@@ -1,7 +1,8 @@
-#include "settings_flow_state.h"
-
 #include "input.h"
 #include "settings_state.h"
+#include "settings_nav_state.h"
+#include "settings_flow_state.h"
+
 #include "ui_actions.h"
 #include "ui_runtime.h"
 
@@ -17,6 +18,7 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
   g_settingsFlow.settingsReturnState = returnState;
   g_settingsFlow.settingsReturnTab   = returnTab;
   g_settingsFlow.settingsPage        = page;
+  g_settingsFlow.settingsReturnPage  = page;
 
   if (page == SettingsPage::TOP)
     resetSettingsNav(false);
@@ -25,6 +27,13 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
   requestFullUIRedraw();
   inputForceClear();
   clearInputLatch();
+}
+
+void clearSettingsReturnTarget()
+{
+  g_settingsFlow.settingsReturnValid = false;
+  g_settingsFlow.settingsReturnState = UIState::PET_SCREEN;
+  g_settingsFlow.settingsReturnTab   = Tab::TAB_PET;
 }
 
 void closeSettingsAndReturn(InputState& in)
@@ -39,7 +48,10 @@ void closeSettingsAndReturn(InputState& in)
           ? g_settingsFlow.settingsReturnTab
           : Tab::TAB_PET;
 
-  g_settingsFlow.settingsReturnValid = false;
+  resetSettingsNav(true);
+  g_settingsFlow.settingsPage = SettingsPage::TOP;
+  g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
+  clearSettingsReturnTarget();
 
   uiActionEnterStateClean(targetState, targetTab, true, in, 120);
 }

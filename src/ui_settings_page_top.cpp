@@ -143,7 +143,8 @@ void Handle_TOP(InputState &input, int move)
       return;
     }
 
-    case 9: { // Store Pet
+    case 9:
+    { // Store Pet
       char parkedPath[128];
       if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
       {
@@ -153,20 +154,22 @@ void Handle_TOP(InputState &input, int move)
         clearInputLatch();
         return;
       }
-    
+
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
-      g_settingsFlow.settingsReturnValid = false;
-    
+      clearSettingsReturnTarget();
+
       playBeep();
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
       return;
     }
-    
-    case 10: { // Main Menu
+
+    case 10:
+    { // Main Menu
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
-      g_settingsFlow.settingsReturnValid = false;
+      clearSettingsReturnTarget();
+
       playBeep();
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
       return;
