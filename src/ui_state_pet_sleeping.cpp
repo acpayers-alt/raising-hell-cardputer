@@ -17,6 +17,21 @@ static uint32_t s_enterSleepUiMs = 0;
 static bool s_prevSelectHeld = false;
 static ReturnTarget s_petSleepingReturn{UIState::PET_SCREEN, Tab::TAB_PET};
 
+static void leavePetSleepingToReturnTarget(InputState &in, uint16_t drainMs, bool forceRenderNow)
+{
+  const UIState targetState = s_petSleepingReturn.state;
+  const Tab targetTab = s_petSleepingReturn.tab;
+
+  s_petSleepingReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
+
+  uiActionEnterStateClean(targetState, targetTab, true, in, drainMs);
+  invalidateBackgroundCache();
+  requestFullUIRedraw();
+
+  if (forceRenderNow)
+    forceRenderUIOnce();
+}
+
 void uiPetSleepingOnEnter(const InputState &in)
 {
   s_enterSleepUiMs = millis();
@@ -61,13 +76,7 @@ void uiPetSleepingHandle(InputState &in)
 {
   if (!isPetSleepingNow())
   {
-    const UIState targetState = s_petSleepingReturn.state;
-    const Tab targetTab = s_petSleepingReturn.tab;
-    s_petSleepingReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
-
-    uiActionEnterStateClean(targetState, targetTab, true, in, 200);
-    invalidateBackgroundCache();
-    requestUIRedraw();
+    leavePetSleepingToReturnTarget(in, 200, false);
     return;
   }
 
@@ -106,13 +115,7 @@ void uiPetSleepingHandle(InputState &in)
 
     graphicsReleaseUiCachesForMiniGame();
 
-    const UIState targetState = s_petSleepingReturn.state;
-    const Tab targetTab = s_petSleepingReturn.tab;
-    s_petSleepingReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
-
-    uiActionEnterStateClean(targetState, targetTab, true, in, 200);
-    requestFullUIRedraw();
-    forceRenderUIOnce();
+    leavePetSleepingToReturnTarget(in, 200, true);
     return;
   }
   return;

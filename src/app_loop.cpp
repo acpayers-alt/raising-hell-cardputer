@@ -946,13 +946,6 @@ void appMainLoopTick()
     return;
   }
 
-  if (g_app.uiState == UIState::PET_SLEEPING && !isPetSleepingNow())
-  {
-    uiEnterPetSleepingWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, input, 200);
-    sleepBgKickNow();
-    invalidateBackgroundCache();
-  }
-
   // ---------------------------------------------------------------------------
   // Input-driven redraw hint (single copy)
   // ---------------------------------------------------------------------------
