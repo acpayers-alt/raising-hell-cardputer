@@ -3,12 +3,12 @@
 #include "app_state.h"
 #include "graphics.h"
 #include "input.h"
+#include "pet.h"
 #include "save_manager.h"
 #include "settings_flow_state.h"
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
-#include "pet.h"
 #include "ui_state_pet_sleeping.h"
 
 namespace
@@ -67,13 +67,7 @@ static void reloadBackups()
   clampSelectionAndWindow();
 }
 
-static void leaveBackupBrowser()
-{
-  g_settingsFlow.settingsPage = SettingsPage::PET;
-  uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
-  requestFullUIRedraw();
-  requestUIRedraw();
-}
+static void leaveBackupBrowser(InputState &in) { returnToSettingsPage(SettingsPage::PET, g_app.currentTab, in); }
 
 static void beginRestoreConfirm()
 {
@@ -374,7 +368,7 @@ void uiBackupPetListHandle(InputState &in)
   if (in.menuOnce || in.escOnce)
   {
     playBeep();
-    leaveBackupBrowser();
+    leaveBackupBrowser(in);
     swallowBackupInput(in);
     return;
   }

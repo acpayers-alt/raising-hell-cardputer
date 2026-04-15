@@ -51,8 +51,8 @@
 
 // --- Game / User Systems ---
 #include "game_options_state.h"
-#include "user_toggles_state.h"
 #include "save_manager.h"
+#include "user_toggles_state.h"
 
 // --- Graphics ---
 #include "graphics.h" // ui_showMessage
@@ -493,11 +493,12 @@ static void actGame_ExportBub(InputState &)
   clearInputLatch();
 }
 
-static void actGame_ImportBub(InputState &)
+static void actGame_ImportBub(InputState &input)
 {
-  uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+  uiActionEnterState(UIState::IMPORT_PET_LIST, g_app.currentTab, true);
   requestFullUIRedraw();
   playBeep();
+  uiDrainKb(input);
   clearInputLatch();
 }
 
@@ -621,7 +622,7 @@ static void actPet_StoredPets(InputState &input)
   g_importPetListReturnPage = SettingsPage::PET;
 
   playBeep();
-  uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+  uiActionEnterState(UIState::IMPORT_PET_LIST, g_app.currentTab, true);
   requestUIRedraw();
   uiDrainKb(input);
   clearInputLatch();
@@ -646,7 +647,7 @@ static void actPet_RestoreFromBackup(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::PET;
   playBeep();
-  uiActionEnterState(UIState::BACKUP_PET_LIST, Tab::TAB_PET, true);
+  uiActionEnterState(UIState::BACKUP_PET_LIST, g_app.currentTab, true);
   requestUIRedraw();
   uiDrainKb(input);
   clearInputLatch();
@@ -931,7 +932,7 @@ bool Handle(InputState &input, int move)
       g_app.newPetFlowActive = false;
       saveManagerClearNamePendingFlag();
       saveManagerClearSleepPendingFlag();
-      
+
       // Now enter egg selection clean
       uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
       uiChoosePetOnEnter(input);

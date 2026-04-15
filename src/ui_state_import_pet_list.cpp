@@ -3,16 +3,16 @@
 #include "app_state.h"
 #include "graphics.h"
 #include "input.h"
+#include "pet.h"
 #include "save_manager.h"
 #include "sdcard.h"
 #include "settings_flow_state.h"
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
+#include "ui_state_pet_sleeping.h"
 #include <SD.h>
 #include <cstring>
-#include "pet.h"
-#include "ui_state_pet_sleeping.h"
 
 namespace
 {
@@ -357,13 +357,11 @@ void uiImportPetListHandle(InputState &in)
 
     if (g_importPetListReturnToSettings)
     {
-      g_settingsFlow.settingsPage = g_importPetListReturnPage;
+      const SettingsPage returnPage = g_importPetListReturnPage;
       g_importPetListReturnToSettings = false;
-      uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
-      requestFullUIRedraw();
-      requestUIRedraw();
+      returnToSettingsPage(returnPage, g_app.currentTab, in);
     }
-        else
+    else
     {
       uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
     }

@@ -19,7 +19,9 @@ struct SettingsFlowState {
 
 extern SettingsFlowState g_settingsFlow;
 
-void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage page = SettingsPage::TOP);void closeSettingsAndReturn(InputState& in);
+void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage page = SettingsPage::TOP);
+void closeSettingsAndReturn(InputState& in);
+void returnToSettingsPage(SettingsPage page, Tab tab, InputState& in);
 bool settingsHasReturnTarget();
 UIState settingsReturnState();
 Tab settingsReturnTab();

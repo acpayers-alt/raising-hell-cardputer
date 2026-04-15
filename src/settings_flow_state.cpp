@@ -44,6 +44,13 @@ void closeSettingsAndReturn(InputState& in)
   uiActionEnterStateClean(targetState, targetTab, true, in, 120);
 }
 
+void returnToSettingsPage(SettingsPage page, Tab tab, InputState& in)
+{
+  g_settingsFlow.settingsPage = page;
+  uiActionEnterStateClean(UIState::SETTINGS, tab, true, in, 120);
+  requestFullUIRedraw();
+}
+
 bool settingsHasReturnTarget()
 {
   return g_settingsFlow.settingsReturnValid;
