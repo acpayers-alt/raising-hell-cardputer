@@ -179,6 +179,41 @@ If the game fails to start:
 - Ensure the device has **Wi-Fi connectivity** for asset provisioning
 - Restart the device after flashing
 
+---
+
+## Installing Assets Manually (if you just wanna)
+
+### 1. Download the Assets
+- Go to the project’s GitHub repository
+- Download the assets folder (or clone the repo)
+
+### 2. Prepare Your SD Card
+- Format the SD card as **FAT32**
+- Insert it into your computer
+
+### 3. Copy the Assets
+Create the following folder structure on the SD card (if it doesn’t exist):
+
+/raising_hell/assets/
+
+Copy **all asset files and folders** into:
+
+/raising_hell/assets/
+
+### 4. Insert into Device
+- Safely eject the SD card
+- Insert it into your Cardputer
+- Power on the device
+
+### 5. First Run
+- The game will automatically detect and load the assets
+- If versions don’t match, it may prompt or auto-update (depending on your build)
+
+---
+
+## Notes
+- Do **not** rename files or folders
+- Make sure the path is exactly: /raising_hell/assets/
 
 ------------------------------------------------------------
 Development Direction
