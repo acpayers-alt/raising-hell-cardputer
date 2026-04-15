@@ -5,12 +5,6 @@
 #include <stdio.h>   // snprintf
 #include <string.h>  // strlen, memcpy
 
-static time_t makeLocalTime(struct tm t) {
-  // mktime assumes tm is local time. That's fine as long as you're consistent.
-  t.tm_isdst = -1;
-  return mktime(&t);
-}
-
 AgeParts calcAgeParts(int64_t birthEpoch, int64_t nowEpoch) {
   AgeParts a{0, 0, 0, 0, 0};
   if (birthEpoch <= 0 || nowEpoch <= birthEpoch) return a;
@@ -33,20 +27,6 @@ AgeParts calcAgeParts(int64_t birthEpoch, int64_t nowEpoch) {
   a.months %= 12;
 
   return a;
-}
-
-static void safeAppend(char* dst, size_t dstSize, const char* src) {
-  if (!dst || dstSize == 0 || !src) return;
-
-  size_t dlen = strlen(dst);
-  if (dlen >= dstSize - 1) return;
-
-  size_t slen = strlen(src);
-  size_t room = (dstSize - 1) - dlen;
-  if (slen > room) slen = room;
-
-  memcpy(dst + dlen, src, slen);
-  dst[dlen + slen] = '\0';
 }
 
 void formatAgeString(char* out, size_t outSize, const AgeParts& a, bool includeDays) {

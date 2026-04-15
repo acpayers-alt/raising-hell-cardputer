@@ -412,10 +412,6 @@ bool uiBackupPetListActionMenuActive() { return s_actionMenuActive; }
 
 int uiBackupPetListActionIndex() { return s_actionIndex; }
 
-bool uiBackupPetListConfirmDeleteActive() { return s_confirmDeleteActive; }
-
-int uiBackupPetListConfirmDeleteIndex() { return s_confirmDeleteIndex; }
-
 bool uiBackupPetListConfirmRestoreActive() { return s_confirmRestoreActive; }
 
 int uiBackupPetListConfirmRestoreIndex() { return s_confirmRestoreIndex; }

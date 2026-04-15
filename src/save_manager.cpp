@@ -762,8 +762,6 @@ static void forceChoosePetFlowFromBoot()
   clearInputLatch();
 }
 
-void saveManagerStartFreshPetFlow() { forceChoosePetFlowFromBoot(); }
-
 void saveManagerAbortFreshPetFlow()
 {
   // Abort any half-started new-pet lifecycle cleanly.

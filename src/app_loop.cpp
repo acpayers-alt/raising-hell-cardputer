@@ -85,7 +85,6 @@
 bool handleMenuInput(InputState &in);
 
 static bool s_forcedFirstRender = false;
-static uint32_t s_hbNextMs = 0;
 static bool s_bootKeepAwakeInited = false;
 static uint32_t s_bootKeepAwakeUntilMs = 0;
 static bool s_prevSleeping = false;

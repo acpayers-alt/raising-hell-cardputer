@@ -3,19 +3,30 @@
 #include "input.h"
 #include "save_manager.h"
 
+// ─────────────────────────────────────
+// State lifecycle
+// ─────────────────────────────────────
 void uiImportPetListOnEnter(InputState &in);
 void uiImportPetListHandle(InputState &in);
 
+// ─────────────────────────────────────
+// List data / view state
+// ─────────────────────────────────────
 int uiImportPetListCount();
 int uiImportPetListVisibleCount();
 int uiImportPetListWindowStart();
-const PetExportEntry &uiImportPetListGetVisible(int idx);
 int uiImportPetListSelected();
-bool uiImportPetListConfirming();
-int uiImportPetListConfirmIndex();
 
+const PetExportEntry &uiImportPetListGetVisible(int idx);
+
+// ─────────────────────────────────────
+// Action menu state
+// ─────────────────────────────────────
 bool uiImportPetListActionMenuActive();
-int uiImportPetListActionIndex();
+int  uiImportPetListActionIndex();
 
+// ─────────────────────────────────────
+// Delete confirmation state
+// ─────────────────────────────────────
 bool uiImportPetListConfirmDeleteActive();
-int uiImportPetListConfirmDeleteIndex();
+int  uiImportPetListConfirmDeleteIndex();

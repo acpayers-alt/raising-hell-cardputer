@@ -9,12 +9,6 @@
 #include "ui_invalidate.h"
 #include "ui_actions.h"
 
-static inline int clampi_local(int v, int lo, int hi) {
-  if (v < lo) return lo;
-  if (v > hi) return hi;
-  return v;
-}
-
 // 0 = snack, 1 = until full
 void feedPet(int mode) {
   // Safety clamp

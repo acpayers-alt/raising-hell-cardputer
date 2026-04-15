@@ -19,9 +19,6 @@
 #include "ui_actions.h"
 #include "ui_state_settings.h"
 
-// Keep the boot fix local to this module.
-static bool s_bootNamePetFixApplied = false;
-
 // Menu/ESC suppression is centralized in ui_suppress.*
 static inline bool menuSuppressedNow() { return uiIsMenuSuppressed(); }
 
@@ -61,7 +58,7 @@ static bool uiInterceptGlobalShortcuts(InputState& in)
       return true;
     }
   }
-  
+
   return false;
 }
 
