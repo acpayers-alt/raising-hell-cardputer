@@ -232,7 +232,7 @@ void appMainLoopTick()
   const bool inDeathFlow = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::DEATH_TRANSITION) ||
                            (g_app.uiState == UIState::MINI_GAME) || (g_app.uiState == UIState::MG_PAUSE) ||
                            (g_app.uiState == UIState::BURIAL_SCREEN);
-                           
+
   const bool screenOnNow = isScreenOn();
 
   if (!s_prevScreenOn && screenOnNow)
@@ -340,7 +340,7 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-  #if LED_STATUS_ENABLED
+#if LED_STATUS_ENABLED
   if (ledInputLockActive())
   {
     // Keep alert system in logical screen-off mode during the pulse.
@@ -350,7 +350,7 @@ void appMainLoopTick()
     if (motionAvailable && motionShakeDetected())
     {
       screenWake();
-      motionResetShakeDetector(2500); 
+      motionResetShakeDetector(2500);
       setLastInputActivityMs(now);
       invalidateBackgroundCache();
       requestFullUIRedraw();
@@ -910,8 +910,7 @@ void appMainLoopTick()
 
       if (shouldEnterSleeping)
       {
-        uiPetSleepingSetReturnState(UIState::TITLE_MENU, Tab::TAB_PET);
-        uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, false, input, 200);
+        uiEnterPetSleepingWithReturn(UIState::TITLE_MENU, Tab::TAB_PET, input, 200);
         uiPetSleepingBootEnter();
         sleepBgKickNow();
       }
@@ -933,11 +932,9 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   if (g_app.uiState == UIState::PET_SCREEN && isPetSleepingNow())
   {
-    uiPetSleepingSetReturnState(UIState::PET_SCREEN, Tab::TAB_PET);
-    uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, false, input, 200);
+    uiEnterPetSleepingWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, input, 200);
     sleepBgKickNow();
     invalidateBackgroundCache();
-    requestFullUIRedraw();
     input = InputState{};
     clearInputLatch();
     return;

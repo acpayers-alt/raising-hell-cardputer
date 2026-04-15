@@ -5,12 +5,12 @@
 #include "input.h"
 #include "led_status.h"
 #include "pet.h"
+#include "return_target.h"
 #include "save_manager.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
 #include "ui_state_settings.h"
-#include "return_target.h"
 
 // Entry guard to prevent "carried-held ENTER" from instantly waking the pet.
 static uint32_t s_enterSleepUiMs = 0;
@@ -39,7 +39,7 @@ void uiPetSleepingBootEnter()
   Serial.printf("[HEAPCHK] uiPetSleepingBootEnter after-release free=%u largest=%u\n",
                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
-                
+
   clearInputLatch();
   inputForceClear();
 }
@@ -50,11 +50,22 @@ void uiPetSleepingSetReturnState(UIState state, Tab tab)
   s_petSleepingReturn.tab = tab;
 }
 
+void uiEnterPetSleepingWithReturn(UIState returnState, Tab returnTab, InputState &in, uint16_t drainMs)
+{
+  uiPetSleepingSetReturnState(returnState, returnTab);
+  uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, drainMs);
+  requestFullUIRedraw();
+}
+
 void uiPetSleepingHandle(InputState &in)
 {
   if (!isPetSleepingNow())
   {
-    uiActionEnterStateClean(s_petSleepingReturn.state, s_petSleepingReturn.tab, true, in, 200);
+    const UIState targetState = s_petSleepingReturn.state;
+    const Tab targetTab = s_petSleepingReturn.tab;
+    s_petSleepingReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
+
+    uiActionEnterStateClean(targetState, targetTab, true, in, 200);
     invalidateBackgroundCache();
     requestUIRedraw();
     return;
@@ -71,12 +82,12 @@ void uiPetSleepingHandle(InputState &in)
   if (in.menuOnce || in.escOnce)
   {
     g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
-    inputForceClear();   // critical: kill carried input
+    inputForceClear(); // critical: kill carried input
     openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
     uiActionSwallowAll(in);
     return;
   }
-    
+
   // Wake explicitly on enter/select (but not immediately on entry)
   if (allowWake && (in.selectOnce || in.encoderPressOnce || in.mgSelectOnce || selectEdgeFallback))
   {
@@ -95,10 +106,14 @@ void uiPetSleepingHandle(InputState &in)
 
     graphicsReleaseUiCachesForMiniGame();
 
-    uiActionEnterStateClean(s_petSleepingReturn.state, s_petSleepingReturn.tab, true, in, 200);
+    const UIState targetState = s_petSleepingReturn.state;
+    const Tab targetTab = s_petSleepingReturn.tab;
+    s_petSleepingReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
+
+    uiActionEnterStateClean(targetState, targetTab, true, in, 200);
     requestFullUIRedraw();
     forceRenderUIOnce();
     return;
-    }
+  }
   return;
 }

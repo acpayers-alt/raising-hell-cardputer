@@ -117,12 +117,9 @@ static void titleActivateContinue(InputState &in)
   if (shouldEnterSleeping)
   {
     // Enter sleep screen, but when the pet wakes we should land on the live PET tab.
-    uiPetSleepingSetReturnState(UIState::PET_SCREEN, Tab::TAB_PET);
-
-    uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
+    uiEnterPetSleepingWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, in, 120);
 
     uiPetSleepingBootEnter();
-    requestFullUIRedraw();
     sleepBgKickNow();
     forceRenderUIOnce();
   }
@@ -224,7 +221,7 @@ void uiTitleMenuHandle(InputState &in)
       (void)in.kbPop();
     return;
   }
-  
+
   switch (g_titleMenuIndex)
   {
   case TITLE_CONTINUE:
