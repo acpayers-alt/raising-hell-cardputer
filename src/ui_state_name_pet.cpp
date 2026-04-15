@@ -57,7 +57,7 @@ void uiNamePetHandle(InputState &in)
 
   // Allow cancel only when this is a normal rename flow.
   // New-pet naming remains mandatory.
-  if (g_namePetRenameMode && (in.menuOnce || in.hotSettings))
+  if (g_namePetRenameMode && (in.escOnce || in.menuOnce || in.hotSettings))
   {
     inputSetTextCapture(false);
     g_textCaptureMode = false;
@@ -70,12 +70,21 @@ void uiNamePetHandle(InputState &in)
     inputForceClear();
     clearInputLatch();
 
+    playBeep();
     uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
     requestFullUIRedraw();
     requestUIRedraw();
     return;
   }
 
+  // New-pet naming: ESC is intentionally inert
+  if (!g_namePetRenameMode && in.escOnce)
+  {
+    playBeep();
+    clearInputLatch();
+    return;
+  }
+  
   bool changed = false;
 
   while (in.kbHasEvent())
@@ -103,19 +112,20 @@ void uiNamePetHandle(InputState &in)
 
         g_namePetRenameMode = false;
         g_namePetJustOpened = false;
-        uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
-        requestFullUIRedraw();
-        requestUIRedraw();
-        invalidateBackgroundCache();
-        
+
         while (in.kbHasEvent())
           (void)in.kbPop();
         inputForceClear();
         clearInputLatch();
+
         playBeep();
+        uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        invalidateBackgroundCache();
         return;
       }
-
+      
       finalizeNewPetFromName(in);
       return;
     }

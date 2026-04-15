@@ -811,6 +811,12 @@ void appMainLoopTick()
     input.homeOnce = false;
     input.tabJump = 255;
   }
+  else if (g_app.uiState == UIState::NAME_PET)
+  {
+    // Name entry owns its own cancel behavior locally.
+    input.homeOnce = false;
+    input.tabJump = 255;
+  }
   else if (g_app.uiState == UIState::CLOCK_MODE)
   {
     input.hotSettings = false;
@@ -942,8 +948,8 @@ void appMainLoopTick()
 
   if (g_app.uiState == UIState::PET_SLEEPING && !isPetSleepingNow())
   {
-    petResetUpdateTimers();
-    uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 200);
+    uiEnterPetSleepingWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, input, 200);
+    sleepBgKickNow();
     invalidateBackgroundCache();
   }
 

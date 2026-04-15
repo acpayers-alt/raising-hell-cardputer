@@ -39,17 +39,6 @@ static inline bool canOpenSettingsFrom(UIState s)
   }
 }
 
-static inline bool escBlockedInState(UIState s)
-{
-  switch (s)
-  {
-    case UIState::NAME_PET:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // Forward declaration
 static bool uiInterceptGlobalShortcuts(InputState& in);
 
@@ -62,24 +51,17 @@ static bool uiInterceptGlobalShortcuts(InputState& in)
   // ESC key: open Settings menu from allowed states
   if (in.escOnce)
   {
-    // Always consume ESC if blocked, so nothing else misinterprets it.
-    if (escBlockedInState(g_app.uiState))
-    {
-      in.clearEdges();
-      return true;
-    }
-
     if (!menuSuppressedNow() && canOpenSettingsFrom(g_app.uiState))
     {
       g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
       openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
-      
+
       // Swallow everything this tick so ESC doesn't also act as HOME/tab-jump/etc.
       in.clearEdges();
       return true;
     }
   }
-
+  
   return false;
 }
 
