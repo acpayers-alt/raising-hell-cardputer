@@ -8,20 +8,6 @@
 #include "ui_suppress.h"
 
 // -----------------------------------------------------------------------------
-// Small return stack (overlay-safe)
-// -----------------------------------------------------------------------------
-
-struct UiReturnFrame
-{
-  UIState state;
-  Tab     tab;
-};
-
-static constexpr int kReturnStackMax = 6;
-static UiReturnFrame s_returnStack[kReturnStackMax];
-static int s_returnTop = 0;
-
-// -----------------------------------------------------------------------------
 // Core state transition
 // -----------------------------------------------------------------------------
 
@@ -66,47 +52,6 @@ void uiActionEnterStateClean(UIState state,
 
   if (suppressMenuMs > 0)
     uiSuppressMenuForMs(suppressMenuMs);
-}
-
-// -----------------------------------------------------------------------------
-// Return stack
-// -----------------------------------------------------------------------------
-
-void uiPushReturn(UIState state, Tab tab)
-{
-  if (s_returnTop >= kReturnStackMax)
-    return;
-
-  s_returnStack[s_returnTop++] = { state, tab };
-}
-
-bool uiPopReturn(UIState& stateOut, Tab& tabOut)
-{
-  if (s_returnTop <= 0)
-    return false;
-
-  s_returnTop--;
-  stateOut = s_returnStack[s_returnTop].state;
-  tabOut   = s_returnStack[s_returnTop].tab;
-  return true;
-}
-
-void uiClearReturnStack()
-{
-  s_returnTop = 0;
-}
-
-bool uiActionReturnToPrevious(InputState& in,
-                              bool fullRedraw,
-                              uint32_t suppressMenuMs)
-{
-  UIState st;
-  Tab     tab;
-  if (!uiPopReturn(st, tab))
-    return false;
-
-  uiActionEnterStateClean(st, tab, fullRedraw, in, suppressMenuMs);
-  return true;
 }
 
 // -----------------------------------------------------------------------------

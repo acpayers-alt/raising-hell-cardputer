@@ -405,8 +405,6 @@ int uiImportPetListWindowStart() { return s_windowStart; }
 const PetExportEntry &uiImportPetListGetVisible(int idx) { return s_entries[s_windowStart + idx]; }
 
 int uiImportPetListSelected() { return s_importIndex; }
-bool uiImportPetListConfirming() { return s_confirming; }
-int uiImportPetListConfirmIndex() { return s_confirmIndex; }
 
 bool uiImportPetListActionMenuActive() { return s_actionMenuActive; }
 int uiImportPetListActionIndex() { return s_actionIndex; }
