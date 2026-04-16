@@ -79,6 +79,7 @@
 #include "graphics_set_time_screens.h"
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
+#include "graphics_clock_mode_screens.h"
 
 #include "inventory_state.h"
 #include "mg_pause_menu.h"
@@ -3391,170 +3392,6 @@ static int getClockModeBaselineDeltaForPet()
   }
 }
 
-static void drawClockModeScreen(bool redrawBg)
-{
-  if (!isScreenOn())
-    return;
-
-  const bool hasLivePet = saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
-
-  if (!hasLivePet)
-  {
-    spr.fillScreen(TFT_BLACK);
-
-    time_t now = time(nullptr);
-    tm tmNow = {};
-    localtime_r(&now, &tmNow);
-
-    int hour12 = tmNow.tm_hour % 12;
-    if (hour12 == 0)
-      hour12 = 12;
-
-    char timeBuf[8];
-    snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
-
-    static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-
-    const char *weekday = (tmNow.tm_wday >= 0 && tmNow.tm_wday < 7) ? kWeekdays[tmNow.tm_wday] : "---";
-    const char *month = (tmNow.tm_mon >= 0 && tmNow.tm_mon < 12) ? kMonths[tmNow.tm_mon] : "---";
-
-    char dateBuf[24];
-    snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
-
-    spr.setTextColor(TFT_WHITE);
-
-    spr.setTextDatum(TC_DATUM);
-    spr.drawString(timeBuf, SCREEN_W / 2, SCREEN_H / 2 - 20, 7);
-
-    spr.setTextDatum(TC_DATUM);
-    spr.drawString(dateBuf, SCREEN_W / 2, 20, 4);
-
-    spr.setTextDatum(BC_DATUM);
-    spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);
-
-    spr.setTextDatum(TL_DATUM);
-    return;
-  }
-
-  static PetType s_lastBgPetType = (PetType)255;
-  static uint8_t s_lastBgEvoStage = 255;
-
-  const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
-  const bool cacheMissing = (g_petBgCachedPath == nullptr);
-  const bool needPetBg = redrawBg || petChanged || cacheMissing || g_forcePetBgCache;
-
-  s_lastBgPetType = pet.type;
-  s_lastBgEvoStage = pet.evoStage;
-
-  const bool animChanged = animConsumeFrameChanged();
-  const bool needRestore = redrawBg || animChanged || needPetBg;
-
-  if (petPresentationHasIntroHandoff() && animChanged)
-  {
-    clearPetPresentationIntroHandoff();
-    requestUIRedraw();
-  }
-
-  cachePetAreaBackgroundIfNeeded(needPetBg);
-  g_forcePetBgCache = false;
-
-  if (needRestore)
-  {
-    // Clock Mode owns the full frame. Always repaint the non-pet regions so
-    // transient UI like the power menu cannot bleed through.
-    spr.fillRect(0, 0, SCREEN_W, PET_AREA_Y, TFT_BLACK);
-    spr.fillRect(0, PET_AREA_Y + PET_AREA_H, SCREEN_W, SCREEN_H - (PET_AREA_Y + PET_AREA_H), TFT_BLACK);
-
-    if (petLayerReady)
-    {
-      restorePetAreaFromCache();
-    }
-    else
-    {
-      // Fallback: repaint only the pet area from the current pet background.
-      // Clip so the full-frame JPG cannot spill into the footer strip.
-      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-
-      const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
-      if (bgPath)
-      {
-        spr.setClipRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H);
-        (void)sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
-        spr.clearClipRect();
-      }
-    }
-  }
-
-  // Keep Clock Mode on the same vertical baseline as the PET screen.
-  // Only override X here; Y should match the normal pet home anchor.
-  int homeX = 0;
-  int homeY = 0;
-  getPetHomeScreenPosition(homeX, homeY);
-
-  const int clockHomeX = (SCREEN_W / 2) - 65;
-  const int clockHomeY = homeY;
-
-  if (!petPresentationHasIntroHandoff())
-  {
-    resetPetScreenPositionToHome();
-  }
-
-  const PetMood mood = petResolveMood(pet);
-  const bool wanderAllowed = (mood == MOOD_HAPPY || mood == MOOD_BORED);
-
-  time_t now = time(nullptr);
-  tm tmNow = {};
-  localtime_r(&now, &tmNow);
-
-  int hour12 = tmNow.tm_hour % 12;
-  if (hour12 == 0)
-    hour12 = 12;
-
-  char timeBuf[8];
-  snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
-
-  static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-  static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-
-  const char *weekday = (tmNow.tm_wday >= 0 && tmNow.tm_wday < 7) ? kWeekdays[tmNow.tm_wday] : "---";
-  const char *month = (tmNow.tm_mon >= 0 && tmNow.tm_mon < 12) ? kMonths[tmNow.tm_mon] : "---";
-
-  char dateBuf[24];
-  snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
-
-  spr.setTextColor(TFT_WHITE);
-
-  spr.setTextDatum(TC_DATUM);
-  spr.drawString(timeBuf, SCREEN_W / 2, SCREEN_H / 2 - 20, 7);
-
-  spr.setTextDatum(TC_DATUM);
-  spr.drawString(dateBuf, SCREEN_W / 2, 20, 4);
-
-  // Clock Mode uses its own horizontal placement, but the vertical anchor and
-  // motion ownership now live in the presentation module.
-  if (wanderAllowed && petWalkOverrideActive())
-  {
-    if (!drawIntroWalkingPetOverride())
-      animDrawPetFrameAnchoredBottom(petPresentationX(), petPresentationY());
-  }
-  else
-  {
-    const int drawX = wanderAllowed ? petPresentationX() : clockHomeX;
-    const int drawY = wanderAllowed ? petPresentationY() : clockHomeY;
-    animDrawPetFrameAnchoredBottom(drawX, drawY);
-  }
-
-  // Always repaint the footer strip in Clock Mode.
-  // Do not rely on the pet-area restore path to preserve it.
-  spr.fillRect(0, SCREEN_H - TAB_BAR_H, SCREEN_W, TAB_BAR_H, TFT_BLACK);
-
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);
-
-  spr.setTextDatum(TL_DATUM);
-}
-
 // Death screen
 static void drawDeathScreen(bool redrawBg)
 {
@@ -5091,17 +4928,6 @@ void renderUI()
   uiDrawAlertScreenFlashOverlay();
   uiDrawToastOverlay();
 
-  // draw overlays
-  if (assetOtaConfirmActive())
-  {
-    drawAssetOtaConfirmOverlay();
-  }
-
-  spr.pushSprite(0, 0);
-
-  uiDrawToastOverlay();
-
-  // draw overlays
   if (assetOtaConfirmActive())
   {
     drawAssetOtaConfirmOverlay();
