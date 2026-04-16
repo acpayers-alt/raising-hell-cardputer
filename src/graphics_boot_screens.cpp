@@ -16,6 +16,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#include "graphics_shared_utils.h"
+
 void drawNonPetTabBackground();
 
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";

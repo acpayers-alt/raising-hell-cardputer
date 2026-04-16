@@ -93,6 +93,8 @@
 #include "wifi_setup_state.h"
 #include "graphics_boot_screens.h"
 #include "graphics_menu_screens.h"
+#include "graphics_death_screens.h"
+#include "graphics_shared_utils.h"
 
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
@@ -112,10 +114,9 @@
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
 void drawHatchingScreen(bool redrawBg);
-static void drawBurialScreen();
 static void drawEvolutionScreen();
 static void drawMiniStatPreviewSleepLeft();
-static void drawPetPerfHud();
+void drawPetPerfHud();
 
 // --- Graphics and Runtime
 void resetPetScreenPositionToHome();
@@ -129,9 +130,12 @@ static void drawSettingsScreen();
 static void drawInventoryScreen();
 static void drawPetSleepingScreen();
 static void drawMiniGameScreen();
-static bool getPngWH(const char *path, int &outW, int &outH);
+bool getPngWH(const char *path, int &outW, int &outH);
 static void drawCenteredImageSpr(const char *path, int cx, int cy);
 static void drawCrackedEggBig(int cx, int topY, const char *path);
+static void drawDeathScreen(bool redrawBg);
+static void drawBurialScreen();
+static void drawCenteredLine(const char *s, int y, int font, int size);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
@@ -140,7 +144,6 @@ bool canvasDrawPngFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y
 bool canvasDrawJpgFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 
 // Provide no-arg wrappers for existing bool-signature screens
-static void drawDeathScreen();   // calls drawDeathScreen(bool)
 static void drawNamePetScreen(); // calls drawNamePetScreen(bool)
 
 // Set-time helpers
@@ -633,7 +636,7 @@ static bool s_hudMoodIconReady = false;
 static M5Canvas s_hudRestIcon(&spr);
 static bool s_hudRestIconReady = false;
 
-static int deathTransitionYNudgeForPet()
+int deathTransitionYNudgeForPet()
 {
   switch (pet.type)
   {
@@ -1026,11 +1029,8 @@ bool backgroundCacheInvalidated() { return g_forceBgRedraw; }
 static bool drawJpegBackground(const char *path);
 static void drawSleepScreenImpl(bool redrawBg);
 static void drawPetScreenImpl(bool redrawBg);
-static void drawMiniStatPreview();
-static void listWindow(int total, int current, int maxVisible, int &start, int &count);
+void drawMiniStatPreview();
 static void drawCurrentScreen(bool redrawBg);
-static void drawDeathScreen(bool redrawBg);
-static void drawDeathTransitionScreen(bool redrawBg);
 static void drawWifiSetupScreen();
 static void drawNamePetScreen(bool redrawBg);
 static void drawDecayModePickerMenu();
@@ -1049,8 +1049,8 @@ void ui_drawMessageWindow(const char *title, const char *line1, const char *line
 void ui_showMessage(const char *msg);
 
 static bool ensurePetLayer();
-static void cachePetAreaBackgroundIfNeeded(bool needPetBg);
-static void restorePetAreaFromCache();
+void cachePetAreaBackgroundIfNeeded(bool needPetBg);
+void restorePetAreaFromCache();
 
 // -----------------------------------------------------------------------------
 // Background caching per UI state
@@ -1073,15 +1073,6 @@ void startPetScreenIntroFadeNow();
 // Mini-stat panel sizing (must match drawMiniStatPreview)
 static constexpr int MINI_STAT_W = 56;
 static constexpr int MINI_STAT_PAD = 4;
-
-static int clampi(int v, int lo, int hi)
-{
-  if (v < lo)
-    return lo;
-  if (v > hi)
-    return hi;
-  return v;
-}
 
 // -----------------------------------------------------------------------------
 // Splash screen (silent fallback)
@@ -1799,17 +1790,6 @@ static const char *decayModeLabel(uint8_t mode)
   default:
     return "Normal";
   }
-}
-
-// ============================================================================
-// Utility: list window
-// ============================================================================
-static void listWindow(int total, int current, int maxVisible, int &start, int &count)
-{
-  count = (total < maxVisible) ? total : maxVisible;
-  int half = count / 2;
-  start = current - half;
-  start = clampi(start, 0, total - count);
 }
 
 // ============================================================================
@@ -3618,7 +3598,7 @@ void drawInventoryMenu()
 // ============================================================================
 // NEW PET SCREEN + MINI STATS
 // ============================================================================
-static const char *g_petBgCachedPath = nullptr;
+const char *g_petBgCachedPath = nullptr;
 static PetType g_petBgCachedType = (PetType)255;
 static uint8_t g_petBgCachedStage = 255;
 
@@ -3655,7 +3635,7 @@ void graphicsRecoverAfterOta()
   requestUIRedraw();
 }
 
-static void cachePetAreaBackgroundIfNeeded(bool force)
+void cachePetAreaBackgroundIfNeeded(bool force)
 {
   if (!g_sdReady)
   {
@@ -3723,7 +3703,7 @@ static void cachePetAreaBackgroundIfNeeded(bool force)
   petLayerReady = true;
 }
 
-static inline void restorePetAreaFromCache()
+void restorePetAreaFromCache()
 {
   if (!petLayerReady)
     return;
@@ -3766,7 +3746,7 @@ static const PetRenderProfile kPetProfile[] = {
     /* PET_AXOLOTL  */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
 };
 
-static inline const PetRenderProfile &getPetProfile(PetType t)
+const PetRenderProfile &getPetProfile(PetType t)
 {
   int idx = (int)t;
   const int count = (int)(sizeof(kPetProfile) / sizeof(kPetProfile[0]));
@@ -4689,6 +4669,157 @@ static void drawInventoryScreen() { drawInventoryMenu(); }
 
 static void drawPetSleepingScreen() { drawSleepScreen(); }
 
+// ============================================================================
+// Death screen
+// ============================================================================
+static void drawDeathScreen(bool redrawBg)
+{
+  static bool s_deathScreenFadeInActive = false;
+  static uint32_t s_deathScreenFadeInStartMs = 0;
+  static constexpr uint32_t kDeathScreenFadeInMs = 900;
+
+  if (consumeDeathScreenFadeInStart())
+  {
+    s_deathScreenFadeInActive = true;
+    s_deathScreenFadeInStartMs = millis();
+    forceBacklightDuringFade(0);
+  }
+
+  if (s_deathScreenFadeInActive)
+  {
+    const uint32_t now = millis();
+    const uint32_t elapsed = now - s_deathScreenFadeInStartMs;
+    const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
+
+    if (elapsed >= kDeathScreenFadeInMs)
+    {
+      s_deathScreenFadeInActive = false;
+
+      applyBrightnessLevel(brightnessLevel);
+
+      const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
+      forceBacklightDuringFade(targetBrightness);
+    }
+    else
+    {
+      const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kDeathScreenFadeInMs);
+
+      Serial.printf("[DEATHX] death fade-in done targetBrightness=%u level=%d\n",
+                    (unsigned)brightnessValues[brightnessLevel], (int)brightnessLevel);
+
+      forceBacklightDuringFade(fadeBrightness);
+      requestUIRedraw();
+    }
+  }
+
+  spr.fillSprite(TFT_BLACK);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  drawCenteredLine("YOUR PET", 26, 2, 1);
+  drawCenteredLine("HAS DIED", 46, 2, 1);
+
+  const int y0 = 78;
+  const int gap = 18;
+
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  const int itemCount = uiDeathMenuCount();
+  for (int i = 0; i < itemCount; ++i)
+  {
+    String line = (deathMenuIndex == i) ? "> " : "  ";
+    line += uiDeathMenuLabel(i);
+    spr.drawString(line.c_str(), screenW / 2, y0 + gap * i);
+  }
+
+  spr.setTextFont(1);
+  spr.setTextDatum(TC_DATUM);
+  spr.drawString("UP/DOWN + ENTER", screenW / 2, screenH - 16);
+}
+
+// ============================================================================
+// BURIAL SCREEN
+//  - patched: removed pet.birth_epoch direct field access (compile-safe)
+// ============================================================================
+void drawBurialScreen()
+{
+  static const char *kBurialBg = "/raising_hell/graphics/background/flow/grave.jpg";
+
+  spr.fillSprite(TFT_BLACK);
+
+  // Use wrapper-based draw to avoid drawJpgFile(SD, ...) template instantiation.
+  sprDrawJpgFromSD(kBurialBg, 0, 0);
+
+  const int cx = 120;
+  int y = 44;
+  const int lineH = 14;
+
+  spr.setTextColor(TFT_WHITE);
+  spr.setFont(nullptr);
+  spr.setTextDatum(MC_DATUM);
+
+  spr.drawString(pet.name, cx, y);
+  y += lineH + 6;
+
+  char birthBuf[24] = {0};
+  char deathBuf[24] = {0};
+
+  uint32_t be = saveManagerGetBirthEpoch();
+  if (be == 0)
+    be = (uint32_t)getPetBirthEpoch();
+
+  if (be > 100000)
+  {
+    time_t bt = (time_t)be;
+    tm tmb;
+    localtime_r(&bt, &tmb);
+    snprintf(birthBuf, sizeof(birthBuf), "%04d-%02d-%02d", tmb.tm_year + 1900, tmb.tm_mon + 1, tmb.tm_mday);
+  }
+  else
+  {
+    strncpy(birthBuf,
+            "????"
+            "-"
+            "??"
+            "-"
+            "??",
+            sizeof(birthBuf) - 1);
+  }
+
+  time_t now = time(nullptr);
+  if (now > 100000)
+  {
+    tm tmd;
+    localtime_r(&now, &tmd);
+    snprintf(deathBuf, sizeof(deathBuf), "%04d-%02d-%02d", tmd.tm_year + 1900, tmd.tm_mon + 1, tmd.tm_mday);
+  }
+  else
+  {
+    strncpy(deathBuf,
+            "????"
+            "-"
+            "??"
+            "-"
+            "??",
+            sizeof(deathBuf) - 1);
+  }
+
+  spr.drawString(String("Born: ") + birthBuf, cx, y);
+  y += lineH;
+
+  spr.drawString(String("Died: ") + deathBuf, cx, y);
+  y += lineH;
+
+  char ageBuf[32] = {0};
+  getPetAgeString(ageBuf, sizeof(ageBuf), be);
+  spr.drawString(String("Age: ") + ageBuf, cx, y);
+
+  spr.pushSprite(0, 0);
+}
+
 static void drawMiniGameScreen()
 {
   if (currentMiniGame == MiniGame::NONE)
@@ -4699,7 +4830,7 @@ static void drawMiniGameScreen()
 
 static void drawNamePetScreen() { drawNamePetScreen(true); }
 
-static void drawDeathScreen() { drawDeathScreen(true); }
+void drawDeathScreen() { drawDeathScreen(true); }
 
 // ----- Set Time UI helpers -----
 static void drawButton(int x, int y, int w, int h, const char *label, bool selected)
@@ -5739,7 +5870,7 @@ static void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t out
   spr.fillRect(x + 1, fy, innerW, fillH, fill);
 }
 
-static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
+void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
 {
   const int panelW = 72;
 
@@ -5828,7 +5959,7 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
   spr.setTextDatum(TL_DATUM);
 }
 
-static void drawMiniStatPreview()
+void drawMiniStatPreview()
 {
   const int panelW = 72;
   const int x0 = SCREEN_W - panelW - 4;
@@ -6909,7 +7040,7 @@ void drawPowerMenu() { drawPowerMenuOverlay(); }
 // New pet flow screens
 // ============================================================================
 // Read PNG width/height from IHDR (so we can center without guessing)
-static bool getPngWH(const char *path, int &outW, int &outH)
+bool getPngWH(const char *path, int &outW, int &outH)
 {
   outW = 0;
   outH = 0;
@@ -6997,7 +7128,7 @@ static void drawCrackedEggBig(int cx, int topY, const char *path)
   sprDrawPngFromSD(path, x, y);
 }
 
-static void drawCenteredLine(const char *s, int y, int font = 2, int size = 1)
+static void drawCenteredLine(const char *s, int y, int font, int size)
 {
   spr.setTextDatum(TC_DATUM);
   spr.setTextFont(font);
@@ -7143,7 +7274,7 @@ static void drawNamePetScreen(bool redrawBg)
   drawCenteredLine(g_namePetRenameMode ? "Edit name, press ENTER" : "Type name, press ENTER", screenH - 22, 1, 1);
 }
 
-static void drawPetPerfHud()
+void drawPetPerfHud()
 {
   if (!g_petPerfHudEnabled)
     return;
@@ -7268,77 +7399,6 @@ void drawHatchingScreen(bool redrawBg)
 }
 
 // ============================================================================
-// Death screen
-// ============================================================================
-static void drawDeathScreen(bool redrawBg)
-{
-  static bool s_deathScreenFadeInActive = false;
-  static uint32_t s_deathScreenFadeInStartMs = 0;
-  static constexpr uint32_t kDeathScreenFadeInMs = 900;
-
-  if (consumeDeathScreenFadeInStart())
-  {
-    s_deathScreenFadeInActive = true;
-    s_deathScreenFadeInStartMs = millis();
-    forceBacklightDuringFade(0);
-  }
-
-  if (s_deathScreenFadeInActive)
-  {
-    const uint32_t now = millis();
-    const uint32_t elapsed = now - s_deathScreenFadeInStartMs;
-    const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
-
-    if (elapsed >= kDeathScreenFadeInMs)
-    {
-      s_deathScreenFadeInActive = false;
-
-      applyBrightnessLevel(brightnessLevel);
-
-      const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
-      forceBacklightDuringFade(targetBrightness);
-    }
-    else
-    {
-      const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kDeathScreenFadeInMs);
-
-      Serial.printf("[DEATHX] death fade-in done targetBrightness=%u level=%d\n",
-                    (unsigned)brightnessValues[brightnessLevel], (int)brightnessLevel);
-
-      forceBacklightDuringFade(fadeBrightness);
-      requestUIRedraw();
-    }
-  }
-
-  spr.fillSprite(TFT_BLACK);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  drawCenteredLine("YOUR PET", 26, 2, 1);
-  drawCenteredLine("HAS DIED", 46, 2, 1);
-
-  const int y0 = 78;
-  const int gap = 18;
-
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  const int itemCount = uiDeathMenuCount();
-  for (int i = 0; i < itemCount; ++i)
-  {
-    String line = (deathMenuIndex == i) ? "> " : "  ";
-    line += uiDeathMenuLabel(i);
-    spr.drawString(line.c_str(), screenW / 2, y0 + gap * i);
-  }
-
-  spr.setTextFont(1);
-  spr.setTextDatum(TC_DATUM);
-  spr.drawString("UP/DOWN + ENTER", screenW / 2, screenH - 16);
-}
-
-// ============================================================================
 // Set Time Screen (patched: removed CONTENT_* dependency)
 // ============================================================================
 void drawSetTimeScreen()
@@ -7386,7 +7446,7 @@ void drawSetTimeScreen()
   spr.setTextDatum(TL_DATUM);
 }
 
-static AnimId deathTransitionStaticClipForPet()
+AnimId deathTransitionStaticClipForPet()
 {
   switch (pet.type)
   {
@@ -7428,166 +7488,4 @@ static AnimId deathTransitionStaticClipForPet()
   default:
     return ANIM_NONE;
   }
-}
-
-static uint8_t deathTransitionStaticFrameIndex(const AnimClip *clip)
-{
-  if (!clip || clip->frameCount == 0)
-    return 0;
-
-  // Cheap, deterministic default: use the last frame of the sick clip.
-  // If any pet looks weird, we can special-case per clip later.
-  return (uint8_t)(clip->frameCount - 1);
-}
-
-static void drawDeathTransitionStaticPet()
-{
-  if (!g_sdReady)
-    return;
-
-  const AnimId id = deathTransitionStaticClipForPet();
-  const AnimClip *clip = animGetClip(id);
-  if (!clip || !clip->frames || clip->frameCount == 0)
-    return;
-
-  const uint8_t idx = deathTransitionStaticFrameIndex(clip);
-  const char *path = clip->frames[idx];
-  if (!path || !*path)
-    return;
-
-  const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
-  const int petAreaX = 0;
-
-  const PetRenderProfile &prof = getPetProfile(pet.type);
-
-  const int centerX = petAreaX + (petAreaW / 2) + prof.xOff;
-  const int bottomY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
-
-  int w = 0;
-  int h = 0;
-
-  if (getPngWH(path, w, h) && w > 0 && h > 0)
-  {
-    const int drawX = centerX - (w / 2);
-    const int drawY = bottomY - h + deathTransitionYNudgeForPet();
-    sprDrawPngFromSD(path, drawX, drawY);
-  }
-  else
-  {
-    // Fallback if WH lookup fails.
-    sprDrawPngFromSD(path, centerX, bottomY);
-  }
-}
-
-static void drawDeathTransitionScreen(bool redrawBg)
-{
-  if (!isScreenOn())
-    return;
-
-  static PetType s_lastBgPetType = (PetType)255;
-  static uint8_t s_lastBgEvoStage = 255;
-
-  const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
-
-  const bool cacheMissing = (g_petBgCachedPath == nullptr);
-
-  // redrawBg should restore from cache, not force a fresh SD/JPEG rebuild.
-  const bool needPetBg = petChanged || cacheMissing || g_forcePetBgCache;
-
-  s_lastBgPetType = pet.type;
-  s_lastBgEvoStage = pet.evoStage;
-
-  cachePetAreaBackgroundIfNeeded(needPetBg);
-  g_forcePetBgCache = false;
-
-  if (needPetBg)
-  {
-    restorePetAreaFromCache();
-  }
-
-  drawTopBar();
-  drawDeathTransitionStaticPet();
-  drawMiniStatPreview();
-  drawTabBar();
-  drawPetPerfHud();
-}
-
-// ============================================================================
-// BURIAL SCREEN
-//  - patched: removed pet.birth_epoch direct field access (compile-safe)
-// ============================================================================
-static void drawBurialScreen()
-{
-  static const char *kBurialBg = "/raising_hell/graphics/background/flow/grave.jpg";
-
-  spr.fillSprite(TFT_BLACK);
-
-  // Use wrapper-based draw to avoid drawJpgFile(SD, ...) template instantiation.
-  sprDrawJpgFromSD(kBurialBg, 0, 0);
-
-  const int cx = 120;
-  int y = 44;
-  const int lineH = 14;
-
-  spr.setTextColor(TFT_WHITE);
-  spr.setFont(nullptr);
-  spr.setTextDatum(MC_DATUM);
-
-  spr.drawString(pet.name, cx, y);
-  y += lineH + 6;
-
-  char birthBuf[24] = {0};
-  char deathBuf[24] = {0};
-
-  uint32_t be = saveManagerGetBirthEpoch();
-  if (be == 0)
-    be = (uint32_t)getPetBirthEpoch();
-
-  if (be > 100000)
-  {
-    time_t bt = (time_t)be;
-    tm tmb;
-    localtime_r(&bt, &tmb);
-    snprintf(birthBuf, sizeof(birthBuf), "%04d-%02d-%02d", tmb.tm_year + 1900, tmb.tm_mon + 1, tmb.tm_mday);
-  }
-  else
-  {
-    strncpy(birthBuf,
-            "????"
-            "-"
-            "??"
-            "-"
-            "??",
-            sizeof(birthBuf) - 1);
-  }
-
-  time_t now = time(nullptr);
-  if (now > 100000)
-  {
-    tm tmd;
-    localtime_r(&now, &tmd);
-    snprintf(deathBuf, sizeof(deathBuf), "%04d-%02d-%02d", tmd.tm_year + 1900, tmd.tm_mon + 1, tmd.tm_mday);
-  }
-  else
-  {
-    strncpy(deathBuf,
-            "????"
-            "-"
-            "??"
-            "-"
-            "??",
-            sizeof(deathBuf) - 1);
-  }
-
-  spr.drawString(String("Born: ") + birthBuf, cx, y);
-  y += lineH;
-
-  spr.drawString(String("Died: ") + deathBuf, cx, y);
-  y += lineH;
-
-  char ageBuf[32] = {0};
-  getPetAgeString(ageBuf, sizeof(ageBuf), be);
-  spr.drawString(String("Age: ") + ageBuf, cx, y);
-
-  spr.pushSprite(0, 0);
 }

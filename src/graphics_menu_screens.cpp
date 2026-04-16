@@ -16,6 +16,7 @@
 #include <time.h>
 
 #include "display.h"
+#include "graphics_shared_utils.h"
 
 // Pull in shared graphics globals from graphics.cpp
 extern M5Canvas spr;
