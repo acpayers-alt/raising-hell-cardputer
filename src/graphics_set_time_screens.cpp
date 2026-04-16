@@ -3,6 +3,7 @@
 #include "display.h"
 #include "graphics.h"
 #include "graphics_render_utils.h"
+#include "graphics_ui_common.h"
 
 #include "app_state.h"
 
@@ -14,47 +15,20 @@ extern Pet pet;
 extern int g_setTimeField;
 extern bool g_setTimeMode;
 
-static uint16_t setTimeOutlineForPet(PetType t)
-{
-  return (t == PET_ELDRITCH) ? 0x001F : 0xF800;
-}
-
-static uint16_t setTimeFillSelectedForPet(PetType t)
-{
-  return (t == PET_ELDRITCH) ? 0x0018 : 0x2104;
-}
-
-static void drawButton(int x, int y, int w, int h, const char *label, bool selected)
-{
-  const uint16_t outline = selected ? setTimeOutlineForPet(pet.type) : TFT_DARKGREY;
-  const uint16_t fill = selected ? setTimeFillSelectedForPet(pet.type) : TFT_BLACK;
-  const uint16_t textCol = selected ? TFT_WHITE : TFT_LIGHTGREY;
-
-  spr.fillRoundRect(x, y, w, h, 8, fill);
-  spr.drawRoundRect(x, y, w, h, 8, outline);
-
-  spr.setTextDatum(MC_DATUM);
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(textCol, fill);
-  spr.drawString(label ? label : "", x + (w / 2), y + (h / 2));
-  spr.setTextDatum(TL_DATUM);
-}
-
 extern tm g_setTimeTm;
 
 static void drawSetDateTimePanel(int x, int y, int w, int h, int selectedField)
 {
-  const uint16_t outline = (pet.type == PET_ELDRITCH) ? 0x001F : 0xF800;
+  const uint16_t outline = uiPillOutline(pet.type);
 
   spr.drawRoundRect(x, y, w, h, 8, outline);
   spr.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 8, TFT_BLACK);
 
   const int year = g_setTimeTm.tm_year + 1900;
-  const int mon  = g_setTimeTm.tm_mon + 1;
-  const int day  = g_setTimeTm.tm_mday;
-  const int hh   = g_setTimeTm.tm_hour;
-  const int mm   = g_setTimeTm.tm_min;
+  const int mon = g_setTimeTm.tm_mon + 1;
+  const int day = g_setTimeTm.tm_mday;
+  const int hh = g_setTimeTm.tm_hour;
+  const int mm = g_setTimeTm.tm_min;
 
   char yy[8], mo[4], dd[4], th[4], tmBuf[4];
   snprintf(yy, sizeof(yy), "%04d", year);

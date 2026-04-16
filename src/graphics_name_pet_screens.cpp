@@ -3,6 +3,7 @@
 #include "display.h"
 #include "graphics.h"
 #include "graphics_render_utils.h"
+#include "graphics_ui_common.h"
 
 #include "name_entry_state.h"
 #include "pet.h"
@@ -24,9 +25,8 @@ void drawNamePetScreen(bool redrawBg)
   const int boxX = (screenW - boxW) / 2;
   const int boxY = 54;
 
-  const uint16_t outline = (pet.type == PET_ELDRITCH) ? 0x001F : 0xF800;
   spr.fillRoundRect(boxX, boxY, boxW, boxH, 6, TFT_BLACK);
-  spr.drawRoundRect(boxX, boxY, boxW, boxH, 6, outline);
+  spr.drawRoundRect(boxX, boxY, boxW, boxH, 6, uiModalOutline(pet.type));
   
   spr.setTextDatum(TL_DATUM);
   spr.setTextFont(2);
