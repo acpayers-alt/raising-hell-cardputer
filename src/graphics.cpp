@@ -129,9 +129,6 @@ void drawPetPerfHud();
 void resetClockModePetPresentation();
 
 // --- Compatibility wrappers / missing helpers (compile fix) ---
-static void drawSettingsScreen();
-static void drawInventoryScreen();
-static void drawPetSleepingScreen();
 static void drawMiniGameScreen();
 static void drawDeathScreen(bool redrawBg);
 static void drawBurialScreen();
@@ -142,14 +139,9 @@ bool sprDrawPngFromSD(const char *path, int x, int y);
 bool canvasDrawPngFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 bool canvasDrawJpgFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 
-// Set-time helpers
-static void drawSetTimePanel(int x, int y, int w, int h, const char *title, int selectedField, int fieldId);
-
 // Level-Up Popup helpers
 static bool g_levelUpPopupActive = false;
 static uint16_t g_levelUpPopupLevel = 0;
-void uiInitLevelPopupTracker();
-void uiResetLevelUpPopupState();
 
 void uiResetLevelUpPopupState()
 {
@@ -3563,20 +3555,7 @@ static void drawClockModeScreen(bool redrawBg)
   spr.setTextDatum(TL_DATUM);
 }
 
-// -----------------------------------------------------------------------------
-// Draw Wrappers
-// -----------------------------------------------------------------------------
-void drawPetScreen(bool redrawBg);
-
-static void drawSettingsScreen() { drawSettingsMenu(); }
-
-static void drawInventoryScreen() { drawInventoryMenu(); }
-
-static void drawPetSleepingScreen() { drawSleepScreen(); }
-
-// ============================================================================
 // Death screen
-// ============================================================================
 static void drawDeathScreen(bool redrawBg)
 {
   static bool s_deathScreenFadeInActive = false;
@@ -3735,144 +3714,7 @@ static void drawMiniGameScreen()
 
 void drawDeathScreen() { drawDeathScreen(true); }
 
-// ----- Set Time UI helpers -----
-static void drawSetTimePanel(int x, int y, int w, int h, const char *title, int selectedField, int fieldId)
-{
-  spr.drawRoundRect(x, y, w, h, 8, uiPillOutline(pet.type));
-  spr.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 8, TFT_BLACK);
-
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString(title ? title : "", x + 6, y + 4);
-
-  const int year = g_setTimeTm.tm_year + 1900;
-  const int mon = g_setTimeTm.tm_mon + 1;
-  const int day = g_setTimeTm.tm_mday;
-  const int hh = g_setTimeTm.tm_hour;
-  const int mm = g_setTimeTm.tm_min;
-
-  char a[6], b[6], c[6];
-  a[0] = b[0] = c[0] = '\0';
-
-  int nFields = 0;
-
-  if (fieldId == 0)
-  { // Date
-    snprintf(a, sizeof(a), "%04d", year);
-    snprintf(b, sizeof(b), "%02d", mon);
-    snprintf(c, sizeof(c), "%02d", day);
-    nFields = 3;
-  }
-  else
-  { // Time
-    snprintf(a, sizeof(a), "%02d", hh);
-    snprintf(b, sizeof(b), "%02d", mm);
-    nFields = 2;
-  }
-
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  const int baseY = y + 18;
-  int cx = x + 6;
-
-  auto drawField = [&](const char *s, int fid)
-  {
-    spr.drawString(s, cx, baseY);
-    int tw = spr.textWidth(s);
-    if (selectedField == fid)
-    {
-      spr.drawFastHLine(cx, baseY + 14, tw, TFT_YELLOW);
-    }
-    cx += tw + 6;
-  };
-
-  if (nFields == 3)
-  {
-    drawField(a, 0);
-    spr.drawString("-", cx, baseY);
-    cx += spr.textWidth("-") + 6;
-    drawField(b, 1);
-    spr.drawString("-", cx, baseY);
-    cx += spr.textWidth("-") + 6;
-    drawField(c, 2);
-  }
-  else
-  {
-    drawField(a, 3);
-    spr.drawString(":", cx, baseY);
-    cx += spr.textWidth(":") + 6;
-    drawField(b, 4);
-  }
-}
-
-static void drawSetDateTimePanel(int x, int y, int w, int h, int selectedField)
-{
-  spr.drawRoundRect(x, y, w, h, 8, uiPillOutline(pet.type));
-  spr.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 8, TFT_BLACK);
-
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("Date & Time", x + 6, y + 4);
-
-  const int year = g_setTimeTm.tm_year + 1900;
-  const int mon = g_setTimeTm.tm_mon + 1;
-  const int day = g_setTimeTm.tm_mday;
-  const int hh = g_setTimeTm.tm_hour;
-  const int mm = g_setTimeTm.tm_min;
-
-  char yy[6], mo[4], dd[4], th[4], tm[4];
-  snprintf(yy, sizeof(yy), "%04d", year);
-  snprintf(mo, sizeof(mo), "%02d", mon);
-  snprintf(dd, sizeof(dd), "%02d", day);
-  snprintf(th, sizeof(th), "%02d", hh);
-  snprintf(tm, sizeof(tm), "%02d", mm);
-
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  const int baseY = y + 18;
-  int cx = x + 8;
-
-  auto drawField = [&](const char *s, int fid)
-  {
-    spr.drawString(s, cx, baseY);
-    const int tw = spr.textWidth(s);
-    if (selectedField == fid)
-    {
-      spr.drawFastHLine(cx, baseY + 14, tw, TFT_YELLOW);
-    }
-    cx += tw + 4; // tighter spacing than old panel
-  };
-
-  // Date: YYYY-MM-DD (fields 0,1,2)
-  drawField(yy, 0);
-  spr.drawString("-", cx, baseY);
-  cx += spr.textWidth("-") + 4;
-  drawField(mo, 1);
-  spr.drawString("-", cx, baseY);
-  cx += spr.textWidth("-") + 4;
-  drawField(dd, 2);
-
-  // Spacer between date and time
-  cx += 10;
-
-  // Time: HH:MM (fields 3,4)
-  drawField(th, 3);
-  spr.drawString(":", cx, baseY);
-  cx += spr.textWidth(":") + 4;
-  drawField(tm, 4);
-}
-
-// ============================================================================
 // STATS TAB
-// ============================================================================
 static void drawStatsTab(bool redrawBg)
 {
   (void)redrawBg;
@@ -5332,7 +5174,7 @@ void ui_drawMessageWindow(const char *title, const char *line1, const char *line
     const int inW = boxW - 24;
     const int inH = 20;
 
-    const uint16_t inputOutline = (pet.type == PET_ELDRITCH) ? uiModalOutline(pet.type) : TFT_DARKGREY;
+    const uint16_t inputOutline = uiModalOutline(pet.type);
     spr.drawRoundRect(inX, inY, inW, inH, 6, inputOutline);
 
     spr.setTextFont(2);
