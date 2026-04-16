@@ -95,6 +95,7 @@
 #include "graphics_menu_screens.h"
 #include "graphics_death_screens.h"
 #include "graphics_shared_utils.h"
+#include "graphics_egg_select_screens.h"
 
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
@@ -1043,7 +1044,6 @@ static void uiDrawToastOverlay();
 static void uiDrawAlertScreenFlashOverlay();
 
 void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot);
-void drawChoosePetScreen(bool redrawBg);
 void drawPowerMenu(); // non-static (renderUI calls it)
 void ui_drawMessageWindow(const char *title, const char *line1, const char *line2, bool maskLine2, bool showCursor);
 void ui_showMessage(const char *msg);
@@ -7135,115 +7135,6 @@ static void drawCenteredLine(const char *s, int y, int font, int size)
   spr.setTextSize(size);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString(s ? s : "", screenW / 2, y);
-}
-
-void drawChoosePetScreen(bool redrawBg)
-{
-  if (!isScreenOn())
-    return;
-  if (redrawBg)
-    spr.fillSprite(TFT_BLACK);
-
-  drawCenteredLine("Choose Your Egg", 18, 2, 1);
-
-  const int eggW = 64;
-  const int eggH = 64;
-  const int eggX = (SCREEN_W - eggW) / 2;
-  const int eggY = 38;
-
-  const char *eggPath = nullptr;
-  switch (pet.type)
-  {
-  case PET_DEVIL:
-    eggPath = DEV_EGG_PNG;
-    break;
-  case PET_ELDRITCH:
-    eggPath = ELD_EGG_PNG;
-    break;
-  case PET_KAIJU:
-    eggPath = KAI_EGG_PNG;
-    break;
-  case PET_ANUBIS:
-    eggPath = ANU_EGG_PNG;
-    break;
-  case PET_AXOLOTL:
-    eggPath = AXO_EGG_PNG;
-    break;
-  case PET_ALIEN:
-    eggPath = AL_EGG_PNG;
-    break;
-  default:
-    break;
-  }
-
-  bool ok = false;
-  if (g_sdReady && eggPath)
-  {
-    ok = sprDrawPngFromSD(eggPath, eggX, eggY);
-  }
-
-  if (!ok)
-  {
-    spr.fillEllipse(eggX + eggW / 2, eggY + eggH / 2, eggW / 2, eggH / 2, TFT_WHITE);
-    spr.drawEllipse(eggX + eggW / 2, eggY + eggH / 2, eggW / 2, eggH / 2, TFT_RED);
-  }
-
-  const int arrowOffsetX = 14;
-  const int arrowY = eggY + (eggH / 2) - 4;
-
-  spr.setTextDatum(TL_DATUM);
-  spr.drawString("<", eggX - arrowOffsetX, arrowY);
-  spr.drawString(">", eggX + eggW + arrowOffsetX - 6, arrowY);
-
-  const char *label = "Unknown Egg";
-  switch (pet.type)
-  {
-  case PET_DEVIL:
-    label = "Devil Egg";
-    break;
-  case PET_KAIJU:
-    label = "Kaiju Egg";
-    break;
-  case PET_ELDRITCH:
-    label = "Eldritch Egg";
-    break;
-  case PET_ALIEN:
-    label = "Alien Egg";
-    break;
-  case PET_ANUBIS:
-    label = "Anubis Egg";
-    break;
-  case PET_AXOLOTL:
-    label = "Axolotl Egg";
-    break;
-  default:
-    break;
-  }
-
-  const int eggBottomY = eggY + eggH;
-  const int EGG_LABEL_Y = eggBottomY + 2;
-  int EGG_PROMPT_Y = screenH - 10; // push down
-
-  // Bigger, more prominent label
-  drawCenteredLine(label, EGG_LABEL_Y, 2, 1);
-
-  // Keep prompt smaller
-  drawCenteredLine("Press ENTER to hatch", EGG_PROMPT_Y, 1, 1);
-
-#if SAVE_DIAG_ENABLED
-  {
-    const uint8_t e = saveManagerLastLoadErr();
-    const uint32_t sz = saveManagerLastLoadSize();
-
-    char buf[96];
-    snprintf(buf, sizeof(buf), "ERR=%u FS=%lu SP=%u SV2=%u", (unsigned)e, (unsigned long)sz,
-             (unsigned)sizeof(SavePayload), (unsigned)sizeof(SavePayloadV2));
-
-    spr.setTextSize(1);
-    spr.setTextColor(TFT_YELLOW, TFT_BLACK);
-    spr.drawString(buf, 2, SCREEN_H - 10);
-  }
-#endif
 }
 
 static void drawNamePetScreen(bool redrawBg)
