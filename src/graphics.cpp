@@ -75,6 +75,8 @@
 #include "graphics_pet_presentation.h"
 #include "graphics_render_utils.h"
 #include "graphics_shared_utils.h"
+#include "graphics_name_pet_screens.h"
+
 #include "inventory_state.h"
 #include "mg_pause_menu.h"
 #include "mini_game_pause_menu.h"
@@ -137,9 +139,6 @@ bool sprDrawJpgFromSD(const char *path, int x, int y);
 bool sprDrawPngFromSD(const char *path, int x, int y);
 bool canvasDrawPngFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 bool canvasDrawJpgFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
-
-// Provide no-arg wrappers for existing bool-signature screens
-static void drawNamePetScreen(); // calls drawNamePetScreen(bool)
 
 // Set-time helpers
 static void drawSetTimePanel(int x, int y, int w, int h, const char *title, int selectedField, int fieldId);
@@ -773,7 +772,6 @@ static void drawSleepScreenImpl(bool redrawBg);
 void drawMiniStatPreview();
 static void drawCurrentScreen(bool redrawBg);
 static void drawWifiSetupScreen();
-static void drawNamePetScreen(bool redrawBg);
 static void drawDecayModePickerMenu();
 static void drawScreenSettingsMenu();
 static void drawSystemSettingsMenu();
@@ -3840,8 +3838,6 @@ static void drawMiniGameScreen()
   drawMiniGame();
 }
 
-static void drawNamePetScreen() { drawNamePetScreen(true); }
-
 void drawDeathScreen() { drawDeathScreen(true); }
 
 // ----- Set Time UI helpers -----
@@ -6043,35 +6039,6 @@ void drawPowerMenu() { drawPowerMenuOverlay(); }
 // ============================================================================
 // New pet flow screens
 // ============================================================================
-
-static void drawNamePetScreen(bool redrawBg)
-{
-  if (!isScreenOn())
-    return;
-  if (redrawBg)
-    spr.fillSprite(TFT_BLACK);
-
-  drawCenteredLine(g_namePetRenameMode ? "Rename Pet" : "Name Your Pet", 18, 2, 1);
-
-  const char *name = (g_pendingPetName[0] != '\0') ? g_pendingPetName : "_";
-
-  const int boxW = 200;
-  const int boxH = 26;
-  const int boxX = (screenW - boxW) / 2;
-  const int boxY = 54;
-
-  spr.fillRoundRect(boxX, boxY, boxW, boxH, 6, TFT_BLACK);
-  spr.drawRoundRect(boxX, boxY, boxW, boxH, 6, uiModalOutline(pet.type));
-
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(name, boxX + 8, boxY + 6);
-
-  drawCenteredLine(g_namePetRenameMode ? "Edit name, press ENTER" : "Type name, press ENTER", screenH - 22, 1, 1);
-}
-
 void drawPetPerfHud()
 {
   if (!g_petPerfHudEnabled)
