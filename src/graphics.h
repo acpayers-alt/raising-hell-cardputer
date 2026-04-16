@@ -55,7 +55,7 @@ bool streamRawImageFast(const char *path, int x, int y, int w, int h);
 // -----------------------------------------------------------------------------
 // Screen renderers / UI
 // -----------------------------------------------------------------------------
-void drawPetScreen();
+void drawPetScreen(bool redrawBg);
 void drawSleepScreen();
 
 void drawSettingsMenu();
