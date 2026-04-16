@@ -9,11 +9,12 @@
 #include "new_pet_flow_state.h"
 #include "pet.h"
 
+#include "graphics_render_utils.h"
+
 extern M5Canvas spr;
 extern bool g_sdReady;
 
 bool sprDrawPngFromSD(const char *path, int x, int y);
-bool getPngWH(const char *path, int &outW, int &outH);
 
 static const char *pendingEggCrackedPng()
 {
@@ -51,40 +52,6 @@ static const char *pendingHatchMessage()
   case PET_DEVIL:
   default:
     return "You hatched a baby devil";
-  }
-}
-
-static void drawCenteredImageSpr(const char *path, int cx, int cy)
-{
-  if (!path || !*path)
-    return;
-
-  int w = 0;
-  int h = 0;
-  const bool gotWH = getPngWH(path, w, h);
-
-  const int x = gotWH ? (cx - (w / 2)) : cx;
-  const int y = gotWH ? (cy - (h / 2)) : cy;
-
-  bool ok = false;
-  if (g_sdReady)
-  {
-    ok = sprDrawPngFromSD(path, x, y);
-  }
-
-  if (!ok)
-  {
-    const int boxW = gotWH ? w : 140;
-    const int boxH = gotWH ? h : 40;
-    const int boxX = gotWH ? x : (cx - boxW / 2);
-    const int boxY = gotWH ? y : (cy - boxH / 2);
-
-    spr.drawRect(boxX, boxY, boxW, boxH, TFT_DARKGREY);
-    spr.setTextDatum(MC_DATUM);
-    spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    spr.setTextFont(1);
-    spr.setTextSize(1);
-    spr.drawString("IMG FAIL", cx, cy);
   }
 }
 

@@ -7,6 +7,7 @@
 #include "display.h"
 #include "pet.h"
 #include "save_manager.h"
+#include "graphics_render_utils.h"
 
 extern M5Canvas spr;
 extern bool g_sdReady;
@@ -23,15 +24,6 @@ static constexpr const char *KAI_EGG_PNG = "/raising_hell/graphics/pet/egg/kai_e
 static constexpr const char *ANU_EGG_PNG = "/raising_hell/graphics/pet/egg/anu_egg.png";
 static constexpr const char *AXO_EGG_PNG = "/raising_hell/graphics/pet/egg/axo_egg.png";
 static constexpr const char *AL_EGG_PNG  = "/raising_hell/graphics/pet/egg/al_egg.png";
-
-static void drawCenteredLine(const char *s, int y, int font, int size)
-{
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(font);
-  spr.setTextSize(size);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(s ? s : "", SCREEN_W / 2, y);
-}
 
 void drawChoosePetScreen(bool redrawBg)
 {

@@ -97,6 +97,7 @@
 #include "graphics_shared_utils.h"
 #include "graphics_egg_select_screens.h"
 #include "graphics_hatching_screens.h"
+#include "graphics_render_utils.h"
 
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
@@ -131,10 +132,8 @@ static void drawSettingsScreen();
 static void drawInventoryScreen();
 static void drawPetSleepingScreen();
 static void drawMiniGameScreen();
-bool getPngWH(const char *path, int &outW, int &outH);
 static void drawDeathScreen(bool redrawBg);
 static void drawBurialScreen();
-static void drawCenteredLine(const char *s, int y, int font, int size);
 
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
@@ -6998,55 +6997,6 @@ void drawPowerMenu() { drawPowerMenuOverlay(); }
 // ============================================================================
 // New pet flow screens
 // ============================================================================
-// Read PNG width/height from IHDR (so we can center without guessing)
-bool getPngWH(const char *path, int &outW, int &outH)
-{
-  outW = 0;
-  outH = 0;
-  if (!path || !*path)
-    return false;
-  if (!g_sdReady)
-    return false;
-
-  File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
-
-  uint8_t hdr[24];
-  int n = f.read(hdr, sizeof(hdr));
-  f.close();
-  if (n != (int)sizeof(hdr))
-    return false;
-
-  const uint8_t sig[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
-  for (int i = 0; i < 8; i++)
-  {
-    if (hdr[i] != sig[i])
-      return false;
-  }
-
-  if (hdr[12] != 'I' || hdr[13] != 'H' || hdr[14] != 'D' || hdr[15] != 'R')
-    return false;
-
-  auto be32 = [&](int off) -> int
-  {
-    return (int)((uint32_t)hdr[off] << 24 | (uint32_t)hdr[off + 1] << 16 | (uint32_t)hdr[off + 2] << 8 |
-                 (uint32_t)hdr[off + 3]);
-  };
-
-  outW = be32(16);
-  outH = be32(20);
-  return (outW > 0 && outH > 0);
-}
-
-static void drawCenteredLine(const char *s, int y, int font, int size)
-{
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(font);
-  spr.setTextSize(size);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(s ? s : "", screenW / 2, y);
-}
 
 static void drawNamePetScreen(bool redrawBg)
 {
