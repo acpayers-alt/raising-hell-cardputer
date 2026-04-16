@@ -77,6 +77,7 @@
 #include "graphics_shared_utils.h"
 #include "graphics_name_pet_screens.h"
 #include "graphics_evolution_screens.h"
+#include "graphics_set_time_screens.h"
 
 #include "inventory_state.h"
 #include "mg_pause_menu.h"
@@ -286,7 +287,6 @@ private:
 // Optional offscreen layer (kept; not required for current draw path)
 static M5Canvas petLayer(&spr);
 static bool petLayerReady = false;
-static void drawSetTimeScreen();
 
 // -----------------------------------------------------------------------------
 // Pet UI color scheme
@@ -6039,54 +6039,6 @@ void drawPetPerfHud()
 
   snprintf(line, sizeof(line), "Ani:%ums", (unsigned)ps.animStepMs);
   spr.drawString(line, x + 4, y + 24);
-}
-
-// ============================================================================
-// Set Time Screen (patched: removed CONTENT_* dependency)
-// ============================================================================
-void drawSetTimeScreen()
-{
-  if (!isScreenOn())
-    return;
-
-  drawTopBar();
-
-  const int cx = 0;
-  const int cw = screenW;
-  const int contentY = TOP_BAR_H;
-  const int ch = screenH - TOP_BAR_H;
-
-  spr.fillRect(0, contentY, cw, ch, TFT_BLACK);
-
-  spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-  spr.drawString("Set Date & Time", cx + 8, contentY + 6);
-
-  const int panelX = cx + 10;
-  const int panelY = contentY + 28;
-  const int panelW = cw - 20;
-  const int panelH = 42;
-
-  drawSetDateTimePanel(panelX, panelY, panelW, panelH, g_setTimeField);
-
-  const int okW = 84;
-  const int okH = 22;
-  const int okX = cx + (cw - okW) / 2;
-
-  // Put OK under the combined panel, not down in the footer area
-  const int okY = panelY + panelH + 12;
-
-  const bool okSel = (g_setTimeField == 5);
-  drawButton(okX, okY, okW, okH, "OK", okSel);
-
-  spr.setTextDatum(BC_DATUM);
-  spr.setTextFont(1);
-  spr.setTextSize(1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("Enter: next | Arrows: +/-", cx + cw / 2, contentY + ch - 2);
-  spr.setTextDatum(TL_DATUM);
 }
 
 AnimId deathTransitionStaticClipForPet()
