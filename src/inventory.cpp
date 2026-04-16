@@ -45,46 +45,6 @@ static const char* itemNameForPet(ItemType type, PetType petType) {
         default: return "";
       }
 
-    case PET_KAIJU:
-      switch (type) {
-        case ITEM_SOUL_FOOD:     return "Ration Slab";
-        case ITEM_CURSED_RELIC:  return "Ancient Totem";
-        case ITEM_DEMON_BONE:    return "Titan Bone";
-        case ITEM_RITUAL_CHALK:  return "War Paint";
-        case ITEM_ELDRITCH_EYE:  return "Mutation Core";
-        default: return "";
-      }
-
-    case PET_ANUBIS:
-      switch (type) {
-        case ITEM_SOUL_FOOD:     return "Funerary Bread";
-        case ITEM_CURSED_RELIC:  return "Canopic Relic";
-        case ITEM_DEMON_BONE:    return "Sacred Bone";
-        case ITEM_RITUAL_CHALK:  return "Burial Chalk";
-        case ITEM_ELDRITCH_EYE:  return "Judgment Eye";
-        default: return "";
-      }
-
-    case PET_AXOLOTL:
-      switch (type) {
-        case ITEM_SOUL_FOOD:     return "Plankton Puff";
-        case ITEM_CURSED_RELIC:  return "Coral Charm";
-        case ITEM_DEMON_BONE:    return "Soft Spine";
-        case ITEM_RITUAL_CHALK:  return "Glow Chalk";
-        case ITEM_ELDRITCH_EYE:  return "Evolution Pearl";
-        default: return "";
-      }
-
-    case PET_ALIEN:
-      switch (type) {
-        case ITEM_SOUL_FOOD:     return "Nutrient Gel";
-        case ITEM_CURSED_RELIC:  return "Xeno Artifact";
-        case ITEM_DEMON_BONE:    return "Bio-Rod";
-        case ITEM_RITUAL_CHALK:  return "Circuit Chalk";
-        case ITEM_ELDRITCH_EYE:  return "Phase Node";
-        default: return "";
-      }
-
     case PET_DEVIL:
     default:
       switch (type) {
@@ -99,52 +59,27 @@ static const char* itemNameForPet(ItemType type, PetType petType) {
 }
 
 static const char* itemDescForPet(ItemType type, PetType petType) {
-  const bool dev = (petType == PET_DEVIL);
   const bool eld = (petType == PET_ELDRITCH);
-  const bool kai = (petType == PET_KAIJU);
-  const bool anu = (petType == PET_ANUBIS);
-  const bool axo = (petType == PET_AXOLOTL);
-  const bool ali = (petType == PET_ALIEN);
 
   switch (type) {
     case ITEM_SOUL_FOOD:
       if (eld) return "Salt-soaked bites that quiet the deep hunger.";
-      if (kai) return "Dense rations fit for a rampaging beast.";
-      if (anu) return "A sacred meal to steady the heart and mind.";
-      if (axo) return "A sweet snack that keeps things bright and bubbly.";
-      if (ali) return "Nutrient gel from beyond the stars.";
       return "A small meal that restores hunger.";
 
     case ITEM_CURSED_RELIC:
       if (eld) return "An idol dredged from ruins that whispers at night.";
-      if (kai) return "A cracked charm that stirs destructive ritual urges.";
-      if (anu) return "A warded relic that hums with desert power.";
-      if (axo) return "A strange trinket that seems to grin back.";
-      if (ali) return "A device of unknown origin—cold, light, and wrong.";
       return "A relic steeped in dark energy.";
 
     case ITEM_DEMON_BONE:
       if (eld) return "A bone pulled from the abyss—slick with brine.";
-      if (kai) return "A massive bone shard, heavy with power.";
-      if (anu) return "A preserved bone marked with ancient glyphs.";
-      if (axo) return "A little bone charm—cute, but unsettling.";
-      if (ali) return "A specimen sample… not from this world.";
       return "A bone fragment radiating infernal heat.";
 
     case ITEM_RITUAL_CHALK:
       if (eld) return "Inky sigil-chalk for circles drawn in seawater.";
-      if (kai) return "Thick chalk that cracks stone when invoked.";
-      if (anu) return "Golden dust chalk for precise, solemn rites.";
-      if (axo) return "Soft pastel chalk for playful little rituals.";
-      if (ali) return "Conductive chalk that leaves shimmering trails.";
       return "Chalk used to draw ritual circles.";
 
     case ITEM_ELDRITCH_EYE:
       if (eld) return "A pearl that stares back—do not blink.";
-      if (kai) return "A colossal eye-catalyst that fuels a rampage.";
-      if (anu) return "An all-seeing charm said to judge the unworthy.";
-      if (axo) return "A tiny glass eye—oddly adorable, oddly alive.";
-      if (ali) return "A lens-organ that focuses psychic signals.";
       return "A forbidden eye artifact. It watches.";
 
     case ITEM_NONE:

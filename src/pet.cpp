@@ -533,12 +533,9 @@ static const char *getSpritePathForTypeAndStage(PetType type, uint8_t stage)
 
   switch (type)
   {
-  case PET_KAIJU:
-    return "/graphics/pet/kaiju_normal.jpg";
   case PET_ELDRITCH:
     return "/graphics/pet/eldritch_normal.jpg";
-  case PET_ALIEN:
-    return "/graphics/pet/alien_normal.jpg";
+  case PET_DEVIL:
   default:
     return "/graphics/pet/devil_baby_normal.jpg";
   }
@@ -831,7 +828,7 @@ void Pet::save()
 void Pet::load()
 {
   uint8_t rawType = EEPROM.read(10);
-  if (rawType > PET_ALIEN)
+  if (rawType >= PET_TYPE_COUNT)
     rawType = PET_DEVIL;
 
   type = (PetType)rawType;

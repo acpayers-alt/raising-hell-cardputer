@@ -71,41 +71,41 @@ void uiChoosePetHandle(InputState &in)
   // ---------------------------------------------------------------------------
   // Entry gate to prevent instant hatch
   // ---------------------------------------------------------------------------
-if (g_choosePetBlockHatchUntilRelease)
-{
-  // Always allow ESC to escape, even while blocked
-  if (in.escOnce)
+  if (g_choosePetBlockHatchUntilRelease)
   {
-    playBeep();
+    // Always allow ESC to escape, even while blocked
+    if (in.escOnce)
+    {
+      playBeep();
 
-    saveManagerAbortFreshPetFlow();
+      saveManagerAbortFreshPetFlow();
 
-    uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
-    requestFullUIRedraw();
+      uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
+      requestFullUIRedraw();
 
-    while (in.kbHasEvent())
-      (void)in.kbPop();
-    inputForceClear();
-    clearInputLatch();
-    return;
+      while (in.kbHasEvent())
+        (void)in.kbPop();
+      inputForceClear();
+      clearInputLatch();
+      return;
+    }
+
+    if (!in.selectHeld)
+    {
+      g_choosePetBlockHatchUntilRelease = false;
+    }
+    else
+    {
+      // swallow only select-related noise, not ESC
+      while (in.kbHasEvent())
+        (void)in.kbPop();
+      in.clearEdges();
+      inputForceClear();
+      clearInputLatch();
+      Serial.println("[EGG] BLOCKED waiting for release");
+      return;
+    }
   }
-
-  if (!in.selectHeld)
-  {
-    g_choosePetBlockHatchUntilRelease = false;
-  }
-  else
-  {
-    // swallow only select-related noise, not ESC
-    while (in.kbHasEvent())
-      (void)in.kbPop();
-    in.clearEdges();
-    inputForceClear();
-    clearInputLatch();
-    Serial.println("[EGG] BLOCKED waiting for release");
-    return;
-  }
-}
 
   // Enter edge derived from held state (more reliable than selectOnce)
   const bool enterEdge = (in.selectHeld && !s_prevSelectHeld);
@@ -160,7 +160,8 @@ if (g_choosePetBlockHatchUntilRelease)
   };
 #else
   static const PetType kChoices[] = {
-      PET_DEVIL, PET_ELDRITCH, PET_ALIEN, PET_KAIJU, PET_ANUBIS, PET_AXOLOTL,
+      PET_DEVIL,
+      PET_ELDRITCH,
   };
 #endif
 

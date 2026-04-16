@@ -229,18 +229,9 @@ static const char *petTypeToStringForExport(PetType t)
 {
   switch (t)
   {
-  case PET_DEVIL:
-    return "devil";
   case PET_ELDRITCH:
     return "eldritch";
-  case PET_ALIEN:
-    return "alien";
-  case PET_KAIJU:
-    return "kaiju";
-  case PET_ANUBIS:
-    return "anubis";
-  case PET_AXOLOTL:
-    return "axolotl";
+  case PET_DEVIL:
   default:
     return "devil";
   }
@@ -250,36 +241,26 @@ static bool petTypeFromStringForImport(const char *s, PetType &out)
 {
   if (!s || !*s)
     return false;
+
   if (!strcmp(s, "devil"))
   {
     out = PET_DEVIL;
     return true;
   }
+
   if (!strcmp(s, "eldritch"))
   {
     out = PET_ELDRITCH;
     return true;
   }
-  if (!strcmp(s, "alien"))
+
+  // Legacy imports from removed pet lines collapse to Devil.
+  if (!strcmp(s, "alien") || !strcmp(s, "kaiju") || !strcmp(s, "anubis") || !strcmp(s, "axolotl"))
   {
-    out = PET_ALIEN;
+    out = PET_DEVIL;
     return true;
   }
-  if (!strcmp(s, "kaiju"))
-  {
-    out = PET_KAIJU;
-    return true;
-  }
-  if (!strcmp(s, "anubis"))
-  {
-    out = PET_ANUBIS;
-    return true;
-  }
-  if (!strcmp(s, "axolotl"))
-  {
-    out = PET_AXOLOTL;
-    return true;
-  }
+
   return false;
 }
 
@@ -2022,11 +2003,7 @@ static bool autoHealLoadedSaveIfNeeded()
   switch (pet.type)
   {
   case PET_DEVIL:
-  case PET_KAIJU:
   case PET_ELDRITCH:
-  case PET_ALIEN:
-  case PET_ANUBIS:
-  case PET_AXOLOTL:
     break;
 
   default:

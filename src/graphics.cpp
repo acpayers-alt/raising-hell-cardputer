@@ -67,6 +67,13 @@
 #include "factory_reset_state.h"
 #include "flow_boot_wifi.h"
 #include "game_options_state.h"
+#include "graphics_boot_screens.h"
+#include "graphics_death_screens.h"
+#include "graphics_egg_select_screens.h"
+#include "graphics_hatching_screens.h"
+#include "graphics_menu_screens.h"
+#include "graphics_render_utils.h"
+#include "graphics_shared_utils.h"
 #include "inventory_state.h"
 #include "mg_pause_menu.h"
 #include "mini_game_pause_menu.h"
@@ -91,13 +98,6 @@
 #include "ui_state_title_menu.h"
 #include "user_toggles_state.h"
 #include "wifi_setup_state.h"
-#include "graphics_boot_screens.h"
-#include "graphics_menu_screens.h"
-#include "graphics_death_screens.h"
-#include "graphics_shared_utils.h"
-#include "graphics_egg_select_screens.h"
-#include "graphics_hatching_screens.h"
-#include "graphics_render_utils.h"
 
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
@@ -345,17 +345,6 @@ static AnimId evoHappyClipFor(PetType type, uint8_t stage)
     default:
       return ANIM_ELD_ELDER_HAPPY_PASS;
     }
-
-  case PET_KAIJU:
-    return ANIM_KAI_IDLE_1F;
-  case PET_ALIEN:
-    return ANIM_AL_IDLE_1F;
-  case PET_ANUBIS:
-    return ANIM_ANU_IDLE_1F;
-  case PET_AXOLOTL:
-    return ANIM_AXO_IDLE_1F;
-  default:
-    return ANIM_NONE;
   }
 }
 
@@ -482,63 +471,6 @@ static inline PetUIColorScheme uiSchemeForPet(PetType t)
 {
   switch (t)
   {
-
-  case PET_KAIJU:
-    // Purple theme
-    return PetUIColorScheme{
-        0x1803, // topBg (very dark purple)
-        0x780F, // topOutline (purple)
-        0xFFFF, // topText
-
-        0x1803, // tabBg
-        0x780F, // tabOutline
-        0xA81F, // tabFillSel (bright purple/pink-ish)
-        0xFFFF, // tabTextOff
-        0x0000  // tabTextOn
-    };
-
-  case PET_ALIEN:
-    // Green theme
-    return PetUIColorScheme{
-        0x0200, // topBg (very dark green)
-        0x07E0, // topOutline (green)
-        0xFFFF, // topText
-
-        0x0200, // tabBg
-        0x07E0, // tabOutline
-        0x87F0, // tabFillSel (light green)
-        0xFFFF, // tabTextOff
-        0x0000  // tabTextOn
-    };
-
-  case PET_ANUBIS:
-    // Gold / yellow theme
-    return PetUIColorScheme{
-        0x4200, // topBg (dark brown/gold base)
-        0xFFE0, // topOutline (yellow)
-        0xFFFF, // topText
-
-        0x4200, // tabBg
-        0xFFE0, // tabOutline
-        0xFD20, // tabFillSel (gold)
-        0xFFFF, // tabTextOff
-        0x0000  // tabTextOn
-    };
-
-  case PET_AXOLOTL:
-    // Pink theme
-    return PetUIColorScheme{
-        0x3808, // topBg (dark pink)
-        0xF81F, // topOutline (magenta/pink)
-        0xFFFF, // topText
-
-        0x3808, // tabBg
-        0xF81F, // tabOutline
-        0xFB56, // tabFillSel (pink)
-        0xFFFF, // tabTextOff
-        0x0000  // tabTextOn
-    };
-
   case PET_ELDRITCH:
     return PetUIColorScheme{
         0x0010, // topBg
@@ -574,19 +506,11 @@ static inline uint16_t uiPillFillSelected(PetType t)
 {
   switch (t)
   {
-  case PET_KAIJU:
-    return 0x780F; // purple
-  case PET_ALIEN:
-    return 0x07E0; // green
-  case PET_ANUBIS:
-    return 0xFD20; // gold
-  case PET_AXOLOTL:
-    return 0xFB56; // pink
   case PET_ELDRITCH:
-    return 0x0018; // slightly darker blue
+    return 0x0018;
   case PET_DEVIL:
   default:
-    return 0x2104; // devil-ish pill fill
+    return 0x2104;
   }
 }
 
@@ -808,10 +732,6 @@ static const char *PATH_SHOP_ELD_EVO = "/raising_hell/graphics/ui/shop_items/eld
 
 #define DEV_EGG_PNG "/raising_hell/graphics/pet/egg/dev_egg.png"
 #define ELD_EGG_PNG "/raising_hell/graphics/pet/egg/eld_egg.png"
-#define KAI_EGG_PNG "/raising_hell/graphics/pet/egg/kai_egg.png"
-#define ANU_EGG_PNG "/raising_hell/graphics/pet/egg/anu_egg.png"
-#define AXO_EGG_PNG "/raising_hell/graphics/pet/egg/axo_egg.png"
-#define AL_EGG_PNG "/raising_hell/graphics/pet/egg/al_egg.png"
 
 // Pet-area background (drawn at PET_AREA_Y)
 static const char *PATH_BG_DEVIL_BABY = "/raising_hell/graphics/background/dev/hell_bg.jpg";
@@ -824,23 +744,10 @@ static const char *PATH_BG_ELDRITCH_TEEN = "/raising_hell/graphics/background/el
 static const char *PATH_BG_ELDRITCH_ADULT = "/raising_hell/graphics/background/eld/eld_ad_bg.jpg";
 static const char *PATH_BG_ELDRITCH_ELDER = "/raising_hell/graphics/background/eld/eld_el_bg.jpg";
 
-static const char *PATH_BG_KAIJU = "/raising_hell/graphics/background/kai/kai_bg.jpg";
-static const char *PATH_BG_ALIEN = "/raising_hell/graphics/background/al/al_bg.jpg";
-static const char *PATH_BG_ANUBIS = "/raising_hell/graphics/background/anu/anu_bg.jpg";
-static const char *PATH_BG_AXOLOTL = "/raising_hell/graphics/background/axo/axo_bg.jpg";
-
 static inline const char *bgPathForPet(PetType t)
 {
   switch (t)
   {
-  case PET_KAIJU:
-    return PATH_BG_KAIJU;
-  case PET_ALIEN:
-    return PATH_BG_ALIEN;
-  case PET_ANUBIS:
-    return PATH_BG_ANUBIS;
-  case PET_AXOLOTL:
-    return PATH_BG_AXOLOTL;
   case PET_ELDRITCH:
     return PATH_BG_ELDRITCH;
   case PET_DEVIL:
@@ -3696,12 +3603,8 @@ struct PetRenderProfile
 };
 
 static const PetRenderProfile kPetProfile[] = {
-    /* PET_DEVIL    */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
-    /* PET_KAIJU    */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
-    /* PET_ELDRITCH */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
-    /* PET_ALIEN    */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
-    /* PET_ANUBIS   */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
-    /* PET_AXOLOTL  */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
+  /* PET_DEVIL    */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
+  /* PET_ELDRITCH */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
 };
 
 const PetRenderProfile &getPetProfile(PetType t)
@@ -4132,66 +4035,6 @@ static int getWalkBaselineAdjustForPet()
       return -19; // elder
     default:
       return -6;
-    }
-
-  case PET_ALIEN:
-    switch (pet.evoStage)
-    {
-    case 0:
-      return -2;
-    case 1:
-      return -2;
-    case 2:
-      return -2;
-    case 3:
-      return -2;
-    default:
-      return -2;
-    }
-
-  case PET_KAIJU:
-    switch (pet.evoStage)
-    {
-    case 0:
-      return -2;
-    case 1:
-      return -2;
-    case 2:
-      return -2;
-    case 3:
-      return -2;
-    default:
-      return -2;
-    }
-
-  case PET_ANUBIS:
-    switch (pet.evoStage)
-    {
-    case 0:
-      return -2;
-    case 1:
-      return -2;
-    case 2:
-      return -2;
-    case 3:
-      return -2;
-    default:
-      return -2;
-    }
-
-  case PET_AXOLOTL:
-    switch (pet.evoStage)
-    {
-    case 0:
-      return -2;
-    case 1:
-      return -2;
-    case 2:
-      return -2;
-    case 3:
-      return -2;
-    default:
-      return -2;
     }
 
   default:
@@ -7034,7 +6877,7 @@ void drawPetPerfHud()
   if (g_app.currentTab != Tab::TAB_PET)
     return;
 
-    if (g_app.uiState != UIState::PET_SCREEN)
+  if (g_app.uiState != UIState::PET_SCREEN)
     return;
 
   const PetPerfStats &ps = petPerfStats();
@@ -7191,15 +7034,6 @@ AnimId deathTransitionStaticClipForPet()
     default:
       return ANIM_ELD_ELDER_SICK_SNEEZE;
     }
-
-  case PET_KAIJU:
-    return ANIM_KAI_IDLE_1F;
-  case PET_ALIEN:
-    return ANIM_AL_IDLE_1F;
-  case PET_ANUBIS:
-    return ANIM_ANU_IDLE_1F;
-  case PET_AXOLOTL:
-    return ANIM_AXO_IDLE_1F;
 
   default:
     return ANIM_NONE;
