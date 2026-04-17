@@ -84,6 +84,7 @@
 #include "graphics_pet_presentation.h"
 #include "graphics_mini_stats.h"
 #include "graphics_sd_draw.h"
+#include "graphics_hud_icons.h"
 
 #include "feed_menu_state.h"
 #include "inventory_state.h"
@@ -162,24 +163,6 @@ static constexpr int MINI_STAT_ICON_W = 18;
 static constexpr int MINI_STAT_ICON_H = 18;
 static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0xF81F;
 
-static constexpr int HUD_HEADER_ICON_W = 12;
-static constexpr int HUD_HEADER_ICON_H = 12;
-static constexpr int HUD_STAT_ICON_W = 10;
-static constexpr int HUD_STAT_ICON_H = 10;
-static constexpr uint16_t HUD_ICON_TRANSPARENT = 0xF81F;
-
-static M5Canvas s_hudLifeIconSmall(&spr);
-static bool s_hudLifeIconSmallReady = false;
-static M5Canvas s_hudCoinIconSmall(&spr);
-static bool s_hudCoinIconSmallReady = false;
-
-static M5Canvas s_hudFoodIcon(&spr);
-static bool s_hudFoodIconReady = false;
-static M5Canvas s_hudMoodIcon(&spr);
-static bool s_hudMoodIconReady = false;
-static M5Canvas s_hudRestIcon(&spr);
-static bool s_hudRestIconReady = false;
-
 int deathTransitionYNudgeForPet()
 {
   switch (pet.type)
@@ -191,89 +174,6 @@ int deathTransitionYNudgeForPet()
   default:
     return -2;
   }
-}
-
-static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h)
-{
-  if (ready)
-    return true;
-  if (!g_sdReady || !path || !*path)
-    return false;
-
-  canvas.setColorDepth(16);
-
-  if (!canvas.width() || !canvas.height())
-  {
-    if (!canvas.createSprite(w, h))
-      return false;
-  }
-
-  canvas.fillSprite(HUD_ICON_TRANSPARENT);
-
-  if (!canvasDrawPngFromSD(canvas, path, 0, 0))
-  {
-    canvas.deleteSprite();
-    ready = false;
-    return false;
-  }
-
-  ready = true;
-  return true;
-}
-
-static bool drawHudIconCached(const char *path, int x, int y)
-{
-  M5Canvas *canvas = nullptr;
-  bool *ready = nullptr;
-  int w = 0;
-  int h = 0;
-
-  if (path == PATH_LIFE_ICON)
-  {
-    canvas = &s_hudLifeIconSmall;
-    ready = &s_hudLifeIconSmallReady;
-    w = HUD_HEADER_ICON_W;
-    h = HUD_HEADER_ICON_H;
-  }
-  else if (path == PATH_INF_COIN)
-  {
-    canvas = &s_hudCoinIconSmall;
-    ready = &s_hudCoinIconSmallReady;
-    w = HUD_HEADER_ICON_W;
-    h = HUD_HEADER_ICON_H;
-  }
-  else if (path == PATH_FOOD_ICON)
-  {
-    canvas = &s_hudFoodIcon;
-    ready = &s_hudFoodIconReady;
-    w = HUD_STAT_ICON_W;
-    h = HUD_STAT_ICON_H;
-  }
-  else if (path == PATH_MOOD_ICON)
-  {
-    canvas = &s_hudMoodIcon;
-    ready = &s_hudMoodIconReady;
-    w = HUD_STAT_ICON_W;
-    h = HUD_STAT_ICON_H;
-  }
-  else if (path == PATH_REST_ICON)
-  {
-    canvas = &s_hudRestIcon;
-    ready = &s_hudRestIconReady;
-    w = HUD_STAT_ICON_W;
-    h = HUD_STAT_ICON_H;
-  }
-
-  if (canvas && ready && ensureHudIconCache(*canvas, *ready, path, w, h))
-  {
-    canvas->pushSprite(x, y, HUD_ICON_TRANSPARENT);
-    return true;
-  }
-
-  if (g_sdReady)
-    return sprDrawPngFromSD(path, x, y);
-
-  return false;
 }
 
 #define DEV_EGG_PNG "/raising_hell/graphics/pet/egg/dev_egg.png"
@@ -1397,7 +1297,8 @@ void graphicsReleaseUiCachesForMiniGame()
 
   // Release mini stat icon caches through the owning module.
   graphicsReleaseMiniStatCaches();
-
+  graphicsReleaseHudIconCaches();
+  
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;
   s_nonPetTileW = 0;
