@@ -52,6 +52,10 @@ bool sprDrawJpgFromSD(const char *path, int x, int y);
 // -----------------------------------------------------------------------------
 bool streamRawImage(const char *path, int x, int y, int w, int h);
 bool streamRawImageFast(const char *path, int x, int y, int w, int h);
+void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100,
+    const char *label);
+void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100);
+void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100);
 
 // -----------------------------------------------------------------------------
 // Screen renderers / UI
