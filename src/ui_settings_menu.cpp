@@ -464,12 +464,10 @@ static void actGame_RenamePet(InputState &input)
   inputSetTextCapture(true);
   g_textCaptureMode = true;
 
-  uiActionEnterState(UIState::NAME_PET, g_app.currentTab, true);
+  uiActionEnterStateClean(UIState::NAME_PET, g_app.currentTab, true, input, 120);
 
   requestUIRedraw();
   invalidateBackgroundCache();
-  uiDrainKb(input);
-  clearInputLatch();
   playBeep();
 }
 
@@ -576,11 +574,10 @@ static void actPet_RenamePet(InputState &input)
   inputSetTextCapture(true);
   g_textCaptureMode = true;
 
-  uiActionEnterState(UIState::NAME_PET, g_app.currentTab, true);
+  uiActionEnterStateClean(UIState::NAME_PET, g_app.currentTab, true, input, 120);
 
   requestUIRedraw();
   invalidateBackgroundCache();
-  clearInputLatch();
   playBeep();
 }
 
