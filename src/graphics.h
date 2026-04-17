@@ -26,6 +26,7 @@ void ui_showSuccessMessage(const char *msg);
 // Backgrounds (JPEG-only backgrounds)
 // -----------------------------------------------------------------------------
 void drawBackground(const char *path);
+void drawNonPetTabBackground();
 void drawBootSplash();
 void drawBootAssetWifiRequiredScreen();
 
