@@ -44,7 +44,6 @@ void drawMiniStatPreview();
 void drawTabBar();
 void drawPetPerfHud();
 
-extern const char *g_petBgCachedPath;
 int deathTransitionYNudgeForPet();
 AnimId deathTransitionStaticClipForPet();
 
@@ -107,11 +106,9 @@ void drawDeathTransitionScreen(bool redrawBg)
 
   const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
 
-  const bool cacheMissing = (g_petBgCachedPath == nullptr);
-
   // redrawBg should restore from cache, not force a fresh SD/JPEG rebuild.
-  const bool needPetBg = petChanged || cacheMissing || g_forcePetBgCache;
-
+  const bool needPetBg = petChanged || g_forcePetBgCache;
+  
   s_lastBgPetType = pet.type;
   s_lastBgEvoStage = pet.evoStage;
 

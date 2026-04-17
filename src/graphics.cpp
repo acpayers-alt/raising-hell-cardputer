@@ -81,6 +81,7 @@
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
 #include "graphics_tab_menus.h"
+#include "graphics_pet_presentation.h"
 
 #include "feed_menu_state.h"
 #include "inventory_state.h"
@@ -232,10 +233,6 @@ public:
 private:
   fs::File *_f = nullptr;
 };
-
-// Optional offscreen layer (kept; not required for current draw path)
-static M5Canvas petLayer(&spr);
-static bool petLayerReady = false;
 
 // -----------------------------------------------------------------------------
 // Paths (SD)
@@ -554,7 +551,6 @@ static bool drawJpegBackground(const char *path);
 void drawMiniStatPreview();
 static void drawCurrentScreen(bool redrawBg);
 static void drawWifiSetupScreen();
-static time_t getPetBirthEpoch();
 
 void drawBootLowBatteryChargingScreen(int mv, int pct, bool usb, bool readyToBoot);
 
@@ -975,137 +971,6 @@ const char *getBioStatusImagePath()
 }
 
 // ============================================================================
-// NEW PET SCREEN + MINI STATS
-// ============================================================================
-const char *g_petBgCachedPath = nullptr;
-static PetType g_petBgCachedType = (PetType)255;
-static uint8_t g_petBgCachedStage = 255;
-
-// -----------------------------------------------------------------------------
-// Memory Release helper for OTA Assets
-// -----------------------------------------------------------------------------
-void graphicsReleasePetLayerForOta()
-{
-  petLayer.deleteSprite();
-  petLayerReady = false;
-
-  g_petBgCachedPath = nullptr;
-  g_petBgCachedType = (PetType)255;
-  g_petBgCachedStage = 255;
-  g_forcePetBgCache = true;
-}
-
-void graphicsRecoverAfterOta()
-{
-  petLayer.deleteSprite();
-  petLayerReady = false;
-
-  // Do NOT delete/recreate the main sprite here.
-  // We already have a valid sprite; just force cached content to rebuild.
-  g_petBgCachedPath = nullptr;
-  g_petBgCachedType = (PetType)255;
-  g_petBgCachedStage = 255;
-  g_forcePetBgCache = true;
-
-  bgDrawnForState = false;
-  lastDrawnState = (UIState)255;
-
-  invalidateBackgroundCache();
-  requestUIRedraw();
-}
-
-void cachePetAreaBackgroundIfNeeded(bool force)
-{
-  if (!g_sdReady)
-  {
-    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    return;
-  }
-
-  const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
-
-  if (!ensurePetLayer())
-  {
-    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-    if (bgPath)
-    {
-      (void)sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
-    }
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    return;
-  }
-
-  if (!petLayerReady)
-    force = true;
-
-  if (!force && (g_petBgCachedPath == bgPath) && (g_petBgCachedType == pet.type) &&
-      (g_petBgCachedStage == pet.evoStage))
-  {
-    return;
-  }
-
-  petLayer.fillSprite(TFT_BLACK);
-
-  bool ok = true;
-  if (bgPath)
-  {
-    // Use sprite file storage + path-only overload.
-    static bool s_petLayerFsInited = false;
-    if (!s_petLayerFsInited)
-    {
-      petLayer.setFileStorage(SD);
-      s_petLayerFsInited = true;
-    }
-    ok = petLayer.drawJpgFile(bgPath, 0, 0);
-  }
-
-  if (!ok)
-  {
-    petLayerReady = false;
-    g_petBgCachedPath = nullptr;
-    g_petBgCachedType = (PetType)255;
-    g_petBgCachedStage = 255;
-
-    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    return;
-  }
-
-  g_petBgCachedPath = bgPath;
-  g_petBgCachedType = pet.type;
-  g_petBgCachedStage = pet.evoStage;
-  petLayerReady = true;
-}
-
-void restorePetAreaFromCache()
-{
-  if (!petLayerReady)
-    return;
-  spr.pushImage(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, (uint16_t *)petLayer.getBuffer());
-}
-
-static bool ensurePetLayer()
-{
-  if (petLayerReady)
-    return true;
-
-  petLayer.setColorDepth(16);
-  if (!petLayer.createSprite(SCREEN_W, PET_AREA_H))
-  {
-    petLayerReady = false;
-    return false;
-  }
-
-  petLayerReady = true;
-  return true;
-}
-
-// ============================================================================
 // Pet Type Render Profiles (static sprites)
 // ============================================================================
 static int getClockModeBaselineDeltaForPet()
@@ -1216,11 +1081,6 @@ static void drawDeathScreen(bool redrawBg)
   spr.drawString("UP/DOWN + ENTER", screenW / 2, screenH - 16);
 }
 
-static time_t getPetBirthEpoch()
-{
-  return 0;
-}
-
 // ============================================================================
 // BURIAL SCREEN
 //  - patched: removed pet.birth_epoch direct field access (compile-safe)
@@ -1249,8 +1109,6 @@ void drawBurialScreen()
   char deathBuf[24] = {0};
 
   uint32_t be = saveManagerGetBirthEpoch();
-  if (be == 0)
-    be = (uint32_t)getPetBirthEpoch();
 
   if (be > 100000)
   {
@@ -1693,14 +1551,8 @@ void freeSleepAnimFrameCache()
 
 void graphicsReleaseUiCachesForMiniGame()
 {
-  // Release pet-area cached sprite.
-  petLayer.deleteSprite();
-  petLayerReady = false;
-
-  g_petBgCachedPath = nullptr;
-  g_petBgCachedType = (PetType)255;
-  g_petBgCachedStage = 255;
-  g_forcePetBgCache = true;
+  // Release pet presentation caches through the owning module.
+  graphicsReleasePetLayerForOta();
 
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;

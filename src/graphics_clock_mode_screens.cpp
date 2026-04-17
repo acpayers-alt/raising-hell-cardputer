@@ -9,7 +9,6 @@
 extern Pet pet;
 extern bool g_sdReady;
 extern bool g_forcePetBgCache;
-extern const char *g_petBgCachedPath;
 
 bool isScreenOn();
 void requestUIRedraw();
@@ -74,8 +73,7 @@ void drawClockModeScreen(bool redrawBg)
   static uint8_t s_lastBgEvoStage = 255;
 
   const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
-  const bool cacheMissing = (g_petBgCachedPath == nullptr);
-  const bool needPetBg = redrawBg || petChanged || cacheMissing || g_forcePetBgCache;
+  const bool needPetBg = redrawBg || petChanged || g_forcePetBgCache;
 
   s_lastBgPetType = pet.type;
   s_lastBgEvoStage = pet.evoStage;
@@ -99,56 +97,7 @@ void drawClockModeScreen(bool redrawBg)
     spr.fillRect(0, 0, SCREEN_W, PET_AREA_Y, TFT_BLACK);
     spr.fillRect(0, PET_AREA_Y + PET_AREA_H, SCREEN_W, SCREEN_H - (PET_AREA_Y + PET_AREA_H), TFT_BLACK);
 
-    if (g_petBgCachedPath != nullptr)
-    {
-      restorePetAreaFromCache();
-    }
-    else
-    {
-      // Fallback: repaint only the pet area from the current pet background.
-      // Clip so the full-frame image cannot spill into the footer strip.
-      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-
-      const char *bgPath = nullptr;
-
-      if (pet.type == PET_ELDRITCH)
-      {
-        if (pet.evoStage >= 3)
-          bgPath = "/raising_hell/graphics/background/eld/eld_el_bg.jpg";
-        else if (pet.evoStage == 2)
-          bgPath = "/raising_hell/graphics/background/eld/eld_ad_bg.jpg";
-        else if (pet.evoStage == 1)
-          bgPath = "/raising_hell/graphics/background/eld/eld_teen_bg.jpg";
-        else
-          bgPath = "/raising_hell/graphics/background/eld/eld_bg.jpg";
-      }
-      else
-      {
-        if (pet.evoStage >= 3)
-          bgPath = "/raising_hell/graphics/background/dev/dev_el_bg.jpg";
-        else if (pet.evoStage == 2)
-          bgPath = "/raising_hell/graphics/background/dev/dev_ad_bg.jpg";
-        else if (pet.evoStage == 1)
-          bgPath = "/raising_hell/graphics/background/dev/dev_teen_bg.jpg";
-        else
-          bgPath = "/raising_hell/graphics/background/dev/hell_bg.jpg";
-      }
-
-      if (bgPath)
-      {
-        spr.setClipRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H);
-
-        const char *ext = strrchr(bgPath, '.');
-        const bool isPng = (ext && (strcasecmp(ext, ".png") == 0));
-
-        if (isPng)
-          (void)sprDrawPngFromSD(bgPath, 0, PET_AREA_Y);
-        else
-          (void)sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
-
-        spr.clearClipRect();
-      }
-    }
+    restorePetAreaFromCache();
   }
 
   // Keep Clock Mode on the same vertical baseline as the PET screen.

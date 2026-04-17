@@ -1,67 +1,310 @@
 #include "graphics_pet_presentation.h"
-#include "display.h"
-#include "graphics.h"
-#include "graphics_render_utils.h"
-#include "graphics_shared_utils.h"
 
 #include <Arduino.h>
 #include <stdlib.h>
 
+#include "display.h"
+#include "graphics.h"
+#include "graphics_render_utils.h"
+#include "graphics_shared_utils.h"
+#include "anim_clips.h"
+
 #include "app_state.h"
 #include "pet.h"
+
+struct PetRenderProfile
+{
+  int w;
+  int h;
+  int xOff;
+  int yOff;
+};
+
+// ============================================================================
+// EXTERNALS
+// ============================================================================
 
 extern Pet pet;
 extern AppState g_app;
 extern bool g_sdReady;
 
 extern bool g_forcePetBgCache;
-extern const char *g_petBgCachedPath;
-extern bool petLayerReady;
 
+// UI / rendering hooks
 void requestUIRedraw();
 bool isScreenOn();
-
-void cachePetAreaBackgroundIfNeeded(bool forceRefresh);
-void restorePetAreaFromCache();
 
 void drawTopBar();
 void drawMiniStatPreview();
 void drawTabBar();
 void drawPetPerfHud();
+void resetPetWanderToHome();
 
+// Animation
 bool animConsumeFrameChanged();
 void animDrawPetFrameAnchoredBottom(int anchorCenterX, int anchorBottomY);
 
-const char *bgPathForPetWithStage(PetType t, uint8_t evoStage);
-
+// Assets
 bool getPngWH(const char *path, int &w, int &h);
 
-// ---------------------------------------------------------------------------
-// Pet screen position (anchor-based, bottom-center)
-// ---------------------------------------------------------------------------
+// ============================================================================
+// PET LAYER / BACKGROUND CACHE
+// ============================================================================
+
+static M5Canvas petLayer(&spr);
+static bool petLayerReady = false;
+
+static const char *s_petBgCachedPath = nullptr;
+static PetType s_petBgCachedType = (PetType)255;
+static uint8_t s_petBgCachedStage = 255;
+static bool ensurePetLayer();
+
+void graphicsReleasePetLayerForOta()
+{
+  petLayer.deleteSprite();
+  petLayerReady = false;
+
+  s_petBgCachedPath = nullptr;
+  s_petBgCachedType = (PetType)255;
+  s_petBgCachedStage = 255;
+  g_forcePetBgCache = true;
+}
+
+void graphicsRecoverAfterOta()
+{
+  petLayer.deleteSprite();
+  petLayerReady = false;
+
+  s_petBgCachedPath = nullptr;
+  s_petBgCachedType = (PetType)255;
+  s_petBgCachedStage = 255;
+  g_forcePetBgCache = true;
+
+  invalidateBackgroundCache();
+  requestUIRedraw();
+}
+
+static bool ensurePetLayer()
+{
+  if (petLayerReady)
+    return true;
+
+  petLayer.setColorDepth(16);
+  if (!petLayer.createSprite(SCREEN_W, PET_AREA_H))
+  {
+    petLayerReady = false;
+    return false;
+  }
+
+  petLayerReady = true;
+  return true;
+}
+
+static inline const char *bgPathForPet(PetType t)
+{
+  switch (t)
+  {
+  case PET_ELDRITCH:
+    return "/raising_hell/graphics/background/eld/eld_bg.jpg";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/background/dev/hell_bg.jpg";
+  }
+}
+
+static const char *bgPathForPetWithStage(PetType t, int evoStage)
+{
+  if (t == PET_DEVIL)
+  {
+    if (evoStage >= 3)
+      return "/raising_hell/graphics/background/dev/dev_el_bg.jpg";
+    if (evoStage == 2)
+      return "/raising_hell/graphics/background/dev/dev_ad_bg.jpg";
+    if (evoStage == 1)
+      return "/raising_hell/graphics/background/dev/dev_teen_bg.jpg";
+    return "/raising_hell/graphics/background/dev/hell_bg.jpg";
+  }
+
+  if (t == PET_ELDRITCH)
+  {
+    if (evoStage >= 3)
+      return "/raising_hell/graphics/background/eld/eld_el_bg.jpg";
+    if (evoStage == 2)
+      return "/raising_hell/graphics/background/eld/eld_ad_bg.jpg";
+    if (evoStage == 1)
+      return "/raising_hell/graphics/background/eld/eld_teen_bg.jpg";
+    return "/raising_hell/graphics/background/eld/eld_bg.jpg";
+  }
+
+  return bgPathForPet(t);
+}
+
+void cachePetAreaBackgroundIfNeeded(bool force)
+{
+  if (!g_sdReady)
+  {
+    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    return;
+  }
+
+  const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
+
+  if (!ensurePetLayer())
+  {
+    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+    if (bgPath)
+    {
+      (void)sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+    }
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    return;
+  }
+
+  if (!petLayerReady)
+    force = true;
+
+  if (!force && (s_petBgCachedPath == bgPath) && (s_petBgCachedType == pet.type) &&
+      (s_petBgCachedStage == pet.evoStage))
+  {
+    return;
+  }
+
+  petLayer.fillSprite(TFT_BLACK);
+
+  bool ok = true;
+  if (bgPath)
+  {
+    static bool s_petLayerFsInited = false;
+    if (!s_petLayerFsInited)
+    {
+      petLayer.setFileStorage(SD);
+      s_petLayerFsInited = true;
+    }
+    ok = petLayer.drawJpgFile(bgPath, 0, 0);
+  }
+
+  if (!ok)
+  {
+    petLayerReady = false;
+    s_petBgCachedPath = nullptr;
+    s_petBgCachedType = (PetType)255;
+    s_petBgCachedStage = 255;
+
+    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    return;
+  }
+
+  s_petBgCachedPath = bgPath;
+  s_petBgCachedType = pet.type;
+  s_petBgCachedStage = pet.evoStage;
+  petLayerReady = true;
+}
+
+void restorePetAreaFromCache()
+{
+  if (!petLayerReady)
+    return;
+
+  spr.pushImage(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, (uint16_t *)petLayer.getBuffer());
+}
+
+// ============================================================================
+// PET SCREEN POSITION (ANCHOR-BASED)
+// ============================================================================
 
 static int s_petScreenX = 0;
 static int s_petScreenY = 0;
 static bool s_petScreenPosInitialized = false;
 
-static bool s_petIntroWalkActive = false;
-static uint32_t s_petIntroWalkLastStepMs = 0;
-static constexpr int kPetIntroWalkStepPx = 3;
-static constexpr uint32_t kPetIntroWalkStepMs = 40;
-
-static bool s_petIntroArriveTurnActive = false;
-static uint32_t s_petIntroArriveTurnStartMs = 0;
-static constexpr uint32_t kPetIntroArriveTurnMs = 180;
-
-static bool s_petIntroStandHoldActive = false;
-static uint32_t s_petIntroStandHoldStartMs = 0;
-static constexpr int kPetIntroYOffset = 0;
-static constexpr uint32_t kPetIntroStandHoldMs = 300;
-static bool s_petIntroHandoffActive = false;
-static constexpr uint32_t kPetIntroWalkFrameMs = 45;
-
 static int s_petHomeX = 0;
 static int s_petHomeY = 0;
+
+// ============================================================================
+// INTRO SEQUENCE STATE
+// ============================================================================
+
+static bool s_petIntroWalkActive = false;
+static bool s_petIntroArriveTurnActive = false;
+static bool s_petIntroStandHoldActive = false;
+static bool s_petIntroHandoffActive = false;
+
+static uint32_t s_petIntroWalkLastStepMs = 0;
+static uint32_t s_petIntroArriveTurnStartMs = 0;
+static uint32_t s_petIntroStandHoldStartMs = 0;
+
+static constexpr int kPetIntroWalkStepPx = 3;
+static constexpr uint32_t kPetIntroWalkStepMs = 40;
+static constexpr uint32_t kPetIntroArriveTurnMs = 180;
+static constexpr uint32_t kPetIntroStandHoldMs = 300;
+static constexpr uint32_t kPetIntroWalkFrameMs = 45;
+
+static constexpr int kPetIntroYOffset = 0;
+
+// ============================================================================
+// WALKING SPRITE PATHS
+// ============================================================================
+
+// ---------------- DEVIL ----------------
+
+// Baby
+static const char *PATH_DEV_BB_WALK1   = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
+static const char *PATH_DEV_BB_WALK2   = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
+static const char *PATH_DEV_BB_WALK1_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft1.png";
+static const char *PATH_DEV_BB_WALK2_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft2.png";
+
+// Teen
+static const char *PATH_DEV_TN_WALK1   = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk1.png";
+static const char *PATH_DEV_TN_WALK2   = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk2.png";
+static const char *PATH_DEV_TN_WALK1_L = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walkleft1.png";
+static const char *PATH_DEV_TN_WALK2_L = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walkleft2.png";
+
+// Adult
+static const char *PATH_DEV_AD_WALK1   = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk1.png";
+static const char *PATH_DEV_AD_WALK2   = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk2.png";
+static const char *PATH_DEV_AD_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft1.png";
+static const char *PATH_DEV_AD_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft2.png";
+
+// Elder
+static const char *PATH_DEV_EL_WALK1   = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk1.png";
+static const char *PATH_DEV_EL_WALK2   = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk2.png";
+static const char *PATH_DEV_EL_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft1.png";
+static const char *PATH_DEV_EL_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft2.png";
+
+// ---------------- ELDRITCH ----------------
+
+// Baby
+static const char *PATH_ELD_BB_WALK1   = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk1.png";
+static const char *PATH_ELD_BB_WALK2   = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk2.png";
+static const char *PATH_ELD_BB_WALK1_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft1.png";
+static const char *PATH_ELD_BB_WALK2_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft2.png";
+
+// Teen
+static const char *PATH_ELD_TN_WALK1   = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk1.png";
+static const char *PATH_ELD_TN_WALK2   = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk2.png";
+static const char *PATH_ELD_TN_WALK1_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft1.png";
+static const char *PATH_ELD_TN_WALK2_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft2.png";
+
+// Adult
+static const char *PATH_ELD_AD_WALK1   = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk1.png";
+static const char *PATH_ELD_AD_WALK2   = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk2.png";
+static const char *PATH_ELD_AD_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft1.png";
+static const char *PATH_ELD_AD_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft2.png";
+
+// Elder
+static const char *PATH_ELD_EL_WALK1   = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk1.png";
+static const char *PATH_ELD_EL_WALK2   = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk2.png";
+static const char *PATH_ELD_EL_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft1.png";
+static const char *PATH_ELD_EL_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft2.png";
+
+// ============================================================================
+// WANDER SYSTEM
+// ============================================================================
 
 enum class PetWanderState : uint8_t
 {
@@ -74,25 +317,37 @@ enum class PetWanderState : uint8_t
 };
 
 static PetWanderState s_petWanderState = PetWanderState::HOME_IDLE;
+
 static int s_petWanderTargetX = 0;
 static int s_petWanderSideAX = 0;
 static int s_petWanderSideBX = 0;
+
 static uint32_t s_petWanderUntilMs = 0;
 static uint32_t s_petWanderLastStepMs = 0;
 
 static constexpr int kPetWanderRangePx = 55;
 static constexpr int kPetWanderMinMovePx = 28;
 static constexpr int kPetWanderStepPx = 2;
+
 static constexpr uint32_t kPetWanderStepMs = 30;
 static constexpr uint32_t kPetWanderPauseAwayMs = 5000;
 static constexpr uint32_t kPetWanderMinIdleMs = 5000;
 static constexpr uint32_t kPetWanderMaxIdleMs = 7000;
 
+// ============================================================================
+// PUBLIC STATE ACCESSORS
+// ============================================================================
+
 int petPresentationX() { return s_petScreenX; }
 int petPresentationY() { return s_petScreenY; }
+
 bool petPresentationHasIntroHandoff() { return s_petIntroHandoffActive; }
 
 void clearPetPresentationIntroHandoff() { s_petIntroHandoffActive = false; }
+
+// ============================================================================
+// STATE HELPERS
+// ============================================================================
 
 bool petPresentationScriptedIntroActive()
 {
@@ -105,9 +360,15 @@ bool petPresentationAnimating()
          s_petWanderState == PetWanderState::MOVING_TO_SIDE_B || s_petWanderState == PetWanderState::RETURNING_HOME;
 }
 
+bool petWalkOverrideActive() { return petPresentationAnimating(); }
+
+// ============================================================================
+// PET PROFILE
+// ============================================================================
+
 static const PetRenderProfile kPetProfile[] = {
-    /* PET_DEVIL    */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
-    /* PET_ELDRITCH */ {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET},
+    {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET}, // DEVIL
+    {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET}, // ELDRITCH
 };
 
 const PetRenderProfile &getPetProfile(PetType t)
@@ -119,104 +380,49 @@ const PetRenderProfile &getPetProfile(PetType t)
   return kPetProfile[idx];
 }
 
-bool petWalkOverrideActive()
-{
-  return s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive || s_petIntroHandoffActive ||
-         s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
-         s_petWanderState == PetWanderState::RETURNING_HOME;
-}
-
-// -- Pet Walking Paths
-
-// -- Devil
-// -- Devil Baby
-static const char *PATH_DEV_BB_WALK1 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
-static const char *PATH_DEV_BB_WALK2 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
-static const char *PATH_DEV_BB_WALK1_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft1.png";
-static const char *PATH_DEV_BB_WALK2_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft2.png";
-
-// -- Devil Teen
-static const char *PATH_DEV_TN_WALK1 = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk1.png";
-static const char *PATH_DEV_TN_WALK2 = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk2.png";
-static const char *PATH_DEV_TN_WALK1_L = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walkleft1.png";
-static const char *PATH_DEV_TN_WALK2_L = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walkleft2.png";
-
-// -- Devil Teen
-static const char *PATH_DEV_AD_WALK1 = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk1.png";
-static const char *PATH_DEV_AD_WALK2 = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk2.png";
-static const char *PATH_DEV_AD_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft1.png";
-static const char *PATH_DEV_AD_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft2.png";
-
-// -- Devil Elder
-static const char *PATH_DEV_EL_WALK1 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk1.png";
-static const char *PATH_DEV_EL_WALK2 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk2.png";
-static const char *PATH_DEV_EL_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft1.png";
-static const char *PATH_DEV_EL_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft2.png";
-
-// -- Eldritch
-// -- Eldritch Baby
-static const char *PATH_ELD_BB_WALK1 = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk1.png";
-static const char *PATH_ELD_BB_WALK2 = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk2.png";
-static const char *PATH_ELD_BB_WALK1_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft1.png";
-static const char *PATH_ELD_BB_WALK2_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft2.png";
-
-// -- Eldritch Teen
-static const char *PATH_ELD_TN_WALK1 = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk1.png";
-static const char *PATH_ELD_TN_WALK2 = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk2.png";
-static const char *PATH_ELD_TN_WALK1_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft1.png";
-static const char *PATH_ELD_TN_WALK2_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft2.png";
-
-// -- Eldritch Adult
-static const char *PATH_ELD_AD_WALK1 = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk1.png";
-static const char *PATH_ELD_AD_WALK2 = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk2.png";
-static const char *PATH_ELD_AD_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft1.png";
-static const char *PATH_ELD_AD_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft2.png";
-
-// -- Eldritch Elder
-static const char *PATH_ELD_EL_WALK1 = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk1.png";
-static const char *PATH_ELD_EL_WALK2 = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk2.png";
-static const char *PATH_ELD_EL_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft1.png";
-static const char *PATH_ELD_EL_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft2.png";
+// ============================================================================
+// POSITIONING
+// ============================================================================
 
 void getPetHomeScreenPosition(int &outX, int &outY)
 {
   const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
-  const int petAreaX = 0;
 
   const PetRenderProfile &prof = getPetProfile(pet.type);
 
-  outX = petAreaX + (petAreaW / 2) + prof.xOff;
+  outX = (petAreaW / 2) + prof.xOff;
   outY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
 }
 
+// ============================================================================
+// RESET / INIT
+// ============================================================================
+
 void resetPetScreenPositionToHome()
 {
-  int homeX = 0;
-  int homeY = 0;
-  getPetHomeScreenPosition(homeX, homeY);
+  getPetHomeScreenPosition(s_petHomeX, s_petHomeY);
 
-  s_petHomeX = homeX;
-  s_petHomeY = homeY;
-
-  s_petScreenX = homeX;
-  s_petScreenY = homeY;
+  s_petScreenX = s_petHomeX;
+  s_petScreenY = s_petHomeY;
   s_petScreenPosInitialized = true;
 
   s_petIntroWalkActive = false;
-  s_petIntroWalkLastStepMs = 0;
   s_petIntroArriveTurnActive = false;
-  s_petIntroArriveTurnStartMs = 0;
   s_petIntroStandHoldActive = false;
-  s_petIntroStandHoldStartMs = 0;
   s_petIntroHandoffActive = false;
 
   resetPetWanderToHome();
 }
 
+// ============================================================================
+// WANDER CONTROL
+// ============================================================================
+
 static void scheduleNextPetWander()
 {
   const uint32_t now = millis();
   const uint32_t span = (kPetWanderMaxIdleMs - kPetWanderMinIdleMs);
+
   s_petWanderUntilMs = now + kPetWanderMinIdleMs + (span ? (uint32_t)random((long)span) : 0);
 }
 
@@ -224,55 +430,50 @@ void resetPetWanderToHome()
 {
   s_petScreenX = s_petHomeX;
   s_petScreenY = s_petHomeY;
+
   s_petWanderTargetX = s_petHomeX;
   s_petWanderSideAX = s_petHomeX;
   s_petWanderSideBX = s_petHomeX;
+
   s_petWanderState = PetWanderState::HOME_IDLE;
   s_petWanderLastStepMs = 0;
+
   scheduleNextPetWander();
 }
 
+// ============================================================================
+// CLOCK MODE RESET
+// ============================================================================
+
 void resetClockModePetPresentation()
 {
-  // Clear any scripted intro ownership so Clock Mode can draw the pet normally.
   s_petIntroWalkActive = false;
   s_petIntroArriveTurnActive = false;
   s_petIntroStandHoldActive = false;
   s_petIntroHandoffActive = false;
 
-  // Reset wander state so Clock Mode starts from a clean home position.
   s_petWanderState = PetWanderState::HOME_IDLE;
-  s_petWanderTargetX = 0;
-  s_petWanderSideAX = 0;
-  s_petWanderSideBX = 0;
-  s_petWanderUntilMs = 0;
-  s_petWanderLastStepMs = 0;
 
   s_petScreenPosInitialized = false;
 }
 
+// ============================================================================
+// INTRO WALK (ENTRY)
+// ============================================================================
+
 void startPetIntroWalkFromLeft()
 {
-  int homeX = 0;
-  int homeY = 0;
-  getPetHomeScreenPosition(homeX, homeY);
-  s_petHomeX = homeX;
-  s_petHomeY = homeY;
+  getPetHomeScreenPosition(s_petHomeX, s_petHomeY);
 
-  // Start fully offscreen to the left using the pet sprite width as margin.
   s_petScreenX = -PET_SPR_W;
-  s_petScreenY = homeY;
+  s_petScreenY = s_petHomeY;
+
   s_petScreenPosInitialized = true;
 
   s_petIntroWalkActive = true;
   s_petIntroWalkLastStepMs = millis();
-  s_petIntroArriveTurnActive = false;
-  s_petIntroStandHoldActive = false;
-  s_petIntroHandoffActive = false;
+
   s_petWanderState = PetWanderState::HOME_IDLE;
-  s_petWanderTargetX = s_petHomeX;
-  s_petWanderLastStepMs = 0;
-  s_petWanderUntilMs = 0;
 }
 
 void tickPetIntroWalk()
@@ -347,14 +548,11 @@ void tickPetIntroWalk()
 
 void tickPetWander()
 {
-  // Never wander while the scripted intro is still owning the pet.
   if (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive)
     return;
 
   const bool wanderActive = (s_petWanderState != PetWanderState::HOME_IDLE);
 
-  // Only wander on the main PET tab or in Clock Mode.
-  // IMPORTANT: do not hard-reset an active wander.
   const bool freeRoamState = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
                               (g_app.uiState == UIState::CLOCK_MODE));
 
@@ -365,10 +563,8 @@ void tickPetWander()
     return;
   }
 
-  // Keep the pet grounded at home Y.
   s_petScreenY = s_petHomeY;
 
-  // Don't start a new wander while sleeping, but don't interrupt one already in progress.
   if (pet.isSleeping)
   {
     if (!wanderActive)
@@ -376,8 +572,6 @@ void tickPetWander()
     return;
   }
 
-  // Only happy or bored pets should START wandering.
-  // If a wander is already active, let it finish naturally.
   const PetMood mood = petResolveMood(pet);
   const bool wanderAllowed = (mood == MOOD_HAPPY || mood == MOOD_BORED);
   if (!wanderAllowed && !wanderActive)
@@ -413,10 +607,7 @@ void tickPetWander()
       return;
     }
 
-    const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
-
     const bool inClockMode = (g_app.uiState == UIState::CLOCK_MODE);
-
     const int minAnchorX = PET_SPR_W / 2;
     const int rightClearancePx = 12;
 
@@ -424,15 +615,11 @@ void tickPetWander()
 
     if (inClockMode)
     {
-      // Clock Mode has no mini-stat cluster on the right, so let the pet use
-      // the full screen width (minus sprite visibility padding).
       maxAnchorX = SCREEN_W - (PET_SPR_W / 2) - rightClearancePx;
     }
     else
     {
       const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
-
-      // PET tab still reserves space for the mini-stat cluster.
       maxAnchorX = petAreaW - (PET_SPR_W / 2) - rightClearancePx;
     }
 
@@ -446,7 +633,6 @@ void tickPetWander()
 
     s_petWanderSideBX = clampi(originX + offsetB, minAnchorX, maxAnchorX);
 
-    // Reject tiny real moves after clamping.
     if (abs(s_petWanderSideAX - originX) < kPetWanderMinMovePx ||
         abs(s_petWanderSideBX - s_petWanderSideAX) < kPetWanderMinMovePx)
     {
@@ -518,7 +704,6 @@ void tickPetWander()
     if ((int32_t)(now - s_petWanderUntilMs) < 0)
       return;
 
-    // Intentionally end the wander wherever the pet currently is.
     s_petWanderState = PetWanderState::HOME_IDLE;
     scheduleNextPetWander();
     requestUIRedraw();
@@ -534,22 +719,15 @@ void tickPetWander()
 
     int dx = s_petHomeX - s_petScreenX;
 
-    // Close enough → snap ONLY position, do NOT reset state logic
     if (abs(dx) <= kPetWanderStepPx)
     {
       s_petScreenX = s_petHomeX;
       s_petScreenY = s_petHomeY;
-
-      // Transition cleanly to idle WITHOUT teleport helper
       s_petWanderState = PetWanderState::HOME_IDLE;
-
-      // Schedule next wander
       s_petWanderUntilMs = now + random(kPetWanderMinIdleMs, kPetWanderMaxIdleMs);
-
       return;
     }
 
-    // Step toward home
     s_petScreenX += (dx > 0) ? kPetWanderStepPx : -kPetWanderStepPx;
     requestUIRedraw();
     return;
@@ -564,31 +742,21 @@ static int getWalkBaselineAdjustForPet()
   case PET_DEVIL:
     switch (pet.evoStage)
     {
-    case 0:
-      return -9; // baby
-    case 1:
-      return -9; // teen
-    case 2:
-      return -20; // adult
-    case 3:
-      return -25; // elder
-    default:
-      return -2;
+    case 0: return -9;
+    case 1: return -9;
+    case 2: return -20;
+    case 3: return -25;
+    default: return -2;
     }
 
   case PET_ELDRITCH:
     switch (pet.evoStage)
     {
-    case 0:
-      return -1; // baby
-    case 1:
-      return -9; // teen
-    case 2:
-      return -18; // adult
-    case 3:
-      return -19; // elder
-    default:
-      return -6;
+    case 0: return -1;
+    case 1: return -9;
+    case 2: return -18;
+    case 3: return -19;
+    default: return -6;
     }
 
   default:
@@ -601,7 +769,8 @@ bool drawIntroWalkingPetOverride()
   if (!g_sdReady)
     return false;
 
-  const bool walking = s_petIntroWalkActive || s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
+  const bool walking = s_petIntroWalkActive ||
+                       s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
                        s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
                        s_petWanderState == PetWanderState::RETURNING_HOME;
 
@@ -611,7 +780,8 @@ bool drawIntroWalkingPetOverride()
   {
     facingLeft = false;
   }
-  else if (s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B)
+  else if (s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
+           s_petWanderState == PetWanderState::MOVING_TO_SIDE_B)
   {
     facingLeft = (s_petWanderTargetX < s_petScreenX);
   }
@@ -702,11 +872,8 @@ bool drawIntroWalkingPetOverride()
   const int yOffset =
       (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive) ? kPetIntroYOffset : 0;
 
-  // Anchor walking frames to the same nominal sprite box as static frames.
-  // If a walking PNG is shorter than PET_SPR_H, don't let that pull it lower.
   const int anchorH = PET_SPR_H;
   const int walkBaselineAdjust = getWalkBaselineAdjustForPet();
-
   const int drawY = s_petScreenY - anchorH + yOffset + walkBaselineAdjust;
 
   const bool ok = sprDrawPngFromSD(path, drawX, drawY);
@@ -727,23 +894,16 @@ static void drawPetScreenImpl(bool redrawBg)
   static uint8_t s_lastBgEvoStage = 255;
 
   const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
-
-  const bool cacheMissing = (g_petBgCachedPath == nullptr);
-
-  const bool needPetBg = redrawBg || petChanged || cacheMissing || g_forcePetBgCache;
+  const bool needPetBg = redrawBg || petChanged || g_forcePetBgCache;
 
   s_lastBgPetType = pet.type;
   s_lastBgEvoStage = pet.evoStage;
 
   bool animChanged = false;
   if (g_app.currentTab == Tab::TAB_PET)
-  {
     animChanged = animConsumeFrameChanged();
-  }
   else
-  {
     (void)animConsumeFrameChanged();
-  }
 
   const bool needRestore = redrawBg || animChanged || needPetBg;
 
@@ -757,9 +917,7 @@ static void drawPetScreenImpl(bool redrawBg)
   g_forcePetBgCache = false;
 
   if (needPetBg || needRestore)
-  {
     restorePetAreaFromCache();
-  }
 
   drawTopBar();
 
@@ -770,26 +928,17 @@ static void drawPetScreenImpl(bool redrawBg)
   s_petHomeX = homeCenterX;
   s_petHomeY = homeBottomY;
 
-  // Normal PET-screen entries should land at home unless a scripted intro
-  // or wander movement is actively owning the position.
   if (!s_petScreenPosInitialized)
   {
     s_petScreenX = homeCenterX;
     s_petScreenY = homeBottomY;
     s_petScreenPosInitialized = true;
   }
-  else if (!petWalkOverrideActive() && g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET)
-  {
-    // Do not forcibly snap here.
-    // Let the wander / intro state machine own the final position.
-  }
 
   if (petWalkOverrideActive())
   {
     if (!drawIntroWalkingPetOverride())
-    {
       animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
-    }
   }
   else
   {
@@ -798,7 +947,6 @@ static void drawPetScreenImpl(bool redrawBg)
 
   drawMiniStatPreview();
   drawTabBar();
-
   drawPetPerfHud();
 }
 
