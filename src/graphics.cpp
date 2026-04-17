@@ -1180,7 +1180,7 @@ void drawShopScreen()
     spr.drawEllipse(imgX + imgW / 2, imgY + imgH / 2, imgW / 2, imgH / 2, TFT_RED);
   }
 
-  // Price (safe: shopIndex is guaranteed < SHOP_ITEM_COUNT here)
+  // Price (safe: selectedIndex is guaranteed < SHOP_ITEM_COUNT here)
   const int cost = availableItems[g_shopScreen.selectedIndex].price;
   char priceLine[16];
   snprintf(priceLine, sizeof(priceLine), "$%d", cost);

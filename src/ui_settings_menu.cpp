@@ -32,6 +32,7 @@
 #include "name_entry_state.h"
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
+#include "system_status_state.h"
 
 // --- Networking / Time ---
 #include "wifi_power.h"
@@ -214,7 +215,7 @@ static void actTop_Console(InputState &input)
 static void actTop_OpenStatus(InputState &)
 {
   g_settingsFlow.settingsPage = SettingsPage::STATUS;
-  g_app.statusScreenIndex = 0;
+  g_systemStatus.scrollOffset = 0;
   requestUIRedraw();
   playBeep();
   clearInputLatch();
@@ -610,7 +611,7 @@ static void actPet_StorePet(InputState &input)
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
   clearSettingsReturnTarget();
-  
+
   playBeep();
   uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
 }

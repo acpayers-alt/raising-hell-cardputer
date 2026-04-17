@@ -11,6 +11,7 @@
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
 #include "sound.h"
+#include "system_status_state.h"
 #include "ui_actions.h"
 #include "ui_defs.h"
 #include "ui_input_common.h"
@@ -127,7 +128,7 @@ void Handle_TOP(InputState &input, int move)
     case 7:
     { // System Status
       g_settingsFlow.settingsPage = SettingsPage::STATUS;
-      g_app.statusScreenIndex = 0;
+      g_systemStatus.scrollOffset = 0;
       requestUIRedraw();
       playBeep();
       clearInputLatch();

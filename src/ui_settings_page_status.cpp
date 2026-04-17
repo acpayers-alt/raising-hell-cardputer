@@ -5,6 +5,7 @@
 #include "input.h"
 #include "sound.h"
 #include "ui_runtime.h"
+#include "system_status_state.h"
 
 namespace UiSettingsPages
 {
@@ -22,12 +23,11 @@ void Handle_STATUS(InputState &input, int move)
   const int visibleLines = 6;
   const int maxIndex = (pairCount > visibleLines) ? (pairCount - visibleLines) : 0;
 
-  g_app.statusScreenIndex += move;
-
-  if (g_app.statusScreenIndex < 0)
-    g_app.statusScreenIndex = 0;
-  if (g_app.statusScreenIndex > maxIndex)
-    g_app.statusScreenIndex = maxIndex;
+  g_systemStatus.scrollOffset += move;
+  if (g_systemStatus.scrollOffset < 0)
+    g_systemStatus.scrollOffset = 0;
+  if (g_systemStatus.scrollOffset > maxIndex)
+    g_systemStatus.scrollOffset = maxIndex;
 
   requestUIRedraw();
   playBeep();
