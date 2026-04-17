@@ -34,7 +34,6 @@
 // -----------------------------------------------------------------------------
 // Core Runtime / Engine
 // -----------------------------------------------------------------------------
-#include "auto_screen.h"
 #include "brightness_state.h"
 #include "input.h"
 #include "sound.h"
@@ -49,7 +48,6 @@
 #include "save_manager.h"
 #include "savegame.h"
 #include "shop_items.h"
-#include "timezone.h"
 #include "wifi_time.h"
 
 // -----------------------------------------------------------------------------
@@ -64,45 +62,40 @@
 // -----------------------------------------------------------------------------
 #include "boot_state.h"
 #include "death_state.h"
-#include "factory_reset_state.h"
 #include "flow_boot_wifi.h"
-#include "game_options_state.h"
 
 #include "graphics_boot_screens.h"
+#include "graphics_chrome.h"
+#include "graphics_clock_mode_screens.h"
 #include "graphics_death_screens.h"
 #include "graphics_egg_select_screens.h"
 #include "graphics_evolution_screens.h"
 #include "graphics_hatching_screens.h"
 #include "graphics_menu_screens.h"
 #include "graphics_name_pet_screens.h"
+#include "graphics_overlays.h"
 #include "graphics_pet_presentation.h"
 #include "graphics_render_utils.h"
 #include "graphics_set_time_screens.h"
+#include "graphics_settings_screens.h"
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
-#include "graphics_clock_mode_screens.h"
-#include "graphics_overlays.h"
-#include "graphics_chrome.h"
-#include "graphics_settings_screens.h"
 
+#include "feed_menu_state.h"
 #include "inventory_state.h"
+#include "shop_screen_state.h"
+
 #include "mg_pause_menu.h"
 #include "mini_game_pause_menu.h"
 #include "mini_games.h"
 #include "name_entry_state.h"
 #include "new_pet_flow_state.h"
-#include "settings_flow_state.h"
 #include "settings_nav_state.h"
-#include "settings_state.h"
-#include "system_status_state.h"
-#include "time_state.h"
 #include "ui_death_menu.h"
 #include "ui_feed_menu.h"
 #include "ui_menu_state.h"
 #include "ui_play_menu.h"
 #include "ui_power_menu.h"
-#include "ui_settings_menu.h"
-#include "ui_settings_pages.h"
 #include "ui_sleep_menu.h"
 #include "ui_state_backup_pet_list.h"
 #include "ui_state_import_pet_list.h"
@@ -113,10 +106,7 @@
 // -----------------------------------------------------------------------------
 // OTA / Build / Config
 // -----------------------------------------------------------------------------
-#include "asset_ota.h"
-#include "asset_ota_config.h"
 #include "build_flags.h"
-#include "version.h"
 
 // -----------------------------------------------------------------------------
 // Misc / Tools
@@ -1038,15 +1028,15 @@ void drawShopScreen()
 
   const int totalItems = SHOP_ITEM_COUNT;
 
-  if (g_app.shopIndex < 0)
-    g_app.shopIndex = 0;
-  if (g_app.shopIndex >= SHOP_ITEM_COUNT)
-    g_app.shopIndex = SHOP_ITEM_COUNT - 1;
+  if (g_shopScreen.selectedIndex < 0)
+    g_shopScreen.selectedIndex = 0;
+  if (g_shopScreen.selectedIndex >= SHOP_ITEM_COUNT)
+    g_shopScreen.selectedIndex = SHOP_ITEM_COUNT - 1;
 
   // Windowing for visible rows
   constexpr int MAX_VISIBLE = 4; // shop list tends to look good with 4
   int start = 0, visCount = 0;
-  listWindow(totalItems, g_app.shopIndex, MAX_VISIBLE, start, visCount);
+  listWindow(totalItems, g_shopScreen.selectedIndex, MAX_VISIBLE, start, visCount);
 
   // Safety: never draw more rows than actually exist
   if (visCount < 0)
@@ -1097,7 +1087,7 @@ void drawShopScreen()
       continue;
 
     const int y = startY + row * (itemH + gapY);
-    const bool sel = (i == g_app.shopIndex);
+    const bool sel = (i == g_shopScreen.selectedIndex);
 
     const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
     const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
@@ -1154,7 +1144,7 @@ void drawShopScreen()
   const int imgX = panelX + pad;
   const int imgY = panelY + pad - 4;
 
-  const ItemType selType = availableItems[g_app.shopIndex].type;
+  const ItemType selType = availableItems[g_shopScreen.selectedIndex].type;
 
   const bool eldTheme = (pet.type == PET_ELDRITCH);
 
@@ -1191,7 +1181,7 @@ void drawShopScreen()
   }
 
   // Price (safe: shopIndex is guaranteed < SHOP_ITEM_COUNT here)
-  const int cost = availableItems[g_app.shopIndex].price;
+  const int cost = availableItems[g_shopScreen.selectedIndex].price;
   char priceLine[16];
   snprintf(priceLine, sizeof(priceLine), "$%d", cost);
 
@@ -1255,11 +1245,11 @@ void drawFeedMenu()
 
   const int totalItems = uiFeedMenuCount();
 
-  g_app.feedMenuIndex = clampi(g_app.feedMenuIndex, 0, totalItems - 1);
+  g_feedMenu.selectedIndex = clampi(g_feedMenu.selectedIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;
-  listWindow(totalItems, g_app.feedMenuIndex, MAX_VISIBLE, start, visCount);
+  listWindow(totalItems, g_feedMenu.selectedIndex, MAX_VISIBLE, start, visCount);
   int itemH = 22;
   int gap = 6;
 
@@ -1317,7 +1307,7 @@ void drawFeedMenu()
   {
     int i = start + row;
     int y = startY + row * (itemH + gap);
-    bool sel = (i == g_app.feedMenuIndex);
+    bool sel = (i == g_feedMenu.selectedIndex);
 
     uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
     uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;

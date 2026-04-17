@@ -928,17 +928,21 @@ static void drawSystemStatusMenu()
       "PSRAM FREE",    psramFreeBuf,
   };
 
+  // Clamp AND store back into state
   const int totalLines = (int)(sizeof(lines) / sizeof(lines[0])) / 2;
 
-  // Clamp AND store back into state
-  g_systemStatus.scrollOffset =
-    clampi(g_systemStatus.scrollOffset, 0, totalLines - visibleLines);
-  
-  int start = g_systemStatus.scrollOffset;
-  
   if (totalLines <= visibleLines)
-    start = 0;
-        
+  {
+    g_systemStatus.scrollOffset = 0;
+  }
+  else
+  {
+    g_systemStatus.scrollOffset =
+      clampi(g_systemStatus.scrollOffset, 0, totalLines - visibleLines);
+  }
+  
+  const int start = g_systemStatus.scrollOffset;
+
   spr.fillRect(0, contentY, SCREEN_W, SCREEN_H - contentY, TFT_BLACK);
 
   spr.setTextDatum(TL_DATUM);
