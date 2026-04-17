@@ -86,6 +86,7 @@
 #include "graphics_sd_draw.h"
 #include "graphics_hud_icons.h"
 #include "graphics_nonpet_bg.h"
+#include "graphics_pet_bg_paths.h"
 
 #include "feed_menu_state.h"
 #include "inventory_state.h"
@@ -175,56 +176,6 @@ int deathTransitionYNudgeForPet()
 
 #define DEV_EGG_PNG "/raising_hell/graphics/pet/egg/dev_egg.png"
 #define ELD_EGG_PNG "/raising_hell/graphics/pet/egg/eld_egg.png"
-
-// Pet-area background (drawn at PET_AREA_Y)
-static const char *PATH_BG_DEVIL_BABY = "/raising_hell/graphics/background/dev/hell_bg.jpg";
-static const char *PATH_BG_DEVIL_TEEN = "/raising_hell/graphics/background/dev/dev_teen_bg.jpg";
-static const char *PATH_BG_DEVIL_ADULT = "/raising_hell/graphics/background/dev/dev_ad_bg.jpg";
-static const char *PATH_BG_DEVIL_ELDER = "/raising_hell/graphics/background/dev/dev_el_bg.jpg";
-
-static const char *PATH_BG_ELDRITCH = "/raising_hell/graphics/background/eld/eld_bg.jpg";
-static const char *PATH_BG_ELDRITCH_TEEN = "/raising_hell/graphics/background/eld/eld_teen_bg.jpg";
-static const char *PATH_BG_ELDRITCH_ADULT = "/raising_hell/graphics/background/eld/eld_ad_bg.jpg";
-static const char *PATH_BG_ELDRITCH_ELDER = "/raising_hell/graphics/background/eld/eld_el_bg.jpg";
-
-static inline const char *bgPathForPet(PetType t)
-{
-  switch (t)
-  {
-  case PET_ELDRITCH:
-    return PATH_BG_ELDRITCH;
-  case PET_DEVIL:
-  default:
-    return PATH_BG_PET;
-  }
-}
-
-static const char *bgPathForPetWithStage(PetType t, int evoStage)
-{
-  if (t == PET_DEVIL)
-  {
-    if (evoStage >= 3)
-      return PATH_BG_DEVIL_ELDER;
-    if (evoStage == 2)
-      return PATH_BG_DEVIL_ADULT;
-    if (evoStage == 1)
-      return PATH_BG_DEVIL_TEEN;
-    return PATH_BG_DEVIL_BABY;
-  }
-
-  if (t == PET_ELDRITCH)
-  {
-    if (evoStage >= 3)
-      return PATH_BG_ELDRITCH_ELDER;
-    if (evoStage == 2)
-      return PATH_BG_ELDRITCH_ADULT;
-    if (evoStage == 1)
-      return PATH_BG_ELDRITCH_TEEN;
-    return PATH_BG_ELDRITCH;
-  }
-
-  return bgPathForPet(t);
-}
 
 // -----------------------------------------------------------------------------
 // Burial helpers (self-contained; no external dependencies)

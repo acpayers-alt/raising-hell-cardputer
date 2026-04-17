@@ -1,5 +1,6 @@
 #include "graphics_pet_presentation.h"
 #include "graphics_mini_stats.h"
+#include "graphics_pet_bg_paths.h"
 
 #include <Arduino.h>
 #include <stdlib.h>
@@ -98,45 +99,6 @@ static bool ensurePetLayer()
 
   petLayerReady = true;
   return true;
-}
-
-static inline const char *bgPathForPet(PetType t)
-{
-  switch (t)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/background/eld/eld_bg.jpg";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/background/dev/hell_bg.jpg";
-  }
-}
-
-static const char *bgPathForPetWithStage(PetType t, int evoStage)
-{
-  if (t == PET_DEVIL)
-  {
-    if (evoStage >= 3)
-      return "/raising_hell/graphics/background/dev/dev_el_bg.jpg";
-    if (evoStage == 2)
-      return "/raising_hell/graphics/background/dev/dev_ad_bg.jpg";
-    if (evoStage == 1)
-      return "/raising_hell/graphics/background/dev/dev_teen_bg.jpg";
-    return "/raising_hell/graphics/background/dev/hell_bg.jpg";
-  }
-
-  if (t == PET_ELDRITCH)
-  {
-    if (evoStage >= 3)
-      return "/raising_hell/graphics/background/eld/eld_el_bg.jpg";
-    if (evoStage == 2)
-      return "/raising_hell/graphics/background/eld/eld_ad_bg.jpg";
-    if (evoStage == 1)
-      return "/raising_hell/graphics/background/eld/eld_teen_bg.jpg";
-    return "/raising_hell/graphics/background/eld/eld_bg.jpg";
-  }
-
-  return bgPathForPet(t);
 }
 
 void cachePetAreaBackgroundIfNeeded(bool force)
