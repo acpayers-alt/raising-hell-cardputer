@@ -11,6 +11,7 @@
 #include "graphics_chrome.h"
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
+#include "graphics_nonpet_bg.h"
 #include "inventory.h"
 #include "inventory_state.h"
 #include "pet.h"

@@ -85,6 +85,7 @@
 #include "graphics_mini_stats.h"
 #include "graphics_sd_draw.h"
 #include "graphics_hud_icons.h"
+#include "graphics_nonpet_bg.h"
 
 #include "feed_menu_state.h"
 #include "inventory_state.h"
@@ -136,8 +137,6 @@ static void drawBurialScreen();
 volatile bool g_sleepBgKick = false;
 
 // Misc Helpers
-void drawNonPetTabBackground();
-
 void sleepBgKickNow()
 {
   g_sleepBgKick = true;
@@ -150,8 +149,6 @@ void sleepBgKickNow()
 static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
 const char *PATH_BG_SLEEP = "/raising_hell/graphics/background/sleep_bg.jpg";
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
-static const char *PATH_BG_NONPET_TILE_DEV = "/raising_hell/graphics/background/flow/dev_tab_bg.png";
-static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/flow/eld_tab_bg.png";
 
 static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
 static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
@@ -229,18 +226,6 @@ static const char *bgPathForPetWithStage(PetType t, int evoStage)
   return bgPathForPet(t);
 }
 
-static inline const char *nonPetTilePathForPet(PetType t)
-{
-  switch (t)
-  {
-  case PET_ELDRITCH:
-    return PATH_BG_NONPET_TILE_ELD;
-  case PET_DEVIL:
-  default:
-    return PATH_BG_NONPET_TILE_DEV;
-  }
-}
-
 // -----------------------------------------------------------------------------
 // Burial helpers (self-contained; no external dependencies)
 // -----------------------------------------------------------------------------
@@ -304,13 +289,6 @@ void restorePetAreaFromCache();
 // -----------------------------------------------------------------------------
 static UIState lastDrawnState = UIState::PET_SCREEN;
 static bool bgDrawnForState = false;
-static M5Canvas s_nonPetTile(&M5.Display);
-static bool s_nonPetTileReady = false;
-static int s_nonPetTileW = 0;
-static int s_nonPetTileH = 0;
-static PetType s_nonPetTileCachedType = (PetType)255;
-static constexpr int NONPET_TILE_W = 35;
-static constexpr int NONPET_TILE_H = 70;
 
 static bool s_petScreenIntroFadeActive = false;
 static bool s_petScreenWasActiveLastFrame = false;
@@ -376,93 +354,6 @@ void drawBackground(const char *path)
 static inline void clearContentArea(uint16_t color = TFT_BLACK)
 {
   spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, color);
-}
-
-static bool ensureNonPetTileReady()
-{
-  const PetType desiredType = pet.type;
-  const char *path = nonPetTilePathForPet(desiredType);
-
-  if (s_nonPetTileReady && s_nonPetTileW > 0 && s_nonPetTileH > 0 && s_nonPetTileCachedType == desiredType)
-  {
-    return true;
-  }
-
-  s_nonPetTile.deleteSprite();
-  s_nonPetTileReady = false;
-  s_nonPetTileW = 0;
-  s_nonPetTileH = 0;
-  s_nonPetTileCachedType = (PetType)255;
-
-  if (!g_sdReady)
-    return false;
-
-  s_nonPetTile.setColorDepth(16);
-  if (!s_nonPetTile.createSprite(NONPET_TILE_W, NONPET_TILE_H))
-  {
-    Serial.println("[NONPET TILE] createSprite failed");
-    return false;
-  }
-
-  s_nonPetTile.fillSprite(TFT_BLACK);
-
-  bool ok = false;
-  const char *ext = strrchr(path, '.');
-
-  if (ext && (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0))
-    ok = canvasDrawJpgFromSD(s_nonPetTile, path, 0, 0);
-  else
-    ok = canvasDrawPngFromSD(s_nonPetTile, path, 0, 0);
-
-  if (!ok)
-  {
-    static char s_lastNonPetTileFailPath[160] = {0};
-
-    const char *failPath = path ? path : "(null)";
-    if (strcmp(s_lastNonPetTileFailPath, failPath) != 0)
-    {
-      strncpy(s_lastNonPetTileFailPath, failPath, sizeof(s_lastNonPetTileFailPath) - 1);
-      s_lastNonPetTileFailPath[sizeof(s_lastNonPetTileFailPath) - 1] = '\0';
-      Serial.printf("[NONPET TILE] load failed path='%s'\n", failPath);
-    }
-
-    s_nonPetTile.deleteSprite();
-    return false;
-  }
-
-  s_nonPetTileW = s_nonPetTile.width();
-  s_nonPetTileH = s_nonPetTile.height();
-  s_nonPetTileReady = (s_nonPetTileW > 0 && s_nonPetTileH > 0);
-
-  if (s_nonPetTileReady)
-    s_nonPetTileCachedType = desiredType;
-
-  if (s_nonPetTileW != NONPET_TILE_W || s_nonPetTileH != NONPET_TILE_H)
-  {
-    Serial.printf("[NONPET TILE] unexpected cache size %dx%d expected %dx%d\n", s_nonPetTileW, s_nonPetTileH,
-                  NONPET_TILE_W, NONPET_TILE_H);
-  }
-
-  return s_nonPetTileReady;
-}
-
-void drawNonPetTabBackground()
-{
-  spr.fillScreen(TFT_BLACK);
-
-  if (!ensureNonPetTileReady())
-  {
-    spr.fillScreen(TFT_BLACK);
-    return;
-  }
-
-  for (int y = 0; y < SCREEN_H; y += s_nonPetTileH)
-  {
-    for (int x = 0; x < SCREEN_W; x += s_nonPetTileW)
-    {
-      s_nonPetTile.pushSprite(&spr, x, y);
-    }
-  }
 }
 
 // -----------------------------------------------------------------------------
@@ -1297,13 +1188,9 @@ void graphicsReleaseUiCachesForMiniGame()
 
   // Release mini stat icon caches through the owning module.
   graphicsReleaseMiniStatCaches();
-  graphicsReleaseHudIconCaches();
-  
-  s_nonPetTile.deleteSprite();
-  s_nonPetTileReady = false;
-  s_nonPetTileW = 0;
-  s_nonPetTileH = 0;
-  s_nonPetTileCachedType = (PetType)255;
+
+  // Release non-pet tiled background cache through the owning module.
+  graphicsReleaseNonPetTileCache();
 
   // Release cached sleep animation full-screen frame buffers.
   freeSleepAnimFrameCache();
