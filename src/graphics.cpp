@@ -82,6 +82,7 @@
 #include "graphics_ui_common.h"
 #include "graphics_tab_menus.h"
 #include "graphics_pet_presentation.h"
+#include "graphics_mini_stats.h"
 
 #include "feed_menu_state.h"
 #include "inventory_state.h"
@@ -119,7 +120,6 @@
 
 // --- Cache/Draw Helpers
 bool g_forcePetBgCache = false;
-void drawMiniStatPreviewSleepLeft();
 void drawPetPerfHud();
 
 // --- Graphics and Runtime
@@ -133,8 +133,6 @@ static void drawBurialScreen();
 // SD image helpers (avoid LGFX template instantiation on fs::SDFS)
 bool sprDrawJpgFromSD(const char *path, int x, int y);
 bool sprDrawPngFromSD(const char *path, int x, int y);
-bool canvasDrawPngFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
-bool canvasDrawJpgFromSD(m5gfx::M5Canvas &canvas, const char *path, int x, int y);
 
 // Sleep Graphics Kick
 volatile bool g_sleepBgKick = false;
@@ -148,47 +146,6 @@ void sleepBgKickNow()
   requestUIRedraw();
 }
 
-// -----------------------------------------------------------------------------
-// SD image helpers for sprites
-//
-// IMPORTANT:
-// Do NOT call spr.drawJpgFile(SD, ...) / spr.drawPngFile(SD, ...) on this toolchain.
-// That path instantiates DataWrapperT<fs::...> and fails to compile.
-// Instead, setFileStorage(SD) once, then use the "path-only" overload.
-// -----------------------------------------------------------------------------
-static void ensureSprFileStorage() { spr.setFileStorage(SD); }
-
-bool sprDrawJpgFromSD(const char *path, int x, int y)
-{
-  if (!g_sdReady)
-    return false;
-  if (!path || !*path)
-    return false;
-  ensureSprFileStorage();
-  return spr.drawJpgFile(path, x, y);
-}
-
-bool sprDrawPngFromSD(const char *path, int x, int y)
-{
-  if (!g_sdReady)
-    return false;
-  if (!path || !*path)
-    return false;
-  ensureSprFileStorage();
-  return spr.drawPngFile(path, x, y);
-}
-
-bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y)
-{
-  canvas.setFileStorage(SD);
-  return canvas.drawPngFile(path, x, y);
-}
-
-bool canvasDrawJpgFromSD(M5Canvas &canvas, const char *path, int x, int y)
-{
-  canvas.setFileStorage(SD);
-  return canvas.drawJpgFile(path, x, y);
-}
 // -----------------------------------------------------------------------------
 // LovyanGFX DataWrapper for Arduino fs::File
 // -----------------------------------------------------------------------------
@@ -235,6 +192,79 @@ private:
 };
 
 // -----------------------------------------------------------------------------
+// SD image helpers for sprites
+//
+// IMPORTANT:
+// Do NOT call spr.drawJpgFile(SD, ...) / spr.drawPngFile(SD, ...) on this toolchain.
+// That path instantiates DataWrapperT<fs::...> and fails to compile.
+// Instead, open the file with SD.open(), wrap it in RH_FileDataWrapper,
+// and call the decoder directly.
+// -----------------------------------------------------------------------------
+bool sprDrawJpgFromSD(const char *path, int x, int y)
+{
+  if (!g_sdReady || !path || !*path)
+    return false;
+
+  fs::File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  RH_FileDataWrapper dw(f);
+  const bool ok = spr.drawJpg(&dw, x, y);
+
+  f.close();
+  return ok;
+}
+
+bool sprDrawPngFromSD(const char *path, int x, int y)
+{
+  if (!g_sdReady || !path || !*path)
+    return false;
+
+  fs::File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  RH_FileDataWrapper dw(f);
+  const bool ok = spr.drawPng(&dw, x, y);
+
+  f.close();
+  return ok;
+}
+
+bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y)
+{
+  if (!g_sdReady || !path || !*path)
+    return false;
+
+  fs::File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  RH_FileDataWrapper dw(f);
+  const bool ok = canvas.drawPng(&dw, x, y);
+
+  f.close();
+  return ok;
+}
+
+bool canvasDrawJpgFromSD(M5Canvas &canvas, const char *path, int x, int y)
+{
+  if (!g_sdReady || !path || !*path)
+    return false;
+
+  fs::File f = SD.open(path, FILE_READ);
+  if (!f)
+    return false;
+
+  RH_FileDataWrapper dw(f);
+  const bool ok = canvas.drawJpg(&dw, x, y);
+
+  f.close();
+  return ok;
+}
+
+// -----------------------------------------------------------------------------
 // Paths (SD)
 // -----------------------------------------------------------------------------
 static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
@@ -252,11 +282,6 @@ static const char *PATH_REST_ICON = "/raising_hell/graphics/ui/icons/rest_icon.p
 static constexpr int MINI_STAT_ICON_W = 18;
 static constexpr int MINI_STAT_ICON_H = 18;
 static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0xF81F;
-
-static M5Canvas s_miniStatLifeIcon(&spr);
-static bool s_miniStatLifeIconReady = false;
-static M5Canvas s_miniStatCoinIcon(&spr);
-static bool s_miniStatCoinIconReady = false;
 
 static constexpr int HUD_HEADER_ICON_W = 12;
 static constexpr int HUD_HEADER_ICON_H = 12;
@@ -287,62 +312,6 @@ int deathTransitionYNudgeForPet()
   default:
     return -2;
   }
-}
-
-static bool ensureMiniStatIconCache(M5Canvas &canvas, bool &ready, const char *path)
-{
-  if (ready)
-    return true;
-  if (!g_sdReady || !path || !*path)
-    return false;
-
-  canvas.setColorDepth(16);
-
-  if (!canvas.width() || !canvas.height())
-  {
-    if (!canvas.createSprite(MINI_STAT_ICON_W, MINI_STAT_ICON_H))
-      return false;
-  }
-
-  canvas.fillSprite(MINI_STAT_ICON_TRANSPARENT);
-
-  if (!canvasDrawPngFromSD(canvas, path, 1, 1))
-  {
-    canvas.deleteSprite();
-    ready = false;
-    return false;
-  }
-
-  ready = true;
-  return true;
-}
-
-static bool drawMiniStatIconCached(const char *path, int x, int y)
-{
-  M5Canvas *canvas = nullptr;
-  bool *ready = nullptr;
-
-  if (path == PATH_LIFE_ICON)
-  {
-    canvas = &s_miniStatLifeIcon;
-    ready = &s_miniStatLifeIconReady;
-  }
-  else if (path == PATH_INF_COIN)
-  {
-    canvas = &s_miniStatCoinIcon;
-    ready = &s_miniStatCoinIconReady;
-  }
-
-  if (canvas && ready && ensureMiniStatIconCache(*canvas, *ready, path))
-  {
-    canvas->pushSprite(x, y, MINI_STAT_ICON_TRANSPARENT);
-    return true;
-  }
-
-  if (g_sdReady)
-    return sprDrawPngFromSD(path, x, y);
-
-  return false;
 }
 
 static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h)
@@ -426,13 +395,6 @@ static bool drawHudIconCached(const char *path, int x, int y)
     return sprDrawPngFromSD(path, x, y);
 
   return false;
-}
-
-static void drawMiniStatNumberRight(int value, int rightX, int y)
-{
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%d", value);
-  spr.drawString(buf, rightX, y);
 }
 
 #define DEV_EGG_PNG "/raising_hell/graphics/pet/egg/dev_egg.png"
@@ -1554,6 +1516,9 @@ void graphicsReleaseUiCachesForMiniGame()
   // Release pet presentation caches through the owning module.
   graphicsReleasePetLayerForOta();
 
+  // Release mini stat icon caches through the owning module.
+  graphicsReleaseMiniStatCaches();
+
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;
   s_nonPetTileW = 0;
@@ -1639,165 +1604,6 @@ bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, uint8_t 
   s_sleepAnimFrameCacheMode = mode;
   s_sleepAnimFrameCacheReady = true;
   return true;
-}
-
-// ============================================================================
-// Tiny stat preview panel
-// ============================================================================
-void drawMiniStatPreviewAt(int x0, bool showCoin, bool alignRight)
-{
-  const int panelW = 72;
-
-  // Layout
-  const int headerY = PET_AREA_Y + 2;
-
-  // Stat block
-  const int barH = 14;
-  const int rowGap = 4;
-  const int rowH = barH + rowGap;
-
-  const uint16_t colHunger = 0xF800;
-  const uint16_t colMood = 0x001F;
-  const uint16_t colEnergy = 0x03E0;
-
-  // Bars first
-  const int y0 = headerY + 4;
-  const int barX = x0 + 2;
-  const int barW = panelW - 4;
-
-  const int yHunger = y0 + 0 * rowH;
-  const int yMood = y0 + 1 * rowH;
-  const int yRest = y0 + 2 * rowH;
-
-  drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
-  drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
-  drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
-
-  // Bottom header: coin/count on left, heart/HP on right
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-
-  const int headerY2 = headerY + 74;
-  const int headerIconY = headerY2 + 0;
-  const int topTextY = headerY2 + 1;
-
-  spr.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
-
-  // Define the right-side heart anchor first so coin text can avoid it
-  const int heartIconX = x0 + panelW - 2 - 16 - 28;
-
-  // Left side: coin + count (count grows left, icon follows it)
-  if (showCoin)
-  {
-    char infBuf[20];
-    snprintf(infBuf, sizeof(infBuf), "%d", pet.inf);
-
-    // Fixed right edge for coin text, safely left of the heart block
-    const int coinRightX = heartIconX - 6;
-
-    spr.setTextDatum(TR_DATUM);
-
-    // Measure count width using current font/settings
-    const int coinTextW = spr.textWidth(infBuf);
-
-    // Keep a small gap between icon and number
-    const int coinGap = 6;
-
-    // Place icon so it sits just left of the text block
-    const int coinIconX = coinRightX - coinTextW - coinGap - 16;
-
-    drawMiniStatIconCached(PATH_INF_COIN, coinIconX, headerIconY);
-
-    // fake-bold / slightly larger-looking text
-    spr.drawString(infBuf, coinRightX, topTextY);
-    spr.drawString(infBuf, coinRightX - 1, topTextY);
-  }
-
-  // Right side: heart + HP
-  {
-    char hpBuf[16];
-    snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
-
-    const int hpTextW = spr.textWidth(hpBuf);
-    const int hpTextX = x0 + panelW - 2 - hpTextW;
-
-    drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
-
-    spr.setTextDatum(TL_DATUM);
-
-    // fake-bold / slightly larger-looking text
-    spr.drawString(hpBuf, hpTextX, topTextY);
-    spr.drawString(hpBuf, hpTextX + 1, topTextY);
-  }
-
-  spr.setTextDatum(TL_DATUM);
-}
-
-void drawMiniStatPreview()
-{
-  const int panelW = 72;
-  const int x0 = SCREEN_W - panelW - 4;
-  drawMiniStatPreviewAt(x0, /*showCoin=*/true, /*alignRight=*/true);
-}
-
-void drawMiniStatPreviewSleepLeft()
-{
-  const int x0 = 4;
-  const int panelW = 72;
-
-  // Layout
-  const int headerY = PET_AREA_Y + 2;
-
-  // Stat block
-  const int barH = 14;
-  const int rowGap = 4;
-  const int rowH = barH + rowGap;
-
-  const uint16_t colHunger = 0xF800;
-  const uint16_t colMood = 0x001F;
-  const uint16_t colEnergy = 0x03E0;
-
-  // Bars near the top
-  const int y0 = headerY + 4;
-  const int barX = x0 + 2;
-  const int barW = panelW - 4;
-
-  const int yHunger = y0 + 0 * rowH;
-  const int yMood = y0 + 1 * rowH;
-  const int yRest = y0 + 2 * rowH;
-
-  drawTinyBar(barX, yHunger, barW, barH, colHunger, colHunger, pet.hunger, "Hunger");
-  drawTinyBar(barX, yMood, barW, barH, colMood, colMood, pet.happiness, "Mood");
-  drawTinyBar(barX, yRest, barW, barH, colEnergy, colEnergy, pet.energy, "Rest");
-
-  // Bottom footer: heart + HP only on the sleep-left panel.
-  spr.setTextFont(2);
-  spr.setTextSize(1);
-
-  const int headerY2 = headerY + 64;
-  const int headerIconY = headerY2 + 0;
-  const int topTextY = headerY2 + 1;
-
-  {
-    const int heartIconX = x0 + 2;
-
-    char hpBuf[16];
-    snprintf(hpBuf, sizeof(hpBuf), "%d", pet.health);
-
-    const int hpTextX = heartIconX + 18;
-    const int hpTextW = spr.textWidth(hpBuf);
-
-    drawMiniStatIconCached(PATH_LIFE_ICON, heartIconX, headerIconY);
-
-    spr.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
-    spr.setTextDatum(TL_DATUM);
-
-    // fake-bold
-    spr.drawString(hpBuf, hpTextX, topTextY);
-    spr.drawString(hpBuf, hpTextX + 1, topTextY);
-  }
-
-  spr.setTextDatum(TL_DATUM);
 }
 
 // ============================================================================

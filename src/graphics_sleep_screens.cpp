@@ -3,11 +3,12 @@
 // -----------------------------------------------------------------------------
 // Core includes
 // -----------------------------------------------------------------------------
+#include "anim_clips.h"
 #include "display.h"
 #include "graphics.h"
-#include "pet.h"
-#include "anim_clips.h"
 #include "graphics_assets.h"
+#include "graphics_mini_stats.h"
+#include "pet.h"
 
 // -----------------------------------------------------------------------------
 // External state (owned elsewhere)
@@ -32,7 +33,6 @@ bool isScreenOn();
 
 // Shared drawing helpers
 void drawTopBar();
-void drawMiniStatPreviewSleepLeft();
 void drawSleepMeterBar();
 
 // Image helpers
@@ -142,10 +142,7 @@ static const char *DEV_ELDER_SLEEP_FRAMES[DEV_ELDER_SLEEP_FRAME_COUNT] = {
     "/raising_hell/graphics/pet/anim/dev/ed/sleep/dev_el_sleepbk4.jpg",
 };
 
-static inline bool useDevElderSleepAnim()
-{
-  return (pet.type == PET_DEVIL) && (pet.evoStage == 3);
-}
+static inline bool useDevElderSleepAnim() { return (pet.type == PET_DEVIL) && (pet.evoStage == 3); }
 
 // -----------------------------------------------------------------------------
 // ELDRITCH BABY sleep background animation (4 PNG frames)

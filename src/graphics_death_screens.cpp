@@ -1,4 +1,5 @@
 #include "graphics_death_screens.h"
+#include "graphics_mini_stats.h"
 #include "graphics.h"
 
 #include "anim_clips.h"
@@ -40,7 +41,6 @@ bool isScreenOn();
 void cachePetAreaBackgroundIfNeeded(bool needPetBg);
 void restorePetAreaFromCache();
 void drawTopBar();
-void drawMiniStatPreview();
 void drawTabBar();
 void drawPetPerfHud();
 

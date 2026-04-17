@@ -1,4 +1,5 @@
 #include "graphics_pet_presentation.h"
+#include "graphics_mini_stats.h"
 
 #include <Arduino.h>
 #include <stdlib.h>
@@ -47,7 +48,6 @@ void requestUIRedraw();
 bool isScreenOn();
 
 void drawTopBar();
-void drawMiniStatPreview();
 void drawTabBar();
 void drawPetPerfHud();
 void resetPetWanderToHome();

@@ -5,6 +5,7 @@
 #include "M5Cardputer.h"
 #include <stdint.h>
 #include "display_dims_state.h"
+#include <M5GFX.h>
 
 void updateBattery();
 bool displayUsbPowerLikely();
