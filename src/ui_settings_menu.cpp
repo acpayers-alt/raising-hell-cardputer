@@ -621,10 +621,8 @@ static void actPet_StoredPets(InputState &input)
   g_importPetListReturnPage = SettingsPage::PET;
 
   playBeep();
-  uiActionEnterState(UIState::IMPORT_PET_LIST, g_app.currentTab, true);
+  uiActionEnterStateClean(UIState::IMPORT_PET_LIST, g_app.currentTab, true, input, 120);
   requestUIRedraw();
-  uiDrainKb(input);
-  clearInputLatch();
 }
 
 static void actPet_BackupCurrentPet(InputState &input)
@@ -646,10 +644,8 @@ static void actPet_RestoreFromBackup(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::PET;
   playBeep();
-  uiActionEnterState(UIState::BACKUP_PET_LIST, g_app.currentTab, true);
+  uiActionEnterStateClean(UIState::BACKUP_PET_LIST, g_app.currentTab, true, input, 120);
   requestUIRedraw();
-  uiDrainKb(input);
-  clearInputLatch();
 }
 
 static void actPet_NewPet(InputState &input)

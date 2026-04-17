@@ -363,13 +363,13 @@ void uiImportPetListHandle(InputState &in)
     }
     else
     {
-      uiActionEnterState(UIState::TITLE_MENU, Tab::TAB_PET, true);
+      uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, in, 120);
     }
 
     swallowImportInput(in);
     return;
   }
-
+  
   const bool activate = in.selectOnce || in.encoderPressOnce;
   if (!activate)
   {
