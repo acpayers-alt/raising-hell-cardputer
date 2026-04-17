@@ -22,7 +22,6 @@ extern volatile bool g_sleepBgKick;
 
 // Shared path + cache (owned by graphics.cpp for now)
 extern const char *PATH_BG_SLEEP;
-extern uint16_t **s_sleepAnimFrameCache;
 
 // -----------------------------------------------------------------------------
 // External systems (owned elsewhere)
@@ -379,18 +378,12 @@ static void drawSleepScreenImpl(bool redrawBg)
 
     if (s_mode != 0 && frames && frameCount > 0)
     {
-      if (ensureSleepAnimFrameCache(s_mode, frames, frameCount, 0, 18))
-      {
-        uint16_t *sprBuf = (uint16_t *)spr.getBuffer();
-        if (sprBuf && s_sleepAnimFrameCache && s_sleepAnimFrameCache[s_frame])
-        {
-          const size_t pxCount = (size_t)SCREEN_W * (size_t)SCREEN_H;
-          memcpy(sprBuf, s_sleepAnimFrameCache[s_frame], pxCount * sizeof(uint16_t));
-          ok = true;
-        }
-      }
+      // Cache system currently disabled (no PSRAM). Keep call for structure.
+      (void)ensureSleepAnimFrameCache(s_mode, frames, frameCount, 0, 18);
+    
+      // Fall through to live draw path below
     }
-
+    
     if (!ok)
     {
       if (g_sdReady && bgPath)
