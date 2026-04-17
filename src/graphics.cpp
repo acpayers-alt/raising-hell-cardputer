@@ -83,6 +83,7 @@
 #include "graphics_tab_menus.h"
 #include "graphics_pet_presentation.h"
 #include "graphics_mini_stats.h"
+#include "graphics_sd_draw.h"
 
 #include "feed_menu_state.h"
 #include "inventory_state.h"
@@ -130,10 +131,6 @@ static void drawMiniGameScreen();
 static void drawDeathScreen(bool redrawBg);
 static void drawBurialScreen();
 
-// SD image helpers (avoid LGFX template instantiation on fs::SDFS)
-bool sprDrawJpgFromSD(const char *path, int x, int y);
-bool sprDrawPngFromSD(const char *path, int x, int y);
-
 // Sleep Graphics Kick
 volatile bool g_sleepBgKick = false;
 
@@ -144,124 +141,6 @@ void sleepBgKickNow()
 {
   g_sleepBgKick = true;
   requestUIRedraw();
-}
-
-// -----------------------------------------------------------------------------
-// LovyanGFX DataWrapper for Arduino fs::File
-// -----------------------------------------------------------------------------
-class RH_FileDataWrapper : public lgfx::v1::DataWrapper
-{
-public:
-  explicit RH_FileDataWrapper(fs::File &f) : _f(&f) {}
-
-  int read(uint8_t *buf, uint32_t len) override
-  {
-    if (!_f)
-      return 0;
-    return (int)_f->read(buf, len);
-  }
-
-  void skip(int32_t offset) override
-  {
-    if (!_f)
-      return;
-    _f->seek(_f->position() + offset);
-  }
-
-  bool seek(uint32_t offset) override
-  {
-    if (!_f)
-      return false;
-    return _f->seek(offset);
-  }
-
-  void close(void) override
-  {
-    // no-op; caller closes the file
-  }
-
-  int32_t tell(void) override
-  {
-    if (!_f)
-      return 0;
-    return (int32_t)_f->position();
-  }
-
-private:
-  fs::File *_f = nullptr;
-};
-
-// -----------------------------------------------------------------------------
-// SD image helpers for sprites
-//
-// IMPORTANT:
-// Do NOT call spr.drawJpgFile(SD, ...) / spr.drawPngFile(SD, ...) on this toolchain.
-// That path instantiates DataWrapperT<fs::...> and fails to compile.
-// Instead, open the file with SD.open(), wrap it in RH_FileDataWrapper,
-// and call the decoder directly.
-// -----------------------------------------------------------------------------
-bool sprDrawJpgFromSD(const char *path, int x, int y)
-{
-  if (!g_sdReady || !path || !*path)
-    return false;
-
-  fs::File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
-
-  RH_FileDataWrapper dw(f);
-  const bool ok = spr.drawJpg(&dw, x, y);
-
-  f.close();
-  return ok;
-}
-
-bool sprDrawPngFromSD(const char *path, int x, int y)
-{
-  if (!g_sdReady || !path || !*path)
-    return false;
-
-  fs::File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
-
-  RH_FileDataWrapper dw(f);
-  const bool ok = spr.drawPng(&dw, x, y);
-
-  f.close();
-  return ok;
-}
-
-bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y)
-{
-  if (!g_sdReady || !path || !*path)
-    return false;
-
-  fs::File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
-
-  RH_FileDataWrapper dw(f);
-  const bool ok = canvas.drawPng(&dw, x, y);
-
-  f.close();
-  return ok;
-}
-
-bool canvasDrawJpgFromSD(M5Canvas &canvas, const char *path, int x, int y)
-{
-  if (!g_sdReady || !path || !*path)
-    return false;
-
-  fs::File f = SD.open(path, FILE_READ);
-  if (!f)
-    return false;
-
-  RH_FileDataWrapper dw(f);
-  const bool ok = canvas.drawJpg(&dw, x, y);
-
-  f.close();
-  return ok;
 }
 
 // -----------------------------------------------------------------------------

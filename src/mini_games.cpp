@@ -18,6 +18,8 @@
 
 #else
 
+#include "graphics_sd_draw.h"
+
 #include "esp_heap_caps.h"
 #include <stdint.h>
 
@@ -4104,7 +4106,7 @@ static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int 
 
   dst.fillSprite(kDodgerKey);
 
-  if (!dst.drawPngFile(SD, usePath, 0, 0))
+  if (!canvasDrawPngFromSD(dst, usePath, 0, 0))
   {
     dst.deleteSprite();
     return false;

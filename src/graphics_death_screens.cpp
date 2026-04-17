@@ -1,5 +1,6 @@
 #include "graphics_death_screens.h"
 #include "graphics_mini_stats.h"
+#include "graphics_sd_draw.h"
 #include "graphics.h"
 
 #include "anim_clips.h"
@@ -34,8 +35,6 @@ struct PetRenderProfile
 // Shared helpers/state still owned by graphics.cpp
 const PetRenderProfile &getPetProfile(PetType t);
 bool getPngWH(const char *path, int &outW, int &outH);
-bool sprDrawPngFromSD(const char *path, int x, int y);
-bool sprDrawJpgFromSD(const char *path, int x, int y);
 bool isScreenOn();
 
 void cachePetAreaBackgroundIfNeeded(bool needPetBg);

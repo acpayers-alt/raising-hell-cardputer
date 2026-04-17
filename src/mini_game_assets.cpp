@@ -6,136 +6,137 @@
 #include <strings.h>
 
 #include "esp_heap_caps.h"
-#include "graphics.h"   // spr
-#include "sdcard.h"     // g_sdReady
+#include "graphics.h" // spr
+#include "sdcard.h"   // g_sdReady
+
+#include "graphics_sd_draw.h"
 
 namespace
 {
-  static M5Canvas s_sharedBgSpr(&M5.Display);
-  static bool s_sharedBgReady = false;
-  static MiniGame s_sharedBgOwner = MiniGame::NONE;
-  static char s_sharedBgPath[128] = {0};
-  static int s_sharedBgW = 0;
-  static int s_sharedBgH = 0;
+static M5Canvas s_sharedBgSpr(&M5.Display);
+static bool s_sharedBgReady = false;
+static MiniGame s_sharedBgOwner = MiniGame::NONE;
+static char s_sharedBgPath[128] = {0};
+static int s_sharedBgW = 0;
+static int s_sharedBgH = 0;
 
-  // ---------------------------------------------------------------------------
-  // Sprite slot registry
-  // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Sprite slot registry
+// ---------------------------------------------------------------------------
 
-  struct MgSpriteSlot
-  {
-    bool inUse = false;
-    MiniGame owner = MiniGame::NONE;
-    char assetId[48] = {0};
-    char path[128] = {0};
-    uint8_t depth = 0;
-    uint16_t transparentKey = 0;
-    M5Canvas canvas = M5Canvas(&M5.Display);
-  };
+struct MgSpriteSlot
+{
+  bool inUse = false;
+  MiniGame owner = MiniGame::NONE;
+  char assetId[48] = {0};
+  char path[128] = {0};
+  uint8_t depth = 0;
+  uint16_t transparentKey = 0;
+  M5Canvas canvas = M5Canvas(&M5.Display);
+};
 
-  static constexpr int kMgSpriteSlotCount = 24;
-  static MgSpriteSlot s_spriteSlots[kMgSpriteSlotCount];
+static constexpr int kMgSpriteSlotCount = 24;
+static MgSpriteSlot s_spriteSlots[kMgSpriteSlotCount];
 
-  static MgSpriteSlot *findSpriteSlot(MiniGame owner, const char *assetId)
-  {
-    if (!assetId || !assetId[0])
-      return nullptr;
-
-    for (int i = 0; i < kMgSpriteSlotCount; ++i)
-    {
-      MgSpriteSlot &slot = s_spriteSlots[i];
-      if (!slot.inUse)
-        continue;
-      if (slot.owner != owner)
-        continue;
-      if (strcmp(slot.assetId, assetId) != 0)
-        continue;
-      return &slot;
-    }
+static MgSpriteSlot *findSpriteSlot(MiniGame owner, const char *assetId)
+{
+  if (!assetId || !assetId[0])
     return nullptr;
-  }
 
-  static MgSpriteSlot *findFreeSpriteSlot()
+  for (int i = 0; i < kMgSpriteSlotCount; ++i)
   {
-    for (int i = 0; i < kMgSpriteSlotCount; ++i)
-    {
-      if (!s_spriteSlots[i].inUse)
-        return &s_spriteSlots[i];
-    }
-    return nullptr;
+    MgSpriteSlot &slot = s_spriteSlots[i];
+    if (!slot.inUse)
+      continue;
+    if (slot.owner != owner)
+      continue;
+    if (strcmp(slot.assetId, assetId) != 0)
+      continue;
+    return &slot;
   }
-
-  static void clearSpriteSlot(MgSpriteSlot &slot, const char *tag)
-  {
-    slot.canvas.deleteSprite();
-    slot.inUse = false;
-    slot.owner = MiniGame::NONE;
-    slot.assetId[0] = 0;
-    slot.path[0] = 0;
-    slot.depth = 0;
-    slot.transparentKey = 0;
-
-    if (tag && tag[0])
-      mgAssetsLogHeap(tag);
-  }
-
-  static bool resolveSdPath(const char* path, const char** outUsePath)
-  {
-    if (!path || !path[0])
-      return false;
-
-    if (SD.exists(path))
-    {
-      if (outUsePath) *outUsePath = path;
-      return true;
-    }
-
-    if (path[0] == '/' && SD.exists(path + 1))
-    {
-      if (outUsePath) *outUsePath = path + 1;
-      return true;
-    }
-
-    return false;
-  }
-
-  static bool isPngPath(const char* path)
-  {
-    if (!path || !path[0])
-      return false;
-
-    const char* ext = strrchr(path, '.');
-    if (!ext)
-      return false;
-
-    return (strcasecmp(ext, ".png") == 0);
-  }
+  return nullptr;
 }
+
+static MgSpriteSlot *findFreeSpriteSlot()
+{
+  for (int i = 0; i < kMgSpriteSlotCount; ++i)
+  {
+    if (!s_spriteSlots[i].inUse)
+      return &s_spriteSlots[i];
+  }
+  return nullptr;
+}
+
+static void clearSpriteSlot(MgSpriteSlot &slot, const char *tag)
+{
+  slot.canvas.deleteSprite();
+  slot.inUse = false;
+  slot.owner = MiniGame::NONE;
+  slot.assetId[0] = 0;
+  slot.path[0] = 0;
+  slot.depth = 0;
+  slot.transparentKey = 0;
+
+  if (tag && tag[0])
+    mgAssetsLogHeap(tag);
+}
+
+static bool resolveSdPath(const char *path, const char **outUsePath)
+{
+  if (!path || !path[0])
+    return false;
+
+  if (SD.exists(path))
+  {
+    if (outUsePath)
+      *outUsePath = path;
+    return true;
+  }
+
+  if (path[0] == '/' && SD.exists(path + 1))
+  {
+    if (outUsePath)
+      *outUsePath = path + 1;
+    return true;
+  }
+
+  return false;
+}
+
+static bool isPngPath(const char *path)
+{
+  if (!path || !path[0])
+    return false;
+
+  const char *ext = strrchr(path, '.');
+  if (!ext)
+    return false;
+
+  return (strcasecmp(ext, ".png") == 0);
+}
+} // namespace
 
 static bool readJpegDims(const char *usePath, int *outW, int *outH);
 
-void mgAssetsLogHeap(const char* tag)
+void mgAssetsLogHeap(const char *tag)
 {
-  Serial.printf(
-      "[MG HEAP] %s free=%u largest=%u\n",
-      tag ? tag : "(null)",
-      (unsigned)ESP.getFreeHeap(),
-      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  Serial.printf("[MG HEAP] %s free=%u largest=%u\n", tag ? tag : "(null)", (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 
-void mgAssetsBeginSession(MiniGame game, const char* tag)
+void mgAssetsBeginSession(MiniGame game, const char *tag)
 {
   Serial.printf("[MG ASSET] begin game=%d tag=%s\n", (int)game, tag ? tag : "(null)");
   mgAssetsLogHeap(tag ? tag : "mgAssetsBeginSession");
 }
 
-void mgAssetsEndSession(MiniGame game, const char* tag)
+void mgAssetsEndSession(MiniGame game, const char *tag)
 {
   Serial.printf("[MG ASSET] end game=%d tag=%s\n", (int)game, tag ? tag : "(null)");
   mgAssetsLogHeap(tag ? tag : "mgAssetsEndSession");
 }
 
-bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
+bool mgAssetsEnsureSharedBg(MiniGame owner, const char *path)
 {
   if (!path || !path[0])
     return false;
@@ -147,9 +148,7 @@ bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
   }
 
   // Already loaded and matches exactly.
-  if (s_sharedBgReady &&
-      s_sharedBgPath[0] &&
-      strcmp(s_sharedBgPath, path) == 0)
+  if (s_sharedBgReady && s_sharedBgPath[0] && strcmp(s_sharedBgPath, path) == 0)
   {
     s_sharedBgOwner = owner;
     return true;
@@ -193,9 +192,9 @@ bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
 
   bool ok = false;
   if (isPng)
-    ok = s_sharedBgSpr.drawPngFile(SD, usePath, 0, 0);
+    ok = canvasDrawPngFromSD(s_sharedBgSpr, usePath, 0, 0);
   else
-    ok = s_sharedBgSpr.drawJpgFile(SD, usePath, 0, 0);
+    ok = canvasDrawJpgFromSD(s_sharedBgSpr, usePath, 0, 0);
 
   if (!ok)
   {
@@ -207,8 +206,9 @@ bool mgAssetsEnsureSharedBg(MiniGame owner, const char* path)
   s_sharedBgOwner = owner;
   strlcpy(s_sharedBgPath, path, sizeof(s_sharedBgPath));
 
-  Serial.printf("[MG ASSET] shared bg ready owner=%d path='%s' w=%d h=%d\n",
-    (int)owner, s_sharedBgPath, s_sharedBgW, s_sharedBgH);  mgAssetsLogHeap("shared-bg-after-load");
+  Serial.printf("[MG ASSET] shared bg ready owner=%d path='%s' w=%d h=%d\n", (int)owner, s_sharedBgPath, s_sharedBgW,
+                s_sharedBgH);
+  mgAssetsLogHeap("shared-bg-after-load");
   return true;
 }
 
@@ -245,49 +245,26 @@ void mgAssetsReleaseSharedBg()
   mgAssetsLogHeap("shared-bg-release-all");
 }
 
-bool mgAssetsHasSharedBg()
-{
-  return s_sharedBgReady;
-}
+bool mgAssetsHasSharedBg() { return s_sharedBgReady; }
 
-MiniGame mgAssetsSharedBgOwner()
-{
-  return s_sharedBgOwner;
-}
+MiniGame mgAssetsSharedBgOwner() { return s_sharedBgOwner; }
 
-const char* mgAssetsSharedBgPath()
-{
-  return s_sharedBgPath;
-}
+const char *mgAssetsSharedBgPath() { return s_sharedBgPath; }
 
-M5Canvas* mgAssetsSharedBg()
-{
-  return s_sharedBgReady ? &s_sharedBgSpr : nullptr;
-}
+M5Canvas *mgAssetsSharedBg() { return s_sharedBgReady ? &s_sharedBgSpr : nullptr; }
 
-int mgAssetsSharedBgW()
-{
-  return s_sharedBgW;
-}
+int mgAssetsSharedBgW() { return s_sharedBgW; }
 
-int mgAssetsSharedBgH()
-{
-  return s_sharedBgH;
-}
+int mgAssetsSharedBgH() { return s_sharedBgH; }
 
-void mgAssetsReleaseSprite(M5Canvas& dst, const char* tag)
+void mgAssetsReleaseSprite(M5Canvas &dst, const char *tag)
 {
   dst.deleteSprite();
   if (tag && tag[0])
     mgAssetsLogHeap(tag);
 }
 
-bool mgAssetsLoadSprite(
-    M5Canvas& dst,
-    const char* path,
-    int colorDepth,
-    uint16_t fillColor,
-    const char* tag)
+bool mgAssetsLoadSprite(M5Canvas &dst, const char *path, int colorDepth, uint16_t fillColor, const char *tag)
 {
   if (!path || !path[0])
   {
@@ -301,7 +278,7 @@ bool mgAssetsLoadSprite(
     return false;
   }
 
-  const char* usePath = path;
+  const char *usePath = path;
   if (!resolveSdPath(path, &usePath))
   {
     Serial.printf("[MG ASSET] sprite missing path='%s'\n", path);
@@ -329,8 +306,7 @@ bool mgAssetsLoadSprite(
 
   if (!dst.createSprite(w, h))
   {
-    Serial.printf("[MG ASSET] createSprite FAIL path='%s' w=%d h=%d depth=%d\n",
-                  usePath, w, h, colorDepth);
+    Serial.printf("[MG ASSET] createSprite FAIL path='%s' w=%d h=%d depth=%d\n", usePath, w, h, colorDepth);
     mgAssetsLogHeap("sprite-create-fail");
     return false;
   }
@@ -339,9 +315,9 @@ bool mgAssetsLoadSprite(
 
   bool ok = false;
   if (isPngPath(usePath))
-    ok = dst.drawPngFile(SD, usePath, 0, 0);
+    ok = canvasDrawPngFromSD(dst, usePath, 0, 0);
   else
-    ok = dst.drawJpgFile(SD, usePath, 0, 0);
+    ok = canvasDrawJpgFromSD(dst, usePath, 0, 0);
 
   if (!ok)
   {
@@ -357,9 +333,12 @@ bool mgAssetsLoadSprite(
 
 bool mgAssetsReadImageDims(const char *path, int *outW, int *outH, const char **outUsePath)
 {
-  if (outW) *outW = 0;
-  if (outH) *outH = 0;
-  if (outUsePath) *outUsePath = nullptr;
+  if (outW)
+    *outW = 0;
+  if (outH)
+    *outH = 0;
+  if (outUsePath)
+    *outUsePath = nullptr;
 
   if (!g_sdReady || !path || !path[0])
     return false;
@@ -379,8 +358,10 @@ bool mgAssetsReadImageDims(const char *path, int *outW, int *outH, const char **
 
 static bool readJpegDims(const char *usePath, int *outW, int *outH)
 {
-  if (outW) *outW = 0;
-  if (outH) *outH = 0;
+  if (outW)
+    *outW = 0;
+  if (outH)
+    *outH = 0;
 
   if (!usePath || !usePath[0] || !g_sdReady)
     return false;
@@ -435,25 +416,23 @@ static bool readJpegDims(const char *usePath, int *outW, int *outH)
     if (segLen < 2)
       break;
 
-    const bool isSOF =
-      marker == 0xC0 || marker == 0xC1 || marker == 0xC2 ||
-      marker == 0xC3 || marker == 0xC5 || marker == 0xC6 ||
-      marker == 0xC7 || marker == 0xC9 || marker == 0xCA ||
-      marker == 0xCB || marker == 0xCD || marker == 0xCE ||
-      marker == 0xCF;
+    const bool isSOF = marker == 0xC0 || marker == 0xC1 || marker == 0xC2 || marker == 0xC3 || marker == 0xC5 ||
+                       marker == 0xC6 || marker == 0xC7 || marker == 0xC9 || marker == 0xCA || marker == 0xCB ||
+                       marker == 0xCD || marker == 0xCE || marker == 0xCF;
 
     if (isSOF)
     {
       uint8_t precision = 0, hHi = 0, hLo = 0, wHi = 0, wLo = 0;
-      if (!readByte(precision) || !readByte(hHi) || !readByte(hLo) ||
-          !readByte(wHi) || !readByte(wLo))
+      if (!readByte(precision) || !readByte(hHi) || !readByte(hLo) || !readByte(wHi) || !readByte(wLo))
       {
         f.close();
         return false;
       }
 
-      if (outH) *outH = (int)(((uint16_t)hHi << 8) | (uint16_t)hLo);
-      if (outW) *outW = (int)(((uint16_t)wHi << 8) | (uint16_t)wLo);
+      if (outH)
+        *outH = (int)(((uint16_t)hHi << 8) | (uint16_t)hLo);
+      if (outW)
+        *outW = (int)(((uint16_t)wHi << 8) | (uint16_t)wLo);
       f.close();
       return true;
     }
@@ -468,9 +447,12 @@ static bool readJpegDims(const char *usePath, int *outW, int *outH)
 
 bool mgAssetsReadPngDims(const char *path, int *outW, int *outH, const char **outUsePath)
 {
-  if (outW) *outW = 0;
-  if (outH) *outH = 0;
-  if (outUsePath) *outUsePath = nullptr;
+  if (outW)
+    *outW = 0;
+  if (outH)
+    *outH = 0;
+  if (outUsePath)
+    *outUsePath = nullptr;
 
   if (!g_sdReady || !path || !path[0])
     return false;
@@ -512,22 +494,17 @@ bool mgAssetsReadPngDims(const char *path, int *outW, int *outH, const char **ou
   if (w <= 0 || h <= 0)
     return false;
 
-  if (outW) *outW = w;
-  if (outH) *outH = h;
-  if (outUsePath) *outUsePath = usePath;
+  if (outW)
+    *outW = w;
+  if (outH)
+    *outH = h;
+  if (outUsePath)
+    *outUsePath = usePath;
   return true;
 }
 
-bool mgAssetsLoadCachedSprite(
-    M5Canvas &dst,
-    bool &ready,
-    char *cachedPath,
-    size_t cachedPathSize,
-    const char *path,
-    uint8_t colorDepth,
-    uint16_t transparentKey,
-    const char *loadTag,
-    const char *releaseTag)
+bool mgAssetsLoadCachedSprite(M5Canvas &dst, bool &ready, char *cachedPath, size_t cachedPathSize, const char *path,
+                              uint8_t colorDepth, uint16_t transparentKey, const char *loadTag, const char *releaseTag)
 {
   if (!path || !path[0] || !g_sdReady)
     return false;
@@ -562,179 +539,154 @@ bool mgAssetsLoadCachedSprite(
 
 namespace
 {
-  static MiniGame s_mgmemCurrentGame = MiniGame::NONE;
-  static int s_mgmemCurrentPetType = -1;
-}
+static MiniGame s_mgmemCurrentGame = MiniGame::NONE;
+static int s_mgmemCurrentPetType = -1;
+} // namespace
 
 namespace mgmem
 {
-  void beginSession(MiniGame game, int petType)
+void beginSession(MiniGame game, int petType)
+{
+  if (s_mgmemCurrentGame != MiniGame::NONE)
   {
-    if (s_mgmemCurrentGame != MiniGame::NONE)
-    {
-      Serial.printf("[MGMEM] beginSession resetting stale game=%d before game=%d\n",
-                    (int)s_mgmemCurrentGame,
-                    (int)game);
+    Serial.printf("[MGMEM] beginSession resetting stale game=%d before game=%d\n", (int)s_mgmemCurrentGame, (int)game);
 
-      releaseAllForCurrentGame();
-      mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
-    }
-
-    s_mgmemCurrentGame = game;
-    s_mgmemCurrentPetType = petType;
-
-    char tag[64];
-    snprintf(tag, sizeof(tag), "mgmem.begin game=%d pet=%d", (int)game, petType);
-    mgAssetsLogHeap(tag);
+    releaseAllForCurrentGame();
+    mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
   }
 
-  void endSession()
+  s_mgmemCurrentGame = game;
+  s_mgmemCurrentPetType = petType;
+
+  char tag[64];
+  snprintf(tag, sizeof(tag), "mgmem.begin game=%d pet=%d", (int)game, petType);
+  mgAssetsLogHeap(tag);
+}
+
+void endSession()
+{
+  if (s_mgmemCurrentGame != MiniGame::NONE)
   {
-    if (s_mgmemCurrentGame != MiniGame::NONE)
-    {
-      releaseAllForCurrentGame();
-      mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
-    }
-
-    char tag[64];
-    snprintf(tag, sizeof(tag), "mgmem.end game=%d pet=%d",
-             (int)s_mgmemCurrentGame,
-             s_mgmemCurrentPetType);
-    mgAssetsLogHeap(tag);
-
-    s_mgmemCurrentGame = MiniGame::NONE;
-    s_mgmemCurrentPetType = -1;
+    releaseAllForCurrentGame();
+    mgAssetsReleaseSharedBgIfOwner(s_mgmemCurrentGame);
   }
 
-  bool ensureSharedBg(const char *path, M5Canvas *&out, int &outW, int &outH)
+  char tag[64];
+  snprintf(tag, sizeof(tag), "mgmem.end game=%d pet=%d", (int)s_mgmemCurrentGame, s_mgmemCurrentPetType);
+  mgAssetsLogHeap(tag);
+
+  s_mgmemCurrentGame = MiniGame::NONE;
+  s_mgmemCurrentPetType = -1;
+}
+
+bool ensureSharedBg(const char *path, M5Canvas *&out, int &outW, int &outH)
+{
+  out = nullptr;
+  outW = 0;
+  outH = 0;
+
+  if (s_mgmemCurrentGame == MiniGame::NONE)
+    return false;
+
+  if (!mgAssetsEnsureSharedBg(s_mgmemCurrentGame, path))
+    return false;
+
+  out = mgAssetsSharedBg();
+  outW = mgAssetsSharedBgW();
+  outH = mgAssetsSharedBgH();
+
+  return (out != nullptr && outW > 0 && outH > 0);
+}
+
+bool ensureSprite(MiniGame owner, const char *assetId, const char *path, uint8_t colorDepth, uint16_t transparentKey,
+                  M5Canvas *&out)
+{
+  out = nullptr;
+
+  if (owner == MiniGame::NONE || !assetId || !assetId[0] || !path || !path[0])
+    return false;
+
+  MgSpriteSlot *slot = findSpriteSlot(owner, assetId);
+  if (slot)
   {
-    out = nullptr;
-    outW = 0;
-    outH = 0;
+    const bool samePath = strcmp(slot->path, path) == 0;
+    const bool sameDepth = (slot->depth == colorDepth);
+    const bool sameKey = (slot->transparentKey == transparentKey);
+    const bool spriteReady = (slot->canvas.width() > 0 && slot->canvas.height() > 0);
 
-    if (s_mgmemCurrentGame == MiniGame::NONE)
-      return false;
+    if (samePath && sameDepth && sameKey && spriteReady)
+    {
+      out = &slot->canvas;
+      return true;
+    }
 
-    if (!mgAssetsEnsureSharedBg(s_mgmemCurrentGame, path))
-      return false;
-
-    out = mgAssetsSharedBg();
-    outW = mgAssetsSharedBgW();
-    outH = mgAssetsSharedBgH();
-
-    return (out != nullptr && outW > 0 && outH > 0);
+    clearSpriteSlot(*slot, "mgmem.ensureSprite.reload-old");
   }
-
-  bool ensureSprite(MiniGame owner,
-                    const char *assetId,
-                    const char *path,
-                    uint8_t colorDepth,
-                    uint16_t transparentKey,
-                    M5Canvas *&out)
+  else
   {
-    out = nullptr;
-
-    if (owner == MiniGame::NONE || !assetId || !assetId[0] || !path || !path[0])
-      return false;
-
-    MgSpriteSlot *slot = findSpriteSlot(owner, assetId);
-    if (slot)
-    {
-      const bool samePath = strcmp(slot->path, path) == 0;
-      const bool sameDepth = (slot->depth == colorDepth);
-      const bool sameKey = (slot->transparentKey == transparentKey);
-      const bool spriteReady = (slot->canvas.width() > 0 && slot->canvas.height() > 0);
-
-      if (samePath && sameDepth && sameKey && spriteReady)
-      {
-        out = &slot->canvas;
-        return true;
-      }
-
-      clearSpriteSlot(*slot, "mgmem.ensureSprite.reload-old");
-    }
-    else
-    {
-      slot = findFreeSpriteSlot();
-      if (!slot)
-      {
-        Serial.printf("[MGMEM] ensureSprite FAIL no free slots owner=%d asset=%s\n",
-                      (int)owner, assetId);
-        mgAssetsLogHeap("mgmem.ensureSprite.no-slot");
-        return false;
-      }
-    }
-
-    if (!mgAssetsLoadSprite(slot->canvas, path, colorDepth, transparentKey, assetId))
-    {
-      clearSpriteSlot(*slot, "mgmem.ensureSprite.load-fail");
-      return false;
-    }
-
-    slot->inUse = true;
-    slot->owner = owner;
-    strlcpy(slot->assetId, assetId, sizeof(slot->assetId));
-    strlcpy(slot->path, path, sizeof(slot->path));
-    slot->depth = colorDepth;
-    slot->transparentKey = transparentKey;
-
-    out = &slot->canvas;
-    return true;
-  }
-
-  void releaseSprite(MiniGame owner, const char *assetId)
-  {
-    MgSpriteSlot *slot = findSpriteSlot(owner, assetId);
+    slot = findFreeSpriteSlot();
     if (!slot)
-      return;
-
-    clearSpriteSlot(*slot, assetId);
-  }
-
-  void releaseAllForCurrentGame()
-  {
-    if (s_mgmemCurrentGame == MiniGame::NONE)
-      return;
-
-    for (int i = 0; i < kMgSpriteSlotCount; ++i)
     {
-      MgSpriteSlot &slot = s_spriteSlots[i];
-      if (!slot.inUse)
-        continue;
-      if (slot.owner != s_mgmemCurrentGame)
-        continue;
-
-      clearSpriteSlot(slot, "mgmem.releaseAllForCurrentGame");
+      Serial.printf("[MGMEM] ensureSprite FAIL no free slots owner=%d asset=%s\n", (int)owner, assetId);
+      mgAssetsLogHeap("mgmem.ensureSprite.no-slot");
+      return false;
     }
   }
 
-  size_t freeBytes()
+  if (!mgAssetsLoadSprite(slot->canvas, path, colorDepth, transparentKey, assetId))
   {
-    return (size_t)ESP.getFreeHeap();
+    clearSpriteSlot(*slot, "mgmem.ensureSprite.load-fail");
+    return false;
   }
 
-  size_t largestBlock()
-  {
-    return (size_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-  }
+  slot->inUse = true;
+  slot->owner = owner;
+  strlcpy(slot->assetId, assetId, sizeof(slot->assetId));
+  strlcpy(slot->path, path, sizeof(slot->path));
+  slot->depth = colorDepth;
+  slot->transparentKey = transparentKey;
 
-  void logUsage(const char *tag)
-  {
-    Serial.printf("[MGMEM] %s free=%u largest=%u game=%d pet=%d\n",
-                  tag ? tag : "(null)",
-                  (unsigned)freeBytes(),
-                  (unsigned)largestBlock(),
-                  (int)s_mgmemCurrentGame,
-                  s_mgmemCurrentPetType);
-  }
+  out = &slot->canvas;
+  return true;
+}
 
-  MiniGame currentGame()
-  {
-    return s_mgmemCurrentGame;
-  }
+void releaseSprite(MiniGame owner, const char *assetId)
+{
+  MgSpriteSlot *slot = findSpriteSlot(owner, assetId);
+  if (!slot)
+    return;
 
-  int currentPetType()
+  clearSpriteSlot(*slot, assetId);
+}
+
+void releaseAllForCurrentGame()
+{
+  if (s_mgmemCurrentGame == MiniGame::NONE)
+    return;
+
+  for (int i = 0; i < kMgSpriteSlotCount; ++i)
   {
-    return s_mgmemCurrentPetType;
+    MgSpriteSlot &slot = s_spriteSlots[i];
+    if (!slot.inUse)
+      continue;
+    if (slot.owner != s_mgmemCurrentGame)
+      continue;
+
+    clearSpriteSlot(slot, "mgmem.releaseAllForCurrentGame");
   }
 }
+
+size_t freeBytes() { return (size_t)ESP.getFreeHeap(); }
+
+size_t largestBlock() { return (size_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT); }
+
+void logUsage(const char *tag)
+{
+  Serial.printf("[MGMEM] %s free=%u largest=%u game=%d pet=%d\n", tag ? tag : "(null)", (unsigned)freeBytes(),
+                (unsigned)largestBlock(), (int)s_mgmemCurrentGame, s_mgmemCurrentPetType);
+}
+
+MiniGame currentGame() { return s_mgmemCurrentGame; }
+
+int currentPetType() { return s_mgmemCurrentPetType; }
+} // namespace mgmem

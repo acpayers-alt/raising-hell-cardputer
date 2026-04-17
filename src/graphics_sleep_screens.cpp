@@ -8,6 +8,7 @@
 #include "graphics.h"
 #include "graphics_assets.h"
 #include "graphics_mini_stats.h"
+#include "graphics_sd_draw.h"
 #include "pet.h"
 
 // -----------------------------------------------------------------------------
@@ -34,10 +35,6 @@ bool isScreenOn();
 // Shared drawing helpers
 void drawTopBar();
 void drawSleepMeterBar();
-
-// Image helpers
-bool sprDrawPngFromSD(const char *path, int x, int y);
-bool sprDrawJpgFromSD(const char *path, int x, int y);
 
 // Sleep frame cache subsystem
 void freeSleepAnimFrameCache();

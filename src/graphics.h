@@ -4,6 +4,7 @@
 #include "ui_defs.h"
 #include <Arduino.h>
 #include <M5GFX.h>
+#include "graphics_sd_draw.h"
 
 #ifndef TFT_BLACK
 #define TFT_BLACK 0x0000
@@ -45,9 +46,6 @@ void sleepBgNotifyScreenWake();
 
 void sleepBgKickNow();
 
-bool sprDrawPngFromSD(const char *path, int x, int y);
-bool sprDrawJpgFromSD(const char *path, int x, int y);
-
 // -----------------------------------------------------------------------------
 // RAW streaming helpers for sprites/icons
 // -----------------------------------------------------------------------------
@@ -79,8 +77,6 @@ void resetClockModePetPresentation();
 void uiTriggerAlertScreenFlash(uint8_t r, uint8_t g, uint8_t b, uint32_t durationMs = 90);
 void uiBeginAlertScreenFlash(uint8_t r, uint8_t g, uint8_t b);
 void uiEndAlertScreenFlash();
-
-bool canvasDrawPngFromSD(M5Canvas &canvas, const char *path, int x, int y);
 
 // Console
 void drawConsoleMenu();

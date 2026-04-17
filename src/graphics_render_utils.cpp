@@ -1,5 +1,6 @@
 #include "graphics_render_utils.h"
 #include "graphics.h"
+#include "graphics_sd_draw.h"
 
 #include <M5GFX.h>
 #include <Arduino.h>
@@ -11,7 +12,6 @@
 extern M5Canvas spr;
 extern bool g_sdReady;
 
-bool sprDrawPngFromSD(const char *path, int x, int y);
 
 void drawCenteredLine(const char *s, int y, int font, int size)
 {

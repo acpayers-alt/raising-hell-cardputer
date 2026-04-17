@@ -1,5 +1,6 @@
 #include "graphics_egg_select_screens.h"
 #include "graphics.h"
+#include "graphics_sd_draw.h"
 
 #include <M5GFX.h>
 #include <Arduino.h>
@@ -15,7 +16,6 @@ extern bool g_sdReady;
 static const char *eggPreviewPathForType(PetType type);
 static const char *eggLabelForType(PetType type);
 
-bool sprDrawPngFromSD(const char *path, int x, int y);
 bool isScreenOn();
 
 static constexpr const char *DEV_EGG_PNG = "/raising_hell/graphics/pet/egg/dev_egg.png";

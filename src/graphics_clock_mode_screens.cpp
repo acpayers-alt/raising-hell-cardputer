@@ -1,4 +1,5 @@
 #include "graphics_clock_mode_screens.h"
+#include "graphics_sd_draw.h"
 
 #include "display.h"
 #include "graphics.h"
@@ -18,8 +19,6 @@ void restorePetAreaFromCache();
 
 void drawTopBar();
 
-bool sprDrawJpgFromSD(const char *path, int x, int y);
-bool sprDrawPngFromSD(const char *path, int x, int y);
 void animDrawPetFrameAnchoredBottom(int anchorCenterX, int anchorBottomY);
 bool animConsumeFrameChanged();
 

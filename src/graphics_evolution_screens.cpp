@@ -1,4 +1,5 @@
 #include "graphics_evolution_screens.h"
+#include "graphics_sd_draw.h"
 
 #include "app_state.h"
 #include "display.h"
@@ -13,7 +14,6 @@ extern AppState g_app;
 extern Pet pet;
 
 bool getPngWH(const char *path, int &w, int &h);
-bool sprDrawPngFromSD(const char *path, int x, int y);
 
 static AnimId evoHappyClipFor(PetType type, uint8_t stage)
 {

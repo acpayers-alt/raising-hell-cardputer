@@ -10,11 +10,11 @@
 #include "pet.h"
 
 #include "graphics_render_utils.h"
+#include "graphics_sd_draw.h"
 
 extern M5Canvas spr;
 extern bool g_sdReady;
 
-bool sprDrawPngFromSD(const char *path, int x, int y);
 
 static const char *pendingEggCrackedPng()
 {

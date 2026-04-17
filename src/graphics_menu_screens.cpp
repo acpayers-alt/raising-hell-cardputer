@@ -17,6 +17,7 @@
 
 #include "display.h"
 #include "graphics_shared_utils.h"
+#include "graphics_sd_draw.h"
 
 // Pull in shared graphics globals from graphics.cpp
 extern M5Canvas spr;
@@ -28,7 +29,6 @@ extern bool g_sdReady;
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
 
 // Provided by graphics.cpp
-bool sprDrawJpgFromSD(const char *path, int x, int y);
 bool isScreenOn();
 
 static void drawTitleMenuText(M5Canvas &dst, const char *text, int x, int y, uint8_t font, uint16_t fg,
