@@ -56,9 +56,9 @@
 #include <FS.h>
 #include <Preferences.h>
 #include <SD.h>
+#include <esp_err.h>
 #include <esp_system.h>
 #include <nvs_flash.h>
-#include <esp_err.h>
 
 // -----------------------------------------------------------------------------
 // Standard Library
@@ -568,7 +568,9 @@ static void execLine(char *line)
     logLine("  fwmark reprovision  clear marker + set asset flag");
     logLine("  reboot              reboot device");
     logLine("  nvsclear            wipe NVS (factory clean) + reboot");
-    
+    logLine("  ntpskip            bypass stalled NTP check");
+    logLine("  timeinvalidate            marks current time invalid");
+
     logLine("Logs:");
     logLine("  logdump             dump runtime log buffer");
     logLine("  logtail [n]         dump last n log lines");
@@ -1115,7 +1117,7 @@ static void execLine(char *line)
       saveManagerMarkDirty(); // optional
       return;
     }
-    
+
     // wifi clear
     if (!strcmp(argv[1], "clear"))
     {
@@ -1310,6 +1312,48 @@ static void execLine(char *line)
     min %= 60;
 
     logf("Uptime: %lu:%02lu:%02lu", (unsigned long)hr, (unsigned long)min, (unsigned long)sec);
+
+    return;
+  }
+
+  if (!strcmp(argv[0], "timeinvalidate"))
+  {
+    struct timeval tv = {0, 0};
+    settimeofday(&tv, nullptr);
+
+    g_timeAnchorAttempted = false;
+    g_timeAnchorRestored = false;
+
+    logLine("[TIME] invalidated");
+    return;
+  }
+
+  // -------------------------------------------------
+  // NTP SKIP (recover from stalled time sync)
+  // -------------------------------------------------
+  if (!strcmp(argv[0], "ntpskip"))
+  {
+    if (time(nullptr) > 1600000000)
+    {
+      logLine("[NTP] time already valid");
+      return;
+    }
+
+    time_t before = time(nullptr);
+
+    // Force a valid epoch (anything > ~2019 works)
+    const time_t fallback = 1700000000;
+    struct timeval tv = {fallback, 0};
+    settimeofday(&tv, nullptr);
+
+    // Align with boot pipeline expectations
+    g_timeAnchorAttempted = true;
+    g_timeAnchorRestored = true;
+
+    time_t after = time(nullptr);
+
+    logf("[NTP] skip applied");
+    logf("time: %lu -> %lu", (unsigned long)before, (unsigned long)after);
 
     return;
   }
@@ -1638,7 +1682,7 @@ static void execLine(char *line)
     ESP.restart();
     return;
   }
-  
+
   if (!strcmp(argv[0], "reboot"))
   {
     logLine("[OK] rebooting...");
