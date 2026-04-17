@@ -7,8 +7,6 @@
 #include "input.h"
 
 void resetSettingsNav(bool resetTopIndex);
-void openSettingsWithReturn(UIState returnState, Tab returnTab);
-void closeSettingsAndReturn(InputState& in);
 bool settingsHasReturnTarget();
 UIState settingsReturnState();
 Tab settingsReturnTab();

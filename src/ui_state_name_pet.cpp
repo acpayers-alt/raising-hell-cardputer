@@ -71,7 +71,7 @@ void uiNamePetHandle(InputState &in)
     clearInputLatch();
 
     playBeep();
-    uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+    closeSettingsAndReturn(in);
     requestFullUIRedraw();
     requestUIRedraw();
     return;
@@ -84,7 +84,7 @@ void uiNamePetHandle(InputState &in)
     clearInputLatch();
     return;
   }
-  
+
   bool changed = false;
 
   while (in.kbHasEvent())
@@ -119,13 +119,13 @@ void uiNamePetHandle(InputState &in)
         clearInputLatch();
 
         playBeep();
-        uiActionEnterState(UIState::SETTINGS, g_app.currentTab, true);
+        closeSettingsAndReturn(in);
         requestFullUIRedraw();
         requestUIRedraw();
         invalidateBackgroundCache();
         return;
       }
-      
+
       finalizeNewPetFromName(in);
       return;
     }

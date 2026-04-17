@@ -242,7 +242,7 @@ void uiTitleMenuHandle(InputState &in)
   case TITLE_SETTINGS:
   {
     playBeep();
-    openSettingsWithReturn(UIState::TITLE_MENU, Tab::TAB_PET);
+    openSettingsWithReturn(UIState::TITLE_MENU, Tab::TAB_PET, SettingsPage::TOP);
     swallowTitleInput(in);
     return;
   }
