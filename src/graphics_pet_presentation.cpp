@@ -30,6 +30,18 @@ extern bool g_sdReady;
 
 extern bool g_forcePetBgCache;
 
+// ============================================================================
+// PET LAYER / BACKGROUND CACHE
+// ============================================================================
+
+static M5Canvas petLayer(&spr);
+static bool petLayerReady = false;
+
+static const char *s_petBgCachedPath = nullptr;
+static PetType s_petBgCachedType = (PetType)255;
+static uint8_t s_petBgCachedStage = 255;
+static bool ensurePetLayer();
+
 // UI / rendering hooks
 void requestUIRedraw();
 bool isScreenOn();
@@ -46,18 +58,6 @@ void animDrawPetFrameAnchoredBottom(int anchorCenterX, int anchorBottomY);
 
 // Assets
 bool getPngWH(const char *path, int &w, int &h);
-
-// ============================================================================
-// PET LAYER / BACKGROUND CACHE
-// ============================================================================
-
-static M5Canvas petLayer(&spr);
-static bool petLayerReady = false;
-
-static const char *s_petBgCachedPath = nullptr;
-static PetType s_petBgCachedType = (PetType)255;
-static uint8_t s_petBgCachedStage = 255;
-static bool ensurePetLayer();
 
 void graphicsReleasePetLayerForOta()
 {
@@ -410,8 +410,6 @@ void resetPetScreenPositionToHome()
   s_petIntroArriveTurnActive = false;
   s_petIntroStandHoldActive = false;
   s_petIntroHandoffActive = false;
-
-  resetPetWanderToHome();
 }
 
 // ============================================================================

@@ -59,7 +59,6 @@ void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t outline, i
 // -----------------------------------------------------------------------------
 // Screen renderers / UI
 // -----------------------------------------------------------------------------
-void drawPetScreen(bool redrawBg);
 void drawSleepScreen();
 
 void drawSettingsMenu();
