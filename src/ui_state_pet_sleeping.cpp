@@ -72,6 +72,13 @@ void uiEnterPetSleepingWithReturn(UIState returnState, Tab returnTab, InputState
   requestFullUIRedraw();
 }
 
+void enterSleepFlow(UIState returnState, Tab returnTab, InputState &in, uint16_t drainMs)
+{
+  uiEnterPetSleepingWithReturn(returnState, returnTab, in, drainMs);
+  uiPetSleepingBootEnter();
+  sleepBgKickNow();
+}
+
 void uiPetSleepingHandle(InputState &in)
 {
   if (!isPetSleepingNow())

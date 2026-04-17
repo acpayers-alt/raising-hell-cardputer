@@ -117,9 +117,7 @@ static void titleActivateContinue(InputState &in)
   if (shouldEnterSleeping)
   {
     // Enter sleep screen, but when the pet wakes we should land on the live PET tab.
-    uiEnterPetSleepingWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, in, 120);
-    uiPetSleepingBootEnter();
-    sleepBgKickNow();
+    enterSleepFlow(UIState::PET_SCREEN, Tab::TAB_PET, in, 120);
     forceRenderUIOnce();
   }
   else

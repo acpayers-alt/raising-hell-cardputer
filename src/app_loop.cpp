@@ -960,9 +960,7 @@ void appMainLoopTick()
 
       if (shouldEnterSleeping)
       {
-        uiEnterPetSleepingWithReturn(UIState::TITLE_MENU, Tab::TAB_PET, input, 200);
-        uiPetSleepingBootEnter();
-        sleepBgKickNow();
+        enterSleepFlow(g_app.uiState, g_app.currentTab, input, 200);
       }
       else
       {
@@ -982,8 +980,7 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   if (g_app.uiState == UIState::PET_SCREEN && isPetSleepingNow())
   {
-    uiEnterPetSleepingWithReturn(UIState::PET_SCREEN, Tab::TAB_PET, input, 200);
-    sleepBgKickNow();
+    enterSleepFlow(UIState::PET_SCREEN, Tab::TAB_PET, input, 200);
     invalidateBackgroundCache();
     input = InputState{};
     clearInputLatch();

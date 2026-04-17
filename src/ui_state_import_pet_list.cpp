@@ -369,7 +369,7 @@ void uiImportPetListHandle(InputState &in)
     swallowImportInput(in);
     return;
   }
-  
+
   const bool activate = in.selectOnce || in.encoderPressOnce;
   if (!activate)
   {
