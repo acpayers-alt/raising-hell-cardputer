@@ -13,9 +13,6 @@
 
 #if RH_MINIGAMES_IMPL_IN_PAUSE_MENU
 
-#include "mini_games.h"
-// Intentionally empty (implementation moved elsewhere).
-
 #else
 
 #include "graphics_sd_draw.h"

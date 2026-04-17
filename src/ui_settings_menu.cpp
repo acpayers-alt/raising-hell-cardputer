@@ -20,7 +20,6 @@
 // --- UI Core ---
 #include "ui_actions.h"
 #include "ui_input_common.h"
-#include "ui_input_utils.h" // uiDrainKb
 #include "ui_input_utils.h"
 #include "ui_runtime.h"
 #include "ui_settings_actions.h"
@@ -52,7 +51,6 @@
 
 // --- Game / User Systems ---
 #include "game_options_state.h"
-#include "save_manager.h"
 #include "user_toggles_state.h"
 
 // --- Graphics ---

@@ -37,9 +37,6 @@ bool isScreenOn();
 void drawTopBar();
 void drawSleepMeterBar();
 
-// Sleep frame cache subsystem
-bool ensureSleepAnimFrameCache(uint8_t mode, const char *const *frames, uint8_t frameCount, int x, int y);
-
 // -----------------------------------------------------------------------------
 // Sleep module state (owned here)
 // -----------------------------------------------------------------------------

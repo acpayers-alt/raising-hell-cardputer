@@ -2,13 +2,11 @@
 #pragma once
 #include "ui_defs.h"
 #include "ui_state_utils.h" 
-// keep any other settings_state.h declarations below...
 
 #include <stdint.h>
 #include <time.h>
 
-#include "ui_defs.h"
-#include "pet.h"  // for PET_NAME_MAX
+#include "pet.h"
 
 #include "user_toggles_state.h"
 #include "settings_nav_state.h"

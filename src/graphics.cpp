@@ -74,7 +74,6 @@
 #include "graphics_menu_screens.h"
 #include "graphics_name_pet_screens.h"
 #include "graphics_overlays.h"
-#include "graphics_pet_presentation.h"
 #include "graphics_render_utils.h"
 #include "graphics_set_time_screens.h"
 #include "graphics_settings_screens.h"
@@ -148,15 +147,8 @@ void sleepBgKickNow()
 // -----------------------------------------------------------------------------
 // Paths (SD)
 // -----------------------------------------------------------------------------
-static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
 const char *PATH_BG_SLEEP = "/raising_hell/graphics/background/sleep_bg.jpg";
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
-
-static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
-static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
-static const char *PATH_FOOD_ICON = "/raising_hell/graphics/ui/icons/food_icon.png";
-static const char *PATH_MOOD_ICON = "/raising_hell/graphics/ui/icons/mood_icon.png";
-static const char *PATH_REST_ICON = "/raising_hell/graphics/ui/icons/rest_icon.png";
 
 static constexpr int MINI_STAT_ICON_W = 18;
 static constexpr int MINI_STAT_ICON_H = 18;
@@ -226,7 +218,6 @@ bool backgroundCacheInvalidated() { return g_forceBgRedraw; }
 // Local helpers (forward decls)
 // -----------------------------------------------------------------------------
 static bool drawJpegBackground(const char *path);
-void drawMiniStatPreview();
 static void drawCurrentScreen(bool redrawBg);
 static void drawWifiSetupScreen();
 
