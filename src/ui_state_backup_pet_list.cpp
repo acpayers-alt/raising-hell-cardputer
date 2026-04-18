@@ -30,6 +30,8 @@ int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
 bool s_confirmRestoreActive = false;
 int s_confirmRestoreIndex = 0; // 0 Yes, 1 Cancel
 
+static SettingsPage s_returnPage = SettingsPage::PET;
+
 static void swallowBackupInput(InputState &in)
 {
   while (in.kbHasEvent())
@@ -67,7 +69,7 @@ static void reloadBackups()
   clampSelectionAndWindow();
 }
 
-static void leaveBackupBrowser(InputState &in) { returnToSettingsPage(SettingsPage::PET, g_app.currentTab, in); }
+static void leaveBackupBrowser(InputState &in) { returnToSettingsPage(s_returnPage, g_app.currentTab, in); }
 
 static void beginRestoreConfirm()
 {
@@ -166,6 +168,7 @@ static void performDelete(InputState &in)
 
 void openBackupPetListFromSettings(SettingsPage returnPage, InputState &in)
 {
+  s_returnPage = returnPage;
   g_settingsFlow.settingsPage = returnPage;
   uiActionEnterStateClean(UIState::BACKUP_PET_LIST, g_app.currentTab, true, in, 120);
   requestFullUIRedraw();
@@ -182,6 +185,9 @@ void uiBackupPetListOnEnter(InputState &in)
   s_confirmRestoreActive = false;
   s_confirmRestoreIndex = 0;
 
+  if (g_app.uiState != UIState::SETTINGS && g_settingsFlow.settingsPage != s_returnPage)
+  s_returnPage = SettingsPage::PET;
+  
   reloadBackups();
   swallowBackupInput(in);
   requestFullUIRedraw();
