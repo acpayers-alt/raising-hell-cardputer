@@ -1221,12 +1221,9 @@ void postBootInitTick()
       return;
     }
 
-    // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
-    if (bootAssetProvisionWifiOnboardingActive())
-      return;
-
-    // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
-    if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
+    // Let the boot Wi-Fi/provision helper own Wi-Fi bring-up, credential fallback,
+    // and connection waiting before OTA is allowed to run.
+    if (!bootAssetProvisionWifiReady())
       return;
 
     if (runBootAssetProvision())

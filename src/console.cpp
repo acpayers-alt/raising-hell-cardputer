@@ -264,9 +264,9 @@ static void logLine(const char *s)
 static void consoleArmReprovisionRecovery()
 {
   const bool wifiEnabledBefore = settingsWifiEnabled();
-  const bool hasCredsBefore    = wifiStoreHasCreds();
+  const bool hasCredsBefore = wifiStoreHasCreds();
 
-  Serial.printf("[REPAIR] reprovision armed wifiEnabled=%d hasCreds=%d\n",
+  Serial.printf("[RESCUE] reprovision armed wifiEnabled=%d hasCreds=%d\n",
                 wifiEnabledBefore ? 1 : 0,
                 hasCredsBefore ? 1 : 0);
 
@@ -285,9 +285,9 @@ static void consoleArmReprovisionRecovery()
   }
 
   const bool wifiEnabledAfter = settingsWifiEnabled();
-  const bool hasCredsAfter    = wifiStoreHasCreds();
+  const bool hasCredsAfter = wifiStoreHasCreds();
 
-  Serial.printf("[REPAIR] wifiEnabledAfter=%d hasCreds=%d\n",
+  Serial.printf("[RESCUE] wifiEnabledAfter=%d hasCreds=%d\n",
                 wifiEnabledAfter ? 1 : 0,
                 hasCredsAfter ? 1 : 0);
 
@@ -298,9 +298,43 @@ static void consoleArmReprovisionRecovery()
     logLine("[OK] WiFi enabled for next-boot reprovision");
 
   if (!hasCredsAfter)
-    logLine("[WARN] no WiFi credentials saved; provisioning may still fail");
+    logLine("[WARN] no WiFi credentials saved; boot WiFi flow may still be required");
 
-  logLine("[OK] reboot to retry asset provisioning");
+  logLine("[OK] rebooting into rescue reprovision...");
+  delay(100);
+  ESP.restart();
+}
+
+static void consoleRequestAssetRepair()
+{
+  const bool wifiEnabledBefore = settingsWifiEnabled();
+  const bool hasCredsBefore = wifiStoreHasCreds();
+
+  Serial.printf("[REPAIR] asset repair requested wifiEnabled=%d hasCreds=%d\n", wifiEnabledBefore ? 1 : 0,
+                hasCredsBefore ? 1 : 0);
+
+  requestAssetProvisionOnNextBoot();
+
+  if (!wifiEnabledBefore)
+  {
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+  }
+
+  const bool wifiEnabledAfter = settingsWifiEnabled();
+  const bool hasCredsAfter = wifiStoreHasCreds();
+
+  Serial.printf("[REPAIR] wifiEnabledAfter=%d hasCreds=%d\n", wifiEnabledAfter ? 1 : 0, hasCredsAfter ? 1 : 0);
+
+  logLine("[OK] asset provision requested");
+
+  if (!wifiEnabledBefore)
+    logLine("[OK] WiFi enabled for asset repair");
+
+  if (!hasCredsAfter)
+    logLine("[WARN] no WiFi credentials saved");
+
+  logLine("[OK] provisioning should start automatically");
 }
 
 static void logf(const char *fmt, ...)
@@ -587,7 +621,8 @@ static void execLine(char *line)
     logLine("  assetflag clear     clear asset provision boot flag");
     logLine("  assetflag set       set asset provision boot flag");
     logLine("  repair              alias for fwmark reprovision");
-    logLine("  repair assets       alias for fwmark reprovision");
+    logLine("  repair assets       re-run asset provisioning (safe)");
+    logLine("  rescue ota          dev: clear firmware marker + reprovision");
     logLine("  rescue              alias for fwmark reprovision");
     logLine("  rescue ota          alias for fwmark reprovision");
     logLine("  fwmark              show firmware marker status");
@@ -1585,31 +1620,27 @@ static void execLine(char *line)
     return;
   }
 
-  if (!strcmp(argv[0], "repair") || !strcmp(argv[0], "rescue"))
+  if (!strcmp(argv[0], "repair"))
   {
-    // Accept:
-    //   repair
-    //   repair assets
-    //   rescue
-    //   rescue ota
-    // Silently ignore extra args (support-friendly)
-
-    if (argc >= 2)
+    if (argc == 1 || (argc >= 2 && !strcmp(argv[1], "assets")))
     {
-      if (strcmp(argv[0], "repair") == 0 && strcmp(argv[1], "assets") != 0)
-      {
-        logLine("Usage: repair [assets]");
-        return;
-      }
-
-      if (strcmp(argv[0], "rescue") == 0 && strcmp(argv[1], "ota") != 0)
-      {
-        logLine("Usage: rescue [ota]");
-        return;
-      }
+      consoleRequestAssetRepair();
+      return;
     }
 
-    consoleArmReprovisionRecovery();
+    logLine("Usage: repair [assets]");
+    return;
+  }
+
+  if (!strcmp(argv[0], "rescue"))
+  {
+    if (argc == 1 || (argc >= 2 && !strcmp(argv[1], "ota")))
+    {
+      consoleArmReprovisionRecovery(); // dev path
+      return;
+    }
+
+    logLine("Usage: rescue [ota]");
     return;
   }
 
