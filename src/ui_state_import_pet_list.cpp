@@ -28,6 +28,8 @@ static bool s_actionMenuActive = false;
 static int s_actionIndex = 0; // 0 Retrieve, 1 Delete, 2 Cancel
 static bool s_confirmDeleteActive = false;
 static int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
+static bool s_returnToSettings = false;
+static SettingsPage s_returnPage = SettingsPage::TOP;
 
 static void swallowImportInput(InputState &in)
 {
@@ -58,8 +60,8 @@ static bool deleteStoredPetAtPath(const char *path)
 
 void openImportPetListFromSettings(SettingsPage returnPage, InputState &in)
 {
-  g_importPetListReturnToSettings = true;
-  g_importPetListReturnPage = returnPage;
+  s_returnToSettings = true;
+  s_returnPage = returnPage;
 
   uiActionEnterStateClean(UIState::IMPORT_PET_LIST, g_app.currentTab, true, in, 120);
   requestFullUIRedraw();
@@ -67,8 +69,8 @@ void openImportPetListFromSettings(SettingsPage returnPage, InputState &in)
 
 void openImportPetListFromTitle(InputState &in)
 {
-  g_importPetListReturnToSettings = false;
-  g_importPetListReturnPage = SettingsPage::TOP;
+  s_returnToSettings = false;
+  s_returnPage = SettingsPage::TOP;
 
   uiActionEnterStateClean(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true, in, 120);
   requestFullUIRedraw();
@@ -84,6 +86,10 @@ void uiImportPetListOnEnter(InputState &in)
   s_actionIndex = 0;
   s_confirmDeleteActive = false;
   s_confirmDeleteIndex = 0;
+
+  if (!s_returnToSettings)
+    s_returnPage = SettingsPage::TOP;
+
   swallowImportInput(in);
   requestFullUIRedraw();
 }
@@ -194,7 +200,7 @@ void uiImportPetListHandle(InputState &in)
         s_actionMenuActive = false;
         s_actionIndex = 0;
 
-        if (g_importPetListReturnToSettings)
+        if (s_returnToSettings)
         {
           // Settings flow: keep the existing confirm prompt.
           s_confirming = true;
@@ -208,7 +214,7 @@ void uiImportPetListHandle(InputState &in)
           if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), false))
           {
             playBeep();
-            g_importPetListReturnToSettings = false;
+            s_returnToSettings = false;
             ui_showSuccessMessage("Pet Resumed");
 
             const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
@@ -307,7 +313,7 @@ void uiImportPetListHandle(InputState &in)
       s_confirmIndex = 0;
       s_actionMenuActive = false;
       s_actionIndex = 0;
-      g_importPetListReturnToSettings = false;
+      s_returnToSettings = false;
 
       ui_showSuccessMessage("Pet Resumed");
 
@@ -373,10 +379,10 @@ void uiImportPetListHandle(InputState &in)
   {
     playBeep();
 
-    if (g_importPetListReturnToSettings)
+    if (s_returnToSettings)
     {
-      const SettingsPage returnPage = g_importPetListReturnPage;
-      g_importPetListReturnToSettings = false;
+      const SettingsPage returnPage = s_returnPage;
+      s_returnToSettings = false;
       returnToSettingsPage(returnPage, g_app.currentTab, in);
     }
     else

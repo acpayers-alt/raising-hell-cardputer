@@ -20,7 +20,7 @@ void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSetting
   g_consoleReturn.tab = returnTab;
   g_consoleReturnPage = retSettingsPage;
   uiPushReturnTarget(returnState, returnTab);
-    
+
   if (retToSettings)
   {
     g_settingsFlow.settingsReturnPage = retSettingsPage;
@@ -57,8 +57,14 @@ void uiConsoleHandle(InputState &input)
     // IMPORTANT: swallow BEFORE changing state so no edge leaks into the next state
     swallowTypingAndEdges(input);
 
+    const UIReturnTarget ret = uiGetReturnTarget();
+
     if (g_consoleReturn.state == UIState::SETTINGS)
     {
+      // Console pushed its own shared return target on open.
+      // Settings close will pop its own return target, so pop console's first.
+      uiPopReturnTarget();
+
       g_settingsFlow.settingsPage = g_consoleReturnPage;
       closeSettingsAndReturn(input);
       requestUIRedraw();
@@ -66,7 +72,8 @@ void uiConsoleHandle(InputState &input)
     }
 
     // Normal behavior: return to the UI state we came from
-    uiActionEnterStateClean(g_consoleReturn.state, g_consoleReturn.tab, true, input, 120);
+    uiPopReturnTarget();
+    uiActionEnterStateClean(ret.state, ret.tab, true, input, 120);
     requestUIRedraw();
     return;
   }
@@ -87,15 +94,22 @@ bool closeConsoleAndReturn(InputState &input)
   // Swallow BEFORE changing state so no edge leaks into the next state
   swallowTypingAndEdges(input);
 
+  const UIReturnTarget ret = uiGetReturnTarget();
+
   if (g_consoleReturn.state == UIState::SETTINGS)
   {
+    // Console pushed its own shared return target on open.
+    // Settings close will pop its own return target, so pop console's first.
+    uiPopReturnTarget();
+
     g_settingsFlow.settingsPage = g_consoleReturnPage;
     closeSettingsAndReturn(input);
     requestUIRedraw();
     return true;
   }
-  
-  uiActionEnterStateClean(g_consoleReturn.state, g_consoleReturn.tab, true, input, 120);
+
+  uiPopReturnTarget();
+  uiActionEnterStateClean(ret.state, ret.tab, true, input, 120);
   requestUIRedraw();
   return true;
 }
