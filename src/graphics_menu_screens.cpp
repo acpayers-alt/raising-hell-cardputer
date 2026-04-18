@@ -317,7 +317,9 @@ void drawTitleMenuScreen(bool redrawBg)
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
-  const bool hasRuntimePet = (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
+  const bool hasBirth = (saveManagerGetBirthEpoch() != 0);
+  const bool hasName = (pet.getName()[0] != '\0');
+  const bool hasRuntimePet = (hasBirth && hasName);
 
   char row0Buf[80];
   if (hasRuntimePet)
@@ -336,6 +338,24 @@ void drawTitleMenuScreen(bool redrawBg)
 
     snprintf(row0Buf, sizeof(row0Buf), "%s - lvl %u %s", pet.getName(), (unsigned)pet.level, typePretty);
   }
+  else if (hasSave && hasBirth)
+  {
+    // Runtime state is partially present but the name is missing.
+    // Show a more specific fallback so row 0 never goes "mysteriously blank."
+    const char *typePretty = "Devil";
+    switch (pet.type)
+    {
+    case PET_ELDRITCH:
+      typePretty = "Eldritch";
+      break;
+    case PET_DEVIL:
+    default:
+      typePretty = "Devil";
+      break;
+    }
+
+    snprintf(row0Buf, sizeof(row0Buf), "(unnamed) - lvl %u %s", (unsigned)pet.level, typePretty);
+  }
   else if (hasSave)
   {
     snprintf(row0Buf, sizeof(row0Buf), "Continue");
@@ -344,7 +364,7 @@ void drawTitleMenuScreen(bool redrawBg)
   {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }
-
+  
   const char *storageLabel = hasImport ? "Pet Storage" : "Pet Storage Empty";
   const char *labels[3] = {row0Buf, storageLabel, "Settings"};
   const bool enabled[3] = {true, true, true};

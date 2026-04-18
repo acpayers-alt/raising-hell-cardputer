@@ -34,8 +34,29 @@ static bool titleHasLivePet()
 
 static void refreshTitleMenuAvailability()
 {
-  s_titleHasSave = titleHasLivePet();
+  const bool saveExists = saveManagerSaveFileExists();
+  const bool hasBirth = (saveManagerGetBirthEpoch() != 0);
+  const bool hasName = (pet.getName()[0] != '\0');
+
+  s_titleHasSave = saveExists || (hasBirth && hasName);
   s_titleHasImport = saveManagerHasImportableBubJson();
+
+  static uint32_t s_lastBlankNameLogMs = 0;
+  const uint32_t now = millis();
+
+  if (saveExists && hasBirth && !hasName)
+  {
+    if (now - s_lastBlankNameLogMs > 2000)
+    {
+      Serial.printf("[TITLE][WARN] save exists but runtime pet name is blank birth=%lu ui=%d tab=%d sleep=%d newPet=%d\n",
+                    (unsigned long)saveManagerGetBirthEpoch(),
+                    (int)g_app.uiState,
+                    (int)g_app.currentTab,
+                    g_app.isSleeping ? 1 : 0,
+                    g_app.newPetFlowActive ? 1 : 0);
+      s_lastBlankNameLogMs = now;
+    }
+  }
 }
 
 enum TitleMenuItem : int
