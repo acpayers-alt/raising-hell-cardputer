@@ -1,7 +1,7 @@
-#include "input.h"
-#include "settings_state.h"
-#include "settings_nav_state.h"
 #include "settings_flow_state.h"
+#include "input.h"
+#include "settings_nav_state.h"
+#include "settings_state.h"
 
 #include "ui_actions.h"
 #include "ui_runtime.h"
@@ -14,14 +14,13 @@ SettingsPage g_importPetListReturnPage = SettingsPage::TOP;
 
 void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage page)
 {
-  g_settingsFlow.settingsReturnValid = true;
-  g_settingsFlow.settingsReturnState = returnState;
-  g_settingsFlow.settingsReturnTab   = returnTab;
-  g_settingsFlow.settingsPage        = page;
-  g_settingsFlow.settingsReturnPage  = page;
+  g_settingsFlow.settingsPage = page;
+  g_settingsFlow.settingsReturnPage = page;
 
   if (page == SettingsPage::TOP)
     resetSettingsNav(false);
+
+  uiPushReturnTarget(returnState, returnTab);
 
   uiActionEnterState(UIState::SETTINGS, returnTab, true);
   requestFullUIRedraw();
@@ -29,51 +28,27 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
   clearInputLatch();
 }
 
-void clearSettingsReturnTarget()
+void closeSettingsAndReturn(InputState &in)
 {
-  g_settingsFlow.settingsReturnValid = false;
-  g_settingsFlow.settingsReturnState = UIState::PET_SCREEN;
-  g_settingsFlow.settingsReturnTab   = Tab::TAB_PET;
-}
-
-void closeSettingsAndReturn(InputState& in)
-{
-  const UIState targetState =
-      g_settingsFlow.settingsReturnValid
-          ? g_settingsFlow.settingsReturnState
-          : UIState::PET_SCREEN;
-
-  const Tab targetTab =
-      g_settingsFlow.settingsReturnValid
-          ? g_settingsFlow.settingsReturnTab
-          : Tab::TAB_PET;
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
 
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
   g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
-  clearSettingsReturnTarget();
 
-  uiActionEnterStateClean(targetState, targetTab, true, in, 120);
+  uiActionEnterStateClean(ret.state, ret.tab, true, in, 120);
 }
 
-void returnToSettingsPage(SettingsPage page, Tab tab, InputState& in)
+void returnToSettingsPage(SettingsPage page, Tab tab, InputState &in)
 {
   g_settingsFlow.settingsPage = page;
   uiActionEnterStateClean(UIState::SETTINGS, tab, true, in, 120);
   requestFullUIRedraw();
 }
 
-bool settingsHasReturnTarget()
-{
-  return g_settingsFlow.settingsReturnValid;
-}
+bool settingsHasReturnTarget() { return uiHasReturnTarget(); }
 
-UIState settingsReturnState()
-{
-  return g_settingsFlow.settingsReturnState;
-}
+UIState settingsReturnState() { return uiGetReturnTarget().state; }
 
-Tab settingsReturnTab()
-{
-  return g_settingsFlow.settingsReturnTab;
-}
+Tab settingsReturnTab() { return uiGetReturnTarget().tab; }

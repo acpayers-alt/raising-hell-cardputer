@@ -11,10 +11,7 @@
 static UIReturnTarget g_uiReturnStack[8];
 static int g_uiReturnDepth = 0;
 
-static UIReturnTarget defaultReturnTarget()
-{
-  return {UIState::TITLE_MENU, Tab::TAB_PET};
-}
+static UIReturnTarget defaultReturnTarget() { return {UIState::TITLE_MENU, Tab::TAB_PET}; }
 
 void uiSetReturnTarget(UIState state, Tab tab)
 {
@@ -67,10 +64,7 @@ UIReturnTarget uiPopReturnTarget()
   return g_uiReturnStack[g_uiReturnDepth - 1];
 }
 
-bool uiHasReturnTarget()
-{
-  return g_uiReturnDepth > 0;
-}
+bool uiHasReturnTarget() { return g_uiReturnDepth > 0; }
 
 void uiReturnToTarget()
 {
@@ -88,13 +82,6 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
   const Tab prevTab = g_app.currentTab;
 
   const bool changed = (g_app.uiState != state) || (g_app.currentTab != tab);
-
-  if (state == UIState::SETTINGS)
-  {
-    g_settingsFlow.settingsReturnValid = true;
-    g_settingsFlow.settingsReturnState = prevState;
-    g_settingsFlow.settingsReturnTab = prevTab;
-  }
 
   if (!changed)
     return;

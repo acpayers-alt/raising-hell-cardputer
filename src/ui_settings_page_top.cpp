@@ -158,7 +158,7 @@ void Handle_TOP(InputState &input, int move)
 
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
-      clearSettingsReturnTarget();
+      uiPopReturnTarget();
 
       playBeep();
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
@@ -169,7 +169,7 @@ void Handle_TOP(InputState &input, int move)
     { // Main Menu
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
-      clearSettingsReturnTarget();
+      uiPopReturnTarget();
 
       playBeep();
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
