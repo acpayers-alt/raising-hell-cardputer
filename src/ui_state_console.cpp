@@ -63,8 +63,6 @@ void uiConsoleHandle(InputState &input)
     {
       // Console pushed its own shared return target on open.
       // Settings close will pop its own return target, so pop console's first.
-      uiPopReturnTarget();
-
       g_settingsFlow.settingsPage = g_consoleReturnPage;
       closeSettingsAndReturn(input);
       requestUIRedraw();
@@ -100,8 +98,6 @@ bool closeConsoleAndReturn(InputState &input)
   {
     // Console pushed its own shared return target on open.
     // Settings close will pop its own return target, so pop console's first.
-    uiPopReturnTarget();
-
     g_settingsFlow.settingsPage = g_consoleReturnPage;
     closeSettingsAndReturn(input);
     requestUIRedraw();
