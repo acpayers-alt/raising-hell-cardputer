@@ -42,7 +42,7 @@ bool controlsHelpDismissAllowed() { return (uint32_t)(millis() - s_controlsHelpE
 
 void controlsHelpBegin(UIState returnState, Tab returnTab)
 {
-  uiSetReturnTarget(returnState, returnTab);
+  uiPushReturnTarget(returnState, returnTab);
 
   uiActionEnterState(UIState::CONTROLS_HELP, returnTab, true);
   requestFullUIRedraw();
@@ -52,7 +52,6 @@ void controlsHelpDismiss()
 {
   if (!g_controlsHelpSeen)
   {
-    // Only mark seen if we can persist it.
     if (sdReady())
     {
       g_controlsHelpSeen = 1;
@@ -63,9 +62,8 @@ void controlsHelpDismiss()
   inputForceClear();
   clearInputLatch();
 
-  // Special case: on first boot, Controls Help should continue into the
-  // boot wizard entry function, not directly into a wizard state.
-  UIReturnTarget ret = uiGetReturnTarget();
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
 
   if (ret.state == UIState::BOOT_WIFI_PROMPT)
   {

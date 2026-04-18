@@ -19,8 +19,8 @@ void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSetting
   g_consoleReturn.state = returnState;
   g_consoleReturn.tab = returnTab;
   g_consoleReturnPage = retSettingsPage;
-  uiSetReturnTarget(returnState, returnTab);
-  
+  uiPushReturnTarget(returnState, returnTab);
+    
   if (retToSettings)
   {
     g_settingsFlow.settingsReturnPage = retSettingsPage;

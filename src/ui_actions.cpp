@@ -8,22 +8,74 @@
 #include "ui_state_lifecycle.h"
 #include "ui_suppress.h"
 
-static UIReturnTarget g_uiReturnTarget = {UIState::TITLE_MENU, Tab::TAB_PET};
+static UIReturnTarget g_uiReturnStack[8];
+static int g_uiReturnDepth = 0;
+
+static UIReturnTarget defaultReturnTarget()
+{
+  return {UIState::TITLE_MENU, Tab::TAB_PET};
+}
 
 void uiSetReturnTarget(UIState state, Tab tab)
 {
-  g_uiReturnTarget.state = state;
-  g_uiReturnTarget.tab = tab;
+  if (g_uiReturnDepth > 0)
+  {
+    g_uiReturnStack[g_uiReturnDepth - 1].state = state;
+    g_uiReturnStack[g_uiReturnDepth - 1].tab = tab;
+    return;
+  }
+
+  g_uiReturnStack[0].state = state;
+  g_uiReturnStack[0].tab = tab;
+  g_uiReturnDepth = 1;
+}
+
+void uiPushReturnTarget(UIState state, Tab tab)
+{
+  if (g_uiReturnDepth >= (int)(sizeof(g_uiReturnStack) / sizeof(g_uiReturnStack[0])))
+  {
+    g_uiReturnStack[(sizeof(g_uiReturnStack) / sizeof(g_uiReturnStack[0])) - 1].state = state;
+    g_uiReturnStack[(sizeof(g_uiReturnStack) / sizeof(g_uiReturnStack[0])) - 1].tab = tab;
+    return;
+  }
+
+  g_uiReturnStack[g_uiReturnDepth].state = state;
+  g_uiReturnStack[g_uiReturnDepth].tab = tab;
+  g_uiReturnDepth++;
 }
 
 UIReturnTarget uiGetReturnTarget()
 {
-  return g_uiReturnTarget;
+  if (g_uiReturnDepth <= 0)
+    return defaultReturnTarget();
+
+  return g_uiReturnStack[g_uiReturnDepth - 1];
+}
+
+UIReturnTarget uiPopReturnTarget()
+{
+  if (g_uiReturnDepth <= 0)
+    return defaultReturnTarget();
+
+  g_uiReturnDepth--;
+  if (g_uiReturnDepth <= 0)
+  {
+    g_uiReturnDepth = 0;
+    return defaultReturnTarget();
+  }
+
+  return g_uiReturnStack[g_uiReturnDepth - 1];
+}
+
+bool uiHasReturnTarget()
+{
+  return g_uiReturnDepth > 0;
 }
 
 void uiReturnToTarget()
 {
-  uiActionEnterState(g_uiReturnTarget.state, g_uiReturnTarget.tab, true);
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiActionEnterState(ret.state, ret.tab, true);
 }
 
 // -----------------------------------------------------------------------------

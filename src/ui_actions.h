@@ -15,6 +15,10 @@ void uiSetReturnTarget(UIState state, Tab tab);
 UIReturnTarget uiGetReturnTarget();
 void uiReturnToTarget();
 
+void uiPushReturnTarget(UIState state, Tab tab);
+UIReturnTarget uiPopReturnTarget();
+bool uiHasReturnTarget();
+
 // -----------------------------------------------------------------------------
 // Core state transition API
 // -----------------------------------------------------------------------------
