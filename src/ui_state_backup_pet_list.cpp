@@ -186,8 +186,8 @@ void uiBackupPetListOnEnter(InputState &in)
   s_confirmRestoreIndex = 0;
 
   if (g_app.uiState != UIState::SETTINGS && g_settingsFlow.settingsPage != s_returnPage)
-  s_returnPage = SettingsPage::PET;
-  
+    s_returnPage = SettingsPage::PET;
+
   reloadBackups();
   swallowBackupInput(in);
   requestFullUIRedraw();
