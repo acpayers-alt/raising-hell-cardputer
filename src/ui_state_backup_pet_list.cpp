@@ -164,6 +164,13 @@ static void performDelete(InputState &in)
 
 } // namespace
 
+void openBackupPetListFromSettings(SettingsPage returnPage, InputState &in)
+{
+  g_settingsFlow.settingsPage = returnPage;
+  uiActionEnterStateClean(UIState::BACKUP_PET_LIST, g_app.currentTab, true, in, 120);
+  requestFullUIRedraw();
+}
+
 void uiBackupPetListOnEnter(InputState &in)
 {
   s_selected = 0;

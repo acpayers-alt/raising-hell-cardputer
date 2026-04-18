@@ -2,12 +2,15 @@
 
 #include "input.h"
 #include "save_manager.h"
+#include "settings_flow_state.h"
 
 // ─────────────────────────────────────
 // State lifecycle
 // ─────────────────────────────────────
 void uiImportPetListOnEnter(InputState &in);
 void uiImportPetListHandle(InputState &in);
+void openImportPetListFromSettings(SettingsPage returnPage, InputState &in);
+void openImportPetListFromTitle(InputState &in);
 
 // ─────────────────────────────────────
 // List data / view state

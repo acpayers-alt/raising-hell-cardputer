@@ -32,6 +32,8 @@
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
 #include "system_status_state.h"
+#include "ui_state_import_pet_list.h"
+#include "ui_state_backup_pet_list.h"
 
 // --- Networking / Time ---
 #include "wifi_power.h"
@@ -339,9 +341,7 @@ static void actScreen_AutoScreenSelect(InputState &input) { actScreen_AutoScreen
 static void actScreen_ClockMode(InputState &input)
 {
   playBeep();
-  uiClockModeSetReturnState(g_app.uiState, g_app.currentTab);
-  uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, input, 120);
-  requestFullUIRedraw();
+  openClockModeWithReturn(g_app.uiState, g_app.currentTab, input, 120);
 }
 
 static void actScreen_ShakeSensitivityLeft(InputState &)
@@ -614,11 +614,9 @@ static void actPet_StorePet(InputState &input)
 static void actPet_StoredPets(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::PET;
-  g_importPetListReturnToSettings = true;
-  g_importPetListReturnPage = SettingsPage::PET;
 
   playBeep();
-  uiActionEnterStateClean(UIState::IMPORT_PET_LIST, g_app.currentTab, true, input, 120);
+  openImportPetListFromSettings(SettingsPage::PET, input);
   requestUIRedraw();
 }
 
@@ -639,9 +637,8 @@ static void actPet_BackupCurrentPet(InputState &input)
 
 static void actPet_RestoreFromBackup(InputState &input)
 {
-  g_settingsFlow.settingsPage = SettingsPage::PET;
   playBeep();
-  uiActionEnterStateClean(UIState::BACKUP_PET_LIST, g_app.currentTab, true, input, 120);
+  openBackupPetListFromSettings(SettingsPage::PET, input);
   requestUIRedraw();
 }
 

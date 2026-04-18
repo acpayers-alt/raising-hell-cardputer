@@ -56,6 +56,24 @@ static bool deleteStoredPetAtPath(const char *path)
 
 } // namespace
 
+void openImportPetListFromSettings(SettingsPage returnPage, InputState &in)
+{
+  g_importPetListReturnToSettings = true;
+  g_importPetListReturnPage = returnPage;
+
+  uiActionEnterStateClean(UIState::IMPORT_PET_LIST, g_app.currentTab, true, in, 120);
+  requestFullUIRedraw();
+}
+
+void openImportPetListFromTitle(InputState &in)
+{
+  g_importPetListReturnToSettings = false;
+  g_importPetListReturnPage = SettingsPage::TOP;
+
+  uiActionEnterStateClean(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true, in, 120);
+  requestFullUIRedraw();
+}
+
 void uiImportPetListOnEnter(InputState &in)
 {
   s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
