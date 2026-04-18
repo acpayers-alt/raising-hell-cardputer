@@ -14,8 +14,8 @@
 #include "new_pet_flow_state.h"
 
 // --- Input / rendering --------------------------------------------------------
-#include "input.h"
 #include "graphics.h"
+#include "input.h"
 
 // --- Persistence / storage ----------------------------------------------------
 #include "save_manager.h"
@@ -39,10 +39,7 @@ void controlsHelpOnEnter()
   clearInputLatch();
 }
 
-bool controlsHelpDismissAllowed()
-{
-  return (uint32_t)(millis() - s_controlsHelpEnterMs) >= 250;
-}
+bool controlsHelpDismissAllowed() { return (uint32_t)(millis() - s_controlsHelpEnterMs) >= 250; }
 
 void controlsHelpBegin(UIState returnState, Tab returnTab)
 {
@@ -50,10 +47,6 @@ void controlsHelpBegin(UIState returnState, Tab returnTab)
   s_controlsHelpReturn.tab = returnTab;
 
   uiActionEnterState(UIState::CONTROLS_HELP, returnTab, true);
-
-  // Prevent the opening key from immediately dismissing help.
-  controlsHelpOnEnter();
-
   requestFullUIRedraw();
 }
 
@@ -80,12 +73,12 @@ void controlsHelpDismiss()
     requestFullUIRedraw();
     return;
   }
-  
+
   if (s_controlsHelpReturn.state == UIState::CHOOSE_PET)
-{
-  g_choosePetInputUnlockMs = millis() + 350;
-  g_choosePetBlockHatchUntilRelease = true;
-}
+  {
+    g_choosePetInputUnlockMs = millis() + 350;
+    g_choosePetBlockHatchUntilRelease = true;
+  }
 
   uiActionEnterState(s_controlsHelpReturn.state, s_controlsHelpReturn.tab, true);
   requestFullUIRedraw();

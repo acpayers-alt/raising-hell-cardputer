@@ -11,23 +11,24 @@
 #include "ui_runtime.h"
 
 // Console return target
-static ReturnTarget g_consoleReturn{};
-
-// Special case: console was opened from inside Settings and should return back into Settings
-static bool g_consoleReturnToSettings = false;
+static ReturnTarget g_consoleReturn{UIState::PET_SCREEN, Tab::TAB_PET};
 static SettingsPage g_consoleReturnPage = SettingsPage::TOP;
 
 void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSettings, SettingsPage retSettingsPage)
 {
   g_consoleReturn.state = returnState;
   g_consoleReturn.tab = returnTab;
-  g_consoleReturnToSettings = retToSettings;
   g_consoleReturnPage = retSettingsPage;
+
+  if (retToSettings)
+  {
+    g_settingsFlow.settingsReturnPage = retSettingsPage;
+  }
 
   consoleOpen();
 
-  // Centralized transition (no raw g_app.uiState writes)
   uiActionEnterState(UIState::CONSOLE, returnTab, true);
+  clearInputLatch();
   requestUIRedraw();
 }
 
@@ -55,11 +56,9 @@ void uiConsoleHandle(InputState &input)
     // IMPORTANT: swallow BEFORE changing state so no edge leaks into the next state
     swallowTypingAndEdges(input);
 
-    if (g_consoleReturnToSettings)
+    if (g_consoleReturn.state == UIState::SETTINGS)
     {
-      // Restore the settings page, then return through the shared settings flow.
       g_settingsFlow.settingsPage = g_consoleReturnPage;
-
       closeSettingsAndReturn(input);
       requestUIRedraw();
       return;
@@ -87,11 +86,9 @@ bool closeConsoleAndReturn(InputState &input)
   // Swallow BEFORE changing state so no edge leaks into the next state
   swallowTypingAndEdges(input);
 
-  if (g_consoleReturnToSettings)
+  if (g_consoleReturn.state == UIState::SETTINGS)
   {
-    // Restore the settings page, then return through the shared settings flow.
     g_settingsFlow.settingsPage = g_consoleReturnPage;
-
     closeSettingsAndReturn(input);
     requestUIRedraw();
     return true;

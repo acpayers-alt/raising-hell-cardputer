@@ -5,6 +5,7 @@
 
 #include "ui_actions.h"
 #include "ui_runtime.h"
+#include "ui_state_lifecycle.h"
 #include "ui_suppress.h"
 
 // -----------------------------------------------------------------------------
@@ -16,34 +17,34 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
   const UIState prevState = g_app.uiState;
   const Tab prevTab = g_app.currentTab;
 
-  const bool changed =
-      (g_app.uiState != state) ||
-      (g_app.currentTab != tab);
+  const bool changed = (g_app.uiState != state) || (g_app.currentTab != tab);
 
-  if (state == UIState::SETTINGS && !settingsHasReturnTarget())
+  if (state == UIState::SETTINGS)
   {
     g_settingsFlow.settingsReturnValid = true;
     g_settingsFlow.settingsReturnState = prevState;
-    g_settingsFlow.settingsReturnTab   = prevTab;
+    g_settingsFlow.settingsReturnTab = prevTab;
   }
 
-  g_app.uiState    = state;
+  if (!changed)
+    return;
+
+  if (prevState != state)
+    uiStateOnExit(prevState);
+
+  g_app.uiState = state;
   g_app.currentTab = tab;
 
-  if (changed)
-  {
-    if (fullRedraw)
-      requestFullUIRedraw();
-    else
-      requestUIRedraw();
-  }
+  if (prevState != state)
+    uiStateOnEnter(state);
+
+  if (fullRedraw)
+    requestFullUIRedraw();
+  else
+    requestUIRedraw();
 }
 
-void uiActionEnterStateClean(UIState state,
-                             Tab tab,
-                             bool fullRedraw,
-                             InputState& in,
-                             uint32_t suppressMenuMs)
+void uiActionEnterStateClean(UIState state, Tab tab, bool fullRedraw, InputState &in, uint32_t suppressMenuMs)
 {
   // Make sure nothing "leaks" into the next state.
   uiActionSwallowAll(in);
@@ -58,19 +59,19 @@ void uiActionEnterStateClean(UIState state,
 // Input helpers
 // -----------------------------------------------------------------------------
 
-void uiActionDrainKb(InputState& in)
+void uiActionDrainKb(InputState &in)
 {
   while (in.kbHasEvent())
     (void)in.kbPop();
 }
 
-void uiActionSwallowEdges(InputState& in)
+void uiActionSwallowEdges(InputState &in)
 {
   in.clearEdges();
   clearInputLatch();
 }
 
-void uiActionSwallowAll(InputState& in)
+void uiActionSwallowAll(InputState &in)
 {
   uiActionDrainKb(in);
   in.clearEdges();

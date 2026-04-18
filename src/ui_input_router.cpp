@@ -1,16 +1,17 @@
 #include "ui_input_router.h"
 
 #include "app_state.h"
+#include "controls_help_state.h"
 #include "input.h"
 #include "ui_actions.h"
 #include "ui_input_interceptors.h"
+#include "ui_state_backup_pet_list.h"
 #include "ui_state_choose_pet.h"
 #include "ui_state_handlers.h"
 #include "ui_state_import_pet_list.h"
 #include "ui_state_pet_sleeping.h"
 #include "ui_state_title_menu.h"
 #include "wifi_setup_state.h"
-#include "ui_state_backup_pet_list.h"
 
 // ----------------------------------------------------------------------------
 // Text capture policy
@@ -50,6 +51,39 @@ static inline bool isNoInputState(UIState s)
 
 static bool dispatchToHandler(UIState s, InputState &in) { return uiDispatchToStateHandler(s, in); }
 
+static void uiRunStateEntryHooks(UIState state, InputState &in)
+{
+  switch (state)
+  {
+  case UIState::PET_SLEEPING:
+    uiPetSleepingOnEnter(in);
+    break;
+
+  case UIState::TITLE_MENU:
+    uiTitleMenuOnEnter(in);
+    break;
+
+  case UIState::BACKUP_PET_LIST:
+    uiBackupPetListOnEnter(in);
+    break;
+
+  case UIState::IMPORT_PET_LIST:
+    uiImportPetListOnEnter(in);
+    break;
+
+  case UIState::CHOOSE_PET:
+    uiChoosePetOnEnter(in);
+    break;
+
+  case UIState::CONTROLS_HELP:
+    controlsHelpOnEnter();
+    break;
+
+  default:
+    break;
+  }
+}
+
 bool uiHandleInput(InputState &in)
 {
   static bool s_lastTextCapture = false;
@@ -68,21 +102,7 @@ bool uiHandleInput(InputState &in)
   static UIState s_prevState = UIState::BOOT;
   if (g_app.uiState != s_prevState)
   {
-    if (g_app.uiState == UIState::PET_SLEEPING)
-      uiPetSleepingOnEnter(in);
-
-    if (g_app.uiState == UIState::TITLE_MENU)
-      uiTitleMenuOnEnter(in);
-
-    if (g_app.uiState == UIState::BACKUP_PET_LIST)
-      uiBackupPetListOnEnter(in);
-
-    if (g_app.uiState == UIState::IMPORT_PET_LIST)
-      uiImportPetListOnEnter(in);
-
-    if (g_app.uiState == UIState::CHOOSE_PET)
-      uiChoosePetOnEnter(in);
-
+    uiRunStateEntryHooks(g_app.uiState, in);
     s_prevState = g_app.uiState;
   }
 
