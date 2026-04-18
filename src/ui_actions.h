@@ -5,6 +5,16 @@
 #include "ui_defs.h"
 #include "input.h"
 
+struct UIReturnTarget
+{
+  UIState state;
+  Tab tab;
+};
+
+void uiSetReturnTarget(UIState state, Tab tab);
+UIReturnTarget uiGetReturnTarget();
+void uiReturnToTarget();
+
 // -----------------------------------------------------------------------------
 // Core state transition API
 // -----------------------------------------------------------------------------

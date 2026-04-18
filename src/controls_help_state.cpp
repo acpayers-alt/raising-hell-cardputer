@@ -29,7 +29,6 @@ extern Tab g_bootWizardAfterOkTab;
 uint8_t g_controlsHelpSeen = 0;
 
 static uint32_t s_controlsHelpEnterMs = 0;
-static ReturnTarget s_controlsHelpReturn{};
 
 void controlsHelpOnEnter()
 {
@@ -43,8 +42,7 @@ bool controlsHelpDismissAllowed() { return (uint32_t)(millis() - s_controlsHelpE
 
 void controlsHelpBegin(UIState returnState, Tab returnTab)
 {
-  s_controlsHelpReturn.state = returnState;
-  s_controlsHelpReturn.tab = returnTab;
+  uiSetReturnTarget(returnState, returnTab);
 
   uiActionEnterState(UIState::CONTROLS_HELP, returnTab, true);
   requestFullUIRedraw();
@@ -67,19 +65,21 @@ void controlsHelpDismiss()
 
   // Special case: on first boot, Controls Help should continue into the
   // boot wizard entry function, not directly into a wizard state.
-  if (s_controlsHelpReturn.state == UIState::BOOT_WIFI_PROMPT)
+  UIReturnTarget ret = uiGetReturnTarget();
+
+  if (ret.state == UIState::BOOT_WIFI_PROMPT)
   {
     bootWizardBegin(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
     requestFullUIRedraw();
     return;
   }
 
-  if (s_controlsHelpReturn.state == UIState::CHOOSE_PET)
+  if (ret.state == UIState::CHOOSE_PET)
   {
     g_choosePetInputUnlockMs = millis() + 350;
     g_choosePetBlockHatchUntilRelease = true;
   }
 
-  uiActionEnterState(s_controlsHelpReturn.state, s_controlsHelpReturn.tab, true);
+  uiActionEnterState(ret.state, ret.tab, true);
   requestFullUIRedraw();
 }
