@@ -602,6 +602,11 @@ static bool bootAssetProvisionWifiReady()
   if (!bootAssetProvisionRequired())
     return false;
 
+  // While the dedicated boot Wi-Fi / onboarding flow is active, provisioning
+  // must wait for that flow to finish and return us to BOOT.
+  if (bootAssetProvisionWifiOnboardingActive())
+    return false;
+
   // Optional OTA request: if WiFi is disabled in settings, let OTA report it and continue boot.
   if (!g_bootAssetProvisionMustComplete && !settingsWifiEnabled())
     return true;
@@ -609,6 +614,36 @@ static bool bootAssetProvisionWifiReady()
   if (!g_bootProvisionWifiStarted)
   {
     const bool shouldEnableWifi = g_bootAssetProvisionMustComplete ? true : settingsWifiEnabled();
+    const bool haveStoredCreds = wifiStoreHasCreds();
+    const bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+
+    Serial.printf("[BOOT][PROVISION][WIFICHK] mandatory=%d wifiEnabled=%d haveStoredCreds=%d wifiConnected=%d ui=%d\n",
+                  g_bootAssetProvisionMustComplete ? 1 : 0, shouldEnableWifi ? 1 : 0, haveStoredCreds ? 1 : 0,
+                  wifiConnected ? 1 : 0, (int)g_app.uiState);
+
+    // If provisioning needs Wi-Fi but we do not have stored creds to auto-connect,
+    // fall back to the boot Wi-Fi connection flow instead of idling and later
+    // failing with a misleading "enable wifi first" style error.
+    //
+    // BOOT_ASSET_WIFI_REQUIRED will:
+    //   1) try stored creds if present
+    //   2) try launcher-imported creds
+    //   3) fall back to manual Wi-Fi setup
+    if (shouldEnableWifi && !wifiConnected && !haveStoredCreds)
+    {
+      Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
+
+      g_bootProvisionWifiOnboardingStarted = true;
+      g_bootAssetProvisionActive = false;
+
+      ui_setBootSplashActive(false);
+      uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
+      renderUI();
+      clearInputLatch();
+      return false;
+    }
 
     wifiSetEnabled(shouldEnableWifi);
     applyWifiPower(shouldEnableWifi);
@@ -659,21 +694,19 @@ static void finalizeBootLanding()
   if (!g_wifiApplied)
   {
     const bool pref = settingsWifiEnabled();
-  
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n",
-                  pref ? 1 : 0,
+
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n", pref ? 1 : 0,
                   (WiFi.getMode() == WIFI_OFF ? 0 : 1));
-  
+
     wifiSetEnabled(pref);
     applyWifiPower(pref);
-  
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n",
-                  pref ? 1 : 0,
+
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n", pref ? 1 : 0,
                   (WiFi.getMode() == WIFI_OFF ? 0 : 1));
-  
+
     g_wifiApplied = true;
   }
-  
+
   // If we are landing on the title screen with no save file, this is a
   // "no-save title menu" landing, not an active new-pet flow.
   //

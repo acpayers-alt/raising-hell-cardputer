@@ -263,6 +263,13 @@ static void logLine(const char *s)
 
 static void consoleArmReprovisionRecovery()
 {
+  const bool wifiEnabledBefore = settingsWifiEnabled();
+  const bool hasCredsBefore    = wifiStoreHasCreds();
+
+  Serial.printf("[REPAIR] reprovision armed wifiEnabled=%d hasCreds=%d\n",
+                wifiEnabledBefore ? 1 : 0,
+                hasCredsBefore ? 1 : 0);
+
   if (!bootFirmwareMarkerClear())
   {
     logLine("FAILED to clear firmware marker");
@@ -270,8 +277,29 @@ static void consoleArmReprovisionRecovery()
   }
 
   requestAssetProvisionOnNextBoot();
+
+  if (!wifiEnabledBefore)
+  {
+    settingsSetWifiEnabled(true);
+    saveSettingsToSD();
+  }
+
+  const bool wifiEnabledAfter = settingsWifiEnabled();
+  const bool hasCredsAfter    = wifiStoreHasCreds();
+
+  Serial.printf("[REPAIR] wifiEnabledAfter=%d hasCreds=%d\n",
+                wifiEnabledAfter ? 1 : 0,
+                hasCredsAfter ? 1 : 0);
+
   logLine("[OK] firmware marker cleared");
   logLine("[OK] asset provision boot flag set");
+
+  if (!wifiEnabledBefore)
+    logLine("[OK] WiFi enabled for next-boot reprovision");
+
+  if (!hasCredsAfter)
+    logLine("[WARN] no WiFi credentials saved; provisioning may still fail");
+
   logLine("[OK] reboot to retry asset provisioning");
 }
 
