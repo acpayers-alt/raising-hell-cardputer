@@ -36,8 +36,6 @@ static inline bool canOpenSettingsFrom(UIState s)
   }
 }
 
-<<<<<<< HEAD
-=======
 static inline bool escBlockedInState(UIState s)
 {
   switch (s)
@@ -67,7 +65,6 @@ static inline bool consoleBlockedInState(UIState s)
   }
 }
 
->>>>>>> main
 // Forward declaration
 static bool uiInterceptGlobalShortcuts(InputState& in);
 
