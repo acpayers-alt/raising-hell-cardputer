@@ -17,6 +17,7 @@ static const char* kTzNames[] = {
   "Europe/UK",
   "Europe/Central",
   "Europe/Eastern",
+  "Europe/Moscow",
 
   // Asia
   "Asia/Japan",
@@ -54,7 +55,8 @@ static const char* kTzPosix[] = {
   "GMT0BST,M3.5.0/1,M10.5.0/2",      // UK
   "CET-1CEST,M3.5.0/2,M10.5.0/3",    // Central Europe
   "EET-2EEST,M3.5.0/3,M10.5.0/4",    // Eastern Europe
-
+  "MSK-3",                           // Moscow (UTC+3, no DST)
+  
   // Asia
   "JST-9",
   "KST-9",

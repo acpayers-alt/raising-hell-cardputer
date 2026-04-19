@@ -35,6 +35,9 @@
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
 extern Tab g_bootWizardAfterOkTab;
+static uint32_t s_bootNtpWaitStartMs = 0;
+static bool s_bootNtpWaitStarted = false;
+static constexpr uint32_t kBootNtpWaitTimeoutMs = 20000;
 
 // -----------------------------------------------------------------------------
 // Launcher Import
@@ -43,6 +46,12 @@ static bool s_bootWifiImported = false;
 static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
+
+void bootWifiBeginNtpWait()
+{
+  s_bootNtpWaitStartMs = millis();
+  s_bootNtpWaitStarted = true;
+}
 
 void bootWifiSetImportedInfo(const char *ssid)
 {
@@ -101,6 +110,60 @@ static int tzIndexFromDetectedName(const String &tzNameStr)
 
   if (tzNameStr == "Pacific/Honolulu")
     return 6;
+
+  if (tzNameStr == "Europe/London")
+    return 7;
+
+  if (tzNameStr == "Europe/Paris" || tzNameStr == "Europe/Berlin" || tzNameStr == "Europe/Rome" ||
+      tzNameStr == "Europe/Madrid" || tzNameStr == "Europe/Amsterdam" || tzNameStr == "Europe/Brussels" ||
+      tzNameStr == "Europe/Vienna" || tzNameStr == "Europe/Zurich" || tzNameStr == "Europe/Prague" ||
+      tzNameStr == "Europe/Warsaw" || tzNameStr == "Europe/Stockholm" || tzNameStr == "Europe/Copenhagen" ||
+      tzNameStr == "Europe/Oslo" || tzNameStr == "Europe/Budapest")
+    return 8;
+
+  if (tzNameStr == "Europe/Helsinki" || tzNameStr == "Europe/Athens" || tzNameStr == "Europe/Bucharest" ||
+      tzNameStr == "Europe/Kyiv" || tzNameStr == "Europe/Sofia" || tzNameStr == "Europe/Riga" ||
+      tzNameStr == "Europe/Tallinn" || tzNameStr == "Europe/Vilnius")
+    return 9;
+
+  if (tzNameStr == "Europe/Moscow")
+    return 10;
+
+  if (tzNameStr == "Asia/Tokyo")
+    return 11;
+
+  if (tzNameStr == "Asia/Seoul")
+    return 12;
+
+  if (tzNameStr == "Asia/Shanghai" || tzNameStr == "Asia/Hong_Kong")
+    return 13;
+
+  if (tzNameStr == "Asia/Kolkata")
+    return 14;
+
+  if (tzNameStr == "Asia/Singapore")
+    return 15;
+
+  if (tzNameStr == "Australia/Sydney" || tzNameStr == "Australia/Melbourne" || tzNameStr == "Australia/Brisbane")
+    return 16;
+
+  if (tzNameStr == "Australia/Adelaide")
+    return 17;
+
+  if (tzNameStr == "Pacific/Auckland")
+    return 18;
+
+  if (tzNameStr == "America/Halifax")
+    return 19;
+
+  if (tzNameStr == "America/Sao_Paulo")
+    return 20;
+
+  if (tzNameStr == "America/Argentina/Buenos_Aires")
+    return 21;
+
+  if (tzNameStr == "Africa/Johannesburg")
+    return 22;
 
   return -1;
 }
@@ -494,10 +557,17 @@ void uiBootWifiWaitHandle(InputState &in)
     if (tzDetected)
     {
       wifiStartSntpNow();
+      bootWifiBeginNtpWait();
+      
+      Serial.println("[BOOT][NTP] wait started (auto TZ)");
+      
       uiActionEnterState(UIState::BOOT_NTP_WAIT, g_bootWizardAfterOkTab, true);
       requestUIRedraw();
       return;
     }
+
+    s_bootNtpWaitStarted = false;
+    s_bootNtpWaitStartMs = 0;
 
     uiActionEnterState(UIState::BOOT_TZ_PICK, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
@@ -520,6 +590,9 @@ void uiBootNtpWaitHandle(InputState &in)
 {
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
+    s_bootNtpWaitStarted = false;
+    s_bootNtpWaitStartMs = 0;
+
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
@@ -536,8 +609,30 @@ void uiBootNtpWaitHandle(InputState &in)
     return;
   }
 
+  if (s_bootNtpWaitStarted)
+  {
+    const uint32_t elapsed = millis() - s_bootNtpWaitStartMs;
+    if (elapsed >= kBootNtpWaitTimeoutMs)
+    {
+      Serial.printf("[BOOT][NTP] timeout after %lu ms -> fallback to manual time\n", (unsigned long)elapsed);
+
+      s_bootNtpWaitStarted = false;
+      s_bootNtpWaitStartMs = 0;
+
+      uiActionSwallowAll(in);
+      uiDrainKb(in);
+      clearInputLatch();
+      beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+      requestUIRedraw();
+      return;
+    }
+  }
+
   if (timeIsSynced())
   {
+    s_bootNtpWaitStarted = false;
+    s_bootNtpWaitStartMs = 0;
+
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();

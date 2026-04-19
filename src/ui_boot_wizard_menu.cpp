@@ -3,6 +3,7 @@
 #include "app_state.h"
 #include "boot_pipeline.h"
 #include "flow_time_editor.h"
+#include "flow_boot_wifi.h"
 #include "input.h"
 #include "timezone.h"
 #include "ui_actions.h"
@@ -176,6 +177,11 @@ bool UiBootWizardMenu::HandleTimezonePick(InputState &in)
   if (in.selectOnce)
   {
     tzCommit();
+    wifiStartSntpNow();
+    bootWifiBeginNtpWait();
+
+    Serial.println("[BOOT][NTP] wait started (manual TZ)");
+
     uiActionEnterState(UIState::BOOT_NTP_WAIT, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     uiActionSwallowAll(in);
@@ -183,7 +189,7 @@ bool UiBootWizardMenu::HandleTimezonePick(InputState &in)
     clearInputLatch();
     return true;
   }
-
+  
   uiActionSwallowAll(in);
   return true;
 }
