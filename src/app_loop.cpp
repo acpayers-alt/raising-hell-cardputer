@@ -43,6 +43,7 @@
 #include "ui_runtime.h"
 #include "ui_state_console.h"
 #include "ui_state_pet_sleeping.h"
+#include "ui_state_clock_mode.h"
 #include "ui_tabs.h"
 
 // -----------------------------------------------------------------------------
@@ -916,9 +917,7 @@ void appMainLoopTick()
     if (g_app.uiState == UIState::CLOCK_MODE)
     {
       noteUserActivity();
-      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 120);
-      invalidateBackgroundCache();
-      requestUIRedraw();
+      uiClockModeExitToReturn(input, 120);
       input = InputState{};
       clearInputLatch();
       return;
@@ -927,19 +926,7 @@ void appMainLoopTick()
     if (g_app.uiState == UIState::PET_SLEEPING)
     {
       noteUserActivity();
-      g_app.isSleeping = false;
-      g_app.sleepUntilAwakened = false;
-      g_app.sleepUntilRested = false;
-      g_app.sleepingByTimer = false;
-      g_app.sleepTargetEnergy = 0;
-      g_app.sleepStartTime = 0;
-      g_app.sleepDurationMs = 0;
-      pet.isSleeping = false;
-      saveManagerClearSleepPendingFlag();
-      saveManagerMarkDirty();
-      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 120);
-      invalidateBackgroundCache();
-      requestFullUIRedraw();
+      uiPetSleepingWakeAndReturn(input, 120, true);
       input = InputState{};
       clearInputLatch();
       return;

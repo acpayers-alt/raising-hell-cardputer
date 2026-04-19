@@ -9,3 +9,4 @@ void uiPetSleepingBootEnter();
 void uiPetSleepingSetReturnState(UIState state, Tab tab);
 void uiEnterPetSleepingWithReturn(UIState returnState, Tab returnTab, InputState& in, uint16_t drainMs = 120);
 void enterSleepFlow(UIState returnState, Tab returnTab, InputState& in, uint16_t drainMs = 120);
+void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs = 200, bool forceRenderNow = true);

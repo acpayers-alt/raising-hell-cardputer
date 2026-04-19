@@ -79,6 +79,26 @@ void enterSleepFlow(UIState returnState, Tab returnTab, InputState &in, uint16_t
   sleepBgKickNow();
 }
 
+void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs, bool forceRenderNow)
+{
+  g_app.isSleeping = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepingByTimer = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+
+  pet.isSleeping = false;
+
+  saveManagerClearSleepPendingFlag();
+  saveManagerMarkDirty();
+
+  graphicsReleaseUiCachesForMiniGame();
+
+  leavePetSleepingToReturnTarget(in, drainMs, forceRenderNow);
+}
+
 void uiPetSleepingHandle(InputState &in)
 {
   if (!isPetSleepingNow())
@@ -107,22 +127,7 @@ void uiPetSleepingHandle(InputState &in)
   // Wake explicitly on enter/select (but not immediately on entry)
   if (allowWake && (in.selectOnce || in.encoderPressOnce || in.mgSelectOnce || selectEdgeFallback))
   {
-    g_app.isSleeping = false;
-    g_app.sleepUntilAwakened = false;
-    g_app.sleepUntilRested = false;
-    g_app.sleepingByTimer = false;
-    g_app.sleepTargetEnergy = 0;
-    g_app.sleepStartTime = 0;
-    g_app.sleepDurationMs = 0;
-
-    pet.isSleeping = false;
-
-    saveManagerClearSleepPendingFlag();
-    saveManagerMarkDirty();
-
-    graphicsReleaseUiCachesForMiniGame();
-
-    leavePetSleepingToReturnTarget(in, 200, true);
+    uiPetSleepingWakeAndReturn(in, 200, true);
     return;
   }
   return;

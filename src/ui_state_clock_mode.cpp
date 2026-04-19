@@ -22,28 +22,34 @@ void openClockModeWithReturn(UIState state, Tab tab, InputState &in, uint16_t dr
   requestFullUIRedraw();
 }
 
+void uiClockModeExitToReturn(InputState &in, uint16_t drainMs)
+{
+  const ReturnTarget target = s_clockModeReturn;
+  s_clockModeReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
+
+  const bool returningToSleep = (target.state == UIState::PET_SLEEPING);
+
+  uiActionEnterStateClean(target.state, target.tab, true, in, drainMs);
+
+  if (returningToSleep)
+  {
+    uiPetSleepingBootEnter();
+    requestFullUIRedraw();
+    sleepBgKickNow();
+    forceRenderUIOnce();
+  }
+  else
+  {
+    requestFullUIRedraw();
+  }
+}
+
 void uiClockModeHandle(InputState &in)
 {
   if (in.escOnce || in.menuOnce)
   {
     playBeep();
-
-    const bool returningToSleep = (s_clockModeReturn.state == UIState::PET_SLEEPING);
-
-    uiActionEnterStateClean(s_clockModeReturn.state, s_clockModeReturn.tab, true, in, 150);
-
-    if (returningToSleep)
-    {
-      uiPetSleepingBootEnter();
-      requestFullUIRedraw();
-      sleepBgKickNow();
-      forceRenderUIOnce();
-    }
-    else
-    {
-      requestFullUIRedraw();
-    }
-
+    uiClockModeExitToReturn(in, 150);
     return;
   }
 }
