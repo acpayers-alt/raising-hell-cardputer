@@ -3,13 +3,17 @@
 A Tamagotchi-style virtual pet game for the M5Stack Cardputer ADV (ESP32).
 
 Raise your infernal companion through multiple life stages, feed it, play mini-games, manage sleep cycles, survive decay, and maybe… resurrect what should not be resurrected.
-
+[![Discord](https://img.shields.io/discord/1495288087104721038?label=Join%20Discord&logo=discord&color=5865F2)](https://discord.gg/RH7dwZqaxV)
 ![Latest Release](https://img.shields.io/github/v/release/acpayers-alt/raising-hell-cardputer)
 ![Platform](https://img.shields.io/badge/platform-Cardputer%20ADV-orange)
 ![License](https://img.shields.io/github/license/acpayers-alt/raising-hell-cardputer)
 
 ![Raising Hell](media/rh_multicards.JPG)
 
+## Community
+
+Follow live development, report issues, and help shape Raising Hell:
+https://discord.gg/RH7dwZqaxV
 
 ------------------------------------------------------------
 Hardware Target
