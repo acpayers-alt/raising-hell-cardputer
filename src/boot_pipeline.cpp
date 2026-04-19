@@ -602,6 +602,11 @@ static bool bootAssetProvisionWifiReady()
   if (!bootAssetProvisionRequired())
     return false;
 
+  // While the dedicated boot Wi-Fi / onboarding flow is active, provisioning
+  // must wait for that flow to finish and return us to BOOT.
+  if (bootAssetProvisionWifiOnboardingActive())
+    return false;
+
   // Optional OTA request: if WiFi is disabled in settings, let OTA report it and continue boot.
   if (!g_bootAssetProvisionMustComplete && !settingsWifiEnabled())
     return true;
@@ -609,6 +614,36 @@ static bool bootAssetProvisionWifiReady()
   if (!g_bootProvisionWifiStarted)
   {
     const bool shouldEnableWifi = g_bootAssetProvisionMustComplete ? true : settingsWifiEnabled();
+    const bool haveStoredCreds = wifiStoreHasCreds();
+    const bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+
+    Serial.printf("[BOOT][PROVISION][WIFICHK] mandatory=%d wifiEnabled=%d haveStoredCreds=%d wifiConnected=%d ui=%d\n",
+                  g_bootAssetProvisionMustComplete ? 1 : 0, shouldEnableWifi ? 1 : 0, haveStoredCreds ? 1 : 0,
+                  wifiConnected ? 1 : 0, (int)g_app.uiState);
+
+    // If provisioning needs Wi-Fi but we do not have stored creds to auto-connect,
+    // fall back to the boot Wi-Fi connection flow instead of idling and later
+    // failing with a misleading "enable wifi first" style error.
+    //
+    // BOOT_ASSET_WIFI_REQUIRED will:
+    //   1) try stored creds if present
+    //   2) try launcher-imported creds
+    //   3) fall back to manual Wi-Fi setup
+    if (shouldEnableWifi && !wifiConnected && !haveStoredCreds)
+    {
+      Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
+
+      g_bootProvisionWifiOnboardingStarted = true;
+      g_bootAssetProvisionActive = false;
+
+      ui_setBootSplashActive(false);
+      uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
+      renderUI();
+      clearInputLatch();
+      return false;
+    }
 
     wifiSetEnabled(shouldEnableWifi);
     applyWifiPower(shouldEnableWifi);
@@ -659,36 +694,47 @@ static void finalizeBootLanding()
   if (!g_wifiApplied)
   {
     const bool pref = settingsWifiEnabled();
-  
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n",
-                  pref ? 1 : 0,
+
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n", pref ? 1 : 0,
                   (WiFi.getMode() == WIFI_OFF ? 0 : 1));
-  
+
     wifiSetEnabled(pref);
     applyWifiPower(pref);
-  
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n",
-                  pref ? 1 : 0,
+
+    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n", pref ? 1 : 0,
                   (WiFi.getMode() == WIFI_OFF ? 0 : 1));
-  
+
     g_wifiApplied = true;
   }
-  
-  // saveManagerLoad() already owns runtime normalization for the "no valid save"
-  // case. At boot landing, only clear the boot-setup flag that belongs to the
-  // onboarding pipeline itself.
+
+  // If we are landing on the title screen with no save file, this is a
+  // "no-save title menu" landing, not an active new-pet flow.
+  //
+  // saveManagerLoad() may already have staged a fresh in-memory new-pet flow
+  // and written name_pending.flag before the first-boot wizard ran.
+  // If we keep those flags here, the next reboot will incorrectly think
+  // onboarding/new-pet flow is still pending.
   if (s_bootFinalLandingState == UIState::TITLE_MENU && !bootSaveFileExists())
   {
+    const bool hadNamePending = saveManagerNamePendingFlagExists();
     const bool hadBootSetupPending = bootSetupPendingFlagExists();
+
+    if (hadNamePending)
+      saveManagerClearNamePendingFlag();
 
     if (hadBootSetupPending)
       bootSetupClearPendingFlag();
 
-    Serial.printf("[BOOT][LAND] no-save title landing bootSetupPending=%d saveExists=%d\n",
-                  hadBootSetupPending ? 1 : 0,
+    g_app.newPetFlowActive = false;
+
+    Serial.printf("[BOOT][LAND] no-save title cleanup namePending=%d bootSetupPending=%d\n", hadNamePending ? 1 : 0,
+                  hadBootSetupPending ? 1 : 0);
+
+    Serial.printf("[BOOT][LAND] post-cleanup namePending=%d bootSetupPending=%d saveExists=%d\n",
+                  saveManagerNamePendingFlagExists() ? 1 : 0, bootSetupPendingFlagExists() ? 1 : 0,
                   bootSaveFileExists() ? 1 : 0);
   }
-  
+
   if (g_postProvisionControlsHelpPending)
   {
     g_postProvisionControlsHelpPending = false;
@@ -1175,12 +1221,9 @@ void postBootInitTick()
       return;
     }
 
-    // Do not start/retry provisioning while the boot Wi-Fi flow is still active.
-    if (bootAssetProvisionWifiOnboardingActive())
-      return;
-
-    // For mandatory provisioning, only run OTA once Wi-Fi is actually connected.
-    if (g_bootAssetProvisionMustComplete && WiFi.status() != WL_CONNECTED)
+    // Let the boot Wi-Fi/provision helper own Wi-Fi bring-up, credential fallback,
+    // and connection waiting before OTA is allowed to run.
+    if (!bootAssetProvisionWifiReady())
       return;
 
     if (runBootAssetProvision())
