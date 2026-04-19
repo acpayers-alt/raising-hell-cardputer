@@ -35,6 +35,9 @@
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
 extern Tab g_bootWizardAfterOkTab;
+static uint32_t s_bootNtpWaitStartMs = 0;
+static bool s_bootNtpWaitStarted = false;
+static constexpr uint32_t kBootNtpWaitTimeoutMs = 20000;
 
 // -----------------------------------------------------------------------------
 // Launcher Import
@@ -43,6 +46,12 @@ static bool s_bootWifiImported = false;
 static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
+
+void bootWifiBeginNtpWait()
+{
+  s_bootNtpWaitStartMs = millis();
+  s_bootNtpWaitStarted = true;
+}
 
 void bootWifiSetImportedInfo(const char *ssid)
 {
@@ -99,7 +108,7 @@ static int tzIndexFromDetectedName(const String &tzNameStr)
       tzNameStr == "America/Sitka" || tzNameStr == "America/Yakutat" || tzNameStr == "America/Metlakatla")
     return 5;
 
-    if (tzNameStr == "Pacific/Honolulu")
+  if (tzNameStr == "Pacific/Honolulu")
     return 6;
 
   if (tzNameStr == "Europe/London")
@@ -548,10 +557,17 @@ void uiBootWifiWaitHandle(InputState &in)
     if (tzDetected)
     {
       wifiStartSntpNow();
+      bootWifiBeginNtpWait();
+      
+      Serial.println("[BOOT][NTP] wait started (auto TZ)");
+      
       uiActionEnterState(UIState::BOOT_NTP_WAIT, g_bootWizardAfterOkTab, true);
       requestUIRedraw();
       return;
     }
+
+    s_bootNtpWaitStarted = false;
+    s_bootNtpWaitStartMs = 0;
 
     uiActionEnterState(UIState::BOOT_TZ_PICK, g_bootWizardAfterOkTab, true);
     requestUIRedraw();
@@ -574,6 +590,9 @@ void uiBootNtpWaitHandle(InputState &in)
 {
   if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
   {
+    s_bootNtpWaitStarted = false;
+    s_bootNtpWaitStartMs = 0;
+
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
@@ -590,8 +609,30 @@ void uiBootNtpWaitHandle(InputState &in)
     return;
   }
 
+  if (s_bootNtpWaitStarted)
+  {
+    const uint32_t elapsed = millis() - s_bootNtpWaitStartMs;
+    if (elapsed >= kBootNtpWaitTimeoutMs)
+    {
+      Serial.printf("[BOOT][NTP] timeout after %lu ms -> fallback to manual time\n", (unsigned long)elapsed);
+
+      s_bootNtpWaitStarted = false;
+      s_bootNtpWaitStartMs = 0;
+
+      uiActionSwallowAll(in);
+      uiDrainKb(in);
+      clearInputLatch();
+      beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+      requestUIRedraw();
+      return;
+    }
+  }
+
   if (timeIsSynced())
   {
+    s_bootNtpWaitStarted = false;
+    s_bootNtpWaitStartMs = 0;
+
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();

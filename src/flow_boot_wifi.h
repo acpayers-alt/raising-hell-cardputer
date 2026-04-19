@@ -15,7 +15,7 @@ void uiBootWifiImportedHandle(InputState &in);
 void uiBootTzPickHandle(InputState &in);
 void uiBootNtpWaitHandle(InputState &in);
 void uiBootAssetWifiRequiredHandle(InputState &in);
-
+void bootWifiBeginNtpWait();
 
 //Launcher Import Handlers
 void bootWifiSetImportedInfo(const char *ssid);
