@@ -23,10 +23,10 @@ static void actClockMode(InputState &in)
   resetClockModePetPresentation();
 
   // Return to whatever screen was underneath the power menu.
-  uiClockModeSetReturnState(g_settingsFlow.powerMenuReturn.state,
-                            g_settingsFlow.powerMenuReturn.tab);
-
-  uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, in, 120);
+  openClockModeWithReturn(g_settingsFlow.powerMenuReturn.state,
+                          g_settingsFlow.powerMenuReturn.tab,
+                          in,
+                          120);
 }
 
 static void actReboot(InputState& in)

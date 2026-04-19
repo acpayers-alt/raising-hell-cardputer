@@ -9,15 +9,9 @@
 
 static ReturnTarget s_clockModeReturn{UIState::PET_SCREEN, Tab::TAB_PET};
 
-void uiClockModeSetReturnState(UIState state, Tab tab)
-{
-  s_clockModeReturn.state = state;
-  s_clockModeReturn.tab = tab;
-}
-
 void openClockModeWithReturn(UIState state, Tab tab, InputState &in, uint16_t drainMs)
 {
-  uiClockModeSetReturnState(state, tab);
+  s_clockModeReturn = {state, tab};
   uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, in, drainMs);
   requestFullUIRedraw();
 }
