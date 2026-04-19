@@ -99,8 +99,62 @@ static int tzIndexFromDetectedName(const String &tzNameStr)
       tzNameStr == "America/Sitka" || tzNameStr == "America/Yakutat" || tzNameStr == "America/Metlakatla")
     return 5;
 
-  if (tzNameStr == "Pacific/Honolulu")
+    if (tzNameStr == "Pacific/Honolulu")
     return 6;
+
+  if (tzNameStr == "Europe/London")
+    return 7;
+
+  if (tzNameStr == "Europe/Paris" || tzNameStr == "Europe/Berlin" || tzNameStr == "Europe/Rome" ||
+      tzNameStr == "Europe/Madrid" || tzNameStr == "Europe/Amsterdam" || tzNameStr == "Europe/Brussels" ||
+      tzNameStr == "Europe/Vienna" || tzNameStr == "Europe/Zurich" || tzNameStr == "Europe/Prague" ||
+      tzNameStr == "Europe/Warsaw" || tzNameStr == "Europe/Stockholm" || tzNameStr == "Europe/Copenhagen" ||
+      tzNameStr == "Europe/Oslo" || tzNameStr == "Europe/Budapest")
+    return 8;
+
+  if (tzNameStr == "Europe/Helsinki" || tzNameStr == "Europe/Athens" || tzNameStr == "Europe/Bucharest" ||
+      tzNameStr == "Europe/Kyiv" || tzNameStr == "Europe/Sofia" || tzNameStr == "Europe/Riga" ||
+      tzNameStr == "Europe/Tallinn" || tzNameStr == "Europe/Vilnius")
+    return 9;
+
+  if (tzNameStr == "Europe/Moscow")
+    return 10;
+
+  if (tzNameStr == "Asia/Tokyo")
+    return 11;
+
+  if (tzNameStr == "Asia/Seoul")
+    return 12;
+
+  if (tzNameStr == "Asia/Shanghai" || tzNameStr == "Asia/Hong_Kong")
+    return 13;
+
+  if (tzNameStr == "Asia/Kolkata")
+    return 14;
+
+  if (tzNameStr == "Asia/Singapore")
+    return 15;
+
+  if (tzNameStr == "Australia/Sydney" || tzNameStr == "Australia/Melbourne" || tzNameStr == "Australia/Brisbane")
+    return 16;
+
+  if (tzNameStr == "Australia/Adelaide")
+    return 17;
+
+  if (tzNameStr == "Pacific/Auckland")
+    return 18;
+
+  if (tzNameStr == "America/Halifax")
+    return 19;
+
+  if (tzNameStr == "America/Sao_Paulo")
+    return 20;
+
+  if (tzNameStr == "America/Argentina/Buenos_Aires")
+    return 21;
+
+  if (tzNameStr == "Africa/Johannesburg")
+    return 22;
 
   return -1;
 }
