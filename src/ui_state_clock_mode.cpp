@@ -25,11 +25,12 @@ void openClockModeWithReturn(UIState state, Tab tab, InputState &in, uint16_t dr
 void uiClockModeExitToReturn(InputState &in, uint16_t drainMs)
 {
   const ReturnTarget target = s_clockModeReturn;
-  s_clockModeReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
-
   const bool returningToSleep = (target.state == UIState::PET_SLEEPING);
 
   uiActionEnterStateClean(target.state, target.tab, true, in, drainMs);
+
+  // Reset after use, not before.
+  s_clockModeReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
 
   if (returningToSleep)
   {
