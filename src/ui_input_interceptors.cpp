@@ -50,6 +50,24 @@ static inline bool escBlockedInState(UIState s)
   }
 }
 
+static inline bool consoleBlockedInState(UIState s)
+{
+  switch (s)
+  {
+    case UIState::BOOT_WIFI_PROMPT:
+    case UIState::BOOT_WIFI_IMPORTED:
+    case UIState::BOOT_WIFI_WAIT:
+    case UIState::BOOT_TZ_PICK:
+    case UIState::BOOT_NTP_WAIT:
+    case UIState::BOOT_ASSET_WIFI_REQUIRED:
+    case UIState::WIFI_SETUP:
+    case UIState::WIFI_CONNECT_WAIT:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Forward declaration
 static bool uiInterceptGlobalShortcuts(InputState& in);
 
@@ -97,6 +115,14 @@ bool uiHandleGlobalInterceptors(InputState &in)
       uiActionSwallowEdges(in);
       return true;
     }
+  }
+
+  // Never allow console entry during boot WiFi / provisioning flows.
+  if (in.consoleOnce && consoleBlockedInState(g_app.uiState))
+  {
+    Serial.printf("[INPUT] console blocked in state=%d\n", (int)g_app.uiState);
+    uiActionSwallowEdges(in);
+    return true;
   }
 
   // Global shortcuts (ESC -> settings, etc.)
