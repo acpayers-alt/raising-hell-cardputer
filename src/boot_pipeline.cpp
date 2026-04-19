@@ -716,22 +716,12 @@ static void finalizeBootLanding()
   // onboarding/new-pet flow is still pending.
   if (s_bootFinalLandingState == UIState::TITLE_MENU && !bootSaveFileExists())
   {
-    const bool hadNamePending = saveManagerNamePendingFlagExists();
     const bool hadBootSetupPending = bootSetupPendingFlagExists();
-
-    if (hadNamePending)
-      saveManagerClearNamePendingFlag();
 
     if (hadBootSetupPending)
       bootSetupClearPendingFlag();
 
-    g_app.newPetFlowActive = false;
-
-    Serial.printf("[BOOT][LAND] no-save title cleanup namePending=%d bootSetupPending=%d\n", hadNamePending ? 1 : 0,
-                  hadBootSetupPending ? 1 : 0);
-
-    Serial.printf("[BOOT][LAND] post-cleanup namePending=%d bootSetupPending=%d saveExists=%d\n",
-                  saveManagerNamePendingFlagExists() ? 1 : 0, bootSetupPendingFlagExists() ? 1 : 0,
+    Serial.printf("[BOOT][LAND] no-save title landing bootSetupPending=%d saveExists=%d\n", hadBootSetupPending ? 1 : 0,
                   bootSaveFileExists() ? 1 : 0);
   }
 

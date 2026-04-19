@@ -598,12 +598,10 @@ static void execLine(char *line)
     logLine("  repair assets       re-run asset provisioning (safe)");
     logLine("  rescue ota          dev: clear firmware marker + reprovision");
     logLine("  rescue              alias for fwmark reprovision");
-    logLine("  rescue ota          alias for fwmark reprovision");
     logLine("  fwmark              show firmware marker status");
     logLine("  fwmark show         show stored/current build id");
     logLine("  fwmark clear        clear stored build id");
-    logLine("  fwmark reprovision  clear marker + set asset flag");
-    logLine("  reboot              reboot device");
+    logLine("  fwmark reprovision  dev: clear marker + set asset flag");    logLine("  reboot              reboot device");
     logLine("  nvsclear            wipe NVS (factory clean) + reboot");
     logLine("  ntpskip            bypass stalled NTP check");
     logLine("  timeinvalidate            marks current time invalid");
