@@ -1,7 +1,6 @@
 #pragma once
 
 #include "input.h"
-#include "return_target.h"
 #include "ui_defs.h"
 
 // Centralizes Settings page navigation state.

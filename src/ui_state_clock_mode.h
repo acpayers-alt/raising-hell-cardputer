@@ -1,6 +1,6 @@
 #pragma once
 
-#include "app_state.h"
+#include "ui_defs.h"
 #include "input.h"
 
 void uiClockModeHandle(InputState &in);

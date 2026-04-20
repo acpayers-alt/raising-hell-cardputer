@@ -1,6 +1,5 @@
 #pragma once
 
-struct InputState;
 #include "ui_defs.h"
 #include "input.h"
 

@@ -1,8 +1,9 @@
 #pragma once
 
 #include "input.h"
-#include "save_manager.h"
 #include "settings_flow_state.h"
+
+struct PetExportEntry;
 
 // ─────────────────────────────────────
 // State lifecycle

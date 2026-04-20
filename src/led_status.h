@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-#include "led_status.h"
 #include "graphics.h"
 
 #define LED_STATUS_ENABLED 1
