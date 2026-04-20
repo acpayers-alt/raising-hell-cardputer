@@ -2132,16 +2132,6 @@ static bool autoHealLoadedSaveIfNeeded()
   return changed;
 }
 
-static void forceNamePetFlowFromBoot()
-{
-  inputSetTextCapture(true);
-  uiActionEnterState(UIState::NAME_PET, Tab::TAB_PET, true);
-
-  g_app.uiNeedsRedraw = true;
-  requestFullUIRedraw();
-  clearInputLatch();
-}
-
 // ------------------------------------------------------------
 // Public API
 // ------------------------------------------------------------

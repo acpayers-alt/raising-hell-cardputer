@@ -339,7 +339,6 @@ static void drawPetSettingsMenu()
 
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
-  spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
 
   const char *labels[] = {"Rename Pet", "Backup Current Pet", "Restore From Backup", "New Pet"};
   const int totalItems = 4;

@@ -3,7 +3,6 @@
 #include "app_state.h"
 #include "console.h"
 #include "input.h"
-#include "return_target.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_input_common.h"
@@ -11,24 +10,27 @@
 #include "ui_runtime.h"
 
 // Console return target
-static ReturnTarget g_consoleReturn{UIState::PET_SCREEN, Tab::TAB_PET};
-static SettingsPage g_consoleReturnPage = SettingsPage::TOP;
+static bool s_consoleReturnToSettings = false;
+static SettingsPage s_consoleReturnPage = SettingsPage::TOP;
 
 void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSettings, SettingsPage retSettingsPage)
 {
-  g_consoleReturn.state = returnState;
-  g_consoleReturn.tab = returnTab;
-  g_consoleReturnPage = retSettingsPage;
+  s_consoleReturnToSettings = retToSettings;
+  s_consoleReturnPage = retSettingsPage;
+
   uiPushReturnTarget(returnState, returnTab);
 
   if (retToSettings)
-  {
     g_settingsFlow.settingsReturnPage = retSettingsPage;
-  }
 
   consoleOpen();
 
   uiActionEnterState(UIState::CONSOLE, returnTab, true);
+ 
+  // Be explicit here: console must always enter with text capture enabled.
+  inputSetTextCapture(true);
+  g_textCaptureMode = true;
+
   clearInputLatch();
   requestUIRedraw();
 }
@@ -59,26 +61,23 @@ void uiConsoleHandle(InputState &input)
 
     const UIReturnTarget ret = uiGetReturnTarget();
 
-    if (g_consoleReturn.state == UIState::SETTINGS)
+    if (s_consoleReturnToSettings)
     {
-      // Console pushed its own shared return target on open.
-      // Settings close will pop its own return target, so pop console's first.
-      g_settingsFlow.settingsPage = g_consoleReturnPage;
+      g_settingsFlow.settingsPage = s_consoleReturnPage;
       closeSettingsAndReturn(input);
       requestUIRedraw();
       return;
     }
 
-    // Normal behavior: return to the UI state we came from
     uiPopReturnTarget();
     uiActionEnterStateClean(ret.state, ret.tab, true, input, 120);
     requestUIRedraw();
     return;
-  }
 
-  // Let the console module handle keystrokes, cursor, etc.
-  consoleUpdate(input);
-  requestUIRedraw();
+    // Let the console module handle keystrokes, cursor, etc.
+    consoleUpdate(input);
+    requestUIRedraw();
+  }
 }
 
 bool closeConsoleAndReturn(InputState &input)
@@ -94,11 +93,9 @@ bool closeConsoleAndReturn(InputState &input)
 
   const UIReturnTarget ret = uiGetReturnTarget();
 
-  if (g_consoleReturn.state == UIState::SETTINGS)
+  if (s_consoleReturnToSettings)
   {
-    // Console pushed its own shared return target on open.
-    // Settings close will pop its own return target, so pop console's first.
-    g_settingsFlow.settingsPage = g_consoleReturnPage;
+    g_settingsFlow.settingsPage = s_consoleReturnPage;
     closeSettingsAndReturn(input);
     requestUIRedraw();
     return true;

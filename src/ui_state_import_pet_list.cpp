@@ -58,15 +58,6 @@ static bool deleteStoredPetAtPath(const char *path)
 
 } // namespace
 
-void openImportPetListFromSettings(SettingsPage returnPage, InputState &in)
-{
-  s_returnToSettings = true;
-  s_returnPage = returnPage;
-
-  uiActionEnterStateClean(UIState::IMPORT_PET_LIST, g_app.currentTab, true, in, 120);
-  requestFullUIRedraw();
-}
-
 void openImportPetListFromTitle(InputState &in)
 {
   s_returnToSettings = false;
@@ -215,6 +206,7 @@ void uiImportPetListHandle(InputState &in)
           {
             playBeep();
             s_returnToSettings = false;
+            g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
             ui_showSuccessMessage("Pet Resumed");
 
             const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
@@ -314,6 +306,7 @@ void uiImportPetListHandle(InputState &in)
       s_actionMenuActive = false;
       s_actionIndex = 0;
       s_returnToSettings = false;
+      g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
 
       ui_showSuccessMessage("Pet Resumed");
 
@@ -381,8 +374,12 @@ void uiImportPetListHandle(InputState &in)
 
     if (s_returnToSettings)
     {
-      const SettingsPage returnPage = s_returnPage;
+      const SettingsPage returnPage = g_settingsFlow.settingsReturnPage;
+
       s_returnToSettings = false;
+
+      g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
+
       returnToSettingsPage(returnPage, g_app.currentTab, in);
     }
     else
