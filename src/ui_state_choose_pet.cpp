@@ -60,8 +60,6 @@ void uiChoosePetHandle(InputState &in)
         (void)in.kbPop();
       in.clearEdges();
       clearInputLatch();
-      Serial.printf("[EGG] BLOCKED unlockMs still active now=%lu unlockMs=%lu\n", (unsigned long)now,
-                    (unsigned long)g_choosePetInputUnlockMs);
       return;
     }
 
@@ -102,7 +100,6 @@ void uiChoosePetHandle(InputState &in)
       in.clearEdges();
       inputForceClear();
       clearInputLatch();
-      Serial.println("[EGG] BLOCKED waiting for release");
       return;
     }
   }
@@ -243,7 +240,7 @@ void uiChoosePetHandle(InputState &in)
     g_app.flow.hatch.flashPhase = 0;
     g_app.flow.hatch.flashPhaseStartMs = 0;
     g_app.flow.hatch.lastStep = 255;
-    
+
     // Enter the modal hatching state
     uiActionEnterStateClean(UIState::HATCHING, Tab::TAB_PET, false, in, 150);
     requestFullUIRedraw();

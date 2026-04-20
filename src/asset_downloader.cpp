@@ -10,6 +10,8 @@
 #include "asset_ota_config.h"
 #include "sdcard.h"
 
+static constexpr bool kLogOtaTrace = false;
+
 static String joinStagingPath(const String &relPath) { return String(assetOtaStagingRoot()) + "/" + relPath + ".part"; }
 
 static String synthesizeAssetUrl(const char *relPath)
@@ -144,12 +146,14 @@ bool assetDownloadToStaging(const String &fileUrl, const AssetManifestFile &file
   wantHash.toLowerCase();
   wantHash.trim();
 
-  Serial.printf("[OTA TRACE] downloader path=%s\n", file.path);
-Serial.printf("[OTA TRACE] downloader raw sha len=%u sha=%s\n",
-              (unsigned)strlen(file.sha256), file.sha256);
-Serial.printf("[OTA TRACE] downloader wantHash len=%u sha=%s\n",
-              (unsigned)wantHash.length(), wantHash.c_str());
-              
+  if (kLogOtaTrace)
+  {
+    Serial.printf("[OTA TRACE] downloader path=%s\n", file.path);
+    Serial.printf("[OTA TRACE] downloader raw sha len=%u sha=%s\n",
+                  (unsigned)strlen(file.sha256), file.sha256);
+    Serial.printf("[OTA TRACE] downloader wantHash len=%u sha=%s\n",
+                  (unsigned)wantHash.length(), wantHash.c_str());
+  }              
   if (!wantHash.isEmpty() && wantHash.length() != 64)
   {
     http.end();

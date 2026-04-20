@@ -267,9 +267,6 @@ void uiTitleMenuHandle(InputState &in)
   }
 
   swallowTitleInput(in);
-
-  Serial.printf("[TITLE] idx=%d row0=%s import=%d settings=%d\n", g_titleMenuIndex,
-                s_titleHasSave ? "continue" : "newpet", s_titleHasImport ? 1 : 0, 1);
 }
 
 bool uiTitleMenuHasSave() { return s_titleHasSave; }

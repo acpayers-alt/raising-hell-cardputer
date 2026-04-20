@@ -22,10 +22,12 @@
 #include "ui_runtime.h"
 #include "wifi_time.h"
 
+static constexpr bool kLogVerifySuccess = false;
+static constexpr bool kLogInstallVerbose = false;
+
 // -----------------------------------------------------------------------------
 // Worklist helpers
 // -----------------------------------------------------------------------------
-
 const char *assetOtaWorklistPath() { return "/raising_hell/ota/worklist.txt"; }
 
 bool assetOtaWorklistClear()
@@ -267,7 +269,10 @@ static bool localAssetMatches(const AssetManifestFile &f)
   String livePath = "/";
   livePath += f.path;
 
-  Serial.printf("[VERIFY] checking %s\n", livePath.c_str());
+  if (kLogVerifySuccess)
+  {
+    Serial.printf("[VERIFY] checking %s\n", livePath.c_str());
+  }
 
   if (!SD.exists(livePath.c_str()))
   {
@@ -333,7 +338,10 @@ static bool localAssetMatches(const AssetManifestFile &f)
     return false;
   }
 
-  Serial.printf("[VERIFY] OK %s\n", livePath.c_str());
+  if (kLogVerifySuccess)
+  {
+    Serial.printf("[VERIFY] OK %s\n", livePath.c_str());
+  }
   return true;
 }
 
@@ -488,10 +496,13 @@ static bool installStagedFile(const String &relPath, const String &stagingPath)
   String livePath = "/";
   livePath += relPath;
 
-  Serial.printf("\n[INSTALL] =========\n");
-  Serial.printf("[INSTALL] rel=%s\n", relPath.c_str());
-  Serial.printf("[INSTALL] staging=%s\n", stagingPath.c_str());
-  Serial.printf("[INSTALL] live=%s\n", livePath.c_str());
+  if (kLogInstallVerbose)
+  {
+    Serial.printf("\n[INSTALL] =========\n");
+    Serial.printf("[INSTALL] rel=%s\n", relPath.c_str());
+    Serial.printf("[INSTALL] staging=%s\n", stagingPath.c_str());
+    Serial.printf("[INSTALL] live=%s\n", livePath.c_str());
+  }
 
   if (!SD.exists(stagingPath.c_str()))
   {
@@ -507,7 +518,10 @@ static bool installStagedFile(const String &relPath, const String &stagingPath)
 
   if (SD.exists(livePath.c_str()))
   {
-    Serial.println("[INSTALL] removing existing file");
+    if (kLogInstallVerbose)
+    {
+      Serial.println("[INSTALL] removing existing file");
+    }
     SD.remove(livePath.c_str());
   }
 
@@ -519,7 +533,10 @@ static bool installStagedFile(const String &relPath, const String &stagingPath)
 
   bool exists = SD.exists(livePath.c_str());
 
-  Serial.printf("[INSTALL] DONE exists=%d\n", exists);
+  if (kLogInstallVerbose)
+  {
+    Serial.printf("[INSTALL] DONE exists=%d\n", exists);
+  }
 
   return exists;
 }

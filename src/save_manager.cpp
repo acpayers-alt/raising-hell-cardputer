@@ -434,8 +434,6 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
           char full[128];
           snprintf(full, sizeof(full), "%s/%s", dirPath, nm);
 
-          Serial.printf("[EXPORT LIST] scan nm=%s full=%s\n", nm, full);
-
           PetExportEntry entry{};
           if (readExportMetadata(full, entry))
           {

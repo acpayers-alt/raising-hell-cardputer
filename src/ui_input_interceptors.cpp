@@ -106,10 +106,16 @@ bool uiHandleGlobalInterceptors(InputState &in)
     }
   }
 
-  // Never allow console entry during boot WiFi / provisioning flows.
   if (in.consoleOnce && consoleBlockedInState(g_app.uiState))
   {
-    Serial.printf("[INPUT] console blocked in state=%d\n", (int)g_app.uiState);
+    static UIState s_lastBlockedState = (UIState)-1;
+  
+    if (g_app.uiState != s_lastBlockedState)
+    {
+      Serial.printf("[INPUT] console blocked in state=%d\n", (int)g_app.uiState);
+      s_lastBlockedState = g_app.uiState;
+    }
+  
     uiActionSwallowEdges(in);
     return true;
   }
