@@ -236,7 +236,14 @@ void uiChoosePetHandle(InputState &in)
     g_app.flow.hatch.frame = 0;
     g_app.flow.hatch.flashWhite = false;
     g_app.flow.hatch.flashStartMs = 0;
-
+    g_app.flow.hatch.inited = false;
+    g_app.flow.hatch.step = 0;
+    g_app.flow.hatch.stepStartMs = 0;
+    g_app.flow.hatch.flashActive = false;
+    g_app.flow.hatch.flashPhase = 0;
+    g_app.flow.hatch.flashPhaseStartMs = 0;
+    g_app.flow.hatch.lastStep = 255;
+    
     // Enter the modal hatching state
     uiActionEnterStateClean(UIState::HATCHING, Tab::TAB_PET, false, in, 150);
     requestFullUIRedraw();

@@ -13,6 +13,17 @@ struct HatchFlowState {
 
   bool     flashWhite = false;
   uint32_t flashStartMs = 0;
+
+  // Script progression state (formerly hidden static locals in updateHatching)
+  bool     inited = false;
+  uint8_t  step = 0;
+  uint32_t stepStartMs = 0;
+
+  bool     flashActive = false;
+  uint8_t  flashPhase = 0;
+  uint32_t flashPhaseStartMs = 0;
+
+  uint8_t  lastStep = 255;
 };
 
 struct EvoFlowState {
