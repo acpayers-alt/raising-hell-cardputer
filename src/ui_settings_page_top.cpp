@@ -146,15 +146,26 @@ void Handle_TOP(InputState &input, int move)
 
     case 9:
     { // Store Pet
-      char parkedPath[128];
-      if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
+      char boxedPath[128] = {0};
+
+      if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
       {
         ui_showMessage("Store failed");
+        Serial.println("[UI] Store Pet FAILED");
         requestUIRedraw();
         playBeep();
         clearInputLatch();
         return;
       }
+
+      Serial.printf("[UI] Store Pet OK path=%s\n", boxedPath);
+
+      // Box/store already removed the live save on disk.
+      // Reset runtime/UI state so Title correctly shows "New Pet".
+      resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+      g_app.newPetFlowActive = false;
+      saveManagerClearNamePendingFlag();
+      saveManagerClearSleepPendingFlag();
 
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
@@ -164,7 +175,7 @@ void Handle_TOP(InputState &input, int move)
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
       return;
     }
-
+    
     case 10:
     { // Main Menu
       resetSettingsNav(true);

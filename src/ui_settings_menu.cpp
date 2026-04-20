@@ -583,10 +583,9 @@ static void actPet_RenamePet(InputState &input)
 
 static void actPet_StorePet(InputState &input)
 {
-  char boxedPath[128];
-  // Export the current live pet to storage and remove the live on-disk save.
-  // Caller is still responsible for resetting runtime/UI state afterward.
-  bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize);
+  char boxedPath[128] = {0};
+
+  if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
   {
     ui_showMessage("Store failed");
     Serial.println("[UI] Store Pet FAILED");

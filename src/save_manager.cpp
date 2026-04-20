@@ -2649,6 +2649,9 @@ bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
 
 bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize)
 {
+  if (outPath && outPathSize > 0)
+    outPath[0] = '\0';
+
   if (!g_sdReady)
     return false;
 
@@ -2656,9 +2659,9 @@ bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize)
   //
   // Contract:
   // - This function removes the live on-disk save after a successful export.
-  // - It does NOT reset runtime/UI state; callers must do that separately.  if
-  // (!saveManagerExportCurrentBubJson(outPath, outPathSize))
-  return false;
+  // - It does NOT reset runtime/UI state; callers must do that separately.
+  if (!saveManagerExportCurrentBubJson(outPath, outPathSize))
+    return false;
 
   // 2) Remove the active unified save and temp/bak files.
   SD.remove(SAVE_PATH);
