@@ -78,6 +78,18 @@
 static void clearNamePendingFlag();
 void resetRuntimeToCleanNoSaveState(bool resetName);
 static bool isFinalBubFilename(const char *nm);
+static uint32_t s_lastExportListHash = 0;
+
+static uint32_t hashExportEntry(const PetExportEntry &e)
+{
+  uint32_t h = 5381;
+
+  const char *p = e.path;
+  while (*p)
+    h = ((h << 5) + h) + (uint8_t)*p++;
+
+  return h ^ (uint32_t)e.createdAtEpoch;
+}
 
 static const char *getFirmwareVersionString()
 {
@@ -332,6 +344,62 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
 
   File f = SD.open(path, FILE_READ);
   if (!f)
+    return false;
+
+  DynamicJsonDocument filter(256);
+  filter["format"] = true;
+  filter["exportVersion"] = true;
+  filter["createdAtEpoch"] = true;
+  filter["profile"]["name"] = true;
+  filter["profile"]["petType"] = true;
+  filter["profile"]["petId"] = true;
+
+  DynamicJsonDocument doc(1024);
+  DeserializationOption::Filter filtered(filter);
+  const DeserializationError err = deserializeJson(doc, f, filtered);
+  f.close();
+
+  if (err)
+    return false;
+
+  const char *format = doc["format"] | "";
+  const uint16_t exportVersion = doc["exportVersion"] | 0;
+  if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
+    return false;
+
+  const char *name = doc["profile"]["name"] | "";
+  const char *petType = doc["profile"]["petType"] | "";
+  const uint32_t createdAtEpoch = (uint32_t)(doc["createdAtEpoch"] | 0);
+  const char *petId = doc["profile"]["petId"] | "";
+
+  strncpy(out.path, path, sizeof(out.path) - 1);
+  out.path[sizeof(out.path) - 1] = '\0';
+
+  strncpy(out.name, (name && name[0]) ? name : "Bub", sizeof(out.name) - 1);
+  out.name[sizeof(out.name) - 1] = '\0';
+
+  strncpy(out.petType, (petType && petType[0]) ? petType : "DEVIL", sizeof(out.petType) - 1);
+  out.petType[sizeof(out.petType) - 1] = '\0';
+
+  strncpy(out.petId, petId, sizeof(out.petId) - 1);
+  out.petId[sizeof(out.petId) - 1] = '\0';
+
+  out.createdAtEpoch = createdAtEpoch;
+  out.valid = true;
+  return true;
+}
+
+static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
+{
+  out.valid = false;
+  out.path[0] = '\0';
+  out.name[0] = '\0';
+  out.petType[0] = '\0';
+  out.petId[0] = '\0';
+  out.createdAtEpoch = 0;
+
+  File f = SD.open(path, FILE_READ);
+  if (!f)
   {
     Serial.printf("[EXPORT LIST] open failed path=%s\n", path ? path : "(null)");
     return false;
@@ -384,10 +452,6 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
 
   out.createdAtEpoch = createdAtEpoch;
   out.valid = true;
-
-  Serial.printf("[EXPORT LIST] ok path=%s petId=%s name=%s created=%lu\n", out.path,
-                out.petId[0] ? out.petId : "(none)", out.name, (unsigned long)out.createdAtEpoch);
-
   return true;
 }
 
@@ -2623,7 +2687,7 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   }
 
   PetExportEntry verify{};
-  if (!readExportMetadata(tmpPath, verify))
+  if (!readExportMetadataQuiet(tmpPath, verify))
   {
     tryRemove(tmpPath);
     return false;
