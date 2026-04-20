@@ -129,7 +129,33 @@ Download the latest firmware binary from the **GitHub Releases page**:
 
 https://github.com/acpayers-alt/raising-hell-cardputer/releases
 
-### Step 2 — Flash firmware
+## Step 2 - Install Assets/Manifest
+- Do **not** rename asset files or folders (except the manifest file, see below)  
+- Make sure the path is exactly: /raising_hell/assets/
+
+### Manifest Requirement (Important)
+
+Manual installs require the **v2 asset manifest**.
+
+You must use the correct manifest file and rename it to:
+
+manifest_local.json
+
+1. Locate the **v2 manifest file** from the assets package  
+   (for example: `manifest-dev-v2.json` or `manifest-public-v2.json`)
+
+2. Rename it to:
+   manifest_local.json
+
+3. Place it in:
+   /raising_hell/assets/
+
+If the wrong manifest is used, or if it is not renamed correctly, the game will not detect the local asset pack and may:
+- attempt OTA download
+- report missing assets
+- fail to load assets properly
+
+### Step 3 — Flash firmware
 
 Flash the firmware to the device.
 
@@ -145,7 +171,7 @@ Or using esptool:
 esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash 0x10000 firmware.bin
 ```
 
-### Step 3 — Launch the game
+### Step 4 — Launch the game
 
 After booting the firmware:
 
@@ -182,42 +208,6 @@ If the game fails to start:
 - Ensure an **SD card is installed**
 - Ensure the device has **Wi-Fi connectivity** for asset provisioning
 - Restart the device after flashing
-
----
-
-## Installing Assets Manually (if you just wanna)
-
-### 1. Download the Assets
-- Go to the project’s GitHub repository
-- Download the assets folder (or clone the repo)
-
-### 2. Prepare Your SD Card
-- Format the SD card as **FAT32**
-- Insert it into your computer
-
-### 3. Copy the Assets
-Create the following folder structure on the SD card (if it doesn’t exist):
-
-/raising_hell/assets/
-
-Copy **all asset files and folders** into:
-
-/raising_hell/assets/
-
-### 4. Insert into Device
-- Safely eject the SD card
-- Insert it into your Cardputer
-- Power on the device
-
-### 5. First Run
-- The game will automatically detect and load the assets
-- If versions don’t match, it may prompt or auto-update (depending on your build)
-
----
-
-## Notes
-- Do **not** rename files or folders
-- Make sure the path is exactly: /raising_hell/assets/
 
 ------------------------------------------------------------
 Development Direction
