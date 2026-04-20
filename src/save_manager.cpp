@@ -1847,11 +1847,14 @@ static bool saveSaveToSD_internal()
   if (!ensureSaveDir())
     return false;
 
-  // 1) Export current pet to the locker/export system.
+  // Never persist if there is no active finalized pet yet.
   //
-  // Contract:
-  // - This function removes the live on-disk save after a successful export.
-  // - It does NOT reset runtime/UI state; callers must do that separately.  if (g_birthEpoch == 0)
+  // Policy:
+  // - g_birthEpoch == 0 means "no active pet lifecycle exists yet"
+  // - name_pending.flag means fresh pet creation is still incomplete
+  //
+  // A finalized new pet must set a non-zero birth epoch before the first forced save.
+  if (g_birthEpoch == 0)
   {
     Serial.println("[SAVE] SKIP (no active pet)");
     return true;
@@ -2269,6 +2272,13 @@ void saveManagerSetPetIntroFadeBootFlag()
 void saveManagerStampBirthNow()
 {
   uint32_t now = getNowEpochOrZero();
+
+  // A brand-new finalized pet must be saveable even before NTP/time is valid.
+  // If wall clock is unavailable, use a non-zero sentinel epoch for the first save.
+  // Auto-heal/load code can normalize this later once real time is available.
+  if (now == 0)
+    now = 1;
+
   g_birthEpoch = now;
   pet.birth_epoch = now;
   saveManagerMarkDirty();
