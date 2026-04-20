@@ -140,11 +140,10 @@ static void returnFromSetTime()
 {
   g_setTimeActive = false;
 
-  // Return to stored state/tab if valid; otherwise, fall back to PET_SCREEN.
-  if (g_setTimeReturnValid)
-    uiActionEnterState((UIState)g_setTimeReturnState, (Tab)g_setTimeReturnTab, true);
-  else
-    uiActionEnterState(UIState::PET_SCREEN, g_app.currentTab, true);
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
+
+  uiActionEnterState(ret.state, ret.tab, true);
 }
 
 static void commitSetTime()
@@ -171,9 +170,8 @@ static void commitSetTime()
 
 void beginForcedSetTimeBootGate(UIState returnState, Tab returnTab)
 {
-  g_setTimeReturnValid = true;
-  g_setTimeReturnState = (uint8_t)returnState;
-  g_setTimeReturnTab = (uint8_t)returnTab;
+  uiPushReturnTarget(returnState, returnTab);
+
   g_setTimeForceNoCancel = true;
   g_setTimeActive = true;
   g_setTimeField = kFieldYear;
@@ -186,9 +184,8 @@ void beginForcedSetTimeBootGate(UIState returnState, Tab returnTab)
 
 void beginSetTimeEditorFromSettings(SettingsPage /*page*/, UIState returnState, Tab returnTab)
 {
-  g_setTimeReturnValid = true;
-  g_setTimeReturnState = (uint8_t)returnState;
-  g_setTimeReturnTab = (uint8_t)returnTab;
+  uiPushReturnTarget(returnState, returnTab);
+
   g_setTimeForceNoCancel = false;
   g_setTimeActive = true;
   g_setTimeField = kFieldYear;
@@ -202,7 +199,6 @@ void beginSetTimeEditorFromSettings(SettingsPage /*page*/, UIState returnState, 
 // -----------------------------------------------------------------------------
 // UI handler
 // -----------------------------------------------------------------------------
-
 void uiSetTimeHandle(InputState &in)
 {
   if (!g_setTimeActive)
@@ -276,6 +272,8 @@ void uiSetTimeHandle(InputState &in)
     }
 
     g_setTimeActive = false;
+    g_setTimeForceNoCancel = false;
+
     g_wifiSetupFromBootWizard = true;
     g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
     g_wifi.scanIndex = 0;
@@ -291,7 +289,7 @@ void uiSetTimeHandle(InputState &in)
     in.clearEdges();
     return;
   }
-
+  
   if (anyUiChange)
     requestUIRedraw();
 

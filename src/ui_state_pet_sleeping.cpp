@@ -5,7 +5,6 @@
 #include "input.h"
 #include "led_status.h"
 #include "pet.h"
-#include "return_target.h"
 #include "save_manager.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
@@ -15,16 +14,12 @@
 // Entry guard to prevent "carried-held ENTER" from instantly waking the pet.
 static uint32_t s_enterSleepUiMs = 0;
 static bool s_prevSelectHeld = false;
-static ReturnTarget s_petSleepingReturn{UIState::PET_SCREEN, Tab::TAB_PET};
-
 static void leavePetSleepingToReturnTarget(InputState &in, uint16_t drainMs, bool forceRenderNow)
 {
-  const UIState targetState = s_petSleepingReturn.state;
-  const Tab targetTab = s_petSleepingReturn.tab;
+  const UIReturnTarget target = uiGetReturnTarget();
+  uiPopReturnTarget();
 
-  s_petSleepingReturn = {UIState::PET_SCREEN, Tab::TAB_PET};
-
-  uiActionEnterStateClean(targetState, targetTab, true, in, drainMs);
+  uiActionEnterStateClean(target.state, target.tab, true, in, drainMs);
   invalidateBackgroundCache();
   requestFullUIRedraw();
 
@@ -61,13 +56,12 @@ void uiPetSleepingBootEnter()
 
 void uiPetSleepingSetReturnState(UIState state, Tab tab)
 {
-  s_petSleepingReturn.state = state;
-  s_petSleepingReturn.tab = tab;
+  uiSetReturnTarget(state, tab);
 }
 
 void uiEnterPetSleepingWithReturn(UIState returnState, Tab returnTab, InputState &in, uint16_t drainMs)
 {
-  uiPetSleepingSetReturnState(returnState, returnTab);
+  uiPushReturnTarget(returnState, returnTab);
   uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, drainMs);
   requestFullUIRedraw();
 }

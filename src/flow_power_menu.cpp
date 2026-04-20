@@ -36,8 +36,7 @@ void openPowerMenuFromHere(uint32_t nowMs)
   if (g_app.uiState == UIState::POWER_MENU)
     return;
 
-  g_settingsFlow.powerMenuReturn.state = g_app.uiState;
-  g_settingsFlow.powerMenuReturn.tab = g_app.currentTab;
+  uiPushReturnTarget(g_app.uiState, g_app.currentTab);
 
   powerMenuIndex = 0;
   uiActionEnterState(UIState::POWER_MENU, g_app.currentTab, true);
@@ -87,32 +86,27 @@ void powerMenuClose(InputState *in, uint32_t suppressMs)
 {
   const bool returningToSleep = g_settingsFlow.powerMenuReturnToSleep;
 
-  if (in)
+  if (returningToSleep)
   {
-    if (returningToSleep)
-    {
+    uiPopReturnTarget();
+
+    if (in)
       uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, *in, suppressMs);
-    }
     else
-    {
-      uiActionEnterStateClean(g_settingsFlow.powerMenuReturn.state, g_settingsFlow.powerMenuReturn.tab, true, *in,
-                              suppressMs);
-    }
+      uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
   }
   else
   {
-    if (returningToSleep)
-    {
-      uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
-    }
+    const UIReturnTarget ret = uiGetReturnTarget();
+    uiPopReturnTarget();
+
+    if (in)
+      uiActionEnterStateClean(ret.state, ret.tab, true, *in, suppressMs);
     else
-    {
-      uiActionEnterState(g_settingsFlow.powerMenuReturn.state, g_settingsFlow.powerMenuReturn.tab, true);
-    }
+      uiActionEnterState(ret.state, ret.tab, true);
   }
 
   g_settingsFlow.powerMenuReturnToSleep = false;
-  g_settingsFlow.powerMenuReturn = ReturnTarget{};
 }
 
 static void handlePowerMenuInput(InputState &input)
