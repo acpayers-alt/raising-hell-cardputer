@@ -2,7 +2,9 @@
 
 #include "app_state.h"
 #include "controls_help_state.h"
+#include "flow_power_menu.h"
 #include "input.h"
+#include "settings_nav_state.h"
 #include "ui_actions.h"
 #include "ui_input_interceptors.h"
 #include "ui_state_backup_pet_list.h"
@@ -77,6 +79,17 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
 
   case UIState::CONTROLS_HELP:
     controlsHelpOnEnter();
+    break;
+
+  case UIState::SETTINGS:
+    resetSettingsNav(false);
+    clearInputLatch();
+    in.clearEdges();
+    break;
+
+  case UIState::POWER_MENU:
+    clearInputLatch();
+    in.clearEdges();
     break;
 
   default:

@@ -707,24 +707,6 @@ static void finalizeBootLanding()
     g_wifiApplied = true;
   }
 
-  // If we are landing on the title screen with no save file, this is a
-  // "no-save title menu" landing, not an active new-pet flow.
-  //
-  // saveManagerLoad() may already have staged a fresh in-memory new-pet flow
-  // and written name_pending.flag before the first-boot wizard ran.
-  // If we keep those flags here, the next reboot will incorrectly think
-  // onboarding/new-pet flow is still pending.
-  if (s_bootFinalLandingState == UIState::TITLE_MENU && !bootSaveFileExists())
-  {
-    const bool hadBootSetupPending = bootSetupPendingFlagExists();
-
-    if (hadBootSetupPending)
-      bootSetupClearPendingFlag();
-
-    Serial.printf("[BOOT][LAND] no-save title landing bootSetupPending=%d saveExists=%d\n", hadBootSetupPending ? 1 : 0,
-                  bootSaveFileExists() ? 1 : 0);
-  }
-
   if (g_postProvisionControlsHelpPending)
   {
     g_postProvisionControlsHelpPending = false;

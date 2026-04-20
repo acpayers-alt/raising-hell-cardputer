@@ -2255,11 +2255,17 @@ bool saveManagerLoad()
 
   clearNamePendingFlag();
 
+  const bool hadBootSetupPending = bootSetupPendingFlagExists();
+  if (hadBootSetupPending)
+    bootSetupClearPendingFlag();
+
   dirty = false;
   clearInputLatch();
 
-  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d\n", g_app.newPetFlowActive ? 1 : 0,
-                saveManagerNamePendingFlagExists() ? 1 : 0);
+  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d bootSetupPendingWasSet=%d\n",
+                g_app.newPetFlowActive ? 1 : 0,
+                saveManagerNamePendingFlagExists() ? 1 : 0,
+                hadBootSetupPending ? 1 : 0);
 
   return false;
 }
