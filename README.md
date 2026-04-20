@@ -121,61 +121,107 @@ After the first launch:
 
 # 3. Manual Firmware Install (Advanced)
 
-Advanced users can manually flash the firmware using **PlatformIO or esptool**.
+Advanced users can manually flash the firmware using PlatformIO or esptool.
 
 ### Step 1 — Download firmware
 
-Download the latest firmware binary from the **GitHub Releases page**:
+Download the latest firmware binary from the GitHub Releases page:
 
 https://github.com/acpayers-alt/raising-hell-cardputer/releases
 
-## Step 2 - Install Assets/Manifest
-- Do **not** rename asset files or folders (except the manifest file, see below)  
-- Make sure the path is exactly: /raising_hell/assets/
-
-### Manifest Requirement (Important)
-
-Manual installs require the **v2 asset manifest**.
-
-You must use the correct manifest file and rename it to:
-
-manifest_local.json
-
-1. Locate the **v2 manifest file** from the assets package  
-   (for example: `manifest-dev-v2.json` or `manifest-public-v2.json`)
-
-2. Rename it to:
-   manifest_local.json
-
-3. Place it in:
-   /raising_hell/assets/
-
-If the wrong manifest is used, or if it is not renamed correctly, the game will not detect the local asset pack and may:
-- attempt OTA download
-- report missing assets
-- fail to load assets properly
-
-### Step 3 — Flash firmware
+### Step 2 — Flash firmware
 
 Flash the firmware to the device.
 
 Example using PlatformIO:
-
-```bash
 pio run -t upload
-```
 
 Or using esptool:
-
-```bash
 esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash 0x10000 firmware.bin
-```
 
-### Step 4 — Launch the game
+### Step 3 — Launch the game
 
 After booting the firmware:
 
-- The game will automatically **provision its asset pack via OTA**.
+- The game will automatically provision its asset pack via OTA.
+
+---
+
+### Optional: Manual Asset Installation
+
+If you do not want to use OTA, you can install assets manually.
+
+IMPORTANT: Manual installs require the v2 asset manifest.
+
+---
+
+### Required SD Card Structure
+
+Your SD card must contain the following base directory:
+
+/raising_hell/assets/
+
+All asset files and folders must live inside this directory.
+
+---
+
+### Steps
+
+1. Download the asset pack from the repository  
+   Make sure it includes a v2 manifest (for example: manifest-dev-v2.json or manifest-public-v2.json)
+
+2. Create the required directory on your SD card:
+
+/raising_hell/assets/
+
+3. Copy the entire contents of the asset pack into that directory
+
+Your structure should look like:
+
+/raising_hell/assets/
+  manifest_local.json
+  graphics/
+  audio/
+  fonts/
+  ...
+
+(Exact folders may vary depending on asset version)
+
+4. Rename the manifest file:
+
+manifest-dev-v2.json → manifest_local.json  
+or  
+manifest-public-v2.json → manifest_local.json
+
+5. Ensure the final manifest path is:
+
+/raising_hell/assets/manifest_local.json
+
+6. Safely eject the SD card and insert it into the device
+
+7. Power on the device
+
+---
+
+### Behavior
+
+- The game will detect the local manifest and load assets from SD
+- If assets are missing or outdated, OTA may still trigger depending on build
+- No internet connection is required if the asset pack is complete
+
+---
+
+### Common Mistakes
+
+- Manifest not renamed to manifest_local.json
+- Using a non-v2 manifest
+- Placing files outside /raising_hell/assets/
+- Missing folders from the asset pack
+- Incorrect SD card format (must be FAT32)
+
+---
+
+If the game cannot detect assets, it will attempt OTA or report missing assets.
 
 ---
 
