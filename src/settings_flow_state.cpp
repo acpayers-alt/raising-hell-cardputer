@@ -1,8 +1,9 @@
 #include "settings_flow_state.h"
-#include "input.h"
 #include "settings_nav_state.h"
 #include "settings_state.h"
+#include "input.h"
 
+#include "ui_defs.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
 

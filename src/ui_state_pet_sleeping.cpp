@@ -54,10 +54,7 @@ void uiPetSleepingBootEnter()
   inputForceClear();
 }
 
-void uiPetSleepingSetReturnState(UIState state, Tab tab)
-{
-  uiSetReturnTarget(state, tab);
-}
+void uiPetSleepingSetReturnState(UIState state, Tab tab) { uiSetReturnTarget(state, tab); }
 
 void uiEnterPetSleepingWithReturn(UIState returnState, Tab returnTab, InputState &in, uint16_t drainMs)
 {

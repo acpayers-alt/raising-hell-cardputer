@@ -11,7 +11,6 @@ struct SettingsFlowState
   SettingsPage settingsReturnPage = SettingsPage::TOP;
 
   bool powerMenuReturnToSleep = false;
-  ReturnTarget powerMenuReturn{};
 };
 
 extern SettingsFlowState g_settingsFlow;
