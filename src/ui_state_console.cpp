@@ -23,13 +23,7 @@ void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSetting
   if (retToSettings)
     g_settingsFlow.settingsReturnPage = retSettingsPage;
 
-  consoleOpen();
-
   uiActionEnterState(UIState::CONSOLE, returnTab, true);
- 
-  // Be explicit here: console must always enter with text capture enabled.
-  inputSetTextCapture(true);
-  g_textCaptureMode = true;
 
   clearInputLatch();
   requestUIRedraw();
@@ -73,11 +67,11 @@ void uiConsoleHandle(InputState &input)
     uiActionEnterStateClean(ret.state, ret.tab, true, input, 120);
     requestUIRedraw();
     return;
-
-    // Let the console module handle keystrokes, cursor, etc.
-    consoleUpdate(input);
-    requestUIRedraw();
   }
+
+  // Let the console module handle keystrokes, cursor, etc.
+  consoleUpdate(input);
+  requestUIRedraw();
 }
 
 bool closeConsoleAndReturn(InputState &input)
