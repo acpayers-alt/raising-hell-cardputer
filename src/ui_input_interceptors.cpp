@@ -79,9 +79,8 @@ static bool uiInterceptGlobalShortcuts(InputState& in)
   {
     if (!menuSuppressedNow() && canOpenSettingsFrom(g_app.uiState))
     {
-      g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
       openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
-
+      
       // Swallow everything this tick so ESC doesn't also act as HOME/tab-jump/etc.
       in.clearEdges();
       return true;

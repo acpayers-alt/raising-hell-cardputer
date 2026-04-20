@@ -108,7 +108,6 @@ void uiPetSleepingHandle(InputState &in)
   // MENU/ESC opens Settings WITHOUT waking the pet
   if (in.menuOnce || in.escOnce)
   {
-    g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
     inputForceClear(); // critical: kill carried input
     openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
     uiActionSwallowAll(in);

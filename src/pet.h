@@ -147,8 +147,6 @@ public:
 
 extern Pet pet;
 
-void centerPetOnScreen(Pet &pet);
-
 // Death / resurrection helpers
 void petEnterDeathState();
 void petResurrectFull();

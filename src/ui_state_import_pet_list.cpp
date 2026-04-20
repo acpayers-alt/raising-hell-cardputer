@@ -206,7 +206,6 @@ void uiImportPetListHandle(InputState &in)
           {
             playBeep();
             s_returnToSettings = false;
-            g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
             ui_showSuccessMessage("Pet Resumed");
 
             const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
@@ -306,10 +305,9 @@ void uiImportPetListHandle(InputState &in)
       s_actionMenuActive = false;
       s_actionIndex = 0;
       s_returnToSettings = false;
-      g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
 
       ui_showSuccessMessage("Pet Resumed");
-
+      
       const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
 
       if (restoredSleeping)

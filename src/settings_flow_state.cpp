@@ -40,6 +40,7 @@ void closeSettingsAndReturn(InputState &in)
 
 void returnToSettingsPage(SettingsPage page, Tab tab, InputState &in)
 {
+  // Re-enter Settings on a specific page without resetting the whole settings nav.
   g_settingsFlow.settingsPage = page;
   uiActionEnterStateClean(UIState::SETTINGS, tab, true, in, 120);
   requestFullUIRedraw();

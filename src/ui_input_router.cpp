@@ -81,8 +81,10 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
     controlsHelpOnEnter();
     break;
 
-  case UIState::SETTINGS:
-    resetSettingsNav(false);
+    case UIState::SETTINGS:
+    // Do not reset the settings page here.
+    // Some flows intentionally return to a specific subpage
+    // (for example Pet Options after Restore/Import browsers).
     clearInputLatch();
     in.clearEdges();
     break;
