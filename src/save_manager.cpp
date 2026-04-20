@@ -77,6 +77,7 @@
 // Forward declarations for internal helpers used before definition
 static void clearNamePendingFlag();
 void resetRuntimeToCleanNoSaveState(bool resetName);
+static bool isFinalBubFilename(const char *nm);
 
 static const char *getFirmwareVersionString()
 {
@@ -426,41 +427,35 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
     if (!file.isDirectory())
     {
       const char *nm = file.name();
-      if (nm && nm[0])
+      if (isFinalBubFilename(nm))
       {
-        size_t len = strlen(nm);
-        if (len >= 4 && strcmp(nm + len - 4, ".bub") == 0)
+        char full[128];
+        snprintf(full, sizeof(full), "%s/%s", dirPath, nm);
+
+        PetExportEntry entry{};
+        if (readExportMetadata(full, entry))
         {
-          char full[128];
-          snprintf(full, sizeof(full), "%s/%s", dirPath, nm);
+          bool merged = false;
 
-          PetExportEntry entry{};
-          if (readExportMetadata(full, entry))
+          if (entry.petId[0])
           {
-            bool merged = false;
-
-            if (entry.petId[0])
+            for (int i = 0; i < count; ++i)
             {
-              for (int i = 0; i < count; ++i)
+              if (strcmp(outEntries[i].petId, entry.petId) == 0)
               {
-                if (strcmp(outEntries[i].petId, entry.petId) == 0)
-                {
-                  if (entry.createdAtEpoch >= outEntries[i].createdAtEpoch)
-                    outEntries[i] = entry;
+                if (entry.createdAtEpoch >= outEntries[i].createdAtEpoch)
+                  outEntries[i] = entry;
 
-                  merged = true;
-                  break;
-                }
+                merged = true;
+                break;
               }
             }
+          }
 
-            if (!merged)
-            {
-              if (count < maxEntries)
-              {
-                outEntries[count++] = entry;
-              }
-            }
+          if (!merged)
+          {
+            if (count < maxEntries)
+              outEntries[count++] = entry;
           }
         }
       }
@@ -512,6 +507,22 @@ static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)
   dst[j] = '\0';
 }
 
+static bool isFinalBubFilename(const char *nm)
+{
+  if (!nm || !nm[0])
+    return false;
+
+  const char *lastDot = strrchr(nm, '.');
+  if (!lastDot)
+    return false;
+
+  const bool ok = (strcmp(lastDot, ".bub") == 0);
+  if (!ok && strstr(nm, ".bub"))
+    Serial.printf("[EXPORT LIST] reject non-final export filename='%s'\n", nm);
+
+  return ok;
+}
+
 static bool findLatestExportPath(char *outPath, size_t outPathSize)
 {
   if (!outPath || outPathSize == 0)
@@ -535,8 +546,7 @@ static bool findLatestExportPath(char *outPath, size_t outPathSize)
     if (!file.isDirectory())
     {
       const char *nm = file.name();
-      const size_t len = strlen(nm);
-      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
+      if (isFinalBubFilename(nm))
       {
         char full[128];
         snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
@@ -2498,8 +2508,7 @@ static void removeExportsWithPetId(const char *petIdStr)
     if (!file.isDirectory())
     {
       const char *nm = file.name();
-      const size_t len = strlen(nm);
-      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
+      if (isFinalBubFilename(nm))
       {
         char full[128];
         snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
