@@ -125,6 +125,7 @@ void initBacklight()
 static void applyBacklightRaw(uint8_t level)
 {
   static uint8_t s_lastLevel = 255; // impossible value so first call always applies
+  static constexpr bool kLogBacklightChanges = false;
 
   const uint8_t finalLevel = clampU8((int)level);
 
@@ -133,9 +134,9 @@ static void applyBacklightRaw(uint8_t level)
 
   s_lastLevel = finalLevel;
 
-  if (Serial && Serial.availableForWrite() >= 120)
+  if (kLogBacklightChanges && Serial && Serial.availableForWrite() >= 120)
   {
-    Serial.printf("[BL] setBacklight(req=%u final=%u) screenOn=%d pulse=%d ui=%d\n",
+    Serial.printf("[POWER][BL] req=%u final=%u screenOn=%d pulse=%d ui=%d\n",
                   (unsigned)level,
                   (unsigned)finalLevel,
                   isScreenOn() ? 1 : 0,
@@ -219,11 +220,18 @@ uint8_t displayGetUserBrightnessLevel() { return s_lastUserBrightnessLevel; }
 
 void setScreenPowerTagged(bool on, const char *file, int line)
 {
-  if (Serial && Serial.availableForWrite() >= 120)
+  static constexpr bool kLogScreenPower = false;
+  static int s_last = -1;
+
+  if (kLogScreenPower && s_last != (int)on)
   {
-    Serial.printf("[PWR] setScreenPower(%d) @ %s:%d t=%lu ui=%d tab=%d\n", (int)on, file, line, (unsigned long)millis(),
-                  (int)g_app.uiState, (int)g_app.currentTab);
+    Serial.printf("[POWER] screen=%d ui=%d tab=%d\n",
+                  (int)on,
+                  (int)g_app.uiState,
+                  (int)g_app.currentTab);
+    s_last = (int)on;
   }
+
   setScreenPower(on); // IMPORTANT: call the real function, not the macro
 }
 

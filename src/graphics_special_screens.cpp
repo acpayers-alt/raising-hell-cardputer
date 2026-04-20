@@ -59,10 +59,6 @@ static void drawDeathScreenImpl(bool redrawBg)
     else
     {
       const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * elapsed) / kDeathScreenFadeInMs);
-
-      Serial.printf("[DEATHX] death fade-in done targetBrightness=%u level=%d\n",
-                    (unsigned)brightnessValues[brightnessLevel], (int)brightnessLevel);
-
       forceBacklightDuringFade(fadeBrightness);
       requestUIRedraw();
     }
@@ -155,12 +151,6 @@ void drawBurialScreen()
   spr.pushSprite(0, 0);
 }
 
-void drawMiniGameScreen()
-{
-  drawMiniGame();
-}
+void drawMiniGameScreen() { drawMiniGame(); }
 
-void drawDeathScreen()
-{
-  drawDeathScreenImpl(true);
-}
+void drawDeathScreen() { drawDeathScreenImpl(true); }
