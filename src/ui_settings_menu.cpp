@@ -584,7 +584,9 @@ static void actPet_RenamePet(InputState &input)
 static void actPet_StorePet(InputState &input)
 {
   char boxedPath[128];
-  if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
+  // Export the current live pet to storage and remove the live on-disk save.
+  // Caller is still responsible for resetting runtime/UI state afterward.
+  bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize);
   {
     ui_showMessage("Store failed");
     Serial.println("[UI] Store Pet FAILED");
@@ -596,8 +598,8 @@ static void actPet_StorePet(InputState &input)
 
   Serial.printf("[UI] Store Pet OK path=%s\n", boxedPath);
 
-  // Box/store succeeded, so there must no longer be an active runtime pet.
-  saveManagerDeletePetOnly();
+  // Box/store already removed the live save on disk.
+  // Only reset runtime/UI state here so Title correctly shows "New Pet".
   resetRuntimeToCleanNoSaveState(/*resetName=*/true);
   g_app.newPetFlowActive = false;
   saveManagerClearNamePendingFlag();

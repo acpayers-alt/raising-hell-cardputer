@@ -773,7 +773,6 @@ void saveManagerAssignFreshPetId()
 // Forward decls
 // ------------------------------------------------------------
 static void printState(const char *tag);
-static void forceChoosePetFlowFromBoot();
 static void pack(SavePayload &p);
 static void unpack(const SavePayload &p);
 static void newPetInternal();
@@ -1848,13 +1847,11 @@ static bool saveSaveToSD_internal()
   if (!ensureSaveDir())
     return false;
 
-  // Never persist a half-created pet during fresh new-pet flow.
-  // While name_pending.flag exists and the runtime pet name is blank,
-  // CHOOSE_PET / NAME_PET is still in progress, so save.bin must not be created.
-  // Never persist during new-pet flow.
-  // If name_pending.flag exists, the pet is not finalized yet.
-  // HARD BLOCK: do not save if there is no valid pet
-  if (g_birthEpoch == 0)
+  // 1) Export current pet to the locker/export system.
+  //
+  // Contract:
+  // - This function removes the live on-disk save after a successful export.
+  // - It does NOT reset runtime/UI state; callers must do that separately.  if (g_birthEpoch == 0)
   {
     Serial.println("[SAVE] SKIP (no active pet)");
     return true;
@@ -2210,7 +2207,10 @@ bool saveManagerLoad()
       Serial.printf("[PET] current '%s' lvl=%u xp=%lu type=%d\n", pet.name, (unsigned)pet.level, (unsigned long)pet.xp,
                     (int)pet.type);
     }
-
+    // Boot policy:
+    // If a loaded save is still in an unfinished fresh-pet state
+    // (name_pending.flag or blank pet name after heal), do not resume NAME_PET.
+    // Abort the incomplete lifecycle and restart from CHOOSE_PET.
     if (appLifecycleLoadedSaveRequiresChoosePet(namePending, blankPetName))
     {
       if (namePending)
@@ -2224,17 +2224,16 @@ bool saveManagerLoad()
   }
 
   // -----------------------------------------------------------------------
-  // No valid save found → initialize fresh state
+  // No valid save found → normalize runtime to a clean no-save state.
   // -----------------------------------------------------------------------
 
   DBGLN_ON("[SAVE] No valid save found -> initializing clean no-save state");
 
-  // Factory reset / no-save boot should land on the title menu with no save,
-  // not silently re-enter a half-started new-pet flow.
+  // Ownership split:
+  // - saveManagerLoad() owns save/runtime normalization for the no-save case
+  // - boot pipeline owns onboarding/provisioning flow and final landing state
   //
-  // Keep runtime state clean, but do NOT write name_pending.flag and do NOT
-  // enter CHOOSE_PET here. Let the boot pipeline decide whether to run the
-  // first-boot wizard and where to land afterward.
+  // Do not enter CHOOSE_PET here and do not recreate name_pending.flag.
   resetRuntimeToCleanNoSaveState(/*resetName=*/true);
 
   inputSetTextCapture(false);
@@ -2251,8 +2250,7 @@ bool saveManagerLoad()
   clearInputLatch();
 
   Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d bootSetupPendingWasSet=%d\n",
-                g_app.newPetFlowActive ? 1 : 0,
-                saveManagerNamePendingFlagExists() ? 1 : 0,
+                g_app.newPetFlowActive ? 1 : 0, saveManagerNamePendingFlagExists() ? 1 : 0,
                 hadBootSetupPending ? 1 : 0);
 
   return false;
@@ -2645,8 +2643,12 @@ bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize)
     return false;
 
   // 1) Export current pet to the locker/export system.
-  if (!saveManagerExportCurrentBubJson(outPath, outPathSize))
-    return false;
+  //
+  // Contract:
+  // - This function removes the live on-disk save after a successful export.
+  // - It does NOT reset runtime/UI state; callers must do that separately.  if
+  // (!saveManagerExportCurrentBubJson(outPath, outPathSize))
+  return false;
 
   // 2) Remove the active unified save and temp/bak files.
   SD.remove(SAVE_PATH);
