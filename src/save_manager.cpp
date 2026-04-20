@@ -167,6 +167,11 @@ static const char *BACKUPS_DIR = "/raising_hell/backup";
 static const char *EXPORTS_DIR = "/raising_hell/exports";
 static const char *EXPORT_MAGIC = "raising_hell_bub_export";
 static const uint16_t EXPORT_VERSION = 1;
+static int s_lastExportScanInvalidCount = 0;
+static int s_lastExportScanValidCount = 0;
+
+int saveManagerLastExportScanInvalidCount() { return s_lastExportScanInvalidCount; }
+int saveManagerLastExportScanValidCount() { return s_lastExportScanValidCount; }
 
 static void wipeSdRecursive(const char *path)
 {
@@ -401,7 +406,7 @@ static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
   File f = SD.open(path, FILE_READ);
   if (!f)
   {
-    Serial.printf("[EXPORT LIST] open failed path=%s\n", path ? path : "(null)");
+    Serial.printf("[EXPORT LIST][BAD_BUB] open failed path=%s\n", path ? path : "(null)");
     return false;
   }
 
@@ -420,7 +425,7 @@ static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
 
   if (err)
   {
-    Serial.printf("[EXPORT LIST] json failed path=%s err=%s\n", path, err.c_str());
+    Serial.printf("[EXPORT LIST][BAD_BUB] json failed path=%s err=%s\n", path, err.c_str());
     return false;
   }
 
@@ -428,7 +433,7 @@ static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
   const uint16_t exportVersion = doc["exportVersion"] | 0;
   if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
   {
-    Serial.printf("[EXPORT LIST] format/version failed path=%s format=%s version=%u\n", path, format,
+    Serial.printf("[EXPORT LIST][BAD_BUB] format/version failed path=%s format=%s version=%u\n", path, format,
                   (unsigned)exportVersion);
     return false;
   }
@@ -471,7 +476,7 @@ static void sortPetExportsNewestFirst(PetExportEntry *entries, int count)
   }
 }
 
-static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries, int maxEntries)
+static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries, int maxEntries, bool dedupeByPetId)
 {
   if (!outEntries || maxEntries <= 0)
     return 0;
@@ -501,11 +506,11 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
         {
           bool merged = false;
 
-          if (entry.petId[0])
+          if (dedupeByPetId && entry.petId[0])
           {
             for (int i = 0; i < count; ++i)
             {
-              if (strcmp(outEntries[i].petId, entry.petId) == 0)
+              if (outEntries[i].valid && strcmp(outEntries[i].petId, entry.petId) == 0)
               {
                 if (entry.createdAtEpoch >= outEntries[i].createdAtEpoch)
                   outEntries[i] = entry;
@@ -522,6 +527,29 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
               outEntries[count++] = entry;
           }
         }
+        else
+        {
+          // Surface corrupt .bub files so the UI can show and delete them.
+          if (count < maxEntries)
+          {
+            PetExportEntry bad{};
+            bad.valid = false;
+
+            strncpy(bad.path, full, sizeof(bad.path) - 1);
+            bad.path[sizeof(bad.path) - 1] = '\0';
+
+            strncpy(bad.name, "Corrupt .bub", sizeof(bad.name) - 1);
+            bad.name[sizeof(bad.name) - 1] = '\0';
+
+            strncpy(bad.petType, "BAD FILE", sizeof(bad.petType) - 1);
+            bad.petType[sizeof(bad.petType) - 1] = '\0';
+
+            bad.petId[0] = '\0';
+            bad.createdAtEpoch = (uint32_t)file.getLastWrite();
+
+            outEntries[count++] = bad;
+          }
+        }
       }
     }
 
@@ -535,12 +563,12 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
 
 int saveManagerListPetBackups(PetExportEntry *outEntries, int maxEntries)
 {
-  return listPetEntriesFromDir(BACKUPS_DIR, outEntries, maxEntries);
+  return listPetEntriesFromDir(BACKUPS_DIR, outEntries, maxEntries, false);
 }
 
 int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries)
 {
-  return listPetEntriesFromDir(EXPORTS_DIR, outEntries, maxEntries);
+  return listPetEntriesFromDir(EXPORTS_DIR, outEntries, maxEntries, true);
 }
 
 static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)

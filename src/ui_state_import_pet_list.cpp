@@ -70,6 +70,9 @@ void openImportPetListFromTitle(InputState &in)
 void uiImportPetListOnEnter(InputState &in)
 {
   s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
+
+  const int invalidCount = saveManagerLastExportScanInvalidCount();
+
   s_confirming = false;
   s_importIndex = 0;
   s_windowStart = 0;
@@ -80,6 +83,20 @@ void uiImportPetListOnEnter(InputState &in)
 
   if (!s_returnToSettings)
     s_returnPage = SettingsPage::TOP;
+
+  if (s_entryCount <= 0)
+  {
+    if (invalidCount > 0)
+    {
+      Serial.printf("[IMPORT LIST] no valid pets; corrupt files=%d\n", invalidCount);
+      ui_showMessage("Bad .bub file");
+    }
+    else
+    {
+      Serial.println("[IMPORT LIST] no stored pets found");
+      ui_showMessage("No stored pets");
+    }
+  }
 
   swallowImportInput(in);
   requestFullUIRedraw();
@@ -193,43 +210,61 @@ void uiImportPetListHandle(InputState &in)
 
         if (s_returnToSettings)
         {
-          // Settings flow: keep the existing confirm prompt.
-          s_confirming = true;
-          s_confirmIndex = 0;
-          requestFullUIRedraw();
-        }
-        else
-        {
-          // Title-menu flow: retrieve immediately.
-          char importedPath[128];
-          if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), false))
+          // Settings flow: only allow valid entries.
+          if (!s_entries[s_importIndex].valid)
           {
             playBeep();
-            s_returnToSettings = false;
-            ui_showSuccessMessage("Pet Resumed");
-
-            const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
-
-            if (restoredSleeping)
-            {
-              uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, 200);
-              uiPetSleepingBootEnter();
-              requestFullUIRedraw();
-              sleepBgKickNow();
-              forceRenderUIOnce();
-            }
-            else
-            {
-              uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
-            }
-
-            return;
+            ui_showMessage("Bad .bub file");
+            requestUIRedraw();
           }
           else
           {
+            s_confirming = true;
+            s_confirmIndex = 0;
+            requestFullUIRedraw();
+          }
+        }
+        else
+        {
+          // Title-menu flow: retrieve immediately (valid entries only).
+          if (!s_entries[s_importIndex].valid)
+          {
             playBeep();
-            ui_showMessage("Import Failed");
+            ui_showMessage("Bad .bub file");
             requestUIRedraw();
+          }
+          else
+          {
+            char importedPath[128];
+            if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), false))
+            {
+              playBeep();
+              s_returnToSettings = false;
+              ui_showSuccessMessage("Pet Resumed");
+
+              const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
+
+              if (restoredSleeping)
+              {
+                uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, 200);
+                uiPetSleepingBootEnter();
+                requestFullUIRedraw();
+                sleepBgKickNow();
+                forceRenderUIOnce();
+              }
+              else
+              {
+                uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, 200);
+              }
+
+              return;
+            }
+            else
+            {
+              playBeep();
+              ui_showMessage("Import Failed");
+              requestUIRedraw();
+            }
           }
         }
       }
@@ -292,6 +327,21 @@ void uiImportPetListHandle(InputState &in)
       return;
     }
 
+    if (!s_entries[s_importIndex].valid)
+    {
+      playBeep();
+      ui_showMessage("Bad .bub file");
+
+      s_confirming = false;
+      s_confirmIndex = 0;
+      s_actionMenuActive = false;
+      s_actionIndex = 0;
+
+      requestUIRedraw();
+      swallowImportInput(in);
+      return;
+    }
+
     const bool exportCurrentPetFirst = (s_confirmIndex == 0);
 
     char importedPath[128];
@@ -307,7 +357,7 @@ void uiImportPetListHandle(InputState &in)
       s_returnToSettings = false;
 
       ui_showSuccessMessage("Pet Resumed");
-      
+
       const bool restoredSleeping = pet.isSleeping || g_app.isSleeping || saveManagerSleepPendingFlagExists();
 
       if (restoredSleeping)
@@ -399,8 +449,6 @@ void uiImportPetListHandle(InputState &in)
   if (s_entryCount <= 0)
   {
     playBeep();
-    ui_showMessage("No stored pets");
-    requestUIRedraw();
     swallowImportInput(in);
     return;
   }

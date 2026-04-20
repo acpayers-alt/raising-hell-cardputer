@@ -17,6 +17,9 @@ void saveManagerForce();     // force immediate save
 
 bool saveManagerSaveFileExists();
 
+int saveManagerLastExportScanInvalidCount();
+int saveManagerLastExportScanValidCount();
+
 // ─────────────────────────────────────
 // Pet Lifecycle
 // ─────────────────────────────────────

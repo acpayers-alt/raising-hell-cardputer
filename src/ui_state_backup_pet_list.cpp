@@ -81,9 +81,11 @@ static void beginRestoreConfirm()
     return;
   }
 
-  if (!saveManagerValidateBubAtPath(s_entries[s_selected].path))
+  // Block corrupt entries (same behavior as import list)
+  if (!s_entries[s_selected].valid)
   {
-    ui_showMessage("Invalid backup");
+    playBeep();
+    ui_showMessage("Bad .bub file");
     requestUIRedraw();
     return;
   }
@@ -95,6 +97,21 @@ static void beginRestoreConfirm()
 
 static void performRestore(bool storeCurrentFirst, InputState &in)
 {
+  if (!s_entries[s_selected].valid)
+  {
+    playBeep();
+    ui_showMessage("Bad .bub file");
+
+    s_confirmRestoreActive = false;
+    s_confirmRestoreIndex = 0;
+    s_actionMenuActive = false;
+    s_actionIndex = 0;
+
+    requestUIRedraw();
+    swallowBackupInput(in);
+    return;
+  }
+
   char importedPath[128];
   if (saveManagerImportBubAtPath(s_entries[s_selected].path, importedPath, sizeof(importedPath), storeCurrentFirst))
   {
@@ -187,6 +204,23 @@ void uiBackupPetListOnEnter(InputState &in)
   s_confirmRestoreIndex = 0;
 
   reloadBackups();
+
+  const int invalidCount = saveManagerLastExportScanInvalidCount();
+
+  if (s_entryCount <= 0)
+  {
+    if (invalidCount > 0)
+    {
+      Serial.printf("[BACKUP LIST] no valid backups; corrupt files=%d\n", invalidCount);
+      ui_showMessage("Bad .bub file");
+    }
+    else
+    {
+      Serial.println("[BACKUP LIST] no backups found");
+      ui_showMessage("No backups found");
+    }
+  }
+
   swallowBackupInput(in);
   requestFullUIRedraw();
 }
@@ -324,6 +358,8 @@ void uiBackupPetListHandle(InputState &in)
       }
       else if (s_actionIndex == 1)
       {
+        s_actionMenuActive = false;
+        s_actionIndex = 0;
         s_confirmDeleteActive = true;
         s_confirmDeleteIndex = 0;
         requestFullUIRedraw();
@@ -393,8 +429,6 @@ void uiBackupPetListHandle(InputState &in)
   if (s_entryCount <= 0)
   {
     playBeep();
-    ui_showMessage("No backups found");
-    requestUIRedraw();
     swallowBackupInput(in);
     return;
   }
@@ -426,3 +460,7 @@ int uiBackupPetListActionIndex() { return s_actionIndex; }
 bool uiBackupPetListConfirmRestoreActive() { return s_confirmRestoreActive; }
 
 int uiBackupPetListConfirmRestoreIndex() { return s_confirmRestoreIndex; }
+
+bool uiBackupPetListConfirmDeleteActive() { return s_confirmDeleteActive; }
+
+int uiBackupPetListConfirmDeleteIndex() { return s_confirmDeleteIndex; }

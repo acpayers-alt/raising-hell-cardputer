@@ -248,6 +248,23 @@ void drawBackupPetListScreen(bool redrawBg)
     return;
   }
 
+  if (uiBackupPetListConfirmDeleteActive())
+  {
+    const int idx = uiBackupPetListConfirmDeleteIndex();
+
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE);
+    spr.drawString("Delete this backup?", SCREEN_W / 2, SCREEN_H / 2 - 10, 2);
+
+    spr.setTextColor(idx == 0 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("YES", SCREEN_W / 2 - 30, SCREEN_H / 2 + 10, 2);
+
+    spr.setTextColor(idx == 1 ? TFT_YELLOW : TFT_WHITE);
+    spr.drawString("NO", SCREEN_W / 2 + 30, SCREEN_H / 2 + 10, 2);
+
+    return;
+  }
+    
   if (uiBackupPetListActionMenuActive())
   {
     const int idx = uiBackupPetListActionIndex();

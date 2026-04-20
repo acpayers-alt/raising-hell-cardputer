@@ -20,3 +20,5 @@ bool uiBackupPetListConfirmDeleteActive();
 int uiBackupPetListConfirmDeleteIndex();
 bool uiBackupPetListConfirmRestoreActive();
 int uiBackupPetListConfirmRestoreIndex();
+bool uiBackupPetListConfirmDeleteActive();
+int uiBackupPetListConfirmDeleteIndex();
