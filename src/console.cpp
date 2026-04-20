@@ -1730,8 +1730,6 @@ static void execLine(char *line)
 // -----------------------------------------------------------------------------
 void consoleOpen()
 {
-  inputSetTextCapture(true);
-  g_textCaptureMode = true;
   g_consoleOpen = true;
   g_consoleJustOpened = true;
 
@@ -1747,8 +1745,6 @@ void consoleOpen()
 
 void consoleClose()
 {
-  inputSetTextCapture(false);
-  g_textCaptureMode = false;
   g_consoleOpen = false;
 
   requestFullUIRedraw();

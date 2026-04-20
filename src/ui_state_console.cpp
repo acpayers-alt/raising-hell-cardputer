@@ -48,8 +48,6 @@ void uiConsoleHandle(InputState &input)
 {
   if (input.menuOnce || input.escOnce)
   {
-    consoleClose();
-
     // IMPORTANT: swallow BEFORE changing state so no edge leaks into the next state
     swallowTypingAndEdges(input);
 
@@ -79,8 +77,6 @@ bool closeConsoleAndReturn(InputState &input)
   // Only makes sense if console is actually active
   if (g_app.uiState != UIState::CONSOLE)
     return false;
-
-  consoleClose();
 
   // Swallow BEFORE changing state so no edge leaks into the next state
   swallowTypingAndEdges(input);
