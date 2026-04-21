@@ -1,18 +1,27 @@
 #pragma once
 
-#include "mini_games.h"
+#include "input.h"
 
+// Shared mini-game result state
+extern bool s_resultShown;
 void miniGameDrawRewardModal(int gW, int gH);
 
-extern bool s_resultShown;
+// Flappy
+extern bool s_flappyShowIntro;
+void freeFlappyBgCache();
+void freeFlappyFireballSprites();
+void freeFlappyPipeSprites();
+void freeImpWaveSprites();
 
-// Ressurection Run
-void freeResRunSprites();
-bool resRunIsShowingIntro();
+// Crossy
+bool crossyIsShowingIntro();
+void freeCrossyZoneSprites();
+void freeCrossyActorSprites();
 
 // Dodger
-void freeDodgerSprites();
 bool dodgerIsShowingIntro();
+void freeDodgerSprites();
 
-void freeCrossySprites();
-bool crossyIsShowingIntro();
+// Resurrection Run
+bool resRunIsShowingIntro();
+void freeResRunSprites();
