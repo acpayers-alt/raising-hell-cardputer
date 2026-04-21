@@ -78,7 +78,11 @@ static void clearSpriteSlot(MgSpriteSlot &slot, const char *tag)
   slot.transparentKey = 0;
 
   if (tag && tag[0])
-    mgAssetsLogHeap(tag);
+  {
+    // Suppress per-slot heap spam during bulk release
+    if (strcmp(tag, "mgmem.release") != 0)
+      mgAssetsLogHeap(tag);
+  }
 }
 
 static bool resolveSdPath(const char *path, const char **outUsePath)
@@ -664,6 +668,11 @@ void releaseAllForCurrentGame()
   if (s_mgmemCurrentGame == MiniGame::NONE)
     return;
 
+  const uint32_t freeBefore = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+  const uint32_t largestBefore = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+
+  int releasedCount = 0;
+
   for (int i = 0; i < kMgSpriteSlotCount; ++i)
   {
     MgSpriteSlot &slot = s_spriteSlots[i];
@@ -672,8 +681,16 @@ void releaseAllForCurrentGame()
     if (slot.owner != s_mgmemCurrentGame)
       continue;
 
-    clearSpriteSlot(slot, "mgmem.releaseAllForCurrentGame");
+    clearSpriteSlot(slot, "mgmem.release");
+    releasedCount++;
   }
+
+  const uint32_t freeAfter = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+  const uint32_t largestAfter = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+
+  Serial.printf("[MGMEM] releaseAllForCurrentGame released=%d before free=%u largest=%u after free=%u largest=%u\n",
+                releasedCount, (unsigned)freeBefore, (unsigned)largestBefore, (unsigned)freeAfter,
+                (unsigned)largestAfter);
 }
 
 size_t freeBytes() { return (size_t)ESP.getFreeHeap(); }

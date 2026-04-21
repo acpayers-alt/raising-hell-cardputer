@@ -1618,7 +1618,18 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   // Boot pipeline is the single owner of actual Wi-Fi bring-up.
   // Applying it here makes later boot logic think Wi-Fi is already enabled
   // even when the radio/connect path has not actually been restarted.
-  Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiEn ? 1 : 0, wifiIsEnabled() ? 1 : 0);
+  static int s_lastWifiLoadSetting = -1;
+  static int s_lastWifiLoadRuntime = -1;
+
+  const int wifiSettingNow = wifiEn ? 1 : 0;
+  const int wifiRuntimeNow = wifiIsEnabled() ? 1 : 0;
+
+  if (wifiSettingNow != s_lastWifiLoadSetting || wifiRuntimeNow != s_lastWifiLoadRuntime)
+  {
+    Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiSettingNow, wifiRuntimeNow);
+    s_lastWifiLoadSetting = wifiSettingNow;
+    s_lastWifiLoadRuntime = wifiRuntimeNow;
+  }
 
   return true;
 }
