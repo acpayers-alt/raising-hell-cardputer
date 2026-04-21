@@ -5,11 +5,11 @@
 #include <Arduino.h>
 #include <stdlib.h>
 
+#include "anim_clips.h"
 #include "display.h"
 #include "graphics.h"
 #include "graphics_render_utils.h"
 #include "graphics_shared_utils.h"
-#include "anim_clips.h"
 
 #include "app_state.h"
 #include "pet.h"
@@ -42,6 +42,8 @@ static bool petLayerReady = false;
 static const char *s_petBgCachedPath = nullptr;
 static PetType s_petBgCachedType = (PetType)255;
 static uint8_t s_petBgCachedStage = 255;
+static bool s_petBgHardFail = false;
+
 static bool ensurePetLayer();
 
 // UI / rendering hooks
@@ -111,6 +113,13 @@ void cachePetAreaBackgroundIfNeeded(bool force)
     return;
   }
 
+  if (s_petBgHardFail && !force)
+  {
+    // SD/cache previously failed — avoid retry storm
+    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+    return;
+  }
+
   const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
 
   if (!ensurePetLayer())
@@ -128,8 +137,8 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   if (!petLayerReady)
     force = true;
 
-  if (!force && (s_petBgCachedPath == bgPath) && (s_petBgCachedType == pet.type) &&
-      (s_petBgCachedStage == pet.evoStage))
+  if (!force && (s_petBgCachedPath && bgPath && strcmp(s_petBgCachedPath, bgPath) == 0) &&
+      (s_petBgCachedType == pet.type) && (s_petBgCachedStage == pet.evoStage))
   {
     return;
   }
@@ -150,13 +159,15 @@ void cachePetAreaBackgroundIfNeeded(bool force)
 
   if (!ok)
   {
+    s_petBgHardFail = true;
+  
     petLayerReady = false;
     s_petBgCachedPath = nullptr;
     s_petBgCachedType = (PetType)255;
     s_petBgCachedStage = 255;
-
+  
     spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-
+  
     invalidateBackgroundCache();
     requestUIRedraw();
     return;
@@ -166,6 +177,7 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   s_petBgCachedType = pet.type;
   s_petBgCachedStage = pet.evoStage;
   petLayerReady = true;
+  s_petBgHardFail = false;
 }
 
 void restorePetAreaFromCache()
@@ -215,52 +227,52 @@ static constexpr int kPetIntroYOffset = 0;
 // ---------------- DEVIL ----------------
 
 // Baby
-static const char *PATH_DEV_BB_WALK1   = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
-static const char *PATH_DEV_BB_WALK2   = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
+static const char *PATH_DEV_BB_WALK1 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png";
+static const char *PATH_DEV_BB_WALK2 = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png";
 static const char *PATH_DEV_BB_WALK1_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft1.png";
 static const char *PATH_DEV_BB_WALK2_L = "/raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft2.png";
 
 // Teen
-static const char *PATH_DEV_TN_WALK1   = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk1.png";
-static const char *PATH_DEV_TN_WALK2   = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk2.png";
+static const char *PATH_DEV_TN_WALK1 = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk1.png";
+static const char *PATH_DEV_TN_WALK2 = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walk2.png";
 static const char *PATH_DEV_TN_WALK1_L = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walkleft1.png";
 static const char *PATH_DEV_TN_WALK2_L = "/raising_hell/graphics/pet/anim/dev/tn/wlk/dev_tn_walkleft2.png";
 
 // Adult
-static const char *PATH_DEV_AD_WALK1   = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk1.png";
-static const char *PATH_DEV_AD_WALK2   = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk2.png";
+static const char *PATH_DEV_AD_WALK1 = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk1.png";
+static const char *PATH_DEV_AD_WALK2 = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walk2.png";
 static const char *PATH_DEV_AD_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft1.png";
 static const char *PATH_DEV_AD_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ad/wlk/dev_ad_walkleft2.png";
 
 // Elder
-static const char *PATH_DEV_EL_WALK1   = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk1.png";
-static const char *PATH_DEV_EL_WALK2   = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk2.png";
+static const char *PATH_DEV_EL_WALK1 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk1.png";
+static const char *PATH_DEV_EL_WALK2 = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walk2.png";
 static const char *PATH_DEV_EL_WALK1_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft1.png";
 static const char *PATH_DEV_EL_WALK2_L = "/raising_hell/graphics/pet/anim/dev/ed/wlk/dev_edr_walkleft2.png";
 
 // ---------------- ELDRITCH ----------------
 
 // Baby
-static const char *PATH_ELD_BB_WALK1   = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk1.png";
-static const char *PATH_ELD_BB_WALK2   = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk2.png";
+static const char *PATH_ELD_BB_WALK1 = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk1.png";
+static const char *PATH_ELD_BB_WALK2 = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walk2.png";
 static const char *PATH_ELD_BB_WALK1_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft1.png";
 static const char *PATH_ELD_BB_WALK2_L = "/raising_hell/graphics/pet/anim/eld/bb/wlk/eld_bb_walkleft2.png";
 
 // Teen
-static const char *PATH_ELD_TN_WALK1   = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk1.png";
-static const char *PATH_ELD_TN_WALK2   = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk2.png";
+static const char *PATH_ELD_TN_WALK1 = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk1.png";
+static const char *PATH_ELD_TN_WALK2 = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walk2.png";
 static const char *PATH_ELD_TN_WALK1_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft1.png";
 static const char *PATH_ELD_TN_WALK2_L = "/raising_hell/graphics/pet/anim/eld/tn/wlk/eld_tn_walkleft2.png";
 
 // Adult
-static const char *PATH_ELD_AD_WALK1   = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk1.png";
-static const char *PATH_ELD_AD_WALK2   = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk2.png";
+static const char *PATH_ELD_AD_WALK1 = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk1.png";
+static const char *PATH_ELD_AD_WALK2 = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walk2.png";
 static const char *PATH_ELD_AD_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft1.png";
 static const char *PATH_ELD_AD_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ad/wlk/eld_ad_walkleft2.png";
 
 // Elder
-static const char *PATH_ELD_EL_WALK1   = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk1.png";
-static const char *PATH_ELD_EL_WALK2   = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk2.png";
+static const char *PATH_ELD_EL_WALK1 = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk1.png";
+static const char *PATH_ELD_EL_WALK2 = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walk2.png";
 static const char *PATH_ELD_EL_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft1.png";
 static const char *PATH_ELD_EL_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft2.png";
 
@@ -702,21 +714,31 @@ static int getWalkBaselineAdjustForPet()
   case PET_DEVIL:
     switch (pet.evoStage)
     {
-    case 0: return -9;
-    case 1: return -9;
-    case 2: return -20;
-    case 3: return -25;
-    default: return -2;
+    case 0:
+      return -9;
+    case 1:
+      return -9;
+    case 2:
+      return -20;
+    case 3:
+      return -25;
+    default:
+      return -2;
     }
 
   case PET_ELDRITCH:
     switch (pet.evoStage)
     {
-    case 0: return -1;
-    case 1: return -9;
-    case 2: return -18;
-    case 3: return -19;
-    default: return -6;
+    case 0:
+      return -1;
+    case 1:
+      return -9;
+    case 2:
+      return -18;
+    case 3:
+      return -19;
+    default:
+      return -6;
     }
 
   default:
@@ -729,8 +751,7 @@ bool drawIntroWalkingPetOverride()
   if (!g_sdReady)
     return false;
 
-  const bool walking = s_petIntroWalkActive ||
-                       s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
+  const bool walking = s_petIntroWalkActive || s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
                        s_petWanderState == PetWanderState::MOVING_TO_SIDE_B ||
                        s_petWanderState == PetWanderState::RETURNING_HOME;
 
@@ -740,8 +761,7 @@ bool drawIntroWalkingPetOverride()
   {
     facingLeft = false;
   }
-  else if (s_petWanderState == PetWanderState::MOVING_TO_SIDE_A ||
-           s_petWanderState == PetWanderState::MOVING_TO_SIDE_B)
+  else if (s_petWanderState == PetWanderState::MOVING_TO_SIDE_A || s_petWanderState == PetWanderState::MOVING_TO_SIDE_B)
   {
     facingLeft = (s_petWanderTargetX < s_petScreenX);
   }
@@ -840,7 +860,9 @@ bool drawIntroWalkingPetOverride()
 
   if (!ok)
   {
+#if defined(DEBUG_PET_DRAW)
     Serial.printf("[PET WALK] draw failed path='%s' x=%d y=%d w=%d h=%d\n", path, drawX, drawY, w, h);
+#endif
   }
   return ok;
 }
@@ -910,7 +932,4 @@ static void drawPetScreenImpl(bool redrawBg)
   drawPetPerfHud();
 }
 
-void drawPetScreen(bool redrawBg)
-{
-  drawPetScreenImpl(redrawBg);
-}
+void drawPetScreen(bool redrawBg) { drawPetScreenImpl(redrawBg); }

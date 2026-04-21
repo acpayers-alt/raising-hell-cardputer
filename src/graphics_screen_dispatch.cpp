@@ -230,12 +230,6 @@ void drawCurrentScreen(bool redrawBg)
     mgDrawPauseOverlay();
     return;
 
-  default:
-    break;
-  }
-
-  switch (g_app.uiState)
-  {
   case UIState::SETTINGS:
     drawSettingsMenu();
     break;
