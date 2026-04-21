@@ -13,8 +13,8 @@
 #include "pet_age.h"
 #include "save_manager.h"
 #include "sdcard.h"
-#include "ui_play_menu.h"
 #include "ui_menu_state.h"
+#include "ui_play_menu.h"
 
 extern M5Canvas spr;
 
@@ -26,11 +26,9 @@ void drawStatsTab(bool redrawBg)
   if (!isScreenOn())
     return;
 
-  drawTopBar();
-  drawTabBar();
-
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
+
   drawNonPetTabBackground();
   drawTopBar();
   drawTabBar();
@@ -239,9 +237,12 @@ void drawPlayTab(bool redrawBg)
   (void)redrawBg;
 
   drawNonPetTabBackground();
+
+  // draw card + content
+  
   drawTopBar();
   drawTabBar();
-
+  
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
   const int contentBottom = contentY + contentH;
@@ -261,7 +262,7 @@ void drawPlayTab(bool redrawBg)
   constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;
   listWindow(totalItems, selectedIndex, MAX_VISIBLE, start, visCount);
-  
+
   int itemH = 22;
   int gap = 6;
 

@@ -1,5 +1,4 @@
 #include "graphics_render_utils.h"
-#include "graphics.h"
 #include "graphics_sd_draw.h"
 
 #include <M5GFX.h>
@@ -11,7 +10,6 @@
 
 extern M5Canvas spr;
 extern bool g_sdReady;
-
 
 void drawCenteredLine(const char *s, int y, int font, int size)
 {
@@ -76,8 +74,8 @@ void drawCenteredImageSpr(const char *path, int cx, int cy)
 
   if (!ok)
   {
-    const int boxW = gotWH ? w : 140;
-    const int boxH = gotWH ? h : 40;
+    const int boxW = (gotWH && w > 0) ? w : 140;
+    const int boxH = (gotWH && h > 0) ? h : 40;
     const int boxX = gotWH ? x : (cx - boxW / 2);
     const int boxY = gotWH ? y : (cy - boxH / 2);
 

@@ -18,6 +18,7 @@ extern M5Canvas spr;
 extern int screenW;
 extern int screenH;
 extern int deathMenuIndex;
+extern bool g_sdReady;
 
 // These already exist elsewhere in the graphics system.
 bool consumeDeathScreenFadeInStart();
@@ -93,10 +94,17 @@ static void drawDeathScreenImpl(bool redrawBg)
 
 void drawBurialScreen()
 {
+  if (!isScreenOn())
+    return;
+
   static const char *kBurialBg = "/raising_hell/graphics/background/flow/grave.jpg";
 
   spr.fillSprite(TFT_BLACK);
-  sprDrawJpgFromSD(kBurialBg, 0, 0);
+
+  if (g_sdReady)
+  {
+    (void)sprDrawJpgFromSD(kBurialBg, 0, 0);
+  }
 
   const int cx = 120;
   int y = 44;
