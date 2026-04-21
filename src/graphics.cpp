@@ -786,13 +786,8 @@ void renderUI()
 
   const bool redrawBg = (!bgDrawnForState) || bgInvalid || petMotionActive;
 
-  // Update pet intro fade state before drawing/presenting this frame.
-  tickPetScreenIntroFade();
-  tickPetIntroWalk();
-  tickPetWander();
-
   drawCurrentScreen(redrawBg);
-
+  
   if (g_app.uiState == UIState::POWER_MENU)
   {
     drawPowerMenu();
