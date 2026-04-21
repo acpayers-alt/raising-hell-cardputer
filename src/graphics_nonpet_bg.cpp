@@ -13,6 +13,7 @@ static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/
 
 static M5Canvas s_nonPetTile(&M5.Display);
 static bool s_nonPetTileReady = false;
+static bool s_nonPetTileHardFail = false;
 static int s_nonPetTileW = 0;
 static int s_nonPetTileH = 0;
 static PetType s_nonPetTileCachedType = (PetType)255;
@@ -33,6 +34,9 @@ static inline const char *nonPetTilePathForPet(PetType t)
 
 static bool ensureNonPetTileReady()
 {
+  if (s_nonPetTileHardFail)
+    return false;
+
   const PetType desiredType = pet.type;
   const char *path = nonPetTilePathForPet(desiredType);
 
@@ -69,6 +73,8 @@ static bool ensureNonPetTileReady()
 
   if (!ok)
   {
+    s_nonPetTileHardFail = true;
+
     static char s_lastNonPetTileFailPath[160] = {0};
 
     const char *failPath = path ? path : "(null)";
@@ -90,10 +96,12 @@ static bool ensureNonPetTileReady()
   if (s_nonPetTileReady)
     s_nonPetTileCachedType = desiredType;
 
+  s_nonPetTileHardFail = false;
+
   if (s_nonPetTileW != NONPET_TILE_W || s_nonPetTileH != NONPET_TILE_H)
   {
-    Serial.printf("[NONPET TILE] unexpected cache size %dx%d expected %dx%d\n",
-                  s_nonPetTileW, s_nonPetTileH, NONPET_TILE_W, NONPET_TILE_H);
+    Serial.printf("[NONPET TILE] unexpected cache size %dx%d expected %dx%d\n", s_nonPetTileW, s_nonPetTileH,
+                  NONPET_TILE_W, NONPET_TILE_H);
   }
 
   return s_nonPetTileReady;
@@ -122,6 +130,7 @@ void graphicsReleaseNonPetTileCache()
 {
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;
+  s_nonPetTileHardFail = false;
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
   s_nonPetTileCachedType = (PetType)255;
