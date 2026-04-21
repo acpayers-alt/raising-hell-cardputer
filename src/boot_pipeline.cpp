@@ -637,11 +637,16 @@ static bool bootAssetProvisionWifiReady()
       g_bootAssetProvisionActive = false;
 
       ui_setBootSplashActive(false);
-      uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
-      requestFullUIRedraw();
-      requestUIRedraw();
-      renderUI();
-      clearInputLatch();
+
+      if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
+      {
+        uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        renderUI();
+        clearInputLatch();
+      }
+
       return false;
     }
 
@@ -751,7 +756,7 @@ static void finalizeBootLanding()
       // Critical: free any stale UI/sleep buffers before entering sleep screen.
       graphicsReleaseUiCachesForMiniGame();
     }
-    
+
     enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
 
     if (s_bootFinalLandingState == UIState::PET_SLEEPING)
@@ -1022,15 +1027,17 @@ void postBootInitTick()
       if (g_bootAssetProvisionMustComplete)
       {
         g_bootAssetProvisionActive = false;
-        Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED sdReady=%d assetsMissing=%d must=%d "
-                      "active=%d requested=%d ui=%d\n",
-                      g_sdReady ? 1 : 0, g_assetsMissing ? 1 : 0, g_bootAssetProvisionMustComplete ? 1 : 0,
-                      g_bootAssetProvisionActive ? 1 : 0, bootAssetProvisionRequested() ? 1 : 0, (int)g_app.uiState);
-        uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
-        requestFullUIRedraw();
-        requestUIRedraw();
-        renderUI();
-        clearInputLatch();
+        if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
+        {
+          Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED ...");
+
+          uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+          requestFullUIRedraw();
+          requestUIRedraw();
+          renderUI();
+          clearInputLatch();
+        }
+
         return;
       }
 

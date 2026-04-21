@@ -56,10 +56,13 @@ static inline bool consoleBlockedInState(UIState s)
     case UIState::BOOT_WIFI_WAIT:
     case UIState::BOOT_TZ_PICK:
     case UIState::BOOT_NTP_WAIT:
-    case UIState::BOOT_ASSET_WIFI_REQUIRED:
     case UIState::WIFI_SETUP:
     case UIState::WIFI_CONNECT_WAIT:
       return true;
+
+    case UIState::BOOT_ASSET_WIFI_REQUIRED:
+      return false;
+
     default:
       return false;
   }
@@ -111,7 +114,7 @@ bool uiHandleGlobalInterceptors(InputState &in)
     uiActionSwallowEdges(in);
     return true;
   }
-  
+
   // Global shortcuts (ESC -> settings, etc.)
   if (uiInterceptGlobalShortcuts(in))
   {

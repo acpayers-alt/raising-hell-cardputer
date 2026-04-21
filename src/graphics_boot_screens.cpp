@@ -396,16 +396,16 @@ void drawBootAssetWifiRequiredScreen()
   spr.drawString("Initial asset download", 10, 10);
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("Raising Hell requires", 10, 36);
-  spr.drawString("an internet connection", 10, 54);
-  spr.drawString("for initial asset", 10, 72);
-  spr.drawString("download.", 10, 90);
+  spr.drawString("Raising Hell requires", 10, 32);
+  spr.drawString("an internet connection", 10, 48);
+  spr.drawString("for initial asset", 10, 64);
+  spr.drawString("download.", 10, 80);
 
   spr.setTextColor(TFT_GREEN, TFT_BLACK);
-  spr.drawString("ENTER: Set up Wi-Fi", 10, 118);
+  spr.drawString("ENTER: Set up Wi-Fi", 10, 102);
 
   spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  spr.drawString("\\: Console", 10, 136);
+  spr.drawString("\\: Console", 10, 118);
 
   spr.pushSprite(0, 0);
 }
