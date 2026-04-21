@@ -14,9 +14,9 @@
 #include "save_manager.h"
 #include "sdcard.h"
 #include "ui_play_menu.h"
+#include "ui_menu_state.h"
 
 extern M5Canvas spr;
-extern int playMenuIndex;
 
 const char *getBioStatusImagePath();
 
@@ -247,12 +247,21 @@ void drawPlayTab(bool redrawBg)
   const int contentBottom = contentY + contentH;
 
   const int totalItems = uiPlayMenuCount();
-  playMenuIndex = clampi(playMenuIndex, 0, totalItems - 1);
+
+  if (totalItems <= 0)
+  {
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(TFT_RED, TFT_BLACK);
+    spr.drawString("No games available", SCREEN_W / 2, SCREEN_H / 2);
+    return;
+  }
+
+  const int selectedIndex = clampi(playMenuIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;
-  listWindow(totalItems, playMenuIndex, MAX_VISIBLE, start, visCount);
-
+  listWindow(totalItems, selectedIndex, MAX_VISIBLE, start, visCount);
+  
   int itemH = 22;
   int gap = 6;
 
@@ -279,7 +288,7 @@ void drawPlayTab(bool redrawBg)
   {
     int index = start + row;
     int y = startY + row * (itemH + gap);
-    bool sel = (index == playMenuIndex);
+    bool sel = (index == selectedIndex);
 
     uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
     uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;

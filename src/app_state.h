@@ -39,7 +39,6 @@ struct AppState
   int systemSettingsIndex = 0;
   int petSettingsIndex = 0;
   int gameOptionsIndex = 0;
-  int playIndex = 0;
   int autoScreenIndex = 0;
   int decayModeIndex = 0;
 

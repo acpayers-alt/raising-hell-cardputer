@@ -9,9 +9,9 @@
 #include "display.h"
 #include "feed_menu_state.h"
 #include "graphics_chrome.h"
+#include "graphics_nonpet_bg.h"
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
-#include "graphics_nonpet_bg.h"
 #include "inventory.h"
 #include "inventory_state.h"
 #include "pet.h"
@@ -61,67 +61,66 @@ static ItemType shopItemTypeForIndexLocal(int idx)
   }
 }
 
-void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100,
-    const char *label)
+void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100, const char *label)
 {
-value01_100 = clampi(value01_100, 0, 100);
+  value01_100 = clampi(value01_100, 0, 100);
 
-const int r = h / 2;
-const int innerX = x + 1;
-const int innerY = y + 1;
-const int innerW = w - 2;
-const int innerH = h - 2;
-const int fillW = (innerW * value01_100) / 100;
+  const int r = h / 2;
+  const int innerX = x + 1;
+  const int innerY = y + 1;
+  const int innerW = w - 2;
+  const int innerH = h - 2;
+  const int fillW = (innerW * value01_100) / 100;
 
-// Outer pill
-spr.fillRoundRect(x, y, w, h, r, outline);
+  // Outer pill
+  spr.fillRoundRect(x, y, w, h, r, outline);
 
-// Inner dark track
-spr.fillRoundRect(innerX, innerY, innerW, innerH, (innerH / 2), TFT_BLACK);
+  // Inner dark track
+  spr.fillRoundRect(innerX, innerY, innerW, innerH, (innerH / 2), TFT_BLACK);
 
-// Fill with flat right edge
-if (fillW > 0)
-{
-int fw = fillW;
-if (fw < innerH)
-fw = innerH; // keep tiny values visible as a nub
-if (fw > innerW)
-fw = innerW;
+  // Fill with flat right edge
+  if (fillW > 0)
+  {
+    int fw = fillW;
+    if (fw < innerH)
+      fw = innerH; // keep tiny values visible as a nub
+    if (fw > innerW)
+      fw = innerW;
 
-spr.fillRect(innerX, innerY, fw, innerH, fill);
-}
+    spr.fillRect(innerX, innerY, fw, innerH, fill);
+  }
 
-// Centered label
-if (label && label[0])
-{
-spr.setTextFont(1);
-spr.setTextSize(1);
-spr.setTextColor(TFT_WHITE);
-spr.setTextDatum(MC_DATUM);
-spr.drawString(label, x + w / 2, y + h / 2);
-spr.setTextDatum(TL_DATUM);
-}
+  // Centered label
+  if (label && label[0])
+  {
+    spr.setTextFont(1);
+    spr.setTextSize(1);
+    spr.setTextColor(TFT_WHITE);
+    spr.setTextDatum(MC_DATUM);
+    spr.drawString(label, x + w / 2, y + h / 2);
+    spr.setTextDatum(TL_DATUM);
+  }
 }
 
 void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100)
 {
-drawTinyBar(x, y, w, h, fill, outline, value01_100, nullptr);
+  drawTinyBar(x, y, w, h, fill, outline, value01_100, nullptr);
 }
 
 void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100)
 {
-value01_100 = clampi(value01_100, 0, 100);
+  value01_100 = clampi(value01_100, 0, 100);
 
-spr.drawRect(x, y, w, h, outline);
+  spr.drawRect(x, y, w, h, outline);
 
-const int innerW = w - 2;
-const int innerH = h - 2;
-const int fillH = (innerH * value01_100) / 100;
+  const int innerW = w - 2;
+  const int innerH = h - 2;
+  const int fillH = (innerH * value01_100) / 100;
 
-spr.fillRect(x + 1, y + 1, innerW, innerH, TFT_BLACK);
+  spr.fillRect(x + 1, y + 1, innerW, innerH, TFT_BLACK);
 
-const int fy = y + 1 + (innerH - fillH);
-spr.fillRect(x + 1, fy, innerW, fillH, fill);
+  const int fy = y + 1 + (innerH - fillH);
+  spr.fillRect(x + 1, fy, innerW, fillH, fill);
 }
 
 void drawShopScreen()
@@ -460,7 +459,7 @@ void drawSleepMenu()
   if (totalItems <= 0)
     return;
 
-  sleepMenuIndex = clampi(sleepMenuIndex, 0, totalItems - 1);
+  const int selectedIndex = clampi(sleepMenuIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;

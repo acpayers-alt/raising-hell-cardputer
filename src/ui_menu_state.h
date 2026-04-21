@@ -12,8 +12,7 @@
 // - feedMenuIndex aliases g_feedMenu.selectedIndex
 // - powerMenuIndex and lastRenderTimeMs alias into g_app
 //   (single source of truth).
-// - sleepMenuIndex/playMenuIndex/selectedMenu remain standalone legacy globals
-//   until you migrate them too.
+// Also aliased into g_app now as part of the shared UI state.
 
 extern int &shopIndex;
 extern int &feedMenuIndex;
@@ -29,6 +28,5 @@ extern int &selectedMenu;
 extern int &screenSettingsIndex;
 extern int &systemSettingsIndex;
 extern int &gameOptionsIndex;
-extern int &playIndex;
 extern int &autoScreenIndex;
 extern int &decayModeIndex;
