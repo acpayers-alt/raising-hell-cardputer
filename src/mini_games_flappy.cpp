@@ -33,8 +33,11 @@
 // Flappy-local forward decls / helpers
 static const uint16_t kSpriteKey = 0x0841;
 
+static void flappyLogState(const char *tag);
+
 static inline void flappyExitMiniGameToReturnUi(bool beginLockout = true)
 {
+  flappyLogState("exit");
   mgmem::endSession();
   miniGameExitToReturnUi(beginLockout);
 }
@@ -43,7 +46,6 @@ static void logMiniGameHeap(const char *tag) { mgAssetsLogHeap(tag); }
 
 void freeFlappyBgCache();
 static bool ensureFlappyBgCache(const char *path);
-static bool sdExistsTrySlash(const char *path, const char **outUsePath = nullptr);
 
 // -----------------------------------------------------------------------------
 // FLAPPY FIREBALL GLOBALS
@@ -271,6 +273,21 @@ static int s_fbY = 0;
 static int s_fbVY = 0;
 uint32_t s_lastStepMs = 0;
 static int s_flappyBgScrollX = 0;
+
+static void flappyLogState(const char *tag)
+{
+  Serial.printf("[FLAPPY] %s intro=%d playing=%d hit=%d burnDone=%d gameOver=%d won=%d fb=(%d,%d) vy=%d dist=%d free=%u largest=%u\n",
+                tag ? tag : "state",
+                s_flappyShowIntro ? 1 : 0,
+                s_flappyPlaying ? 1 : 0,
+                s_impHit ? 1 : 0,
+                s_impBurnDone ? 1 : 0,
+                g_app.gameOver ? 1 : 0,
+                playerWon ? 1 : 0,
+                s_fbX, s_fbY, s_fbVY, s_flappyDistancePx,
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
 
 // Shared fullscreen background now lives in mini_game_assets.cpp
 // Keep only width/height bookkeeping local for flappy scroll math.
@@ -596,7 +613,7 @@ void startFlappyFireball()
 
   mgmem::logUsage("flappy-after-preload");
 
-  Serial.printf("FLAPPY preload: bg=%d pipes=%d fireball=%d imp=%d free=%u largest=%u\n", bgOk ? 1 : 0, pipeOk ? 1 : 0,
+  Serial.printf("[FLAPPY] preload bg=%d pipes=%d fireball=%d imp=%d free=%u largest=%u\n", bgOk ? 1 : 0, pipeOk ? 1 : 0,
                 fireballOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
@@ -607,6 +624,7 @@ void startFlappyFireball()
   mgBeginInputLockout(220);
 
   mgmem::logUsage("flappy-start-complete");
+  flappyLogState("start-complete");
 }
 
 static bool flappyCollides(int fbX, int fbY, int r, const FlappyPipe &p, int w, int h)
@@ -763,6 +781,9 @@ static void flappyStep(int w, int h, bool flap)
       requestUIRedraw();
       s_resultShown = true;
       s_flappyPlaying = false;
+
+      flappyLogState("lose");
+
       soundError();
       return;
     }
@@ -789,6 +810,9 @@ static void flappyStep(int w, int h, bool flap)
         s_impFrame = 0;
         s_impAnimMs = 0;
         s_impHoldMs = 0;
+
+        flappyLogState("goal-reached");
+
         soundConfirm();
       }
     }
@@ -877,6 +901,9 @@ void updateFlappyFireball(const InputState &input)
       s_flappyShowIntro = false;
       flappyResetWorld(gW, gH);
       s_lastStepMs = now;
+
+      flappyLogState("intro-dismissed");
+
       clearInputLatch();
       inputForceClear();
       mgBeginInputLockout(120);
@@ -961,6 +988,8 @@ void updateFlappyFireball(const InputState &input)
             requestUIRedraw();
             s_resultShown = true;
             s_flappyPlaying = false;
+
+            flappyLogState("win");
           }
         }
       }

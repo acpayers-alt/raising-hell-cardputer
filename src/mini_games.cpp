@@ -150,7 +150,7 @@ bool miniGameIsShowingIntro()
   case MiniGame::FLAPPY_FIREBALL:
     return s_flappyShowIntro;
 
-    case MiniGame::CROSSY_ROAD:
+  case MiniGame::CROSSY_ROAD:
     return crossyIsShowingIntro();
 
   case MiniGame::INFERNAL_DODGER:

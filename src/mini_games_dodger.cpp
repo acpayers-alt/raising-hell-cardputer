@@ -25,7 +25,7 @@ void freeDodgerFireballSprites();
 void freeDodgerCarSprite();
 void freeDodgerGoalFrames();
 void freeDodgerGoreSprite();
-static bool sdExistsTrySlash(const char *path, const char **outUsePath = nullptr);
+static bool sdExistsTrySlash(const char *path, const char **outUsePath);
 
 static bool sdExistsTrySlash(const char *path, const char **outUsePath)
 {
@@ -80,14 +80,17 @@ static const char *dodgerBgRightPathForPet()
   }
 }
 
+static void dodgerLogState(const char *tag);
+
 static inline void dodgerExitMiniGameToReturnUi(bool beginLockout = true)
 {
+  dodgerLogState("exit");
   mgmem::endSession();
   miniGameExitToReturnUi(beginLockout);
 }
 
 // -----------------------------------------------------------------------------
-// FIREBALL RUN GLOBALS
+// (Infernal Dodger) FIREBALL RUN GLOBALS
 // -----------------------------------------------------------------------------
 
 struct DodgerBall
@@ -127,13 +130,8 @@ static int16_t s_dodgerGoalX = 0;
 static int16_t s_dodgerGoalY = 0;
 static int s_dodgerGoalSpawnScrollY = 0;
 
-static bool s_dodgerGoalFrameReady[2] = {false, false};
-static char s_dodgerGoalFramePath[2][160] = {{0}, {0}};
 static int s_dodgerGoalW = 0;
 static int s_dodgerGoalH = 0;
-
-static bool s_dodgerGoreReady = false;
-static char s_dodgerGorePath[160] = {0};
 
 static uint8_t s_dodgerGoalAnimFrame = 0;
 static uint32_t s_dodgerGoalAnimMs = 0;
@@ -157,7 +155,6 @@ static uint32_t s_dodgerSpawnAccMs = 0;
 
 static int16_t s_dodgerPx = 0;
 static int16_t s_dodgerPy = 0;
-static int16_t s_dodgerSpeed = 3;
 static float s_dodgerPxF = 0.0f;
 uint32_t s_dodgerMoveLastMs = 0;
 
@@ -176,6 +173,14 @@ static int s_dodgerFireballH = 0;
 static int s_dodgerCarW = 0;
 static int s_dodgerCarH = 0;
 
+static void dodgerLogState(const char *tag)
+{
+  Serial.printf("[DODGER] %s intro=%d phase=%d gameOver=%d won=%d px=%d py=%d goalY=%d free=%u largest=%u\n",
+                tag ? tag : "state", s_dodgerShowIntro ? 1 : 0, (int)s_dodgerPhase, g_app.gameOver ? 1 : 0,
+                playerWon ? 1 : 0, (int)s_dodgerPx, (int)s_dodgerPy, (int)s_dodgerGoalY, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
+
 static M5Canvas *s_dodgerFireball1Spr = nullptr;
 static M5Canvas *s_dodgerFireball2Spr = nullptr;
 static M5Canvas *s_dodgerFireball3Spr = nullptr;
@@ -187,16 +192,6 @@ static M5Canvas *s_dodgerBgLeftSpr = nullptr;
 static M5Canvas *s_dodgerBgRightSpr = nullptr;
 static int s_dodgerBgHalfW = 0;
 static int s_dodgerBgHalfH = 0;
-
-static bool ensureDodgerGoalFrame1Only(const char *f1)
-{
-  if (!f1)
-    return false;
-
-  return mgmem::ensureSprite(currentMiniGame, "goal_frame_1", f1, 8, kDodgerKey,
-                             s_dodgerGoalFrame1Spr // ← FIXED
-  );
-}
 
 static const char *dodgerIntroLine1()
 {
@@ -375,35 +370,6 @@ static const char *fireballRunCarPathForPet()
   }
 }
 
-static bool loadDodgerSprite(LGFX_Sprite &dst, const char *path, int &outW, int &outH)
-{
-  if (!path || !path[0] || !g_sdReady)
-    return false;
-
-  int w = 0, h = 0;
-  const char *usePath = nullptr;
-
-  if (!mgAssetsReadPngDims(path, &w, &h, &usePath) || w <= 0 || h <= 0)
-    return false;
-
-  dst.setColorDepth(8);
-
-  if (!dst.createSprite(w, h))
-    return false;
-
-  dst.fillSprite(kDodgerKey);
-
-  if (!canvasDrawPngFromSD(dst, usePath, 0, 0))
-  {
-    dst.deleteSprite();
-    return false;
-  }
-
-  outW = w;
-  outH = h;
-  return true;
-}
-
 static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
 {
   if (!path0 || !path1 || !path0[0] || !path1[0] || !g_sdReady)
@@ -564,7 +530,6 @@ static void dodgerReset()
   s_dodgerPxF = (float)s_dodgerPx;
   s_dodgerMoveLastMs = millis();
   s_dodgerPy = gH - 42;
-  s_dodgerSpeed = 3;
   s_dodgerMoveDir = 0;
   s_dodgerDirHoldMs = 0;
 
@@ -723,7 +688,7 @@ void startInfernalDodger()
   s_dodgerInited = true;
   dodgerReset();
 
-  Serial.printf("DODGER preload: bg=%d fireballs=%d car=%d goal=%d gore=%d free=%u largest=%u\n", bgOk ? 1 : 0,
+  Serial.printf("[DODGER] preload bg=%d fireballs=%d car=%d goal=%d gore=%d free=%u largest=%u\n", bgOk ? 1 : 0,
                 fireballOk ? 1 : 0, carOk ? 1 : 0, goalOk ? 1 : 0, goreOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
@@ -737,6 +702,7 @@ void startInfernalDodger()
   mgBeginInputLockout(220);
 
   mgmem::logUsage("dodger-start-complete");
+  dodgerLogState("start-complete");
 }
 
 void updateInfernalDodger(const InputState &input)
@@ -795,6 +761,9 @@ void updateInfernalDodger(const InputState &input)
       dodgerReset();
       s_dodgerMoveLastMs = now;
       s_dodgerLastStepMs = now;
+
+      dodgerLogState("intro-dismissed");
+
       clearInputLatch();
       inputForceClear();
       mgBeginInputLockout(120);
@@ -828,6 +797,7 @@ void updateInfernalDodger(const InputState &input)
       {
         ensureDodgerGoreSprite(g);
         mgmem::logUsage("dodger-after-gore-late-ensure");
+        dodgerLogState("gore-loaded");
       }
     }
   }
@@ -970,6 +940,9 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerPhase = DODGER_PHASE_OFFROAD_CRASH;
       s_dodgerPhaseStartMs = now;
       s_dodgerMoveDir = 0;
+
+      dodgerLogState("offroad-crash");
+
       soundError();
     }
   }
@@ -1019,6 +992,9 @@ void updateInfernalDodger(const InputState &input)
           g_app.gameOver = true;
           requestUIRedraw();
           s_resultShown = true;
+
+          dodgerLogState("lose");
+
           soundError();
           return;
         }
@@ -1039,6 +1015,8 @@ void updateInfernalDodger(const InputState &input)
         s_dodgerCarExitVy = roadSpeed;
         s_dodgerPhase = DODGER_PHASE_IMPACT;
         s_dodgerPhaseStartMs = now;
+
+        dodgerLogState("goal-reached");
       }
     }
     else if (s_dodgerPhase == DODGER_PHASE_IMPACT)
@@ -1072,6 +1050,9 @@ void updateInfernalDodger(const InputState &input)
         g_app.gameOver = true;
         requestUIRedraw();
         s_resultShown = true;
+
+        dodgerLogState("win");
+
         return;
       }
     }
@@ -1095,6 +1076,9 @@ void updateInfernalDodger(const InputState &input)
         g_app.gameOver = true;
         requestUIRedraw();
         s_resultShown = true;
+
+        dodgerLogState("offroad-lose");
+
         return;
       }
     }
