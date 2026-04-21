@@ -1185,15 +1185,16 @@ void postBootInitTick()
 
   if (bootAssetProvisionRequired())
   {
-    // If user opened console during asset intro/provision phase,
-    // freeze boot pipeline UI activity so we don't fight the overlay.
+    // If user opened console during the asset intro/provision phase,
+    // freeze boot pipeline UI activity so we do not fight the overlay.
     if (g_app.uiState == UIState::CONSOLE && bootAssetProvisionWaitingAtIntroScreen())
     {
       return;
     }
-    
+
     const int wifiNow = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
     const int uiNow = (int)g_app.uiState;
+    
     const int onboardingNow = g_bootProvisionWifiOnboardingStarted ? 1 : 0;
     const int activeNow = g_bootAssetProvisionActive ? 1 : 0;
 

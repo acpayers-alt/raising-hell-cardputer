@@ -351,6 +351,17 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
   if (!f)
     return false;
 
+  static uint32_t s_lastBadBubLogMs = 0;
+  auto logBadBub = [&](const char *reason)
+  {
+    const uint32_t now = millis();
+    if (now - s_lastBadBubLogMs > 2000)
+    {
+      Serial.printf("[EXPORT LIST][BAD_BUB] path=%s reason=%s\n", path ? path : "(null)", reason ? reason : "unknown");
+      s_lastBadBubLogMs = now;
+    }
+  };
+
   DynamicJsonDocument filter(256);
   filter["format"] = true;
   filter["exportVersion"] = true;
@@ -403,10 +414,21 @@ static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
   out.petId[0] = '\0';
   out.createdAtEpoch = 0;
 
+  static uint32_t s_lastBadBubLogMs = 0;
+  auto logBadBub = [&](const char *reason)
+  {
+    const uint32_t now = millis();
+    if (now - s_lastBadBubLogMs > 2000)
+    {
+      Serial.printf("[EXPORT LIST][BAD_BUB] path=%s reason=%s\n", path ? path : "(null)", reason ? reason : "unknown");
+      s_lastBadBubLogMs = now;
+    }
+  };
+
   File f = SD.open(path, FILE_READ);
   if (!f)
   {
-    Serial.printf("[EXPORT LIST][BAD_BUB] open failed path=%s\n", path ? path : "(null)");
+    logBadBub("open_failed");
     return false;
   }
 
@@ -425,7 +447,7 @@ static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
 
   if (err)
   {
-    Serial.printf("[EXPORT LIST][BAD_BUB] json failed path=%s err=%s\n", path, err.c_str());
+    logBadBub(err.c_str());
     return false;
   }
 
@@ -433,8 +455,7 @@ static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
   const uint16_t exportVersion = doc["exportVersion"] | 0;
   if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
   {
-    Serial.printf("[EXPORT LIST][BAD_BUB] format/version failed path=%s format=%s version=%u\n", path, format,
-                  (unsigned)exportVersion);
+    logBadBub("format_version_bad");
     return false;
   }
 
@@ -484,15 +505,20 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
   if (!g_sdReady || !dirPath || !SD.exists(dirPath))
     return 0;
 
+  s_lastExportScanInvalidCount = 0;
+  s_lastExportScanValidCount = 0;
+
   File dir = SD.open(dirPath);
   if (!dir || !dir.isDirectory())
     return 0;
 
   int count = 0;
 
-  File file = dir.openNextFile();
-  while (file)
+  for (File file = dir.openNextFile(); file; file = dir.openNextFile())
   {
+    if (!file)
+      break;
+
     if (!file.isDirectory())
     {
       const char *nm = file.name();
@@ -504,6 +530,7 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
         PetExportEntry entry{};
         if (readExportMetadata(full, entry))
         {
+          s_lastExportScanValidCount++;
           bool merged = false;
 
           if (dedupeByPetId && entry.petId[0])
@@ -529,6 +556,8 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
         }
         else
         {
+          s_lastExportScanInvalidCount++;
+
           // Surface corrupt .bub files so the UI can show and delete them.
           if (count < maxEntries)
           {
@@ -538,7 +567,7 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
             strncpy(bad.path, full, sizeof(bad.path) - 1);
             bad.path[sizeof(bad.path) - 1] = '\0';
 
-            strncpy(bad.name, "Corrupt .bub", sizeof(bad.name) - 1);
+            strncpy(bad.name, "Corrupt Save File", sizeof(bad.name) - 1);
             bad.name[sizeof(bad.name) - 1] = '\0';
 
             strncpy(bad.petType, "BAD FILE", sizeof(bad.petType) - 1);
@@ -554,7 +583,6 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
     }
 
     file.close();
-    file = dir.openNextFile();
   }
 
   sortPetExportsNewestFirst(outEntries, count);
@@ -926,7 +954,7 @@ void saveManagerEnterSleepState()
 
   // Critical: free large UI caches before entering the sleeping screen.
   graphicsReleaseUiCachesForMiniGame();
-  
+
   writeSleepPendingFlag();
   saveManagerMarkDirty();
 
