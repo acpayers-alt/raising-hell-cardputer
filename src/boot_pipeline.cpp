@@ -617,9 +617,33 @@ static bool bootAssetProvisionWifiReady()
     const bool haveStoredCreds = wifiStoreHasCreds();
     const bool wifiConnected = (WiFi.status() == WL_CONNECTED);
 
-    Serial.printf("[BOOT][PROVISION][WIFICHK] mandatory=%d wifiEnabled=%d haveStoredCreds=%d wifiConnected=%d ui=%d\n",
-                  g_bootAssetProvisionMustComplete ? 1 : 0, shouldEnableWifi ? 1 : 0, haveStoredCreds ? 1 : 0,
-                  wifiConnected ? 1 : 0, (int)g_app.uiState);
+    static int s_prevMandatory = -1;
+    static int s_prevWifiEnabled = -1;
+    static int s_prevHaveCreds = -1;
+    static int s_prevConnected = -1;
+    static int s_prevUi = -1;
+
+    const int mandatoryNow = g_bootAssetProvisionMustComplete ? 1 : 0;
+    const int wifiEnabledNow = shouldEnableWifi ? 1 : 0;
+    const int haveCredsNow = haveStoredCreds ? 1 : 0;
+    const int connectedNow = wifiConnected ? 1 : 0;
+    const int uiNow = (int)g_app.uiState;
+
+    const bool changed = (mandatoryNow != s_prevMandatory) || (wifiEnabledNow != s_prevWifiEnabled) ||
+                         (haveCredsNow != s_prevHaveCreds) || (connectedNow != s_prevConnected) || (uiNow != s_prevUi);
+
+    if (changed)
+    {
+      Serial.printf(
+          "[BOOT][PROVISION][WIFICHK] mandatory=%d wifiEnabled=%d haveStoredCreds=%d wifiConnected=%d ui=%d\n",
+          mandatoryNow, wifiEnabledNow, haveCredsNow, connectedNow, uiNow);
+
+      s_prevMandatory = mandatoryNow;
+      s_prevWifiEnabled = wifiEnabledNow;
+      s_prevHaveCreds = haveCredsNow;
+      s_prevConnected = connectedNow;
+      s_prevUi = uiNow;
+    }
 
     // If provisioning needs Wi-Fi but we do not have stored creds to auto-connect,
     // fall back to the boot Wi-Fi connection flow instead of idling and later
@@ -631,8 +655,6 @@ static bool bootAssetProvisionWifiReady()
     //   3) fall back to manual Wi-Fi setup
     if (shouldEnableWifi && !wifiConnected && !haveStoredCreds)
     {
-      Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
-
       g_bootProvisionWifiOnboardingStarted = true;
       g_bootAssetProvisionActive = false;
 
@@ -640,6 +662,9 @@ static bool bootAssetProvisionWifiReady()
 
       if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
       {
+
+        Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
+
         uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();
