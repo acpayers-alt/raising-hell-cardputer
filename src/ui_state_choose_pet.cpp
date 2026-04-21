@@ -37,9 +37,6 @@ void uiChoosePetOnEnter(InputState &in)
   in.clearEdges();
   inputForceClear();
   clearInputLatch();
-
-  Serial.printf("[EGG] onEnter selectHeld=%d unlockMs=%lu blockUntilRelease=%d\n", (int)in.selectHeld,
-                (unsigned long)g_choosePetInputUnlockMs, (int)g_choosePetBlockHatchUntilRelease);
 }
 
 void uiChoosePetHandle(InputState &in)
@@ -106,10 +103,6 @@ void uiChoosePetHandle(InputState &in)
 
   // Enter edge derived from held state (more reliable than selectOnce)
   const bool enterEdge = (in.selectHeld && !s_prevSelectHeld);
-  if (enterEdge)
-  {
-    Serial.printf("[EGG] enterEdge DETECTED selectHeld=%d prev=%d\n", (int)in.selectHeld, (int)s_prevSelectHeld);
-  }
 
   s_prevSelectHeld = in.selectHeld;
 

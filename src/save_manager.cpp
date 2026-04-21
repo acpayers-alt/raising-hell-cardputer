@@ -926,10 +926,7 @@ void saveManagerEnterSleepState()
 
   // Critical: free large UI caches before entering the sleeping screen.
   graphicsReleaseUiCachesForMiniGame();
-  Serial.printf("[HEAPCHK] sleep-enter after-release free=%u largest=%u\n",
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
-
+  
   writeSleepPendingFlag();
   saveManagerMarkDirty();
 

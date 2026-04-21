@@ -750,11 +750,8 @@ static void finalizeBootLanding()
     {
       // Critical: free any stale UI/sleep buffers before entering sleep screen.
       graphicsReleaseUiCachesForMiniGame();
-      Serial.printf("[HEAPCHK] boot-sleep-landing after-release free=%u largest=%u\n",
-                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
     }
-
+    
     enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
 
     if (s_bootFinalLandingState == UIState::PET_SLEEPING)

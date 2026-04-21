@@ -108,18 +108,10 @@ bool uiHandleGlobalInterceptors(InputState &in)
 
   if (in.consoleOnce && consoleBlockedInState(g_app.uiState))
   {
-    static UIState s_lastBlockedState = (UIState)-1;
-  
-    if (g_app.uiState != s_lastBlockedState)
-    {
-      Serial.printf("[INPUT] console blocked in state=%d\n", (int)g_app.uiState);
-      s_lastBlockedState = g_app.uiState;
-    }
-  
     uiActionSwallowEdges(in);
     return true;
   }
-
+  
   // Global shortcuts (ESC -> settings, etc.)
   if (uiInterceptGlobalShortcuts(in))
   {

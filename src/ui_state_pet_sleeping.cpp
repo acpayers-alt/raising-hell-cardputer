@@ -46,9 +46,6 @@ void uiPetSleepingBootEnter()
   // so start from a safe "not held" baseline.
   s_prevSelectHeld = false;
   graphicsReleaseUiCachesForMiniGame();
-  Serial.printf("[HEAPCHK] uiPetSleepingBootEnter after-release free=%u largest=%u\n",
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 
   clearInputLatch();
   inputForceClear();
