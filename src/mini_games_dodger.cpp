@@ -82,7 +82,6 @@ static const char *dodgerBgRightPathForPet()
 
 static inline void dodgerExitMiniGameToReturnUi(bool beginLockout = true)
 {
-  freeDodgerSprites();
   mgmem::endSession();
   miniGameExitToReturnUi(beginLockout);
 }

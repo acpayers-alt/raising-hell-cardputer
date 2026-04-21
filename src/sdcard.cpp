@@ -10,8 +10,9 @@
 #include <SPI.h>
 
 bool g_sdReady = false;
-
 bool sdReady() { return g_sdReady; }
+static bool s_sdFirstInit = true;
+static uint32_t s_sdBootStartMs = 0;
 
 // Cardputer-Adv microSD pins (M5 docs):
 // microSD: CS=G12 MOSI=G14 CLK=G40 MISO=G39
@@ -68,13 +69,23 @@ bool initSD()
   // Keep all prints gated (serial-pressure safe)
   DBGLN_ON("[SD] initSD()");
 
+  if (s_sdBootStartMs == 0)
+    s_sdBootStartMs = millis();
+
+  s_sdInitAttemptCount++;
+  const uint32_t attemptNum = s_sdInitAttemptCount;
+  const uint32_t t0 = millis();
+
+  Serial.printf("[SD] init attempt %lu start (%lu ms since boot)\n", (unsigned long)attemptNum,
+                (unsigned long)(millis() - s_sdBootStartMs));
+
   // Ensure CS is deasserted
   pinMode(SD_SPI_CS_PIN, OUTPUT);
   digitalWrite(SD_SPI_CS_PIN, HIGH);
 
   // Try multiple clocks: start fast, fall back to "always works" speeds.
   // 20MHz can be flaky on some boots/cards; 4MHz is a common safe baseline.
-  static const uint32_t kHzList[] = {20000000UL, 10000000UL, 8000000UL, 4000000UL, 1000000UL};
+  static const uint32_t kHzList[] = {20000000UL, 8000000UL, 4000000UL, 1000000UL};
 
   // Make sure prior SD state is torn down (important across retries)
 #if defined(ESP32)
@@ -87,13 +98,24 @@ bool initSD()
 
   // Re-init bus pins
   sdSPI.begin(SD_SPI_SCK_PIN, SD_SPI_MISO_PIN, SD_SPI_MOSI_PIN, SD_SPI_CS_PIN);
-  delay(5);
+  delay(10);
 
   // A small CS pulse can help some cards wake cleanly
   digitalWrite(SD_SPI_CS_PIN, LOW);
   delay(2);
   digitalWrite(SD_SPI_CS_PIN, HIGH);
-  delay(10);
+
+  // Give the card/socket a real settle window after bus re-init.
+  // This is especially useful on the first boot after flashing.
+  if (s_sdFirstInit)
+  {
+    delay(120); // give extra margin on first boot after flash/reset
+    s_sdFirstInit = false;
+  }
+  else
+  {
+    delay(20); // normal settle for subsequent attempts
+  }
 
   for (size_t i = 0; i < (sizeof(kHzList) / sizeof(kHzList[0])); i++)
   {
@@ -117,12 +139,16 @@ bool initSD()
     if (!ok)
     {
       // brief settle before next attempt
-      delay(10);
+      delay(20);
       continue;
     }
 
-    Serial.printf("[SD] cardType=%d sizeMB=%lu\n", (int)SD.cardType(),
-                  (unsigned long)(SD.cardSize() / (1024ULL * 1024ULL)));
+    const uint32_t callMs = millis() - t0;
+    const uint32_t bootMs = (s_sdBootStartMs > 0) ? (millis() - s_sdBootStartMs) : 0;
+
+    Serial.printf("[SD] init attempt %lu OK in %lu ms (call) / %lu ms since boot at %lu Hz cardType=%d sizeMB=%lu\n",
+                  (unsigned long)attemptNum, (unsigned long)callMs, (unsigned long)bootMs, (unsigned long)hz,
+                  (int)SD.cardType(), (unsigned long)(SD.cardSize() / (1024ULL * 1024ULL)));
 
     if (!ensureDir(SAVE_DIR))
     {
