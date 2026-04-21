@@ -677,10 +677,8 @@ void releaseAllForCurrentGame()
   {
     MgSpriteSlot &slot = s_spriteSlots[i];
     if (!slot.inUse)
-      continue;
-    if (slot.owner != s_mgmemCurrentGame)
-      continue;
-
+    continue;
+    
     clearSpriteSlot(slot, "mgmem.release");
     releasedCount++;
   }

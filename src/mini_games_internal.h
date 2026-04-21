@@ -3,7 +3,13 @@
 #include "mini_games.h"
 
 void miniGameDrawRewardModal(int gW, int gH);
+
+extern bool s_resultShown;
+
+// Ressurection Run
 void freeResRunSprites();
 bool resRunIsShowingIntro();
 
-extern bool s_resultShown;
+// Dodger
+void freeDodgerSprites();
+bool dodgerIsShowingIntro();
