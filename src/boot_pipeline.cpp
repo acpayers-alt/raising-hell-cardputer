@@ -1185,6 +1185,13 @@ void postBootInitTick()
 
   if (bootAssetProvisionRequired())
   {
+    // If user opened console during asset intro/provision phase,
+    // freeze boot pipeline UI activity so we don't fight the overlay.
+    if (g_app.uiState == UIState::CONSOLE && bootAssetProvisionWaitingAtIntroScreen())
+    {
+      return;
+    }
+    
     const int wifiNow = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
     const int uiNow = (int)g_app.uiState;
     const int onboardingNow = g_bootProvisionWifiOnboardingStarted ? 1 : 0;
@@ -1213,7 +1220,8 @@ void postBootInitTick()
     }
 
     if (bootAssetProvisionRequired() && g_bootLandingDeferredForAssetProvision && !g_bootAssetProvisionActive &&
-        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED && g_app.uiState != UIState::BOOT)
+        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED && g_app.uiState != UIState::BOOT &&
+        g_app.uiState != UIState::CONSOLE)
     {
       Serial.printf("[BOOT][ASSET_STAGE35] forcing return to BOOT from ui=%d\n", (int)g_app.uiState);
       uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
