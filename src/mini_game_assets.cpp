@@ -676,16 +676,16 @@ void releaseAllForCurrentGame()
   for (int i = 0; i < kMgSpriteSlotCount; ++i)
   {
     MgSpriteSlot &slot = s_spriteSlots[i];
-  
+
     if (!slot.inUse)
       continue;
-  
+
     // Count BEFORE we mutate the slot
     releasedCount++;
-  
+
     clearSpriteSlot(slot, "mgmem.release");
   }
-  
+
   const uint32_t freeAfter = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
   const uint32_t largestAfter = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
 

@@ -13,3 +13,6 @@ bool resRunIsShowingIntro();
 // Dodger
 void freeDodgerSprites();
 bool dodgerIsShowingIntro();
+
+void freeCrossySprites();
+bool crossyIsShowingIntro();
