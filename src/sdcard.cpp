@@ -13,6 +13,7 @@ bool g_sdReady = false;
 bool sdReady() { return g_sdReady; }
 static bool s_sdFirstInit = true;
 static uint32_t s_sdBootStartMs = 0;
+static uint32_t s_sdInitAttemptCount = 0;
 
 // Cardputer-Adv microSD pins (M5 docs):
 // microSD: CS=G12 MOSI=G14 CLK=G40 MISO=G39
