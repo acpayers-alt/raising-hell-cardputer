@@ -3,10 +3,10 @@
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 
+#include "mg_pause_core.h"
 #include "mini_game_assets.h"
 #include "mini_game_return_ui.h"
 #include "mini_game_runtime.h"
-#include "mg_pause_core.h"
 
 #include "app_state.h"
 #include "display.h"
@@ -19,13 +19,6 @@
 #include "ui_runtime.h"
 
 static const uint16_t kResRunKey = 0x0841;
-
-static inline void rrExitMiniGameToReturnUi(bool beginLockout = true)
-{
-  freeResRunSprites();
-  mgmem::endSession();
-  miniGameExitToReturnUi(beginLockout);
-}
 
 // -----------------------------------------------------------------------------
 // Resurrection Run (side-scroller runner) GLOBALS
@@ -77,8 +70,20 @@ static M5Canvas *s_rrLadybugFly1Spr = nullptr;
 static M5Canvas *s_rrLadybugFly2Spr = nullptr;
 
 static void rrInitStars();
-
 static void rrResetObstacles();
+
+static inline void rrExitMiniGameToReturnUi(bool beginLockout = true)
+{
+  freeResRunSprites();
+  mgmem::endSession();
+
+  rr_active = false;
+  currentMiniGame = MiniGame::NONE;
+  g_app.inMiniGame = false;
+  g_app.gameOver = false;
+
+  miniGameExitToReturnUi(beginLockout);
+}
 
 struct RrStar
 {
@@ -115,6 +120,13 @@ static constexpr int kRrHandExitSpeed = 3;
 static constexpr uint32_t kRrHandHoldMs = 250;
 static constexpr uint32_t kRrHandContactHoldMs = 350;
 static constexpr uint32_t kRrWinHoldMs = 500;
+
+static void resRunLogState(const char *tag)
+{
+  Serial.printf("[RESRUN] %s intro=%d phase=%d gameOver=%d won=%d dist=%d free=%u largest=%u\n", tag ? tag : "state",
+                s_rrShowIntro ? 1 : 0, (int)s_rrPhase, g_app.gameOver ? 1 : 0, playerWon ? 1 : 0, rr_distance,
+                (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
 
 static const char *resRunSnakeCrouchPathForPet()
 {
@@ -602,6 +614,7 @@ static void rrFinishRun(bool won)
   s_resultShown = true;
 
   mgmem::logUsage(won ? "rr finish win" : "rr finish loss");
+  resRunLogState(won ? "win" : "lose");
   requestUIRedraw();
 }
 
@@ -671,7 +684,7 @@ static void rrInitStars()
     s_rrStars[i].x = (int16_t)random(0, gW);
     s_rrStars[i].y = (int16_t)random(4, groundY - 6);
     s_rrStars[i].phase = (uint8_t)random(0, 64);
-    s_rrStars[i].kind = (uint8_t)random(0, 4); // 0..3, mostly tiny stars
+    s_rrStars[i].kind = (uint8_t)random(0, 4);
   }
 }
 
@@ -690,10 +703,10 @@ static void rrDrawEldritchStars(int groundY, uint32_t now)
       continue;
 
     const uint8_t t = (uint8_t)((tick + s.phase) & 31U);
-    const uint8_t glow = (t < 16U) ? t : (31U - t); // triangle wave: 0..15..0
+    const uint8_t glow = (t < 16U) ? t : (31U - t);
 
     if (glow < 2)
-      continue; // fully dim most of the time
+      continue;
 
     uint16_t c;
     if (glow < 5)
@@ -766,7 +779,6 @@ void startResurrectionRun()
   freeResRunSprites();
 
   miniGameSetReturnUi(UIState::DEATH, Tab::TAB_PET);
-
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   const bool snakeOk = ensureResRunSnakeSprites();
@@ -774,7 +786,7 @@ void startResurrectionRun()
   const bool handOk = ensureResRunHandSprites();
   const bool ladybugOk = ensureResRunLadybugSprites();
 
-  Serial.printf("RESRUN preload: snake=%d ground=%d hand=%d ladybug=%d run=%dx%d crouch=%dx%d jump=%dx%d "
+  Serial.printf("[RESRUN] preload: snake=%d ground=%d hand=%d ladybug=%d run=%dx%d crouch=%dx%d jump=%dx%d "
                 "hand=%dx%d bug=%dx%d free=%u largest=%u\n",
                 snakeOk ? 1 : 0, groundOk ? 1 : 0, handOk ? 1 : 0, ladybugOk ? 1 : 0, s_rrSnakeW, s_rrSnakeH,
                 s_rrSnakeCrouchW, s_rrSnakeCrouchH, s_rrSnakeJumpW, s_rrSnakeJumpH, s_rrHandW, s_rrHandH, s_rrLadybugW,
@@ -795,6 +807,7 @@ void startResurrectionRun()
   rrResetRunState();
 
   mgmem::logUsage("rr ready");
+  resRunLogState("start-complete");
 
   invalidateBackgroundCache();
   s_rrShowIntro = true;
@@ -843,20 +856,10 @@ void updateResurrectionRun(const InputState &input)
       mgResetAcceptState();
 
       mgmem::logUsage(rr_won ? "rr accept win" : "rr accept loss");
-      mgmem::endSession();
-
-      rr_active = false;
-      currentMiniGame = MiniGame::NONE;
-      g_app.inMiniGame = false;
-      g_app.gameOver = false;
+      resRunLogState(rr_won ? "accept-win" : "accept-loss");
 
       onResurrectionMiniGameResult(rr_won);
-
-      clearInputLatch();
-      inputForceClear();
-      mgPauseReset();
-      mgBeginInputLockout(220);
-      requestUIRedraw();
+      rrExitMiniGameToReturnUi(true);
     }
     return;
   }
@@ -883,13 +886,15 @@ void updateResurrectionRun(const InputState &input)
       return;
     }
 
-    const bool startPressed = miniGameEnterOnce(input) || input.mgSelectOnce || input.mgUpOnce;
+    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
 
     if (startPressed && !mgInputLockedOut())
     {
       s_rrShowIntro = false;
-      rrResetRunState();
       rr_lastMs = now;
+
+      resRunLogState("intro-dismissed");
+
       clearInputLatch();
       inputForceClear();
       mgBeginInputLockout(120);
@@ -969,7 +974,6 @@ void updateResurrectionRun(const InputState &input)
       s_rrHandActive = true;
       s_rrHandTouched = false;
 
-      // HAND_ENTER uses world-space, because draw code subtracts rr_distance.
       s_rrHandX = rr_distance + gW;
       s_rrHandY = groundY - s_rrHandH + 8;
 
@@ -1093,7 +1097,6 @@ void updateResurrectionRun(const InputState &input)
     s_rrHandY = groundY - s_rrHandH + 8;
     s_rrHandX += kRrHandExitSpeed;
 
-    // Snake stays locked in the contact position for the rest of the sequence.
     if (s_rrHandX >= gW + 4)
     {
       s_rrHandActive = false;
@@ -1225,7 +1228,7 @@ void drawResurrectionRun()
 
   if (pet.type == PET_ELDRITCH)
   {
-    skyColor = spr.color565(12, 0, 20); // very dark purple/black
+    skyColor = spr.color565(12, 0, 20);
     spr.fillRect(0, 0, gW, groundY, skyColor);
 
     for (int y = 0; y < groundY; y += 4)
