@@ -686,7 +686,7 @@ static void drawWifiSettingsMenu()
     const int ty = y + (itemH - spr.fontHeight()) / 2;
 
     const char *label = UiSettingsMenu::WifiItemLabel(i);
-    char valueBuf[40];
+    char valueBuf[64];
     valueBuf[0] = '\0';
 
     if (strcmp(label, "WiFi") == 0)

@@ -1383,8 +1383,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
         tmp.autoScreenTimeoutSel = 0;
       if (tmp.shakeSensitivitySel > 3)
@@ -1420,8 +1420,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
         tmp.autoScreenTimeoutSel = 0;
 
@@ -1452,8 +1452,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
         tmp.autoScreenTimeoutSel = 0;
       tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
@@ -1483,8 +1483,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
         tmp.autoScreenTimeoutSel = 0;
       tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
@@ -1515,8 +1515,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
 
       ok = true;
       loadedOld = true;
@@ -1533,7 +1533,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.soundEnabled = (old[2] != 0);
       tmp.wifiEnabled = (old[3] != 0);
 
-      tmp.tzIndex = 2;
+      tmp.tzIndex = tzDefaultIndex();
       tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
@@ -1606,11 +1606,17 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   }
   else
   {
-    tzIndex = g_settings.tzIndex;
-    saveTzIndexToNVS(tzIndex);
+    tzIndex = tzIndexIsValid(g_settings.tzIndex) ? g_settings.tzIndex : (int)tzDefaultIndex();
+    saveTzIndexToNVS((uint8_t)tzIndex);
   }
 
-  applyTimezoneIndex(tzIndex);
+  if (!tzIndexIsValid(tzIndex))
+    tzIndex = (int)tzDefaultIndex();
+
+  applyTimezoneIndex((uint8_t)tzIndex);
+
+  Serial.printf("[SAVE] timezone load idx=%d label='%s' iana='%s' rule='%s'\n", tzIndex, tzName((uint8_t)tzIndex),
+                tzIanaName((uint8_t)tzIndex), tzPosixRule((uint8_t)tzIndex));
 
   const bool wifiEn = (g_settings.wifiEnabled != 0);
 
@@ -2058,7 +2064,7 @@ void saveManagerBegin()
   g_settings.autoScreenOffEnabled = true;
   g_settings.soundEnabled = true;
   g_settings.wifiEnabled = 1;
-  g_settings.tzIndex = 2;
+  g_settings.tzIndex = tzDefaultIndex();
   g_settings.shakeSensitivitySel = 1; // Low = current behavior
   motionSetShakeSensitivity(1);
   gameoptDefaults();
