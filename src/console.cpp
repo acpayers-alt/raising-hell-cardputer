@@ -22,6 +22,7 @@
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
+#include "timezone.h"
 
 // -----------------------------------------------------------------------------
 // Project: Gameplay / Domain
@@ -544,6 +545,192 @@ void wifiBeginConnect(const char *ssid, const char *pass)
 }
 
 // -----------------------------------------------------------------------------
+// Timezone console helpers
+// -----------------------------------------------------------------------------
+static bool consoleParseNonNegativeInt(const char *s, int &out)
+{
+  if (!s || !s[0])
+    return false;
+
+  int v = 0;
+  for (const char *p = s; *p; ++p)
+  {
+    if (*p < '0' || *p > '9')
+      return false;
+    v = (v * 10) + (*p - '0');
+  }
+
+  out = v;
+  return true;
+}
+
+static void consoleFormatTm(char *buf, size_t bufSize, const tm &t)
+{
+  if (!buf || bufSize == 0)
+    return;
+
+  snprintf(buf,
+           bufSize,
+           "%04d-%02d-%02d %02d:%02d:%02d",
+           t.tm_year + 1900,
+           t.tm_mon + 1,
+           t.tm_mday,
+           t.tm_hour,
+           t.tm_min,
+           t.tm_sec);
+}
+
+static void consoleLogTimeSnapshot(const char *prefix)
+{
+  const time_t now = time(nullptr);
+
+  logf("%sepoch: %lu", prefix ? prefix : "", (unsigned long)now);
+
+  if (now <= 1600000000)
+  {
+    logf("%stime:  INVALID", prefix ? prefix : "");
+    return;
+  }
+
+  tm tmLocal = {};
+  tm tmUtc = {};
+  localtime_r(&now, &tmLocal);
+  gmtime_r(&now, &tmUtc);
+
+  char localBuf[32];
+  char utcBuf[32];
+  consoleFormatTm(localBuf, sizeof(localBuf), tmLocal);
+  consoleFormatTm(utcBuf, sizeof(utcBuf), tmUtc);
+
+  logf("%slocal: %s", prefix ? prefix : "", localBuf);
+  logf("%sutc:   %s", prefix ? prefix : "", utcBuf);
+}
+
+static void consoleLogTimezoneStatusForIndex(int idx, const char *prefix)
+{
+  const char *p = prefix ? prefix : "";
+
+  if (!tzIndexIsValid(idx))
+  {
+    logf("%sidx=%d INVALID", p, idx);
+    return;
+  }
+
+  logf("%sidx=%d", p, idx);
+  logf("%slabel=%s", p, tzName((uint8_t)idx));
+  logf("%siana=%s", p, tzIanaName((uint8_t)idx));
+  logf("%srule=%s", p, tzPosixRule((uint8_t)idx));
+}
+
+static bool consoleResolveTimezoneSpec(const char *spec, int &outIdx)
+{
+  if (!spec || !spec[0])
+    return false;
+
+  int numericIdx = -1;
+  if (consoleParseNonNegativeInt(spec, numericIdx))
+  {
+    if (!tzIndexIsValid(numericIdx))
+      return false;
+    outIdx = numericIdx;
+    return true;
+  }
+
+  const int mapped = tzFindIndexByIana(spec);
+  if (!tzIndexIsValid(mapped))
+    return false;
+
+  outIdx = mapped;
+  return true;
+}
+
+static void consoleApplyTimezoneForTest(int idx)
+{
+  if (!tzIndexIsValid(idx))
+    return;
+  applyTimezoneIndex((uint8_t)idx);
+}
+
+static void consoleLogTimezonePreview(int idx, const char *prefix)
+{
+  if (!tzIndexIsValid(idx))
+  {
+    logf("%sINVALID idx=%d", prefix ? prefix : "", idx);
+    return;
+  }
+
+  const int restoreIdx = tzIndexIsValid(tzIndex) ? tzIndex : (int)tzDefaultIndex();
+
+  consoleApplyTimezoneForTest(idx);
+  consoleLogTimezoneStatusForIndex(idx, prefix);
+  consoleLogTimeSnapshot(prefix);
+
+  consoleApplyTimezoneForTest(restoreIdx);
+}
+
+static void consoleShowCurrentTimezoneStatus()
+{
+  if (!tzIndexIsValid(tzIndex))
+  {
+    logf("tzIndex invalid (%d), defaulting to %u for display", tzIndex, (unsigned)tzDefaultIndex());
+  }
+
+  const int currentIdx = tzIndexIsValid(tzIndex) ? tzIndex : (int)tzDefaultIndex();
+
+  logLine("Timezone status:");
+  consoleLogTimezoneStatusForIndex(currentIdx, "  ");
+  consoleLogTimeSnapshot("  ");
+}
+
+static void consoleRunTimezoneCaseSuite()
+{
+  struct TzCase
+  {
+    const char *input;
+    const char *expectIana;
+  };
+
+  static const TzCase kCases[] = {
+      {"America/Chicago", "America/Chicago"},
+      {"America/Phoenix", "America/Phoenix"},
+      {"America/St_Johns", "America/St_Johns"},
+      {"Europe/Paris", "Europe/Paris"},
+      {"Asia/Kolkata", "Asia/Kolkata"},
+      {"Australia/Brisbane", "Australia/Brisbane"},
+      {"Australia/Adelaide", "Australia/Adelaide"},
+      {"Bad/Zone", nullptr},
+  };
+
+  logLine("TZ case suite:");
+
+  for (const TzCase &tc : kCases)
+  {
+    const int idx = tzFindIndexByIana(tc.input);
+
+    if (!tc.expectIana)
+    {
+      if (idx < 0)
+        logf("  PASS %-24s -> unsupported", tc.input);
+      else
+        logf("  FAIL %-24s -> mapped=%d iana=%s", tc.input, idx, tzIanaName((uint8_t)idx));
+      continue;
+    }
+
+    if (idx < 0)
+    {
+      logf("  FAIL %-24s -> unsupported (expected %s)", tc.input, tc.expectIana);
+      continue;
+    }
+
+    const char *actualIana = tzIanaName((uint8_t)idx);
+    if (strcmp(actualIana, tc.expectIana) == 0)
+      logf("  PASS %-24s -> idx=%d %s", tc.input, idx, actualIana);
+    else
+      logf("  FAIL %-24s -> idx=%d %s (expected %s)", tc.input, idx, actualIana, tc.expectIana);
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Command execution
 // -----------------------------------------------------------------------------
 static void execLine(char *line)
@@ -624,6 +811,13 @@ static void execLine(char *line)
     logLine("  setrest <0-100>     set energy");
     logLine("  sethealth <0-100>   set health");
     logLine("  ledtest             cycle LED colors (~5s)");
+    logLine("  tz                  show current timezone + local/UTC time");
+    logLine("  tz list             list supported timezone indices");
+    logLine("  tz map <IANA>       resolve IANA zone -> internal zone");
+    logLine("  tz test <IANA|idx>  apply temporarily, print local time, restore");
+    logLine("  tz save <IANA|idx>  apply + persist timezone");
+    logLine("  tz set <idx>        shortcut for tz save <idx>");
+    logLine("  tz cases            run tricky timezone mapping suite");
     logLine("  reset_settings      delete settings.bin");
     logLine("  newpet!             OVERWRITE save + start a new pet");
     logLine("  pet cycle|devil|eldritch  set pet type");
@@ -1350,6 +1544,110 @@ static void execLine(char *line)
 
     return;
   }
+
+  #if !PUBLIC_BUILD
+  if (!strcmp(argv[0], "tz"))
+  {
+    if (argc == 1)
+    {
+      consoleShowCurrentTimezoneStatus();
+      return;
+    }
+
+    if (!strcmp(argv[1], "list"))
+    {
+      logf("Supported timezones: %u", (unsigned)tzCount());
+      for (uint8_t i = 0; i < tzCount(); ++i)
+      {
+        logf("  [%u] %s -> %s", (unsigned)i, tzName(i), tzIanaName(i));
+      }
+      return;
+    }
+
+    if (!strcmp(argv[1], "map"))
+    {
+      if (argc < 3)
+      {
+        logLine("Usage: tz map <IANA>");
+        return;
+      }
+
+      const int idx = tzFindIndexByIana(argv[2]);
+      if (idx < 0)
+      {
+        logf("tz map: unsupported IANA zone '%s'", argv[2]);
+        return;
+      }
+
+      logf("tz map: '%s' -> idx=%d", argv[2], idx);
+      consoleLogTimezoneStatusForIndex(idx, "  ");
+      return;
+    }
+
+    if (!strcmp(argv[1], "test"))
+    {
+      if (argc < 3)
+      {
+        logLine("Usage: tz test <IANA|idx>");
+        return;
+      }
+
+      int idx = -1;
+      if (!consoleResolveTimezoneSpec(argv[2], idx))
+      {
+        logf("tz test: unknown timezone '%s'", argv[2]);
+        return;
+      }
+
+      logf("tz test: previewing '%s'", argv[2]);
+      consoleLogTimezonePreview(idx, "  ");
+      logf("  restore idx=%d", tzIndexIsValid(tzIndex) ? tzIndex : (int)tzDefaultIndex());
+      return;
+    }
+
+    if (!strcmp(argv[1], "save") || !strcmp(argv[1], "set"))
+    {
+      if (argc < 3)
+      {
+        logLine(!strcmp(argv[1], "set") ? "Usage: tz set <idx>" : "Usage: tz save <IANA|idx>");
+        return;
+      }
+
+      int idx = -1;
+      if (!consoleResolveTimezoneSpec(argv[2], idx))
+      {
+        logf("tz save: unknown timezone '%s'", argv[2]);
+        return;
+      }
+
+      tzIndex = idx;
+      applyTimezoneIndex((uint8_t)tzIndex);
+      saveTzIndexToNVS((uint8_t)tzIndex);
+      saveManagerMarkDirty();
+
+      logLine("tz save: applied + persisted");
+      consoleLogTimezoneStatusForIndex(tzIndex, "  ");
+      consoleLogTimeSnapshot("  ");
+      return;
+    }
+
+    if (!strcmp(argv[1], "cases"))
+    {
+      consoleRunTimezoneCaseSuite();
+      return;
+    }
+
+    logLine("Usage:");
+    logLine("  tz");
+    logLine("  tz list");
+    logLine("  tz map <IANA>");
+    logLine("  tz test <IANA|idx>");
+    logLine("  tz save <IANA|idx>");
+    logLine("  tz set <idx>");
+    logLine("  tz cases");
+    return;
+  }
+#endif
 
   if (!strcmp(argv[0], "timeinvalidate"))
   {
