@@ -107,7 +107,6 @@ void mgResetAcceptState()
 {
   s_acceptArmed = false;
   s_gameOverMs = 0;
-  s_rewardShownAtMs = 0;
 }
 
 const char *mgRewardMessage() { return s_rewardMsg; }
