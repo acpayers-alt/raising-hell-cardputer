@@ -13,6 +13,7 @@
 #include "ui_state_import_pet_list.h"
 #include "ui_state_pet_sleeping.h"
 #include "ui_state_title_menu.h"
+#include "whats_new_state.h"
 #include "wifi_setup_state.h"
 
 // ----------------------------------------------------------------------------
@@ -81,7 +82,11 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
     controlsHelpOnEnter();
     break;
 
-    case UIState::SETTINGS:
+  case UIState::WHATS_NEW:
+    whatsNewOnEnter();
+    break;
+
+  case UIState::SETTINGS:
     // Do not reset the settings page here.
     // Some flows intentionally return to a specific subpage
     // (for example Pet Options after Restore/Import browsers).

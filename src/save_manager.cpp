@@ -57,6 +57,7 @@
 
 // UI state / flows
 #include "controls_help_state.h"
+#include "whats_new_state.h"
 #include "inventory_state.h"
 #include "new_pet_flow_state.h"
 #include "runtime_flags_state.h"
@@ -1397,6 +1398,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
       tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
       tmp.petScreenIntroFadeBootFlag = (tmp.petScreenIntroFadeBootFlag != 0);
+      tmp.whatsNewSeen = (tmp.whatsNewSeen != 0);
     }
   }
   else if (sz == OLD_SZ_11)
@@ -1582,6 +1584,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   ledAlertsEnabled = (g_settings.ledAlertsEnabled != 0);
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
+  g_whatsNewSeen = (g_settings.whatsNewSeen != 0);
 
   // ------------------------------------------------------------
   // One-shot boot flag: pet intro fade
@@ -1662,6 +1665,7 @@ static bool saveSettingsToSD_internal()
   g_settings.petDeathEnabled = petDeathEnabled ? 1 : 0;
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
+  g_settings.whatsNewSeen = (g_whatsNewSeen != 0) ? 1 : 0;
   g_settings.petScreenIntroFadeBootFlag = (g_settings.petScreenIntroFadeBootFlag != 0) ? 1 : 0;
 
   tryRemove(SET_TMP_PATH);
@@ -2065,6 +2069,7 @@ void saveManagerBegin()
   g_settings.soundEnabled = true;
   g_settings.wifiEnabled = 1;
   g_settings.tzIndex = tzDefaultIndex();
+  g_settings.whatsNewSeen = 0;
   g_settings.shakeSensitivitySel = 1; // Low = current behavior
   motionSetShakeSensitivity(1);
   gameoptDefaults();

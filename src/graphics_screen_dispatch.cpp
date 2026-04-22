@@ -43,6 +43,7 @@ void drawHatchingScreen(bool redrawBg);
 void drawEvolutionScreen();
 
 void drawControlsHelpScreen();
+void drawWhatsNewScreen();
 
 void drawBootWifiPromptScreen();
 void drawBootWifiWaitScreen(bool connected, int rssi);
@@ -199,6 +200,10 @@ void drawCurrentScreen(bool redrawBg)
 
   case UIState::CONTROLS_HELP:
     drawControlsHelpScreen();
+    return;
+
+  case UIState::WHATS_NEW:
+    drawWhatsNewScreen();
     return;
 
   case UIState::BOOT_WIFI_PROMPT:

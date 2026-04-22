@@ -106,6 +106,7 @@ struct SettingsData {
   // one-shot dev/test flag:
   // when set, next boot arms the first pet-screen intro fade
   uint8_t petScreenIntroFadeBootFlag;
+  uint8_t whatsNewSeen;
 };
 
 // ============================================================

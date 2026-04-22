@@ -5,6 +5,7 @@
 #include "graphics.h"
 #include "input.h"
 #include "mini_game_runtime.h"
+#include "mini_game_return_ui.h"
 #include "mini_games.h"
 #include "pet.h"
 #include "sound.h"
@@ -33,9 +34,12 @@ void onResurrectionMiniGameResult(bool success)
   {
     petResurrectFull();
 
+    // Resurrection should land back on the live pet screen, not the death menu.
+    miniGameSetReturnUi(UIState::PET_SCREEN, Tab::TAB_PET);
+
     soundSetVolumeLevel(soundGetVolumeLevel());
     soundResetDeathDirgeLatch();
-
+    
     currentMiniGame = MiniGame::NONE;
     g_app.inMiniGame = false;
     g_app.gameOver = false;

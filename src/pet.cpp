@@ -38,6 +38,7 @@ static inline bool isPreBirthUiState(UIState s)
   case UIState::HATCHING:
   case UIState::NAME_PET:
   case UIState::CONTROLS_HELP:
+  case UIState::WHATS_NEW:
   case UIState::BOOT_WIFI_PROMPT:
   case UIState::BOOT_WIFI_WAIT:
   case UIState::BOOT_TZ_PICK:

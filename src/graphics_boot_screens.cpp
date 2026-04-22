@@ -16,13 +16,15 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-#include "graphics_shared_utils.h"
-#include "graphics_nonpet_bg.h"
 #include "graphics_controls_manual_data.h"
+#include "graphics_whats_new_data.h"
+#include "graphics_nonpet_bg.h"
+#include "graphics_shared_utils.h"
 
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
 
 int g_controlsHelpScroll = 0;
+int g_whatsNewScroll = 0;
 
 int controlsHelpLineHeight(const HelpLine &line)
 {
@@ -41,26 +43,29 @@ int controlsHelpLineHeight(const HelpLine &line)
   }
 }
 
-int controlsHelpMaxScroll()
+static int helpLinesMaxScroll(const HelpLine *lines, int count)
 {
   const int topY = 6;
   const int bottomHelpH = 14;
   const int viewH = SCREEN_H - topY - bottomHelpH - 4;
 
-  // Find the earliest line index such that everything from that line
-  // to the end fits in the viewport. That is the true last scroll position.
-  for (int start = 0; start < kControlsManualCount; ++start)
+  for (int start = 0; start < count; ++start)
   {
     int totalRemainingH = 0;
 
-    for (int i = start; i < kControlsManualCount; ++i)
-      totalRemainingH += controlsHelpLineHeight(kControlsManual[i]);
+    for (int i = start; i < count; ++i)
+      totalRemainingH += controlsHelpLineHeight(lines[i]);
 
     if (totalRemainingH <= viewH)
       return start;
   }
 
   return 0;
+}
+
+int controlsHelpMaxScroll()
+{
+  return helpLinesMaxScroll(kControlsManual, kControlsManualCount);
 }
 
 void controlsHelpResetScroll() { g_controlsHelpScroll = 0; }
@@ -88,40 +93,14 @@ bool controlsHelpScrollDown()
   return true;
 }
 
-static int getControlsManualTotalHeight()
-{
-  int y = 0;
-
-  for (int i = 0; i < kControlsManualCount; i++)
-    {
-    switch (kControlsManual[i].type)
-    {
-    case HelpLineType::TITLE:
-      y += 20;
-      break;
-    case HelpLineType::SECTION:
-      y += 18;
-      break;
-    case HelpLineType::BODY:
-      y += 14;
-      break;
-    case HelpLineType::GAP:
-      y += 8;
-      break;
-    }
-  }
-
-  return y;
-}
-
 // -----------------------------------------------------------------------------
 // Controls Helper
 // -----------------------------------------------------------------------------
-void drawControlsHelpScreen()
+static void drawHelpLinesScreen(const HelpLine *lines, int count, int &scroll)
 {
-  const int maxScroll = controlsHelpMaxScroll();
-  if (g_controlsHelpScroll > maxScroll)
-    g_controlsHelpScroll = maxScroll;
+  const int maxScroll = helpLinesMaxScroll(lines, count);
+  if (scroll > maxScroll)
+    scroll = maxScroll;
 
   drawNonPetTabBackground();
 
@@ -142,19 +121,11 @@ void drawControlsHelpScreen()
   const int viewW = panelW - (panelPad * 2);
   const int viewH = panelH - (panelPad * 2);
 
-  // ---------------------------------------------------------------------------
-  // Background panel for controls help
-  // ---------------------------------------------------------------------------
   spr.fillRoundRect(panelX, panelY, panelW, panelH, panelRadius, TFT_BLACK);
   spr.drawRoundRect(panelX, panelY, panelW, panelH, panelRadius, TFT_DARKGREY);
 
   spr.setTextDatum(TL_DATUM);
   spr.setTextSize(1);
-
-  // Larger fonts than before
-  const int titleFont = 2;
-  const int sectionFont = 2;
-  const int bodyFont = 2;
 
   const int titleH = 16;
   const int sectionH = 16;
@@ -162,13 +133,12 @@ void drawControlsHelpScreen()
   const int gapH = 8;
 
   int y = viewY;
-  int drawn = 0;
 
   spr.setClipRect(viewX, viewY, viewW, viewH);
 
-  for (int i = g_controlsHelpScroll; i < kControlsManualCount; ++i)
+  for (int i = scroll; i < count; ++i)
   {
-    const HelpLine &line = kControlsManual[i];
+    const HelpLine &line = lines[i];
 
     int lineH = bodyH;
     switch (line.type)
@@ -194,36 +164,66 @@ void drawControlsHelpScreen()
     {
     case HelpLineType::TITLE:
       spr.setTextColor(TFT_CYAN);
-      spr.drawString(line.text ? line.text : "", viewX, y, titleFont);
       break;
-
     case HelpLineType::SECTION:
       spr.setTextColor(TFT_YELLOW);
-      spr.drawString(line.text ? line.text : "", viewX, y, sectionFont);
       break;
-
     case HelpLineType::BODY:
       spr.setTextColor(TFT_WHITE);
-      spr.drawString(line.text ? line.text : "", viewX, y, bodyFont);
       break;
-
     case HelpLineType::GAP:
       break;
     }
 
+    if (line.text)
+      spr.drawString(line.text, viewX, y, 2);
+
     y += lineH;
-    drawn++;
   }
 
   spr.clearClipRect();
 
-  // Scroll indicators
-  spr.setTextColor(TFT_LIGHTGREY, TFT_TRANSPARENT);
-  if (g_controlsHelpScroll > 0)
+  spr.setTextColor(TFT_LIGHTGREY);
+  if (scroll > 0)
     spr.drawString("^", panelX + panelW - 12, panelY + 4, 1);
 
-  if (g_controlsHelpScroll < controlsHelpMaxScroll())
+  if (scroll < maxScroll)
     spr.drawString("v", panelX + panelW - 12, panelY + panelH - 12, 1);
+  }
+
+  void drawControlsHelpScreen()
+  {
+    drawHelpLinesScreen(kControlsManual, kControlsManualCount, g_controlsHelpScroll);
+  }
+
+  void whatsNewResetScroll() { g_whatsNewScroll = 0; }
+
+bool whatsNewScrollUp()
+{
+  if (g_whatsNewScroll <= 0)
+    return false;
+
+  --g_whatsNewScroll;
+  requestUIRedraw();
+  return true;
+}
+
+bool whatsNewScrollDown()
+{
+  const int maxScroll = helpLinesMaxScroll(kWhatsNew, kWhatsNewCount);
+  if (g_whatsNewScroll >= maxScroll)
+    return false;
+
+  g_whatsNewScroll++;
+  if (g_whatsNewScroll > maxScroll)
+    g_whatsNewScroll = maxScroll;
+  requestUIRedraw();
+  return true;
+}
+
+void drawWhatsNewScreen()
+{
+  drawHelpLinesScreen(kWhatsNew, kWhatsNewCount, g_whatsNewScroll);
 }
 
 void drawBootWifiPromptScreen()
@@ -242,6 +242,8 @@ void drawBootWifiPromptScreen()
 
   spr.pushSprite(0, 0);
 }
+
+void drawWhatsNewScreen();
 
 void drawBootAssetWifiRequiredScreen()
 {

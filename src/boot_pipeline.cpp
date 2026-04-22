@@ -50,6 +50,7 @@
 
 // Input / UI
 #include "controls_help_state.h"
+#include "whats_new_state.h"
 #include "input.h"
 #include "ui_actions.h"
 #include "ui_level_popup.h"
@@ -765,6 +766,17 @@ static void finalizeBootLanding()
     return;
   }
 
+  if (!g_whatsNewSeen && s_bootFinalLandingState == UIState::TITLE_MENU)
+  {
+    clearInputLatch();
+    inputForceClear();
+
+    Serial.printf("[BOOT][LAND] whatsNewBegin returnState=%d\n", (int)s_bootFinalLandingState);
+
+    whatsNewBegin(s_bootFinalLandingState, Tab::TAB_PET);
+    return;
+  }
+  
   uint16_t seedMarkNow = 0;
   EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
 
@@ -1194,7 +1206,7 @@ void postBootInitTick()
 
     const int wifiNow = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
     const int uiNow = (int)g_app.uiState;
-    
+
     const int onboardingNow = g_bootProvisionWifiOnboardingStarted ? 1 : 0;
     const int activeNow = g_bootAssetProvisionActive ? 1 : 0;
 

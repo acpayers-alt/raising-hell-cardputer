@@ -9,6 +9,7 @@
 #include "flow_boot_wizard.h"
 #include "return_target.h"
 #include "ui_actions.h"
+#include "whats_new_state.h"
 
 // --- New pet flow -------------------------------------------------------------
 #include "new_pet_flow_state.h"
@@ -78,6 +79,12 @@ void controlsHelpDismiss()
     g_choosePetBlockHatchUntilRelease = true;
   }
 
+  if (!g_whatsNewSeen && ret.state == UIState::TITLE_MENU)
+  {
+    whatsNewBegin(ret.state, ret.tab);
+    return;
+  }
+  
   uiActionEnterState(ret.state, ret.tab, true);
   requestFullUIRedraw();
 }
