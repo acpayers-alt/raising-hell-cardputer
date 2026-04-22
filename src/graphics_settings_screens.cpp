@@ -17,16 +17,15 @@
 #include "factory_reset_state.h"
 #include "game_options_state.h"
 #include "graphics_chrome.h"
+#include "graphics_nonpet_bg.h"
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
-#include "graphics_nonpet_bg.h"
 #include "motion.h"
 #include "pet.h"
 #include "save_manager.h"
+#include "sdcard.h"
 #include "settings_flow_state.h"
 #include "sound.h"
-#include "sdcard.h"
-#include "wifi_setup_state.h"
 #include "system_status_state.h"
 #include "time_state.h"
 #include "timezone.h"
@@ -34,6 +33,7 @@
 #include "ui_settings_pages.h"
 #include "user_toggles_state.h"
 #include "version.h"
+#include "wifi_setup_state.h"
 #include "wifi_time.h"
 
 static const char *brightnessToText(int level)
@@ -253,10 +253,8 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-      "Manual",
-      nullptr,
-      "Pet Options >",   "Screen Settings >", "System Settings >", "Game Options >", "Console >",
-      "System Status >", "Credits",           "Store Pet",         "Main Menu",
+      "Manual",    nullptr,           "Pet Options >", "Screen Settings >", "System Settings >", "Game Options >",
+      "Console >", "System Status >", "Credits",       "Store Pet",         "Main Menu",
   };
 
   const int totalItems = 11;
@@ -599,7 +597,8 @@ static void drawScreenSettingsMenu()
   };
 
   char shakeLine[32];
-  snprintf(shakeLine, sizeof(shakeLine), "Shake to Wake: %s", motionShakeSensitivityToText(motionGetShakeSensitivity()));
+  snprintf(shakeLine, sizeof(shakeLine), "Shake to Wake: %s",
+           motionShakeSensitivityToText(motionGetShakeSensitivity()));
   labels[3] = shakeLine;
 
   const int totalItems = 4;
@@ -794,11 +793,15 @@ static void drawCreditsScreen()
   if (!isScreenOn())
     return;
 
+  spr.clearClipRect();
+
+  static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
+
   bool ok = false;
   if (g_sdReady)
-    ok = sprDrawJpgFromSD("/raising_hell/graphics/background/flow/rh_splash.jpg", 0, 0);
+    ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
   if (!ok)
-    spr.fillRect(0, 0, SCREEN_W, SCREEN_H, TFT_BLACK);
+    spr.fillSprite(TFT_BLACK);
 
   spr.setTextFont(2);
   spr.setTextSize(1);
@@ -911,21 +914,21 @@ static void drawSystemStatusMenu()
            SD.exists("/raising_hell/assets/manifest_local.json") ? "YES" : "NO");
 
   const char *lines[] = {
-      "BUILD",         buildBuf,
-      "SAVE VER",      saveVerBuf,
-      "UPTIME",        uptimeBuf,
-      "BATTERY",       batteryBuf,
-      "WIFI",          wifiStateBuf,
-      "SSID",          (ssid && ssid[0]) ? ssid : "(none)",
-      "IP",            (ip && ip[0]) ? ip : "(none)",
-      "ASSET OTA",     assetBuf,
-      "OTA CH",        otaChannelBuf,
-      "MANIFEST",      basenameFromUrl(manifestUrl),
-      "LOCAL MAN",     localManifestBuf,
-      "FREE HEAP",     heapFreeBuf,
-      "LARGEST BLK",   heapLargestBuf,
-      "PSRAM SIZE",    psramSizeBuf,
-      "PSRAM FREE",    psramFreeBuf,
+      "BUILD",       buildBuf,
+      "SAVE VER",    saveVerBuf,
+      "UPTIME",      uptimeBuf,
+      "BATTERY",     batteryBuf,
+      "WIFI",        wifiStateBuf,
+      "SSID",        (ssid && ssid[0]) ? ssid : "(none)",
+      "IP",          (ip && ip[0]) ? ip : "(none)",
+      "ASSET OTA",   assetBuf,
+      "OTA CH",      otaChannelBuf,
+      "MANIFEST",    basenameFromUrl(manifestUrl),
+      "LOCAL MAN",   localManifestBuf,
+      "FREE HEAP",   heapFreeBuf,
+      "LARGEST BLK", heapLargestBuf,
+      "PSRAM SIZE",  psramSizeBuf,
+      "PSRAM FREE",  psramFreeBuf,
   };
 
   // Clamp AND store back into state
@@ -937,10 +940,9 @@ static void drawSystemStatusMenu()
   }
   else
   {
-    g_systemStatus.scrollOffset =
-      clampi(g_systemStatus.scrollOffset, 0, totalLines - visibleLines);
+    g_systemStatus.scrollOffset = clampi(g_systemStatus.scrollOffset, 0, totalLines - visibleLines);
   }
-  
+
   const int start = g_systemStatus.scrollOffset;
 
   spr.fillRect(0, contentY, SCREEN_W, SCREEN_H - contentY, TFT_BLACK);
