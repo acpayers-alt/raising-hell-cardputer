@@ -74,7 +74,7 @@ static bool s_prevSelectHeld = false;
 static uint32_t s_mgInputLockoutUntilMs = 0;
 
 static const uint32_t kRewardAcceptDelayMs = 180;
-static const uint32_t kRewardAutoDismissMs = 2200;
+static const uint32_t kRewardAutoDismissMs = 15000;
 
 void mgSetRewardMessage(const char *msg);
 
