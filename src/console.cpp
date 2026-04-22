@@ -166,6 +166,81 @@ static bool consoleSaveRuntimeLogToSd(const char *path, String *outErr)
   return true;
 }
 
+static bool consoleSaveSupportReportToSd(const char *path, String *outErr)
+{
+  if (outErr)
+    *outErr = "";
+
+  if (!g_sdReady)
+  {
+    if (outErr)
+      *outErr = "SD not ready";
+    return false;
+  }
+
+  if (!path || !path[0])
+  {
+    if (outErr)
+      *outErr = "Invalid path";
+    return false;
+  }
+
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+  if (!SD.exists("/raising_hell/logs"))
+    SD.mkdir("/raising_hell/logs");
+
+  if (SD.exists(path))
+    SD.remove(path);
+
+  File f = SD.open(path, FILE_WRITE);
+  if (!f)
+  {
+    if (outErr)
+      *outErr = "Open failed";
+    return false;
+  }
+
+  f.println("=== SUPPORT REPORT ===");
+
+  f.printf("Version: %s\n", RH_VERSION_STRING);
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  f.println("Build: PUBLIC");
+#else
+  f.println("Build: DEV");
+#endif
+
+  f.printf("Save version: %u\n", (unsigned)SAVE_VERSION);
+
+  const char *assetVer = assetOtaInstalledVersion();
+  f.printf("Assets: %s\n", (assetVer && assetVer[0]) ? assetVer : "none");
+
+  const AssetOtaConfig &cfg = assetOtaGetConfig();
+  f.printf("OTA channel: %s\n", ((AssetOtaChannel)cfg.channel == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
+
+  f.printf("Timezone idx: %d\n", tzIndex);
+  f.printf("Timezone name: %s\n", tzName(tzIndex));
+
+  f.printf("WiFi enabled: %s\n", wifiIsEnabled() ? "YES" : "NO");
+  f.printf("WiFi connected: %s\n", wifiIsConnectedNow() ? "YES" : "NO");
+
+  const char *ssid = wifiConsoleSsid();
+  f.printf("SSID: %s\n", (ssid && ssid[0]) ? ssid : "(none)");
+
+  const char *ip = wifiConsoleIpString();
+  f.printf("IP: %s\n", (ip && ip[0]) ? ip : "(none)");
+
+  f.printf("Free heap: %u\n", (unsigned)ESP.getFreeHeap());
+  f.printf("Largest block: %u\n", (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  f.println("======================");
+  f.flush();
+  f.close();
+
+  return true;
+}
+
 static bool consoleParseSemver3(const String &s, int &maj, int &min, int &pat)
 {
   maj = min = pat = 0;
@@ -246,6 +321,18 @@ static void consoleLogSupportModeStatus()
 #else
   logLine("Support mode: always available in dev build");
 #endif
+}
+
+static bool consoleRequireSupportMode()
+{
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  if (!consoleSupportModeEnabled())
+  {
+    logLine("Command locked. Use 'support on'.");
+    return false;
+  }
+#endif
+  return true;
 }
 
 static void resetLine()
@@ -797,27 +884,12 @@ static void execLine(char *line)
     logLine("Recovery / repair:");
     logLine("  name <pet name>     set pet name");
     logLine("  saveheal            repair save name/pending-flag issues");
-    logLine("  bootflags           show boot/recovery flags");
-    logLine("  bootheal            clear common stuck boot flags");
-    logLine("  clearnamepending    clear name-pending flag");
-    logLine("  clearpostprov       clear post-provision help flag");
-    logLine("  clearbootsetup      clear boot setup pending flag");
     logLine("  assetstatus         show asset OTA/debug status");
     logLine("  assetflag           show asset provision boot flag");
     logLine("  assetflag clear     clear asset provision boot flag");
     logLine("  assetflag set       set asset provision boot flag");
-    logLine("  repair              alias for fwmark reprovision");
-    logLine("  repair assets       re-run asset provisioning (safe)");
-    logLine("  rescue ota          dev: clear firmware marker + reprovision");
-    logLine("  rescue              alias for fwmark reprovision");
-    logLine("  fwmark              show firmware marker status");
-    logLine("  fwmark show         show stored/current build id");
-    logLine("  fwmark clear        clear stored build id");
-    logLine("  fwmark reprovision  dev: clear marker + set asset flag");
     logLine("  reboot              reboot device");
-    logLine("  nvsclear            wipe NVS (factory clean) + reboot");
-    logLine("  ntpskip            bypass stalled NTP check");
-    logLine("  timeinvalidate            marks current time invalid");
+    logLine("  ntpskip             bypass stalled NTP check");
 
     logLine("Logs:");
     logLine("  logdump             dump runtime log buffer");
@@ -825,12 +897,15 @@ static void execLine(char *line)
     logLine("  logclear            clear runtime log buffer");
     logLine("  logsave             save runtime log to /raising_hell/logs/logdump.txt");
 
-#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
     logLine("Support:");
     logLine("  support             show support mode status");
+    logLine("  support status      show support mode status");
+    logLine("  support report      system diagnostic dump");
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
     logLine("  support on|off      enable/disable support commands");
+#endif
 
-    if (g_consoleSupportMode)
+    if (consoleSupportModeEnabled())
     {
       logLine("Support commands:");
       logLine("  tz                  show current timezone + local/UTC time");
@@ -840,8 +915,22 @@ static void execLine(char *line)
       logLine("  tz save <IANA|idx>  apply + persist timezone");
       logLine("  tz set <idx>        shortcut for tz save <idx>");
       logLine("  tz cases            run tricky timezone mapping suite");
+      logLine("  bootflags           inspect boot / recovery flags");
+      logLine("  bootheal            clear stuck boot flags");
+      logLine("  clearnamepending    clear name-pending flag");
+      logLine("  clearpostprov       clear post-provision help flag");
+      logLine("  clearbootsetup      clear boot setup pending flag");
+      logLine("  repair              alias for fwmark reprovision");
+      logLine("  repair assets       re-run asset provisioning (safe)");
+      logLine("  rescue ota          clear firmware marker + reprovision");
+      logLine("  rescue              alias for fwmark reprovision");
+      logLine("  fwmark              show firmware marker status");
+      logLine("  fwmark show         show stored/current build id");
+      logLine("  fwmark clear        clear stored build id");
+      logLine("  fwmark reprovision  clear marker + set asset flag");
+      logLine("  timeinvalidate      mark current time invalid");
+      logLine("  nvsclear            wipe NVS + reboot");
     }
-#endif
 
 #if !PUBLIC_BUILD
     logLine("Dev / test:");
@@ -855,13 +944,6 @@ static void execLine(char *line)
     logLine("  setrest <0-100>     set energy");
     logLine("  sethealth <0-100>   set health");
     logLine("  ledtest             cycle LED colors (~5s)");
-    logLine("  tz                  show current timezone + local/UTC time");
-    logLine("  tz list             list supported timezone indices");
-    logLine("  tz map <IANA>       resolve IANA zone -> internal zone");
-    logLine("  tz test <IANA|idx>  apply temporarily, print local time, restore");
-    logLine("  tz save <IANA|idx>  apply + persist timezone");
-    logLine("  tz set <idx>        shortcut for tz save <idx>");
-    logLine("  tz cases            run tricky timezone mapping suite");
     logLine("  reset_settings      delete settings.bin");
     logLine("  newpet!             OVERWRITE save + start a new pet");
     logLine("  pet cycle|devil|eldritch  set pet type");
@@ -871,7 +953,7 @@ static void execLine(char *line)
     logLine("  hurtpet             set low stats + HP=25 (test death flow)");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
     logLine("  healpet             restore HP + all core stats to 100");
-    logLine("  fadeboot        trigger pet intro fade on next boot");
+    logLine("  fadeboot            trigger pet intro fade on next boot");
 #endif
 
     return;
@@ -925,6 +1007,54 @@ static void execLine(char *line)
       return;
     }
 
+    if (!strcmp(argv[1], "report"))
+    {
+      static const char *kSupportReportPath = "/raising_hell/logs/support_report.txt";
+
+      logLine("=== SUPPORT REPORT ===");
+
+      logf("Version: %s", RH_VERSION_STRING);
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+      logLine("Build: PUBLIC");
+#else
+      logLine("Build: DEV");
+#endif
+
+      logf("Save version: %u", (unsigned)SAVE_VERSION);
+
+      const char *assetVer = assetOtaInstalledVersion();
+      logf("Assets: %s", (assetVer && assetVer[0]) ? assetVer : "none");
+
+      const AssetOtaConfig &cfg = assetOtaGetConfig();
+      logf("OTA channel: %s", ((AssetOtaChannel)cfg.channel == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
+
+      logf("Timezone idx: %d", tzIndex);
+      logf("Timezone name: %s", tzName(tzIndex));
+
+      logf("WiFi enabled: %s", wifiIsEnabled() ? "YES" : "NO");
+      logf("WiFi connected: %s", wifiIsConnectedNow() ? "YES" : "NO");
+
+      const char *ssid = wifiConsoleSsid();
+      logf("SSID: %s", (ssid && ssid[0]) ? ssid : "(none)");
+
+      const char *ip = wifiConsoleIpString();
+      logf("IP: %s", (ip && ip[0]) ? ip : "(none)");
+
+      logf("Free heap: %u", (unsigned)ESP.getFreeHeap());
+      logf("Largest block: %u", (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+      logLine("======================");
+
+      String err;
+      if (!consoleSaveSupportReportToSd(kSupportReportPath, &err))
+        logf("support report save failed: %s", err.c_str());
+      else
+        logf("[OK] support report saved: %s", kSupportReportPath);
+
+      return;
+    }
+
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
     if (!strcmp(argv[1], "on"))
     {
@@ -951,6 +1081,7 @@ static void execLine(char *line)
     logLine("Usage:");
     logLine("  support");
     logLine("  support status");
+    logLine("  support report");
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
     logLine("  support on");
     logLine("  support off");
@@ -1633,14 +1764,8 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "tz"))
   {
-#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
-    if (!consoleSupportModeEnabled())
-    {
-      logLine("Command locked in public build.");
-      logLine("Use 'support on' to enable support commands.");
+    if (!consoleRequireSupportMode())
       return;
-    }
-#endif
 
     if (argc == 1)
     {
@@ -1744,6 +1869,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "timeinvalidate"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     struct timeval tv = {0, 0};
     settimeofday(&tv, nullptr);
 
@@ -1786,6 +1914,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "bootflags"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     logLine("Boot / recovery flags:");
     logf("  save exists:        %s", saveManagerSaveFileExists() ? "YES" : "NO");
     logf("  import exists:      %s", saveManagerHasImportableBubJson() ? "YES" : "NO");
@@ -1799,6 +1930,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "clearnamepending"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool before = saveManagerNamePendingFlagExists();
     saveManagerClearNamePendingFlag();
     const bool after = saveManagerNamePendingFlagExists();
@@ -1809,6 +1943,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "clearpostprov"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool before = bootPostProvisionControlsHelpPending();
     bootPostProvisionControlsHelpClear();
     const bool after = bootPostProvisionControlsHelpPending();
@@ -1819,6 +1956,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "clearbootsetup"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool before = bootSetupPendingFlagExists();
     bootSetupClearPendingFlag();
     const bool after = bootSetupPendingFlagExists();
@@ -1829,6 +1969,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "bootheal"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool namePendingBefore = saveManagerNamePendingFlagExists();
     const bool postProvBefore = bootPostProvisionControlsHelpPending();
     const bool bootSetupBefore = bootSetupPendingFlagExists();
@@ -1985,6 +2128,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "repair"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1 || (argc >= 2 && !strcmp(argv[1], "assets")))
     {
       consoleRequestAssetRepair();
@@ -1997,6 +2143,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "rescue"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1 || (argc >= 2 && !strcmp(argv[1], "ota")))
     {
       consoleArmReprovisionRecovery(); // dev path
@@ -2009,6 +2158,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "fwmark"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1 || !strcmp(argv[1], "show"))
     {
       String stored;
@@ -2086,6 +2238,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "nvsclear"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     logLine("[WARN] Erasing NVS partition...");
     delay(50);
 
