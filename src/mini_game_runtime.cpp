@@ -9,16 +9,16 @@
 #include "graphics.h"
 #include "input.h"
 #include "inventory.h"
+#include "mg_pause_core.h"
+#include "mg_pause_menu.h"
 #include "mini_game_assets.h"
 #include "mini_game_return_ui.h"
-#include "mg_pause_core.h"
 #include "pet.h"
 #include "save_manager.h"
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_defs.h"
 #include "ui_runtime.h"
-#include "mg_pause_menu.h"
 
 // cleanup hooks implemented in mini_games.cpp
 extern void freeImpWaveSprites();
@@ -38,16 +38,16 @@ extern void freeCrossyActorSprites();
 extern void freeResRunSprites();
 
 // game update/draw hooks implemented in mini_games.cpp
-extern void updateFlappyFireball(const InputState& input);
+extern void updateFlappyFireball(const InputState &input);
 extern void drawFlappyFireball();
 
-extern void updateCrossyRoad(const InputState& input);
+extern void updateCrossyRoad(const InputState &input);
 extern void drawCrossyRoad();
 
-extern void updateInfernalDodger(const InputState& input);
+extern void updateInfernalDodger(const InputState &input);
 extern void drawInfernalDodger();
 
-extern void updateResurrectionRun(const InputState& input);
+extern void updateResurrectionRun(const InputState &input);
 extern void drawResurrectionRun();
 
 // timers owned by mini_games.cpp, synced on pause/resume
@@ -68,23 +68,23 @@ uint32_t s_gameOverMs = 0;
 
 bool s_showReward = false;
 char s_rewardMsg[64] = {0};
+static uint32_t s_rewardShownAtMs = 0;
 
 static bool s_prevSelectHeld = false;
 static uint32_t s_mgInputLockoutUntilMs = 0;
 
 static const uint32_t kRewardAcceptDelayMs = 180;
+static const uint32_t kRewardAutoDismissMs = 2200;
 
 void mgSetRewardMessage(const char *msg);
 
-bool mgRewardShowing()
-{
-  return s_showReward;
-}
+bool mgRewardShowing() { return s_showReward; }
 
 void mgClearRewardState()
 {
   s_showReward = false;
   s_rewardMsg[0] = 0;
+  s_rewardShownAtMs = 0;
 }
 
 bool mgAcceptArmedNow(uint32_t now)
@@ -95,16 +95,22 @@ bool mgAcceptArmedNow(uint32_t now)
   return s_acceptArmed;
 }
 
+bool mgRewardAutoDismissNow(uint32_t now)
+{
+  if (!s_showReward || s_rewardShownAtMs == 0)
+    return false;
+
+  return (int32_t)(now - (s_rewardShownAtMs + kRewardAutoDismissMs)) >= 0;
+}
+
 void mgResetAcceptState()
 {
   s_acceptArmed = false;
   s_gameOverMs = 0;
+  s_rewardShownAtMs = 0;
 }
 
-const char* mgRewardMessage()
-{
-  return s_rewardMsg;
-}
+const char *mgRewardMessage() { return s_rewardMsg; }
 
 void mgSetRewardMessage(const char *msg)
 {
@@ -118,17 +124,11 @@ void mgSetRewardMessage(const char *msg)
 }
 
 // simple access for per-game files if needed later
-bool mgInputLockedOut()
-{
-  return (int32_t)(millis() - s_mgInputLockoutUntilMs) < 0;
-}
+bool mgInputLockedOut() { return (int32_t)(millis() - s_mgInputLockoutUntilMs) < 0; }
 
-void mgBeginInputLockout(uint32_t ms)
-{
-  s_mgInputLockoutUntilMs = millis() + ms;
-}
+void mgBeginInputLockout(uint32_t ms) { s_mgInputLockoutUntilMs = millis() + ms; }
 
-bool miniGameEnterOnce(const InputState& input)
+bool miniGameEnterOnce(const InputState &input)
 {
   const bool held = input.mgSelectHeld;
 
@@ -143,28 +143,30 @@ bool miniGameEnterOnce(const InputState& input)
   return enterOnce || input.mgSelectOnce;
 }
 
-static const char* mgItemName(ItemType t)
+static const char *mgItemName(ItemType t)
 {
-  const char* nm = g_app.inventory.getItemLabelForType(t);
+  const char *nm = g_app.inventory.getItemLabelForType(t);
   if (nm && nm[0])
     return nm;
 
   switch (t)
   {
-    case ITEM_SOUL_FOOD:    return "SOUL FOOD";
-    case ITEM_CURSED_RELIC: return "CURSED RELIC";
-    case ITEM_DEMON_BONE:   return "DEMON BONE";
-    case ITEM_RITUAL_CHALK: return "RITUAL CHALK";
-    default:                return "ITEM";
+  case ITEM_SOUL_FOOD:
+    return "SOUL FOOD";
+  case ITEM_CURSED_RELIC:
+    return "CURSED RELIC";
+  case ITEM_DEMON_BONE:
+    return "DEMON BONE";
+  case ITEM_RITUAL_CHALK:
+    return "RITUAL CHALK";
+  default:
+    return "ITEM";
   }
 }
 
-static int rollMiniGameInfReward()
-{
-  return 10;
-}
+static int rollMiniGameInfReward() { return 10; }
 
-static bool tryAwardWinItem_1in4(ItemType* outType)
+static bool tryAwardWinItem_1in4(ItemType *outType)
 {
   if (outType)
     *outType = ITEM_NONE;
@@ -172,12 +174,7 @@ static bool tryAwardWinItem_1in4(ItemType* outType)
   if (random(4) != 0)
     return false;
 
-  static const ItemType kRewards[] = {
-    ITEM_SOUL_FOOD,
-    ITEM_CURSED_RELIC,
-    ITEM_DEMON_BONE,
-    ITEM_RITUAL_CHALK
-  };
+  static const ItemType kRewards[] = {ITEM_SOUL_FOOD, ITEM_CURSED_RELIC, ITEM_DEMON_BONE, ITEM_RITUAL_CHALK};
 
   const int n = (int)(sizeof(kRewards) / sizeof(kRewards[0]));
   const ItemType t = kRewards[(int)random((long)n)];
@@ -196,29 +193,21 @@ void mgApplyResultAndShowReward(bool won)
     {
       if (pet.type == PET_ELDRITCH)
       {
-        snprintf(
-          s_rewardMsg,
-          sizeof(s_rewardMsg),
-          "The darkness has returned\nYou may return to life");
+        snprintf(s_rewardMsg, sizeof(s_rewardMsg), "The darkness has returned\nYou may return to life");
       }
       else
       {
-        snprintf(
-          s_rewardMsg,
-          sizeof(s_rewardMsg),
-          "Fall of Man has begun\nYou may return to life");
+        snprintf(s_rewardMsg, sizeof(s_rewardMsg), "Fall of Man has begun\nYou may return to life");
       }
     }
     else
     {
-      snprintf(
-        s_rewardMsg,
-        sizeof(s_rewardMsg),
-        "Resurrection failed\nDeath still holds you");
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "Resurrection failed\nDeath still holds you");
     }
 
     saveManagerMarkDirty();
     s_showReward = true;
+    s_rewardShownAtMs = millis();
     g_app.gameOver = false;
     requestUIRedraw();
     return;
@@ -238,21 +227,13 @@ void mgApplyResultAndShowReward(bool won)
 
     if (wonItem)
     {
-      const char* nm = mgItemName(rewardType);
-      snprintf(
-        s_rewardMsg,
-        sizeof(s_rewardMsg),
-        "You win! XP +20  INF +%d  MOOD +20\nRandom Reward: %s +1",
-        infReward,
-        (nm && nm[0]) ? nm : "ITEM");
+      const char *nm = mgItemName(rewardType);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +20  INF +%d  MOOD +20\nRandom Reward: %s +1", infReward,
+               (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(
-        s_rewardMsg,
-        sizeof(s_rewardMsg),
-        "You win! XP +20  INF +%d  MOOD +20",
-        infReward);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +20  INF +%d  MOOD +20", infReward);
     }
   }
   else
@@ -265,6 +246,7 @@ void mgApplyResultAndShowReward(bool won)
   saveManagerMarkDirty();
 
   s_showReward = true;
+  s_rewardShownAtMs = millis();
   g_app.gameOver = false;
 
   requestUIRedraw();
@@ -319,7 +301,7 @@ void miniGameExitToReturnUi(bool beginLockout)
   freeCrossyActorSprites();
 
   freeResRunSprites();
-  
+
   invalidateBackgroundCache();
   requestFullUIRedraw();
 
@@ -331,29 +313,29 @@ void mgSyncGameTimebases(uint32_t now)
 {
   switch (currentMiniGame)
   {
-    case MiniGame::FLAPPY_FIREBALL:
-      s_lastStepMs = now;
-      break;
+  case MiniGame::FLAPPY_FIREBALL:
+    s_lastStepMs = now;
+    break;
 
-    case MiniGame::INFERNAL_DODGER:
-      s_dodgerLastStepMs = now;
-      s_dodgerMoveLastMs = now;
-      break;
+  case MiniGame::INFERNAL_DODGER:
+    s_dodgerLastStepMs = now;
+    s_dodgerMoveLastMs = now;
+    break;
 
-    case MiniGame::CROSSY_ROAD:
-      s_crossyLastLaneMs = now;
-      break;
+  case MiniGame::CROSSY_ROAD:
+    s_crossyLastLaneMs = now;
+    break;
 
-    case MiniGame::RESURRECTION:
-      rr_lastMs = now;
-      break;
+  case MiniGame::RESURRECTION:
+    rr_lastMs = now;
+    break;
 
-    default:
-      break;
+  default:
+    break;
   }
 }
 
-void updateMiniGame(const InputState& input)
+void updateMiniGame(const InputState &input)
 {
   if (g_app.uiState != UIState::MINI_GAME)
     return;
@@ -392,24 +374,24 @@ void updateMiniGame(const InputState& input)
 
   switch (currentMiniGame)
   {
-    case MiniGame::FLAPPY_FIREBALL:
-      updateFlappyFireball(input);
-      break;
+  case MiniGame::FLAPPY_FIREBALL:
+    updateFlappyFireball(input);
+    break;
 
-    case MiniGame::CROSSY_ROAD:
-      updateCrossyRoad(input);
-      break;
+  case MiniGame::CROSSY_ROAD:
+    updateCrossyRoad(input);
+    break;
 
-    case MiniGame::INFERNAL_DODGER:
-      updateInfernalDodger(input);
-      break;
+  case MiniGame::INFERNAL_DODGER:
+    updateInfernalDodger(input);
+    break;
 
-    case MiniGame::RESURRECTION:
-      updateResurrectionRun(input);
-      break;
+  case MiniGame::RESURRECTION:
+    updateResurrectionRun(input);
+    break;
 
-    default:
-      break;
+  default:
+    break;
   }
 
   requestUIRedraw();
@@ -429,24 +411,24 @@ void drawMiniGame()
 
   switch (currentMiniGame)
   {
-    case MiniGame::FLAPPY_FIREBALL:
-      drawFlappyFireball();
-      break;
+  case MiniGame::FLAPPY_FIREBALL:
+    drawFlappyFireball();
+    break;
 
-    case MiniGame::CROSSY_ROAD:
-      drawCrossyRoad();
-      break;
+  case MiniGame::CROSSY_ROAD:
+    drawCrossyRoad();
+    break;
 
-    case MiniGame::INFERNAL_DODGER:
-      drawInfernalDodger();
-      break;
+  case MiniGame::INFERNAL_DODGER:
+    drawInfernalDodger();
+    break;
 
-    case MiniGame::RESURRECTION:
-      drawResurrectionRun();
-      break;
+  case MiniGame::RESURRECTION:
+    drawResurrectionRun();
+    break;
 
-    default:
-      break;
+  default:
+    break;
   }
 
   if (mgPauseIsPaused())

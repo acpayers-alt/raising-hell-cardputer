@@ -276,16 +276,11 @@ static int s_flappyBgScrollX = 0;
 
 static void flappyLogState(const char *tag)
 {
-  Serial.printf("[FLAPPY] %s intro=%d playing=%d hit=%d burnDone=%d gameOver=%d won=%d fb=(%d,%d) vy=%d dist=%d free=%u largest=%u\n",
-                tag ? tag : "state",
-                s_flappyShowIntro ? 1 : 0,
-                s_flappyPlaying ? 1 : 0,
-                s_impHit ? 1 : 0,
-                s_impBurnDone ? 1 : 0,
-                g_app.gameOver ? 1 : 0,
-                playerWon ? 1 : 0,
-                s_fbX, s_fbY, s_fbVY, s_flappyDistancePx,
-                (unsigned)ESP.getFreeHeap(),
+  Serial.printf("[FLAPPY] %s intro=%d playing=%d hit=%d burnDone=%d gameOver=%d won=%d fb=(%d,%d) vy=%d dist=%d "
+                "free=%u largest=%u\n",
+                tag ? tag : "state", s_flappyShowIntro ? 1 : 0, s_flappyPlaying ? 1 : 0, s_impHit ? 1 : 0,
+                s_impBurnDone ? 1 : 0, g_app.gameOver ? 1 : 0, playerWon ? 1 : 0, s_fbX, s_fbY, s_fbVY,
+                s_flappyDistancePx, (unsigned)ESP.getFreeHeap(),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 
@@ -854,7 +849,8 @@ void updateFlappyFireball(const InputState &input)
   // ---------------------------------------------------------------------------
   if (mgRewardShowing())
   {
-    if (enterOnce && !mgInputLockedOut())
+    const uint32_t now = millis();
+    if ((enterOnce && !mgInputLockedOut()) || mgRewardAutoDismissNow(now))
     {
       mgClearRewardState();
       mgResetAcceptState();

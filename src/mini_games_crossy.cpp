@@ -669,7 +669,7 @@ void startCrossyRoad()
   mgAssetsBeginSession(currentMiniGame, "startCrossyRoad");
   mgmem::beginSession(currentMiniGame, pet.type);
   mgmem::logUsage("crossy-start-beginSession");
-  
+
   UIState retUi = g_app.uiState;
   if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
     retUi = UIState::PET_SCREEN;
@@ -814,7 +814,8 @@ void updateCrossyRoad(const InputState &input)
 
   if (mgRewardShowing())
   {
-    if (enterOnce && !mgInputLockedOut())
+    const uint32_t now = millis();
+    if ((enterOnce && !mgInputLockedOut()) || mgRewardAutoDismissNow(now))
     {
       mgClearRewardState();
       mgResetAcceptState();

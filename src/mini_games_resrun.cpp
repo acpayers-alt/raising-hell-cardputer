@@ -850,7 +850,8 @@ void updateResurrectionRun(const InputState &input)
 
   if (mgRewardShowing())
   {
-    if (enterOnce && !mgInputLockedOut())
+    const uint32_t now = millis();
+    if ((enterOnce && !mgInputLockedOut()) || mgRewardAutoDismissNow(now))
     {
       mgClearRewardState();
       mgResetAcceptState();
@@ -863,7 +864,7 @@ void updateResurrectionRun(const InputState &input)
     }
     return;
   }
-
+  
   if (g_app.gameOver)
   {
     mgApplyResultAndShowReward(playerWon);

@@ -22,12 +22,7 @@ bool miniGameEnterOnce(const InputState& input);
 bool mgRewardShowing();
 void mgClearRewardState();
 bool mgAcceptArmedNow(uint32_t now);
-void mgResetAcceptState();
-const char* mgRewardMessage();
-
-bool mgRewardShowing();
-void mgClearRewardState();
-bool mgAcceptArmedNow(uint32_t now);
+bool mgRewardAutoDismissNow(uint32_t now);
 void mgResetAcceptState();
 const char* mgRewardMessage();
 void mgApplyResultAndShowReward(bool won);
