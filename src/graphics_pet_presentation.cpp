@@ -160,19 +160,26 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   if (!ok)
   {
     s_petBgHardFail = true;
-  
+
     petLayerReady = false;
     s_petBgCachedPath = nullptr;
     s_petBgCachedType = (PetType)255;
     s_petBgCachedStage = 255;
-  
-    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-  
+
+    // Fallback: draw the pet background directly this frame so the user
+    // does not see a black flash while the cache rebuild retries.
+    bool directOk = false;
+    if (bgPath)
+      directOk = sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+
+    if (!directOk)
+      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+
     invalidateBackgroundCache();
     requestUIRedraw();
     return;
   }
-
+  
   s_petBgCachedPath = bgPath;
   s_petBgCachedType = pet.type;
   s_petBgCachedStage = pet.evoStage;
