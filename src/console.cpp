@@ -867,12 +867,17 @@ static void execLine(char *line)
     logLine("  help | ?            show this");
     logLine("  clear               clear console");
     logLine("  exit                close console");
+    logLine("  reboot              reboot device");
 
-    logLine("Status / info:");
+    logLine("Pet Commands:");
     logLine("  mon                 show stats");
     logLine("  age                 show birth epoch + age string");
     logLine("  pet                 show current pet type");
+    logLine("  name <pet name>     set pet name");
+    
+    logLine("Status / info:");
     logLine("  version             show firmware + asset version");
+    logLine("  assetstatus         show asset OTA/debug status");
     logLine("  uptime              show device uptime");
 
     logLine("WiFi:");
@@ -880,11 +885,6 @@ static void execLine(char *line)
     logLine("  wifi off|on         toggle wifi power");
     logLine("  wifi <ssid> <pass>  save + connect");
     logLine("  wifi clear          clear saved creds");
-
-    logLine("Recovery / repair:");
-    logLine("  name <pet name>     set pet name");
-    logLine("  assetstatus         show asset OTA/debug status");
-    logLine("  reboot              reboot device");
 
     logLine("Logs:");
     logLine("  logdump             dump runtime log buffer");

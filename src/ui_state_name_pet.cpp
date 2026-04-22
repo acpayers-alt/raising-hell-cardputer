@@ -70,13 +70,17 @@ void uiNamePetHandle(InputState &in)
     inputForceClear();
     clearInputLatch();
 
+    // Rename-from-settings should return to Settings / Pet page,
+    // not unwind the whole Settings return target back to Title.
+    g_settingsFlow.settingsPage = SettingsPage::PET;
+
     playBeep();
-    closeSettingsAndReturn(in);
+    uiActionEnterStateClean(UIState::SETTINGS, g_app.currentTab, true, in, 120);
     requestFullUIRedraw();
     requestUIRedraw();
     return;
   }
-
+  
   // New-pet naming: ESC is intentionally inert
   if (!g_namePetRenameMode && in.escOnce)
   {
