@@ -76,6 +76,7 @@
 // -----------------------------------------------------------------------------
 static bool g_consoleOpen = false;
 static bool g_consoleJustOpened = false;
+static bool g_consoleSupportMode = false;
 
 // Current editable input line
 static char g_buf[64];
@@ -107,6 +108,8 @@ static bool g_histHasDraft = false;
 static UIState g_consolePrevUiState{};
 static Tab g_consolePrevTab = Tab::TAB_PET;
 static bool g_consoleHadPrevState = false;
+
+static void logLine(const char *s);
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -220,6 +223,30 @@ static bool consoleAssetPackTooOld()
 }
 
 static const char *assetChannelToString(uint8_t ch) { return (ch == (uint8_t)AssetOtaChannel::DEV) ? "dev" : "public"; }
+
+static bool consoleSupportModeEnabled()
+{
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  return g_consoleSupportMode;
+#else
+  return true;
+#endif
+}
+
+static void consoleLogSupportModeStatus()
+{
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  if (g_consoleSupportMode)
+    logLine("Support mode: ON");
+  else
+    logLine("Support mode: OFF");
+
+  if (!g_consoleSupportMode)
+    logLine("Use 'support on' to enable support commands.");
+#else
+  logLine("Support mode: always available in dev build");
+#endif
+}
 
 static void resetLine()
 {
@@ -798,6 +825,24 @@ static void execLine(char *line)
     logLine("  logclear            clear runtime log buffer");
     logLine("  logsave             save runtime log to /raising_hell/logs/logdump.txt");
 
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    logLine("Support:");
+    logLine("  support             show support mode status");
+    logLine("  support on|off      enable/disable support commands");
+
+    if (g_consoleSupportMode)
+    {
+      logLine("Support commands:");
+      logLine("  tz                  show current timezone + local/UTC time");
+      logLine("  tz list             list supported timezone indices");
+      logLine("  tz map <IANA>       resolve IANA zone -> internal zone");
+      logLine("  tz test <IANA|idx>  apply temporarily, print local time, restore");
+      logLine("  tz save <IANA|idx>  apply + persist timezone");
+      logLine("  tz set <idx>        shortcut for tz save <idx>");
+      logLine("  tz cases            run tricky timezone mapping suite");
+    }
+#endif
+
 #if !PUBLIC_BUILD
     logLine("Dev / test:");
     logLine("  fwmark set <id>     set stored build id");
@@ -868,6 +913,48 @@ static void execLine(char *line)
   if (!strcmp(argv[0], "clear"))
   {
     consoleClear();
+    return;
+  }
+
+  // SUPPORT MODE
+  if (!strcmp(argv[0], "support"))
+  {
+    if (argc == 1 || !strcmp(argv[1], "status"))
+    {
+      consoleLogSupportModeStatus();
+      return;
+    }
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    if (!strcmp(argv[1], "on"))
+    {
+      g_consoleSupportMode = true;
+      logLine("[OK] Support mode enabled");
+      logLine("[OK] Additional support commands are now available");
+      return;
+    }
+
+    if (!strcmp(argv[1], "off"))
+    {
+      g_consoleSupportMode = false;
+      logLine("[OK] Support mode disabled");
+      return;
+    }
+#else
+    if (!strcmp(argv[1], "on") || !strcmp(argv[1], "off"))
+    {
+      logLine("Support mode is always available in dev build");
+      return;
+    }
+#endif
+
+    logLine("Usage:");
+    logLine("  support");
+    logLine("  support status");
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    logLine("  support on");
+    logLine("  support off");
+#endif
     return;
   }
 
@@ -1544,9 +1631,17 @@ static void execLine(char *line)
     return;
   }
 
-#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "tz"))
   {
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    if (!consoleSupportModeEnabled())
+    {
+      logLine("Command locked in public build.");
+      logLine("Use 'support on' to enable support commands.");
+      return;
+    }
+#endif
+
     if (argc == 1)
     {
       consoleShowCurrentTimezoneStatus();
@@ -1646,7 +1741,6 @@ static void execLine(char *line)
     logLine("  tz cases");
     return;
   }
-#endif
 
   if (!strcmp(argv[0], "timeinvalidate"))
   {
@@ -2029,6 +2123,10 @@ void consoleOpen()
 {
   g_consoleOpen = true;
   g_consoleJustOpened = true;
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  g_consoleSupportMode = false;
+#endif
 
   requestFullUIRedraw();
   requestUIRedraw();
