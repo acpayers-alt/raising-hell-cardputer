@@ -883,13 +883,8 @@ static void execLine(char *line)
 
     logLine("Recovery / repair:");
     logLine("  name <pet name>     set pet name");
-    logLine("  saveheal            repair save name/pending-flag issues");
     logLine("  assetstatus         show asset OTA/debug status");
-    logLine("  assetflag           show asset provision boot flag");
-    logLine("  assetflag clear     clear asset provision boot flag");
-    logLine("  assetflag set       set asset provision boot flag");
     logLine("  reboot              reboot device");
-    logLine("  ntpskip             bypass stalled NTP check");
 
     logLine("Logs:");
     logLine("  logdump             dump runtime log buffer");
@@ -915,8 +910,13 @@ static void execLine(char *line)
       logLine("  tz save <IANA|idx>  apply + persist timezone");
       logLine("  tz set <idx>        shortcut for tz save <idx>");
       logLine("  tz cases            run tricky timezone mapping suite");
+      logLine("  assetflag           show asset provision boot flag");
+      logLine("  assetflag clear     clear asset provision boot flag");
+      logLine("  assetflag set       set asset provision boot flag");
+      logLine("  ntpskip             bypass stalled NTP check");
       logLine("  bootflags           inspect boot / recovery flags");
       logLine("  bootheal            clear stuck boot flags");
+      logLine("  saveheal            repair save name/pending-flag issues");
       logLine("  clearnamepending    clear name-pending flag");
       logLine("  clearpostprov       clear post-provision help flag");
       logLine("  clearbootsetup      clear boot setup pending flag");
@@ -1887,6 +1887,8 @@ static void execLine(char *line)
   // -------------------------------------------------
   if (!strcmp(argv[0], "ntpskip"))
   {
+    if (!consoleRequireSupportMode())
+      return;
     if (time(nullptr) > 1600000000)
     {
       logLine("[NTP] time already valid");
@@ -1969,6 +1971,8 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "bootheal"))
   {
+    if (!consoleRequireSupportMode())
+      return;
     if (!consoleRequireSupportMode())
       return;
 
@@ -2102,6 +2106,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "assetflag"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1)
     {
       logf("asset provision boot flag: %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
