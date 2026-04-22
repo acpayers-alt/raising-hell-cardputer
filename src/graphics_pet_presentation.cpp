@@ -43,6 +43,7 @@ static const char *s_petBgCachedPath = nullptr;
 static PetType s_petBgCachedType = (PetType)255;
 static uint8_t s_petBgCachedStage = 255;
 static bool s_petBgHardFail = false;
+static bool s_petLayerFsInited = false;
 
 static bool ensurePetLayer();
 
@@ -103,6 +104,52 @@ static bool ensurePetLayer()
   return true;
 }
 
+void graphicsPrewarmPetBackgroundCache()
+{
+  if (!g_sdReady)
+    return;
+
+  const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
+  if (!bgPath || !bgPath[0])
+    return;
+
+  if (petLayerReady &&
+      s_petBgCachedPath &&
+      strcmp(s_petBgCachedPath, bgPath) == 0 &&
+      s_petBgCachedType == pet.type &&
+      s_petBgCachedStage == pet.evoStage)
+  {
+    return;
+  }
+
+  if (!ensurePetLayer())
+    return;
+
+  petLayer.fillSprite(TFT_BLACK);
+
+  if (!s_petLayerFsInited)
+  {
+    petLayer.setFileStorage(SD);
+    s_petLayerFsInited = true;
+  }
+
+  const bool ok = petLayer.drawJpgFile(bgPath, 0, 0);
+  if (!ok)
+  {
+    // Best-effort prewarm only: leave the normal draw path free to retry.
+    petLayerReady = false;
+    s_petBgCachedPath = nullptr;
+    s_petBgCachedType = (PetType)255;
+    s_petBgCachedStage = 255;
+    return;
+  }
+
+  s_petBgCachedPath = bgPath;
+  s_petBgCachedType = pet.type;
+  s_petBgCachedStage = pet.evoStage;
+  s_petBgHardFail = false;
+}
+
 void cachePetAreaBackgroundIfNeeded(bool force)
 {
   if (!g_sdReady)
@@ -148,12 +195,12 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   bool ok = true;
   if (bgPath)
   {
-    static bool s_petLayerFsInited = false;
     if (!s_petLayerFsInited)
     {
       petLayer.setFileStorage(SD);
       s_petLayerFsInited = true;
     }
+    
     ok = petLayer.drawJpgFile(bgPath, 0, 0);
   }
 

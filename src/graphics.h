@@ -13,6 +13,7 @@
 void graphicsRecoverAfterOta();
 void graphicsReleasePetLayerForOta();
 void graphicsReleaseUiCachesForMiniGame();
+void graphicsPrewarmPetBackgroundCache();
 
 // -----------------------------------------------------------------------------
 // Modal / messages

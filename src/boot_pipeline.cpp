@@ -738,6 +738,13 @@ static void finalizeBootLanding()
     g_wifiApplied = true;
   }
 
+  // Prewarm the PET background cache once per boot so the first visible
+  // return to the PET screen does not expose a one-frame background rebuild.
+  if (bootSaveFileExists())
+  {
+    graphicsPrewarmPetBackgroundCache();
+  }
+  
   if (g_postProvisionControlsHelpPending)
   {
     g_postProvisionControlsHelpPending = false;
@@ -776,7 +783,7 @@ static void finalizeBootLanding()
     whatsNewBegin(s_bootFinalLandingState, Tab::TAB_PET);
     return;
   }
-  
+
   uint16_t seedMarkNow = 0;
   EEPROM.get(SEED_MARK_ADDR, seedMarkNow);
 
