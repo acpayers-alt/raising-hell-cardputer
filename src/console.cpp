@@ -19,10 +19,10 @@
 #include "controls_help_state.h"
 #include "save_manager.h"
 #include "sdcard.h"
+#include "timezone.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include "timezone.h"
 
 // -----------------------------------------------------------------------------
 // Project: Gameplay / Domain
@@ -82,9 +82,15 @@ static char g_buf[64];
 static uint8_t g_len = 0;
 
 // Scrollback (fixed ring)
-static constexpr int MAX_LINES = 16;
+static constexpr int MAX_LINES = 96;
 static char g_lines[MAX_LINES][64];
 static int g_lineCount = 0;
+
+// 0 = pinned to bottom/live tail
+// >0 = scrolled upward by this many lines
+static int g_scrollOffset = 0;
+
+static void consoleClampScroll();
 
 // Command history (fixed ring)
 static const int CONSOLE_HIST_MAX = 12;
@@ -246,6 +252,8 @@ static void pushLine(const char *s)
     strncpy(g_lines[MAX_LINES - 1], tmp, sizeof(g_lines[MAX_LINES - 1]) - 1);
     g_lines[MAX_LINES - 1][sizeof(g_lines[MAX_LINES - 1]) - 1] = '\0';
   }
+
+  consoleClampScroll();
 }
 
 static void logLine(const char *s)
@@ -267,8 +275,7 @@ static void consoleArmReprovisionRecovery()
   const bool wifiEnabledBefore = settingsWifiEnabled();
   const bool hasCredsBefore = wifiStoreHasCreds();
 
-  Serial.printf("[RESCUE] reprovision armed wifiEnabled=%d hasCreds=%d\n",
-                wifiEnabledBefore ? 1 : 0,
+  Serial.printf("[RESCUE] reprovision armed wifiEnabled=%d hasCreds=%d\n", wifiEnabledBefore ? 1 : 0,
                 hasCredsBefore ? 1 : 0);
 
   if (!bootFirmwareMarkerClear())
@@ -288,9 +295,7 @@ static void consoleArmReprovisionRecovery()
   const bool wifiEnabledAfter = settingsWifiEnabled();
   const bool hasCredsAfter = wifiStoreHasCreds();
 
-  Serial.printf("[RESCUE] wifiEnabledAfter=%d hasCreds=%d\n",
-                wifiEnabledAfter ? 1 : 0,
-                hasCredsAfter ? 1 : 0);
+  Serial.printf("[RESCUE] wifiEnabledAfter=%d hasCreds=%d\n", wifiEnabledAfter ? 1 : 0, hasCredsAfter ? 1 : 0);
 
   logLine("[OK] firmware marker cleared");
   logLine("[OK] asset provision boot flag set");
@@ -569,15 +574,8 @@ static void consoleFormatTm(char *buf, size_t bufSize, const tm &t)
   if (!buf || bufSize == 0)
     return;
 
-  snprintf(buf,
-           bufSize,
-           "%04d-%02d-%02d %02d:%02d:%02d",
-           t.tm_year + 1900,
-           t.tm_mon + 1,
-           t.tm_mday,
-           t.tm_hour,
-           t.tm_min,
-           t.tm_sec);
+  snprintf(buf, bufSize, "%04d-%02d-%02d %02d:%02d:%02d", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour,
+           t.tm_min, t.tm_sec);
 }
 
 static void consoleLogTimeSnapshot(const char *prefix)
@@ -788,7 +786,8 @@ static void execLine(char *line)
     logLine("  fwmark              show firmware marker status");
     logLine("  fwmark show         show stored/current build id");
     logLine("  fwmark clear        clear stored build id");
-    logLine("  fwmark reprovision  dev: clear marker + set asset flag");    logLine("  reboot              reboot device");
+    logLine("  fwmark reprovision  dev: clear marker + set asset flag");
+    logLine("  reboot              reboot device");
     logLine("  nvsclear            wipe NVS (factory clean) + reboot");
     logLine("  ntpskip            bypass stalled NTP check");
     logLine("  timeinvalidate            marks current time invalid");
@@ -1545,7 +1544,7 @@ static void execLine(char *line)
     return;
   }
 
-  #if !PUBLIC_BUILD
+#if !PUBLIC_BUILD
   if (!strcmp(argv[0], "tz"))
   {
     if (argc == 1)
@@ -2056,6 +2055,7 @@ bool consoleIsOpen() { return g_consoleOpen; }
 void consoleClear()
 {
   g_lineCount = 0;
+  g_scrollOffset = 0;
   for (int i = 0; i < MAX_LINES; i++)
     g_lines[i][0] = '\0';
   resetLine();
@@ -2071,6 +2071,82 @@ const char *consoleGetLine(int idx)
 }
 
 const char *consoleGetInputLine() { return g_buf; }
+
+int consoleGetScrollOffset() { return g_scrollOffset; }
+
+int consoleGetMaxVisibleLines()
+{
+  // Keep this aligned with graphics_console_screens.cpp current layout.
+  // Current Cardputer console body fits about 9 rows.
+  return 9;
+}
+
+static int consoleGetMaxScrollOffsetInternal(int maxLinesVisible)
+{
+  if (maxLinesVisible < 1)
+    maxLinesVisible = 1;
+
+  const int maxOffset = g_lineCount - maxLinesVisible;
+  return (maxOffset > 0) ? maxOffset : 0;
+}
+
+int consoleGetFirstVisibleLine(int maxLinesVisible)
+{
+  if (maxLinesVisible < 1)
+    maxLinesVisible = 1;
+
+  int first = g_lineCount - maxLinesVisible - g_scrollOffset;
+  if (first < 0)
+    first = 0;
+
+  const int maxFirst = (g_lineCount > maxLinesVisible) ? (g_lineCount - maxLinesVisible) : 0;
+  if (first > maxFirst)
+    first = maxFirst;
+
+  return first;
+}
+
+bool consoleIsScrolledUp() { return g_scrollOffset > 0; }
+
+static void consoleClampScroll()
+{
+  const int maxOffset = consoleGetMaxScrollOffsetInternal(consoleGetMaxVisibleLines());
+
+  if (g_scrollOffset < 0)
+    g_scrollOffset = 0;
+  if (g_scrollOffset > maxOffset)
+    g_scrollOffset = maxOffset;
+}
+
+static void consoleSnapToBottom()
+{
+  if (g_scrollOffset != 0)
+  {
+    g_scrollOffset = 0;
+    requestUIRedraw();
+  }
+}
+
+static bool consoleScrollUpOne()
+{
+  const int maxOffset = consoleGetMaxScrollOffsetInternal(consoleGetMaxVisibleLines());
+  if (g_scrollOffset >= maxOffset)
+    return false;
+
+  g_scrollOffset++;
+  requestUIRedraw();
+  return true;
+}
+
+static bool consoleScrollDownOne()
+{
+  if (g_scrollOffset <= 0)
+    return false;
+
+  g_scrollOffset--;
+  requestUIRedraw();
+  return true;
+}
 
 // -----------------------------------------------------------------------------
 // Input handling
@@ -2103,20 +2179,36 @@ void consoleUpdate(InputState &in)
     const bool isBackspace = (code == (uint8_t)RH_KEY_BACKSPACE) || (code == '\b') || (code == 127);
 
     // -------------------------------------------------
-    // Command history navigation (console-only)
-    //   ';' = previous
-    //   '.' = next
+    // Up/down behavior in console:
+    //   empty input -> scrollback
+    //   typed input -> command history
     // -------------------------------------------------
     if (code == (uint8_t)';')
     {
-      if (histPrev())
-        touched = true;
+      if (g_len == 0)
+      {
+        if (consoleScrollUpOne())
+          touched = true;
+      }
+      else
+      {
+        if (histPrev())
+          touched = true;
+      }
       continue;
     }
     if (code == (uint8_t)'.')
     {
-      if (histNext())
-        touched = true;
+      if (g_len == 0)
+      {
+        if (consoleScrollDownOne())
+          touched = true;
+      }
+      else
+      {
+        if (histNext())
+          touched = true;
+      }
       continue;
     }
 
@@ -2124,6 +2216,8 @@ void consoleUpdate(InputState &in)
     if (isEnter)
     {
       g_buf[g_len] = '\0';
+
+      consoleSnapToBottom();
 
       char echo[70];
       snprintf(echo, sizeof(echo), "> %s", g_buf);
@@ -2166,6 +2260,9 @@ void consoleUpdate(InputState &in)
     {
       if (g_len < sizeof(g_buf) - 1)
       {
+        if (g_scrollOffset > 0)
+          consoleSnapToBottom();
+
         g_buf[g_len++] = c;
         g_buf[g_len] = '\0';
         histCancelNav();

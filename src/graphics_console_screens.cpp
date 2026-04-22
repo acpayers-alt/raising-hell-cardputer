@@ -54,12 +54,13 @@ void drawConsoleScreen()
   const int maxLinesVisible = outH / lineH;
 
   const int total = consoleGetLineCount();
-  int first = total - maxLinesVisible;
-  if (first < 0)
-    first = 0;
+  const int first = consoleGetFirstVisibleLine(maxLinesVisible);
+  int last = first + maxLinesVisible;
+  if (last > total)
+    last = total;
 
   int y = outY + 2;
-  for (int i = first; i < total; i++)
+  for (int i = first; i < last; i++)
   {
     const char *s = consoleGetLine(i);
     if (s && *s)
@@ -67,6 +68,21 @@ void drawConsoleScreen()
     y += lineH;
   }
 
+  if (consoleIsScrolledUp())
+  {
+    char scrollBuf[24];
+    snprintf(scrollBuf, sizeof(scrollBuf), "scroll:%d", consoleGetScrollOffset());
+
+    spr.setTextFont(1);
+    spr.setTextSize(1);
+    spr.setTextColor(TFT_YELLOW, TFT_BLACK);
+    spr.setTextDatum(TR_DATUM);
+    spr.drawString(scrollBuf, SCREEN_W - 4, outY + 2);
+
+    spr.setTextDatum(TL_DATUM);
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  }
+      
   spr.setTextFont(CONSOLE_INPUT_FONT);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, inputBg);

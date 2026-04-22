@@ -13,4 +13,9 @@ int consoleGetLineCount();
 const char* consoleGetLine(int index);
 const char* consoleGetInputLine();
 
+int consoleGetScrollOffset();
+int consoleGetMaxVisibleLines();
+int consoleGetFirstVisibleLine(int maxLinesVisible);
+bool consoleIsScrolledUp();
+
 #endif // RH_CONSOLE_H
