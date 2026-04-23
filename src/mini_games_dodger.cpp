@@ -1030,7 +1030,7 @@ void updateInfernalDodger(const InputState &input)
         s_dodgerPy = impactY;
         s_dodgerPhase = DODGER_PHASE_CAR_EXIT;
         s_dodgerPhaseStartMs = now;
-        soundConfirm();
+        soundWin();
       }
     }
     else if (s_dodgerPhase == DODGER_PHASE_CAR_EXIT)
@@ -1079,6 +1079,7 @@ void updateInfernalDodger(const InputState &input)
         s_resultShown = true;
 
         dodgerLogState("offroad-lose");
+        soundError();
 
         return;
       }

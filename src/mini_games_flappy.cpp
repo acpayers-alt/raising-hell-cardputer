@@ -808,7 +808,7 @@ static void flappyStep(int w, int h, bool flap)
 
         flappyLogState("goal-reached");
 
-        soundConfirm();
+        soundWin();
       }
     }
   }

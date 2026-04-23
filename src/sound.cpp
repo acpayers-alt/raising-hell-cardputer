@@ -385,6 +385,23 @@ void soundConfirm()
   startSequence(k, (uint8_t)(sizeof(k) / sizeof(k[0])));
 }
 
+void soundWin()
+{
+  if (!soundEnabled)
+    return;
+  if (uiSfxCooldown(120))
+    return;
+
+  // Upward triumphant arpeggio
+  static const ToneStep k[] = {
+      {1200, 40, 8},
+      {1600, 40, 8},
+      {2200, 60, 0},
+  };
+
+  startSequence(k, (uint8_t)(sizeof(k) / sizeof(k[0])));
+}
+
 void soundCancel()
 {
   if (!soundEnabled)
@@ -401,8 +418,12 @@ void soundError()
     return;
   if (uiSfxCooldown(120))
     return;
-  static const ToneStep k[] = {{260, 120, 0}};
-  startSequence(k, 1);
+
+  static const ToneStep k[] = {
+      {1800, 28, 8},
+      {1200, 44, 0},
+  };
+  startSequence(k, (uint8_t)(sizeof(k) / sizeof(k[0])));
 }
 
 void soundSleep()

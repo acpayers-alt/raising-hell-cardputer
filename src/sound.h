@@ -72,7 +72,7 @@ void soundWake();           // wake tone
 void soundDeath();          // death sting (short, dramatic, buzzy)
 void soundEvoZap();
 void soundFlap();
-
+void soundWin();
 
 // -----------------------------------------------------------------------------
 // Backwards-compat wrappers (so old code compiles)

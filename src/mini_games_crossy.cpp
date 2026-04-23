@@ -854,6 +854,7 @@ void updateCrossyRoad(const InputState &input)
     {
       s_crossyShowIntro = false;
       crossyLogState("intro-dismissed");
+      soundConfirm();
       clearInputLatch();
       inputForceClear();
       mgBeginInputLockout(120);
@@ -883,6 +884,7 @@ void updateCrossyRoad(const InputState &input)
   crossyStepLanes(now);
 
   bool moved = false;
+  bool movedSfxPending = false;
 
   if (!mgInputLockedOut())
   {
@@ -916,7 +918,10 @@ void updateCrossyRoad(const InputState &input)
     }
 
     if (moved)
+    {
+      movedSfxPending = true;
       requestUIRedraw();
+    }
   }
 
   if (s_crossyLandingGraceFrames > 0)
@@ -930,6 +935,7 @@ void updateCrossyRoad(const InputState &input)
       s_crossyWinPoseStart = now;
       s_crossyVisualOffsetPx = 0;
       crossyLogState("goal-reached");
+      soundWin();
       requestUIRedraw();
       return;
     }
@@ -938,6 +944,7 @@ void updateCrossyRoad(const InputState &input)
       playerWon = false;
       g_app.gameOver = true;
       crossyLogState("goal-blocked-lose");
+      soundError();
       requestUIRedraw();
       s_resultShown = true;
       return;
@@ -953,6 +960,7 @@ void updateCrossyRoad(const InputState &input)
         playerWon = false;
         g_app.gameOver = true;
         crossyLogState("water-lose");
+        soundError();
         requestUIRedraw();
         s_resultShown = true;
         return;
@@ -962,6 +970,10 @@ void updateCrossyRoad(const InputState &input)
     {
       s_crossyLandingGraceFrames = 1;
     }
+  }
+  if (movedSfxPending)
+  {
+    soundMenuTick();
   }
 }
 

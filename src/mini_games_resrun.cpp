@@ -611,7 +611,12 @@ static void rrFinishRun(bool won)
 
   g_app.gameOver = true;
   playerWon = won;
+  if (won)
+  soundWin();
   s_resultShown = true;
+
+  if (!won)
+    soundError();
 
   mgmem::logUsage(won ? "rr finish win" : "rr finish loss");
   resRunLogState(won ? "win" : "lose");
@@ -864,7 +869,7 @@ void updateResurrectionRun(const InputState &input)
     }
     return;
   }
-  
+
   if (g_app.gameOver)
   {
     mgApplyResultAndShowReward(playerWon);
