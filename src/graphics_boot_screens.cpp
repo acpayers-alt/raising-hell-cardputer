@@ -243,8 +243,6 @@ void drawBootWifiPromptScreen()
   spr.pushSprite(0, 0);
 }
 
-void drawWhatsNewScreen();
-
 void drawBootAssetWifiRequiredScreen()
 {
   spr.fillScreen(TFT_BLACK);

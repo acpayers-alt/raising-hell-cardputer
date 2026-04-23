@@ -1474,9 +1474,14 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       if (!tzIndexIsValid(tmp.tzIndex))
         tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
 
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
 
       ok = true;
       loadedOld = true;
@@ -1509,9 +1514,14 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       if (!tzIndexIsValid(tmp.tzIndex))
         tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
 
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
       ok = true;
       loadedOld = true;
     }
@@ -1543,8 +1553,14 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       if (!tzIndexIsValid(tmp.tzIndex))
         tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
+
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
 
       ok = true;
       loadedOld = true;
@@ -1564,7 +1580,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.tzIndex = old[4];
 
       tmp.autoClockTimeoutSel = 3;
-      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
+      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 3;
 
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
@@ -1594,9 +1610,9 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.wifiEnabled = (old[3] != 0);
 
       tmp.autoClockTimeoutSel = 3;
-
+      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 3;
+      
       tmp.tzIndex = tzDefaultIndex();
-      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;

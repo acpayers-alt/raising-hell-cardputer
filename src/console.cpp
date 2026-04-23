@@ -1973,8 +1973,6 @@ static void execLine(char *line)
   {
     if (!consoleRequireSupportMode())
       return;
-    if (!consoleRequireSupportMode())
-      return;
 
     const bool namePendingBefore = saveManagerNamePendingFlagExists();
     const bool postProvBefore = bootPostProvisionControlsHelpPending();
