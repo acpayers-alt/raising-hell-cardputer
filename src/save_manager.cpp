@@ -1562,7 +1562,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.soundEnabled = (old[2] != 0);
       tmp.wifiEnabled = (old[3] != 0);
       tmp.tzIndex = old[4];
-      
+
       tmp.autoClockTimeoutSel = 3;
       tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
 
@@ -1594,7 +1594,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.wifiEnabled = (old[3] != 0);
 
       tmp.autoClockTimeoutSel = 3;
-      
+
       tmp.tzIndex = tzDefaultIndex();
       tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
       tmp.petDeathEnabled = 1;

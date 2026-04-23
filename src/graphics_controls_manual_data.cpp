@@ -51,14 +51,11 @@ const HelpLine kControlsManual[] = {
 
     {HelpLineType::SECTION, "Alerts"},
     {HelpLineType::BODY, "Red - Pet is in danger"},
-    {HelpLineType::BODY, "Yellow - Pet needs attention"},
-    {HelpLineType::BODY, "Blue - Pet is tired or sleeping"},
+    {HelpLineType::BODY, "Orange - Pet needs attention"},
     {HelpLineType::BODY, "Green - Pet is doing well"},
-    {HelpLineType::BODY, "Purple - Pet is amazing"},
     {HelpLineType::BODY, "If the screen is off, alerts"},
     {HelpLineType::BODY, "will briefly light it up."},
     {HelpLineType::BODY, "Heed these warnings or else!"},
-    {HelpLineType::GAP, nullptr},
 
     {HelpLineType::SECTION, "Death and Resurrection"},
     {HelpLineType::BODY, "Death is not the end for your"},

@@ -196,24 +196,24 @@ void drawStatsTab(bool redrawBg)
     else if (pet.hunger <= HUNGRY_LEVEL)
     {
       cond = "Hungry";
-      condColor = TFT_YELLOW;
+      condColor = TFT_ORANGE;
     }
     else if (pet.energy <= TIRED_EN)
     {
       cond = "Tired";
-      condColor = TFT_YELLOW;
+      condColor = TFT_ORANGE;
     }
     else if (pet.happiness <= ANGRY_HAPPY)
     {
       cond = "Angry";
-      condColor = TFT_YELLOW;
+      condColor = TFT_ORANGE;
     }
     else if (pet.happiness < BORED_HAPPY)
     {
       cond = "Bored";
       condColor = TFT_GREEN;
     }
-
+    
     spr.setTextDatum(TL_DATUM);
     spr.setTextFont(1);
     spr.setTextSize(1);
