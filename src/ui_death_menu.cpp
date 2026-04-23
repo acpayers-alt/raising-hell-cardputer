@@ -39,12 +39,12 @@ static void actBury(InputState& in)
 {
   (void)in;
 
+  // Let BURIAL_SCREEN own starting the dirge on entry.
   soundResetDeathDirgeLatch();
-  soundFuneralDirge();
 
   uiActionEnterState(UIState::BURIAL_SCREEN, Tab::TAB_PET, true);
   requestUIRedraw();
-  
+
   invalidateBackgroundCache();
 
   inputForceClear();

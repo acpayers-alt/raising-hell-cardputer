@@ -587,11 +587,12 @@ void soundFuneralDirge()
 
   if (soundGetVolumeLevel() == SOUND_VOL_LOW)
   {
-    // Temporary boost for dirge only
-    M5Cardputer.Speaker.setVolume(180); // match MED feel
+    // Temporary boost for dirge only.
+    // Slightly above MED so it reads better even on LOW.
+    M5Cardputer.Speaker.setVolume(210);
     s_restoreVolumeAfterSequence = true;
   }
-
+  
   // Don't let UI spam immediately re-trigger
   s_lastUiSfxMs = millis();
 
