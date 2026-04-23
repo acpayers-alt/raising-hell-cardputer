@@ -141,9 +141,11 @@ void autoClockTick()
   if (!isScreenOn())
     return;
 
-  // Keep this conservative for now:
-  // auto-clock only triggers from the live PET screen on the PET tab.
-  if (g_app.uiState != UIState::PET_SCREEN || g_app.currentTab != Tab::TAB_PET)
+  // Auto-clock may trigger from the normal PET screen or the sleeping PET screen.
+  // Keep the PET-tab requirement so this still behaves like a pet-idle feature.
+  const bool petIdleEligibleState = (g_app.uiState == UIState::PET_SCREEN) || (g_app.uiState == UIState::PET_SLEEPING);
+
+  if (!petIdleEligibleState || g_app.currentTab != Tab::TAB_PET)
     return;
 
   if ((uint32_t)(now - g_lastInputActivityMs) >= timeout)

@@ -713,7 +713,7 @@ void appMainLoopTick()
     // Keep this separate from Auto Screen / Auto Clock so menus don't just sit forever.
     const bool settingsOwnedFlow = (g_app.uiState == UIState::SETTINGS);
 
-    static const uint32_t kSettingsIdleReturnMs = 15000;
+    static const uint32_t kSettingsIdleReturnMs = 120000;
 
     if (settingsOwnedFlow && settingsHasReturnTarget())
     {
