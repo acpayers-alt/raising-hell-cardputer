@@ -695,11 +695,6 @@ static void drawWifiSettingsMenu()
       snprintf(valueBuf, sizeof(valueBuf), "WiFi: %s", wifiIsEnabled() ? "ON" : "OFF");
       label = valueBuf;
     }
-    else if (strcmp(label, "Time Zone") == 0)
-    {
-      snprintf(valueBuf, sizeof(valueBuf), "Time Zone: %s", tzName(tzIndex));
-      label = valueBuf;
-    }
     else if (strcmp(label, "OTA Channel") == 0)
     {
       snprintf(valueBuf, sizeof(valueBuf), "OTA Channel: %s",
@@ -720,12 +715,12 @@ static void drawSystemSettingsMenu()
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
 
-  const char *labels[] = {"Set Time", "Factory Reset", "WiFi Settings >"};
-  const int totalItems = 3;
+  const char *labels[] = {"Set Time", "Time Zone", "Factory Reset", "WiFi Settings >"};
+  const int totalItems = 4;
 
   g_app.systemSettingsIndex = clampi(g_app.systemSettingsIndex, 0, totalItems - 1);
 
-  constexpr int MAX_VISIBLE = 3;
+  constexpr int MAX_VISIBLE = 4;
   int start = 0, visCount = 0;
   listWindow(totalItems, g_app.systemSettingsIndex, MAX_VISIBLE, start, visCount);
 
@@ -756,8 +751,19 @@ static void drawSystemSettingsMenu()
     spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);
 
     const int ty = y + (itemH - spr.fontHeight()) / 2;
+
+    const char *label = labels[i];
+    char valueBuf[64];
+    valueBuf[0] = '\0';
+
+    if (strcmp(label, "Time Zone") == 0)
+    {
+      snprintf(valueBuf, sizeof(valueBuf), "Time Zone: %s", tzName((uint8_t)tzIndex));
+      label = valueBuf;
+    }
+
     spr.setTextColor(textCol, fill);
-    spr.drawString(labels[i], boxX + 10, ty);
+    spr.drawString(label, boxX + 10, ty);
   }
 
   if (g_factoryReset.confirmActive)

@@ -728,6 +728,16 @@ static void actSystem_SetTime(InputState &)
   clearInputLatch();
 }
 
+static void actSystem_TimeZoneSelect(InputState &)
+{
+  settingsCycleTimeZone(+1);
+  // settingsCycleTimeZone already redraws + beeps + clears latch
+}
+
+static void actSystem_TimeZoneLeft(InputState &) { settingsCycleTimeZone(-1); }
+
+static void actSystem_TimeZoneRight(InputState &) { settingsCycleTimeZone(+1); }
+
 static void actSystem_OpenWifi(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::WIFI;
@@ -740,6 +750,7 @@ static void actSystem_OpenWifi(InputState &input)
 
 static MenuItem kSystemItems[] = {
     {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
+    {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
     {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
     {"WiFi", actSystem_OpenWifi, nullptr, nullptr, nullptr},
 };
@@ -791,7 +802,6 @@ static MenuItem kWifiItems[] = {
     {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
 };
 
 #else
@@ -800,7 +810,6 @@ static MenuItem kWifiItems[] = {
     {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
 };
 
