@@ -33,59 +33,17 @@ static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_s
 bool isScreenOn();
 
 static void drawTitleMenuText(M5Canvas &dst, const char *text, int x, int y, uint8_t font, uint16_t fg,
-                              textdatum_t datum)
+  textdatum_t datum)
 {
-  if (!text || !*text)
-    return;
+if (!text || !*text)
+return;
 
-  M5Canvas textSpr(&dst);
-  textSpr.setColorDepth(16);
-
-  textSpr.setTextFont(font);
-  textSpr.setTextSize(1);
-
-  const int tw = textSpr.textWidth(text);
-  const int th = (font == 1) ? 8 : 16;
-
-  const int padX = 2;
-  const int padY = 1;
-  const int sw = tw + padX * 2;
-  const int sh = th + padY * 2;
-
-  if (!textSpr.createSprite(sw, sh))
-    return;
-
-  const uint16_t key = TFT_MAGENTA;
-  textSpr.fillSprite(key);
-  textSpr.setTextColor(fg, key);
-  textSpr.setTextDatum(TL_DATUM);
-  textSpr.drawString(text, padX, padY, font);
-
-  int px = x;
-  int py = y;
-
-  switch (datum)
-  {
-  case textdatum_t::top_center:
-    px = x - (sw / 2);
-    py = y;
-    break;
-  case textdatum_t::top_left:
-    px = x;
-    py = y;
-    break;
-  case textdatum_t::top_right:
-    px = x - sw;
-    py = y;
-    break;
-  default:
-    px = x - (sw / 2);
-    py = y;
-    break;
-  }
-
-  textSpr.pushSprite(&dst, px, py, key);
-  textSpr.deleteSprite();
+dst.setTextFont(font);
+dst.setTextSize(1);
+dst.setTextDatum(datum);
+dst.setTextColor(fg, TFT_TRANSPARENT);
+dst.drawString(text, x, y, font);
+dst.setTextDatum(TL_DATUM);
 }
 
 void drawImportPetListScreen(bool redrawBg)
