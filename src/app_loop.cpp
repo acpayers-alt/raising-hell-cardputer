@@ -711,10 +711,8 @@ void appMainLoopTick()
 
     // Non-pet settings-owned flows should eventually unwind back to PET.
     // Keep this separate from Auto Screen / Auto Clock so menus don't just sit forever.
-    const bool settingsOwnedFlow = (g_app.uiState == UIState::SETTINGS) ||
-                                   (g_app.uiState == UIState::IMPORT_PET_LIST) ||
-                                   (g_app.uiState == UIState::BACKUP_PET_LIST);
-                                   
+    const bool settingsOwnedFlow = (g_app.uiState == UIState::SETTINGS);
+
     static const uint32_t kSettingsIdleReturnMs = 15000;
 
     if (settingsOwnedFlow && settingsHasReturnTarget())
