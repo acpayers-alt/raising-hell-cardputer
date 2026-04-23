@@ -1,6 +1,8 @@
 #include "graphics_pet_presentation.h"
 #include "graphics_mini_stats.h"
 #include "graphics_pet_bg_paths.h"
+#include "graphics_sd_draw.h"
+#include <string.h>
 
 #include <Arduino.h>
 #include <stdlib.h>
@@ -43,7 +45,6 @@ static const char *s_petBgCachedPath = nullptr;
 static PetType s_petBgCachedType = (PetType)255;
 static uint8_t s_petBgCachedStage = 255;
 static bool s_petBgHardFail = false;
-static bool s_petLayerFsInited = false;
 
 static bool ensurePetLayer();
 
@@ -88,6 +89,17 @@ void graphicsRecoverAfterOta()
   requestUIRedraw();
 }
 
+void graphicsReleasePetBackgroundCache()
+{
+  petLayer.deleteSprite();
+  petLayerReady = false;
+
+  s_petBgCachedPath = nullptr;
+  s_petBgCachedType = (PetType)255;
+  s_petBgCachedStage = 255;
+  s_petBgHardFail = false;
+}
+
 static bool ensurePetLayer()
 {
   if (petLayerReady)
@@ -104,6 +116,31 @@ static bool ensurePetLayer()
   return true;
 }
 
+static bool buildPetLayerCacheViaSpr(const char *bgPath)
+{
+  if (!bgPath || !bgPath[0])
+    return false;
+
+  if (!ensurePetLayer())
+    return false;
+
+  uint16_t *dst = (uint16_t *)petLayer.getBuffer();
+  uint16_t *src = (uint16_t *)spr.getBuffer();
+  if (!dst || !src)
+    return false;
+
+  // Decode using the main sprite path, then copy just the pet area into petLayer.
+  spr.clearClipRect();
+  spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+
+  const bool ok = sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+  if (!ok)
+    return false;
+
+  memcpy(dst, src + (PET_AREA_Y * SCREEN_W), SCREEN_W * PET_AREA_H * sizeof(uint16_t));
+  return true;
+}
+
 void graphicsPrewarmPetBackgroundCache()
 {
   if (!g_sdReady)
@@ -113,10 +150,7 @@ void graphicsPrewarmPetBackgroundCache()
   if (!bgPath || !bgPath[0])
     return;
 
-  if (petLayerReady &&
-      s_petBgCachedPath &&
-      strcmp(s_petBgCachedPath, bgPath) == 0 &&
-      s_petBgCachedType == pet.type &&
+  if (petLayerReady && s_petBgCachedPath && strcmp(s_petBgCachedPath, bgPath) == 0 && s_petBgCachedType == pet.type &&
       s_petBgCachedStage == pet.evoStage)
   {
     return;
@@ -127,13 +161,8 @@ void graphicsPrewarmPetBackgroundCache()
 
   petLayer.fillSprite(TFT_BLACK);
 
-  if (!s_petLayerFsInited)
-  {
-    petLayer.setFileStorage(SD);
-    s_petLayerFsInited = true;
-  }
+  const bool ok = buildPetLayerCacheViaSpr(bgPath);
 
-  const bool ok = petLayer.drawJpgFile(bgPath, 0, 0);
   if (!ok)
   {
     // Best-effort prewarm only: leave the normal draw path free to retry.
@@ -195,15 +224,9 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   bool ok = true;
   if (bgPath)
   {
-    if (!s_petLayerFsInited)
-    {
-      petLayer.setFileStorage(SD);
-      s_petLayerFsInited = true;
-    }
-    
-    ok = petLayer.drawJpgFile(bgPath, 0, 0);
+    ok = buildPetLayerCacheViaSpr(bgPath);
   }
-
+  
   if (!ok)
   {
     s_petBgHardFail = true;
@@ -226,7 +249,7 @@ void cachePetAreaBackgroundIfNeeded(bool force)
     requestUIRedraw();
     return;
   }
-  
+
   s_petBgCachedPath = bgPath;
   s_petBgCachedType = pet.type;
   s_petBgCachedStage = pet.evoStage;
@@ -930,7 +953,12 @@ static void drawPetScreenImpl(bool redrawBg)
   static uint8_t s_lastBgEvoStage = 255;
 
   const bool petChanged = (s_lastBgPetType != pet.type) || (s_lastBgEvoStage != pet.evoStage);
-  const bool needPetBg = redrawBg || petChanged || g_forcePetBgCache;
+
+  const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
+  const bool cacheMissing = !petLayerReady || !s_petBgCachedPath || !bgPath || strcmp(s_petBgCachedPath, bgPath) != 0 ||
+                            s_petBgCachedType != pet.type || s_petBgCachedStage != pet.evoStage;
+
+  const bool needPetBg = cacheMissing || petChanged || g_forcePetBgCache;
 
   s_lastBgPetType = pet.type;
   s_lastBgEvoStage = pet.evoStage;

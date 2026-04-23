@@ -8,10 +8,17 @@
 #include "ui_state_lifecycle.h"
 #include "ui_suppress.h"
 
+#include "graphics_pet_presentation.h"
+
 static UIReturnTarget g_uiReturnStack[8];
 static int g_uiReturnDepth = 0;
 
 static UIReturnTarget defaultReturnTarget() { return {UIState::TITLE_MENU, Tab::TAB_PET}; }
+
+static bool usesPetBackgroundCache(UIState state, Tab tab)
+{
+  return (state == UIState::PET_SCREEN) && (tab == Tab::TAB_PET);
+}
 
 void uiSetReturnTarget(UIState state, Tab tab)
 {
@@ -86,6 +93,15 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
   if (!changed)
     return;
 
+  const bool leavingPetCacheZone = usesPetBackgroundCache(prevState, prevTab) &&
+                                   !usesPetBackgroundCache(state, tab);
+
+  const bool enteringPetCacheZone = !usesPetBackgroundCache(prevState, prevTab) &&
+                                    usesPetBackgroundCache(state, tab);
+
+  if (leavingPetCacheZone)
+    graphicsReleasePetBackgroundCache();
+
   if (prevState != state)
     uiStateOnExit(prevState);
 
@@ -94,6 +110,9 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
 
   if (prevState != state)
     uiStateOnEnter(state);
+
+  if (enteringPetCacheZone)
+    graphicsPrewarmPetBackgroundCache();
 
   if (fullRedraw)
     requestFullUIRedraw();

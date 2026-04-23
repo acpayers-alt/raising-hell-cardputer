@@ -18,5 +18,8 @@ bool factoryResetSystemSettingsHook(InputState& in, int cursor);
 // Reset any factory-reset overlay UI state (called when entering/leaving Settings, etc.)
 void factoryResetResetUiState();
 
+// Hold button down to confirm
+uint8_t factoryResetHoldProgress255();
+
 // Factory reset confirmation overlay handler (called by ui_input_interceptors)
 void uiFactoryResetHandle(InputState& in);

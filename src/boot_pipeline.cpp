@@ -829,8 +829,9 @@ static void finalizeBootLanding()
       graphicsReleaseUiCachesForMiniGame();
     }
 
-    enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
-
+    const bool fullRedraw = (s_bootFinalLandingState == UIState::TITLE_MENU);
+    enterState(s_bootFinalLandingState, Tab::TAB_PET, fullRedraw);
+    
     if (s_bootFinalLandingState == UIState::PET_SLEEPING)
     {
       uiPetSleepingBootEnter();
@@ -845,6 +846,13 @@ static void finalizeBootLanding()
   {
     requestFullUIRedraw();
     sleepBgKickNow();
+    return;
+  }
+
+  if (s_bootFinalLandingState == UIState::TITLE_MENU)
+  {
+    requestFullUIRedraw();
+    renderUI();
     return;
   }
 

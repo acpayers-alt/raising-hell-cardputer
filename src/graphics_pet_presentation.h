@@ -1,5 +1,7 @@
 void graphicsReleasePetLayerForOta();
 void graphicsRecoverAfterOta();
+void graphicsPrewarmPetBackgroundCache();
+void graphicsReleasePetBackgroundCache();
 
 void cachePetAreaBackgroundIfNeeded(bool force);
 void restorePetAreaFromCache();

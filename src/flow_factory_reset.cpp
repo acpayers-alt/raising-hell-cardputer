@@ -34,6 +34,18 @@ void factoryResetResetUiState()
   g_factoryResetHoldStartMs = 0;
 }
 
+uint8_t factoryResetHoldProgress255()
+{
+  if (!g_factoryReset.confirmActive || g_factoryReset.confirmIndex != 1 || g_factoryResetHoldStartMs == 0)
+    return 0;
+
+  const uint32_t elapsed = millis() - g_factoryResetHoldStartMs;
+  if (elapsed >= FACTORY_RESET_HOLD_MS)
+    return 255;
+
+  return (uint8_t)((elapsed * 255UL) / FACTORY_RESET_HOLD_MS);
+}
+
 bool factoryResetSystemSettingsHook(InputState &input, int systemSettingsIndex)
 {
   // If confirm dialog is active, handle it entirely here.

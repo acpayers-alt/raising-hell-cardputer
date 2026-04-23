@@ -15,6 +15,7 @@
 #include "console.h"
 #include "display.h"
 #include "factory_reset_state.h"
+#include "flow_factory_reset.h"
 #include "game_options_state.h"
 #include "graphics_chrome.h"
 #include "graphics_nonpet_bg.h"
@@ -146,7 +147,7 @@ static void drawFactoryResetConfirmOverlay()
 
   const int pad = 10;
   const int boxW = screenW - (pad * 2);
-  const int boxH = 74;
+  const int boxH = 116;
   const int x = pad;
   const int y = (screenH - boxH) / 2;
 
@@ -161,9 +162,12 @@ static void drawFactoryResetConfirmOverlay()
 
   spr.setTextFont(1);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("This will wipe your save.", screenW / 2, y + 28);
+  spr.drawString("This will erase ALL data.", screenW / 2, y + 29);
 
-  const int pillY = y + 38;
+  spr.setTextColor(TFT_YELLOW, TFT_BLACK);
+  spr.drawString("HOLD ENTER to confirm", screenW / 2, y + 43);
+
+  const int pillY = y + 58;
   const int pillH = 22;
   const int gap = 10;
 
@@ -203,11 +207,23 @@ static void drawFactoryResetConfirmOverlay()
   spr.setTextColor(TFT_WHITE, yesFill);
   spr.drawString(yesLabel, startX + noW + gap + (yesW / 2), pillY + (pillH / 2));
 
+  const int barW = 96;
+  const int barH = 5;
+  const int barX = (screenW - barW) / 2;
+  const int barY = pillY + pillH + 5;
+
+  const uint8_t progress = factoryResetHoldProgress255();
+  const int fillW = (barW * progress) / 255;
+
+  spr.drawRoundRect(barX, barY, barW, barH, 2, yesSel ? uiPillOutline(pet.type) : TFT_DARKGREY);
+  if (fillW > 0)
+    spr.fillRoundRect(barX + 1, barY + 1, fillW - 2 > 0 ? fillW - 2 : 1, barH - 2, 2, TFT_YELLOW);
+
   spr.setTextFont(1);
   spr.setTextSize(1);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   spr.setTextDatum(BC_DATUM);
-  spr.drawString("ENTER: Continue   MENU/ESC: Cancel", screenW / 2, y + boxH - 6);
+  spr.drawString("ESC: Cancel", screenW / 2, y + boxH - 6);
   spr.setTextDatum(TL_DATUM);
 }
 

@@ -677,25 +677,22 @@ void appMainLoopTick()
     }
   }
 
-if (g_app.uiState != UIState::CONSOLE &&
-    g_app.uiState != UIState::MINI_GAME)
-{
-  if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
-    soundMenuTick();
-  if (input.leftOnce || input.rightOnce)
-    soundClick();
+  if (g_app.uiState != UIState::CONSOLE && g_app.uiState != UIState::MINI_GAME)
+  {
+    if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
+      soundMenuTick();
+    if (input.leftOnce || input.rightOnce)
+      soundClick();
 
-  const bool suppressGlobalConfirm =
-      (g_app.uiState == UIState::DEATH) ||
-      (g_app.uiState == UIState::SHOP);
+    const bool suppressGlobalConfirm = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::SHOP);
 
-  if ((input.selectOnce || input.encoderPressOnce) && !suppressGlobalConfirm)
-    soundConfirm();
+    if ((input.selectOnce || input.encoderPressOnce) && !suppressGlobalConfirm)
+      soundConfirm();
 
-  if (input.menuOnce || input.homeOnce || input.escOnce)
-    soundCancel();
-}
-  
+    if (input.menuOnce || input.homeOnce || input.escOnce)
+      soundCancel();
+  }
+
   // AUTO SCREEN
   const bool keepScreenAwakeForProvision = g_bootAssetProvisionActive || g_bootUiBlockedForAssetProvision;
 
@@ -728,12 +725,26 @@ if (g_app.uiState != UIState::CONSOLE &&
       if ((uint32_t)(nowMs - g_lastInputActivityMs) >= kSettingsIdleReturnMs)
       {
         if (g_app.uiState == UIState::SETTINGS)
+        {
           closeSettingsAndReturn(input);
-        else
-          returnToSettingsPage(g_settingsFlow.settingsPage, g_app.currentTab, input);
 
-        invalidateBackgroundCache();
-        requestUIRedraw();
+          invalidateBackgroundCache();
+
+          if (g_app.uiState == UIState::TITLE_MENU)
+            requestFullUIRedraw();
+          else
+            requestUIRedraw();
+
+          renderUI();
+        }
+        else
+        {
+          returnToSettingsPage(g_settingsFlow.settingsPage, g_app.currentTab, input);
+          invalidateBackgroundCache();
+          requestUIRedraw();
+          renderUI();
+        }
+
         input = InputState{};
         clearInputLatch();
         return;
@@ -935,14 +946,21 @@ if (g_app.uiState != UIState::CONSOLE &&
       if (g_app.uiState == UIState::SETTINGS)
       {
         closeSettingsAndReturn(input);
+
+        invalidateBackgroundCache();
+
+        if (g_app.uiState == UIState::TITLE_MENU)
+          requestFullUIRedraw();
+        else
+          requestUIRedraw();
       }
       else
       {
         returnToSettingsPage(g_settingsFlow.settingsPage, g_app.currentTab, input);
+        invalidateBackgroundCache();
+        requestUIRedraw();
       }
 
-      invalidateBackgroundCache();
-      requestUIRedraw();
       input = InputState{};
       clearInputLatch();
       return;

@@ -3,6 +3,7 @@
 #include <M5GFX.h>
 
 #include "asset_ota.h"
+#include "app_state.h"
 #include "pet.h"
 #include "save_manager.h"
 #include "ui_defs.h"
@@ -16,8 +17,8 @@
 #include <time.h>
 
 #include "display.h"
-#include "graphics_shared_utils.h"
 #include "graphics_sd_draw.h"
+#include "graphics_shared_utils.h"
 
 // Pull in shared graphics globals from graphics.cpp
 extern M5Canvas spr;
@@ -264,7 +265,7 @@ void drawBackupPetListScreen(bool redrawBg)
 
     return;
   }
-    
+
   if (uiBackupPetListActionMenuActive())
   {
     const int idx = uiBackupPetListActionIndex();
@@ -319,18 +320,24 @@ void drawBackupPetListScreen(bool redrawBg)
 
 void drawTitleMenuScreen(bool redrawBg)
 {
+  (void)redrawBg;
+
   if (!isScreenOn())
     return;
 
-  bool ok = false;
-  if (redrawBg)
-  {
-    if (g_sdReady)
-      ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
+  // Title splash must draw full-screen no matter what happened previously.
+  // Clear any lingering clip state before drawing the JPG.
+  spr.clearClipRect();
 
-    if (!ok)
-      spr.fillSprite(TFT_BLACK);
-  }
+  if (redrawBg)
+    spr.fillSprite(TFT_BLACK);
+
+  bool ok = false;
+  if (g_sdReady)
+    ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
+
+  if (!ok)
+    spr.fillSprite(TFT_BLACK);
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
@@ -381,7 +388,7 @@ void drawTitleMenuScreen(bool redrawBg)
   {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }
-  
+
   const char *storageLabel = hasImport ? "Pet Storage" : "Pet Storage Empty";
   const char *labels[3] = {row0Buf, storageLabel, "Settings"};
   const bool enabled[3] = {true, true, true};
