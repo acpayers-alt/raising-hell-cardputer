@@ -677,22 +677,23 @@ void appMainLoopTick()
     }
   }
 
-  if (g_app.uiState != UIState::CONSOLE)
-  {
-    if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
-      soundMenuTick();
-    if (input.leftOnce || input.rightOnce)
-      soundClick();
-  
-    const bool suppressGlobalConfirm =
-        (g_app.uiState == UIState::DEATH);
-  
-    if ((input.selectOnce || input.encoderPressOnce) && !suppressGlobalConfirm)
-      soundConfirm();
-  
-    if (input.menuOnce || input.homeOnce || input.escOnce)
-      soundCancel();
-  }
+  if (g_app.uiState != UIState::CONSOLE &&
+    g_app.uiState != UIState::MINI_GAME)
+{
+  if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
+    soundMenuTick();
+  if (input.leftOnce || input.rightOnce)
+    soundClick();
+
+  const bool suppressGlobalConfirm =
+      (g_app.uiState == UIState::DEATH);
+
+  if ((input.selectOnce || input.encoderPressOnce) && !suppressGlobalConfirm)
+    soundConfirm();
+
+  if (input.menuOnce || input.homeOnce || input.escOnce)
+    soundCancel();
+}
   
   // AUTO SCREEN
   const bool keepScreenAwakeForProvision = g_bootAssetProvisionActive || g_bootUiBlockedForAssetProvision;

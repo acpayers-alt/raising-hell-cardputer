@@ -943,8 +943,6 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerMoveDir = 0;
 
       dodgerLogState("offroad-crash");
-
-      soundError();
     }
   }
 
