@@ -14,27 +14,35 @@
 #include "auto_screen.h"
 #include "brightness_state.h"
 
-namespace UiSettingsPages {
+namespace UiSettingsPages
+{
 
-void Handle_SCREEN(InputState& input, int move) {
-  if (move != 0) {
-    const int totalItems = 3;
+void Handle_SCREEN(InputState &input, int move)
+{
+  if (move != 0)
+  {
+    const int totalItems = 4;
     g_app.screenSettingsIndex += move;
-    if (g_app.screenSettingsIndex < 0) g_app.screenSettingsIndex = totalItems - 1;
-    if (g_app.screenSettingsIndex > totalItems - 1) g_app.screenSettingsIndex = 0;
+    if (g_app.screenSettingsIndex < 0)
+      g_app.screenSettingsIndex = totalItems - 1;
+    if (g_app.screenSettingsIndex > totalItems - 1)
+      g_app.screenSettingsIndex = 0;
 
     requestUIRedraw();
     playBeep();
     return;
   }
 
-  const bool leftPulse  = input.leftOnce;
+  const bool leftPulse = input.leftOnce;
   const bool rightPulse = input.rightOnce;
 
-  if (g_app.screenSettingsIndex == 0 && (leftPulse || rightPulse)) {
+  if (g_app.screenSettingsIndex == 0 && (leftPulse || rightPulse))
+  {
     brightnessLevel += (rightPulse ? 1 : -1);
-    if (brightnessLevel < 0) brightnessLevel = 2;
-    if (brightnessLevel > 2) brightnessLevel = 0;
+    if (brightnessLevel < 0)
+      brightnessLevel = 2;
+    if (brightnessLevel > 2)
+      brightnessLevel = 0;
 
     setBacklight((uint16_t)brightnessValues[brightnessLevel]);
 
@@ -46,23 +54,71 @@ void Handle_SCREEN(InputState& input, int move) {
     return;
   }
 
-  if (g_app.screenSettingsIndex == 1 && uiIsSelect(input)) {
-    g_app.autoScreenIndex             = (int)autoScreenTimeoutSel;
-    g_settingsFlow.settingsReturnPage = SettingsPage::SCREEN;
-    g_settingsFlow.settingsPage       = SettingsPage::AUTO_SCREEN;
+  if (g_app.screenSettingsIndex == 1 && (leftPulse || rightPulse || uiIsSelect(input)))
+  {
+    int sel = (int)autoScreenTimeoutSel + ((leftPulse) ? -1 : 1);
+    if (uiIsSelect(input))
+      sel = (int)autoScreenTimeoutSel + 1;
+    if (sel < 0)
+      sel = 3;
+    if (sel > 3)
+      sel = 0;
+
+    autoScreenTimeoutSel = (uint8_t)sel;
+    autoScreenSetEnabled(autoScreenTimeoutSel != 3);
+
+    if (autoScreenTimeoutSel != 3)
+    {
+      autoClockTimeoutSel = 3;
+      autoClockSetEnabled(false);
+    }
+
+    saveSettingsToSD();
+    saveManagerMarkDirty();
     requestUIRedraw();
     playBeep();
     clearInputLatch();
     return;
   }
-  if (g_app.screenSettingsIndex == 2 && (leftPulse || rightPulse)) {
+
+  if (g_app.screenSettingsIndex == 2 && (leftPulse || rightPulse || uiIsSelect(input)))
+  {
+    int sel = (int)autoClockTimeoutSel + ((leftPulse) ? -1 : 1);
+    if (uiIsSelect(input))
+      sel = (int)autoClockTimeoutSel + 1;
+    if (sel < 0)
+      sel = 3;
+    if (sel > 3)
+      sel = 0;
+
+    autoClockTimeoutSel = (uint8_t)sel;
+    autoClockSetEnabled(autoClockTimeoutSel != 3);
+
+    if (autoClockTimeoutSel != 3)
+    {
+      autoScreenTimeoutSel = 3;
+      autoScreenSetEnabled(false);
+    }
+
+    saveSettingsToSD();
+    saveManagerMarkDirty();
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
+    return;
+  }
+
+  if (g_app.screenSettingsIndex == 3 && (leftPulse || rightPulse))
+  {
     int sel = (int)motionGetShakeSensitivity();
     sel += (rightPulse ? 1 : -1);
-    if (sel < 0) sel = 3;
-    if (sel > 3) sel = 0;
-  
+    if (sel < 0)
+      sel = 3;
+    if (sel > 3)
+      sel = 0;
+
     motionSetShakeSensitivity((uint8_t)sel);
-  
+
     saveSettingsToSD();
     saveManagerMarkDirty();
     requestUIRedraw();

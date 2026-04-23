@@ -41,9 +41,9 @@
 #include "ui_input_router.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
+#include "ui_state_clock_mode.h"
 #include "ui_state_console.h"
 #include "ui_state_pet_sleeping.h"
-#include "ui_state_clock_mode.h"
 #include "ui_tabs.h"
 
 // -----------------------------------------------------------------------------
@@ -709,7 +709,10 @@ void appMainLoopTick()
     if (hasUserActivity(input))
       noteUserActivity();
 
-    autoScreenTick();
+    if (autoClockIsEnabled())
+      autoClockTick();
+    else
+      autoScreenTick();
   }
 
   if (!isScreenOn())

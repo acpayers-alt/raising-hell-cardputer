@@ -93,6 +93,7 @@ struct SettingsData {
   uint8_t wifiEnabled;
   uint8_t tzIndex;
   uint8_t autoScreenTimeoutSel;
+  uint8_t autoClockTimeoutSel;
   uint8_t shakeSensitivitySel;
   uint8_t petDeathEnabled;
   uint8_t ledAlertsEnabled;

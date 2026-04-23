@@ -315,6 +315,14 @@ static void actScreen_AutoScreenLeft(InputState &)
     sel = 3;
 
   autoScreenTimeoutSel = (uint8_t)sel;
+  autoScreenSetEnabled(autoScreenTimeoutSel != 3);
+
+  if (autoScreenTimeoutSel != 3)
+  {
+    autoClockTimeoutSel = 3;
+    autoClockSetEnabled(false);
+  }
+
   saveSettingsToSD();
   saveManagerMarkDirty();
   requestUIRedraw();
@@ -329,6 +337,14 @@ static void actScreen_AutoScreenRight(InputState &)
     sel = 0;
 
   autoScreenTimeoutSel = (uint8_t)sel;
+  autoScreenSetEnabled(autoScreenTimeoutSel != 3);
+
+  if (autoScreenTimeoutSel != 3)
+  {
+    autoClockTimeoutSel = 3;
+    autoClockSetEnabled(false);
+  }
+
   saveSettingsToSD();
   saveManagerMarkDirty();
   requestUIRedraw();
@@ -338,11 +354,51 @@ static void actScreen_AutoScreenRight(InputState &)
 
 static void actScreen_AutoScreenSelect(InputState &input) { actScreen_AutoScreenRight(input); }
 
-static void actScreen_ClockMode(InputState &input)
+static void actScreen_AutoClockLeft(InputState &)
 {
+  int sel = (int)autoClockTimeoutSel - 1;
+  if (sel < 0)
+    sel = 3;
+
+  autoClockTimeoutSel = (uint8_t)sel;
+  autoClockSetEnabled(autoClockTimeoutSel != 3);
+
+  if (autoClockTimeoutSel != 3)
+  {
+    autoScreenTimeoutSel = 3;
+    autoScreenSetEnabled(false);
+  }
+
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
   playBeep();
-  openClockModeWithReturn(g_app.uiState, g_app.currentTab, input, 120);
+  clearInputLatch();
 }
+
+static void actScreen_AutoClockRight(InputState &)
+{
+  int sel = (int)autoClockTimeoutSel + 1;
+  if (sel > 3)
+    sel = 0;
+
+  autoClockTimeoutSel = (uint8_t)sel;
+  autoClockSetEnabled(autoClockTimeoutSel != 3);
+
+  if (autoClockTimeoutSel != 3)
+  {
+    autoScreenTimeoutSel = 3;
+    autoScreenSetEnabled(false);
+  }
+
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actScreen_AutoClockSelect(InputState &input) { actScreen_AutoClockRight(input); }
 
 static void actScreen_ShakeSensitivityLeft(InputState &)
 {
@@ -708,7 +764,7 @@ static MenuItem kTopItems[] = {
 static MenuItem kScreenItems[] = {
     {"Brightness", actScreen_BrightnessSelect, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
     {"Auto Screen", actScreen_AutoScreenSelect, actScreen_AutoScreenLeft, actScreen_AutoScreenRight, nullptr},
-    {"Clock Mode", actScreen_ClockMode, nullptr, nullptr, nullptr},
+    {"Auto Clock", actScreen_AutoClockSelect, actScreen_AutoClockLeft, actScreen_AutoClockRight, nullptr},
     {"Shake Sensitivity", actScreen_ShakeSensitivitySelect, actScreen_ShakeSensitivityLeft,
      actScreen_ShakeSensitivityRight, nullptr},
 };

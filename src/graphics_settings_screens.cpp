@@ -589,17 +589,19 @@ static void drawScreenSettingsMenu()
   char aLine[28];
   snprintf(aLine, sizeof(aLine), "Auto Screen: %s", autoScreenToText((uint8_t)autoScreenTimeoutSel));
 
-  const char *labels[] = {
-      bLine,
-      aLine,
-      "Clock Mode",
-      nullptr,
-  };
+  char cLine[28];
+  snprintf(cLine, sizeof(cLine), "Auto Clock: %s", autoClockToText((uint8_t)autoClockTimeoutSel));
 
   char shakeLine[32];
   snprintf(shakeLine, sizeof(shakeLine), "Shake to Wake: %s",
            motionShakeSensitivityToText(motionGetShakeSensitivity()));
-  labels[3] = shakeLine;
+
+  const char *labels[] = {
+      bLine,
+      aLine,
+      cLine,
+      shakeLine,
+  };
 
   const int totalItems = 4;
 
