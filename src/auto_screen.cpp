@@ -11,7 +11,7 @@
 #include "ui_state_clock_mode.h"
 #include "user_toggles_state.h"
 
-uint8_t autoScreenTimeoutSel = 3;
+uint8_t autoScreenTimeoutSel = 0;
 uint8_t autoClockTimeoutSel = 3;
 
 bool g_screenIsOff = false;

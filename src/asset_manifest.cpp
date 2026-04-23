@@ -177,7 +177,7 @@ static bool assetManifestSelfCheckWorklist(uint16_t expectedCount, uint16_t *out
   if (outReadableCount)
     *outReadableCount = 0;
 
-  // ✅ EARLY EXIT: empty worklist is valid
+  // EARLY EXIT: empty worklist is valid
   if (expectedCount == 0)
   {
     Serial.println("[OTA WL CHECK] empty worklist OK (expected=0)");

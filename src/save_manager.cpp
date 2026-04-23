@@ -730,6 +730,12 @@ void saveManagerFullWipe()
   tryRemove(NAME_PENDING_FLAG_PATH);
   tryRemove(SLEEP_PENDING_FLAG_PATH);
 
+  // Re-arm onboarding screens (pair always)
+  g_controlsHelpSeen = 0;
+  g_whatsNewSeen = 0;
+
+  saveSettingsToSD();
+
   Serial.println("[DEV] FULL WIPE DONE → rebooting");
 
   delay(200);
@@ -1580,7 +1586,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.tzIndex = old[4];
 
       tmp.autoClockTimeoutSel = 3;
-      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 3;
+      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
 
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
@@ -1610,8 +1616,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.wifiEnabled = (old[3] != 0);
 
       tmp.autoClockTimeoutSel = 3;
-      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 3;
-      
+tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
+
       tmp.tzIndex = tzDefaultIndex();
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
@@ -2153,8 +2159,8 @@ void saveManagerBegin()
   lastSaveMs = 0;
 
   g_settings.brightnessLevel = 1;
-  g_settings.autoScreenOffEnabled = false;
-  g_settings.autoScreenTimeoutSel = 3;
+  g_settings.autoScreenOffEnabled = true;
+  g_settings.autoScreenTimeoutSel = 0;
   g_settings.autoClockTimeoutSel = 3;
   g_settings.soundEnabled = true;
   g_settings.wifiEnabled = 1;
@@ -2485,13 +2491,14 @@ bool saveManagerLoad()
   clearNamePendingFlag();
 
   const bool hadBootSetupPending = bootSetupPendingFlagExists();
-  if (hadBootSetupPending)
-    bootSetupClearPendingFlag();
 
+  // Do not clear boot_setup_pending.flag here.
+  // The boot pipeline owns onboarding flow resolution and should be the one to
+  // consume/clear this intent once the boot flow has fully completed.
   dirty = false;
   clearInputLatch();
 
-  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d bootSetupPendingWasSet=%d\n",
+  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d bootSetupPendingStillSet=%d\n",
                 g_app.newPetFlowActive ? 1 : 0, saveManagerNamePendingFlagExists() ? 1 : 0,
                 hadBootSetupPending ? 1 : 0);
 
@@ -2714,9 +2721,18 @@ void saveManagerFactoryReset()
   bootSetupClearPendingFlag();
   bootPostProvisionControlsHelpClear();
 
+  // Re-arm onboarding durably for the next boot.
+  bootWriteFirstRunFlag();
+  bootSetupWritePendingFlag();
+
+  g_controlsHelpSeen = 0;
+  g_whatsNewSeen = 0;
+
   // Also wipe the EEPROM-backed inventory mirror so a brand-new pet cannot
   // inherit inventory across a factory reset.
   g_app.inventory.wipePersistedEeprom();
+
+  saveSettingsToSD();
 
   delay(50);
   ESP.restart();
