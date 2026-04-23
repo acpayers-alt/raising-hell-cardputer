@@ -677,7 +677,7 @@ void appMainLoopTick()
     }
   }
 
-  if (g_app.uiState != UIState::CONSOLE &&
+if (g_app.uiState != UIState::CONSOLE &&
     g_app.uiState != UIState::MINI_GAME)
 {
   if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
@@ -686,7 +686,8 @@ void appMainLoopTick()
     soundClick();
 
   const bool suppressGlobalConfirm =
-      (g_app.uiState == UIState::DEATH);
+      (g_app.uiState == UIState::DEATH) ||
+      (g_app.uiState == UIState::SHOP);
 
   if ((input.selectOnce || input.encoderPressOnce) && !suppressGlobalConfirm)
     soundConfirm();

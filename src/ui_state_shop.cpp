@@ -9,18 +9,21 @@
 #include "ui_runtime.h"
 #include "ui_shop_menu.h"
 
-void uiShopHandle(InputState& in)
+void uiShopHandle(InputState &in)
 {
-  if (uiIsBack(in)) {
+  if (uiIsBack(in))
+  {
     uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
     clearInputLatch();
     return;
   }
 
   const int move = uiNavMove(in);
-  if (move != 0) {
+  if (move != 0)
+  {
     const int totalItems = uiShopMenuCount();
-    if (totalItems > 0) {
+    if (totalItems > 0)
+    {
       uiWrapIndex(shopIndex, move, totalItems);
       requestUIRedraw();
       playBeep();
@@ -30,7 +33,19 @@ void uiShopHandle(InputState& in)
 
   if (!uiIsSelect(in)) return;
 
-  (void)uiShopMenuActivate(shopIndex, in);
+  const bool bought = uiShopMenuActivate(shopIndex, in);
+  
+  if (bought)
+  {
+    soundConfirm();
+  }
+  else
+  {
+    // Only play error if this was actually a purchase attempt
+    // (not e.g. a non-buy menu item if you add those later)
+    soundError();
+  }
+  
   requestUIRedraw();
   clearInputLatch();
 }

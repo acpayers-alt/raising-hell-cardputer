@@ -14,6 +14,7 @@ const HelpLine kWhatsNew[] = {
 
     {HelpLineType::SECTION, "Changes"},
     {HelpLineType::BODY, "- UI cleanup and polish"},
+    {HelpLineType::BODY, "- Sound poish"},
     {HelpLineType::BODY, "- Improved stability"},
     {HelpLineType::GAP, nullptr},
 
