@@ -41,7 +41,7 @@ return;
 dst.setTextFont(font);
 dst.setTextSize(1);
 dst.setTextDatum(datum);
-dst.setTextColor(fg, TFT_TRANSPARENT);
+dst.setTextColor(fg);
 dst.drawString(text, x, y, font);
 dst.setTextDatum(TL_DATUM);
 }

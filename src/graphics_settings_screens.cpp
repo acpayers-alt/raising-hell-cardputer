@@ -162,7 +162,7 @@ static void drawFactoryResetConfirmOverlay()
 
   spr.setTextFont(1);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("This will erase ALL data.", screenW / 2, y + 29);
+  spr.drawString("Wipe your live pet and settings?", screenW / 2, y + 29);
 
   spr.setTextColor(TFT_YELLOW, TFT_BLACK);
   spr.drawString("HOLD ENTER to confirm", screenW / 2, y + 43);
@@ -841,7 +841,23 @@ static void drawCreditsScreen()
   const int yVersion = yAaron + LINE_H;
   const int yAssets = yVersion + TIGHT_H;
 
-  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  const int panelPadX = 12;
+  const int panelPadY = 2;
+  const int panelX = panelPadX;
+  const int panelY = yCreated - panelPadY;
+  const int panelW = SCREEN_W - (panelPadX * 2);
+  const int panelH = (yAssets - yCreated) + TIGHT_H + (panelPadY * 2);
+
+  for (int yy = panelY; yy < panelY + panelH; ++yy)
+  {
+    const int xStart = panelX + ((yy & 1) ? 1 : 0);
+    for (int xx = xStart; xx < panelX + panelW; xx += 2)
+    {
+      spr.drawPixel(xx, yy, TFT_BLACK);
+    }
+  }
+
+  spr.setTextColor(TFT_WHITE);
   spr.drawString("Created By:", SCREEN_W / 2, yCreated);
   spr.drawString("Aaron & Finley Ayers", SCREEN_W / 2, yAaron);
 
@@ -852,7 +868,7 @@ static void drawCreditsScreen()
   versionCol = TFT_RED;
 #endif
 
-  spr.setTextColor(versionCol, TFT_BLACK);
+spr.setTextColor(versionCol);
 
   char verLine[48];
   snprintf(verLine, sizeof(verLine), "Version %s", RH_VERSION_STRING);
