@@ -401,6 +401,7 @@ void drawTitleMenuScreen(bool redrawBg)
     drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, fg, textdatum_t::top_center);
   }
 
+  #ifndef PUBLIC_BUILD
   const char *assetVer = assetOtaInstalledVersion();
   const AssetOtaChannel ch = (AssetOtaChannel)assetOtaGetConfig().channel;
 
@@ -411,14 +412,15 @@ void drawTitleMenuScreen(bool redrawBg)
   snprintf(buildBuf, sizeof(buildBuf), "%s %s", (ch == AssetOtaChannel::DEV) ? "DEV" : "PUB", RH_VERSION_STRING);
 
   spr.setTextDatum(TL_DATUM);
-  spr.setTextColor(TFT_BLACK, TFT_TRANSPARENT);
+  spr.setTextColor(TFT_BLACK);
   spr.drawString(buildBuf, 5, 3, 1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_TRANSPARENT);
+  spr.setTextColor(TFT_LIGHTGREY);
   spr.drawString(buildBuf, 4, 2, 1);
 
   spr.setTextDatum(TR_DATUM);
-  spr.setTextColor(TFT_BLACK, TFT_TRANSPARENT);
+  spr.setTextColor(TFT_BLACK);
   spr.drawString(assetBuf, SCREEN_W - 3, 3, 1);
-  spr.setTextColor(TFT_LIGHTGREY, TFT_TRANSPARENT);
+  spr.setTextColor(TFT_LIGHTGREY);
   spr.drawString(assetBuf, SCREEN_W - 4, 2, 1);
+#endif
 }
