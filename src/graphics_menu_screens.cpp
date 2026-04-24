@@ -401,7 +401,7 @@ void drawTitleMenuScreen(bool redrawBg)
     drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, fg, textdatum_t::top_center);
   }
 
-  #ifndef PUBLIC_BUILD
+  #if !PUBLIC_BUILD
   const char *assetVer = assetOtaInstalledVersion();
   const AssetOtaChannel ch = (AssetOtaChannel)assetOtaGetConfig().channel;
 
