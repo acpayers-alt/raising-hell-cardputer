@@ -5,6 +5,20 @@
 #include "ui_defs.h"
 #include "input.h"
 
+struct UIReturnTarget
+{
+  UIState state;
+  Tab tab;
+};
+
+void uiSetReturnTarget(UIState state, Tab tab);
+UIReturnTarget uiGetReturnTarget();
+void uiReturnToTarget();
+
+void uiPushReturnTarget(UIState state, Tab tab);
+UIReturnTarget uiPopReturnTarget();
+bool uiHasReturnTarget();
+
 // -----------------------------------------------------------------------------
 // Core state transition API
 // -----------------------------------------------------------------------------
@@ -41,16 +55,3 @@ void uiActionDrainKb(InputState& in);
 
 // Swallow EVERYTHING for this frame: drain kb + clear edges + clear latch
 void uiActionSwallowAll(InputState& in);
-
-// -----------------------------------------------------------------------------
-// Navigation return stack
-// -----------------------------------------------------------------------------
-
-void uiPushReturn(UIState state, Tab tab);
-bool uiPopReturn(UIState& stateOut, Tab& tabOut);
-void uiClearReturnStack();
-
-// Pop return target and transition there. If stack is empty, returns false.
-bool uiActionReturnToPrevious(InputState& in,
-                              bool fullRedraw,
-                              uint32_t suppressMenuMs = 250);

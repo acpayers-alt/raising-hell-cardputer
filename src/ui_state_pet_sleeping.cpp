@@ -10,12 +10,22 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 #include "ui_state_settings.h"
-#include "return_target.h"
 
 // Entry guard to prevent "carried-held ENTER" from instantly waking the pet.
 static uint32_t s_enterSleepUiMs = 0;
 static bool s_prevSelectHeld = false;
-static ReturnTarget s_petSleepingReturn{UIState::PET_SCREEN, Tab::TAB_PET};
+static void leavePetSleepingToReturnTarget(InputState &in, uint16_t drainMs, bool forceRenderNow)
+{
+  const UIReturnTarget target = uiGetReturnTarget();
+  uiPopReturnTarget();
+
+  uiActionEnterStateClean(target.state, target.tab, true, in, drainMs);
+  invalidateBackgroundCache();
+  requestFullUIRedraw();
+
+  if (forceRenderNow)
+    forceRenderUIOnce();
+}
 
 void uiPetSleepingOnEnter(const InputState &in)
 {
@@ -36,27 +46,52 @@ void uiPetSleepingBootEnter()
   // so start from a safe "not held" baseline.
   s_prevSelectHeld = false;
   graphicsReleaseUiCachesForMiniGame();
-  Serial.printf("[HEAPCHK] uiPetSleepingBootEnter after-release free=%u largest=%u\n",
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
-                
+
   clearInputLatch();
   inputForceClear();
 }
 
-void uiPetSleepingSetReturnState(UIState state, Tab tab)
+void uiPetSleepingSetReturnState(UIState state, Tab tab) { uiSetReturnTarget(state, tab); }
+
+void uiEnterPetSleepingWithReturn(UIState returnState, Tab returnTab, InputState &in, uint16_t drainMs)
 {
-  s_petSleepingReturn.state = state;
-  s_petSleepingReturn.tab = tab;
+  uiPushReturnTarget(returnState, returnTab);
+  uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, in, drainMs);
+  requestFullUIRedraw();
+}
+
+void enterSleepFlow(UIState returnState, Tab returnTab, InputState &in, uint16_t drainMs)
+{
+  uiEnterPetSleepingWithReturn(returnState, returnTab, in, drainMs);
+  uiPetSleepingBootEnter();
+  sleepBgKickNow();
+}
+
+void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs, bool forceRenderNow)
+{
+  g_app.isSleeping = false;
+  g_app.sleepUntilAwakened = false;
+  g_app.sleepUntilRested = false;
+  g_app.sleepingByTimer = false;
+  g_app.sleepTargetEnergy = 0;
+  g_app.sleepStartTime = 0;
+  g_app.sleepDurationMs = 0;
+
+  pet.isSleeping = false;
+
+  saveManagerClearSleepPendingFlag();
+  saveManagerMarkDirty();
+
+  graphicsReleaseUiCachesForMiniGame();
+
+  leavePetSleepingToReturnTarget(in, drainMs, forceRenderNow);
 }
 
 void uiPetSleepingHandle(InputState &in)
 {
   if (!isPetSleepingNow())
   {
-    uiActionEnterStateClean(s_petSleepingReturn.state, s_petSleepingReturn.tab, true, in, 200);
-    invalidateBackgroundCache();
-    requestUIRedraw();
+    leavePetSleepingToReturnTarget(in, 200, false);
     return;
   }
 
@@ -70,35 +105,17 @@ void uiPetSleepingHandle(InputState &in)
   // MENU/ESC opens Settings WITHOUT waking the pet
   if (in.menuOnce || in.escOnce)
   {
-    g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
-    inputForceClear();   // critical: kill carried input
+    inputForceClear(); // critical: kill carried input
     openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
     uiActionSwallowAll(in);
     return;
   }
-    
+
   // Wake explicitly on enter/select (but not immediately on entry)
   if (allowWake && (in.selectOnce || in.encoderPressOnce || in.mgSelectOnce || selectEdgeFallback))
   {
-    g_app.isSleeping = false;
-    g_app.sleepUntilAwakened = false;
-    g_app.sleepUntilRested = false;
-    g_app.sleepingByTimer = false;
-    g_app.sleepTargetEnergy = 0;
-    g_app.sleepStartTime = 0;
-    g_app.sleepDurationMs = 0;
-
-    pet.isSleeping = false;
-
-    saveManagerClearSleepPendingFlag();
-    saveManagerMarkDirty();
-
-    graphicsReleaseUiCachesForMiniGame();
-
-    uiActionEnterStateClean(s_petSleepingReturn.state, s_petSleepingReturn.tab, true, in, 200);
-    requestFullUIRedraw();
-    forceRenderUIOnce();
+    uiPetSleepingWakeAndReturn(in, 200, true);
     return;
-    }
+  }
   return;
 }

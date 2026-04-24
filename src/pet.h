@@ -16,17 +16,14 @@ void petResetUpdateTimers();
 // PET TYPES
 // ------------------------------------------------------------
 enum PetType : uint8_t {
-  PET_DEVIL,
+  PET_DEVIL = 0,
   PET_ELDRITCH,
-  PET_ALIEN,
-  PET_KAIJU,
-  PET_ANUBIS,
-  PET_AXOLOTL,
   PET_TYPE_COUNT
 };
 
+
 // Array indexed by (int)PetType
-extern const PetVisualProfile PET_PROFILES[6];
+extern const PetVisualProfile PET_PROFILES[PET_TYPE_COUNT];
 
 // ------------------------------------------------------------
 // PET MOOD / CONDITION (priority: sick > tired > hungry > mad > happy)
@@ -82,7 +79,7 @@ public:
   char spritePath[64];
 
   // On-screen position
-  int x;     // adjust later for Kaiju/Eldritch/Alien
+  int x;  
   int y;
 
   // Dimensions for the RAW sprite
@@ -94,15 +91,12 @@ public:
   // --------------------------------------------------------
   ItemType getFoodItem() const {
     switch (type) {
-      case PET_DEVIL:    return ITEM_SOUL_FOOD;
-      case PET_KAIJU:    return ITEM_DEMON_BONE;
       case PET_ELDRITCH: return ITEM_CURSED_RELIC;
-      case PET_ALIEN:    return ITEM_ELDRITCH_EYE;
-      case PET_ANUBIS:   return ITEM_SOUL_FOOD;    // TODO: pick real item
-      case PET_AXOLOTL:  return ITEM_SOUL_FOOD;    // TODO: pick real item
+      case PET_DEVIL:
       default:           return ITEM_SOUL_FOOD;
     }
   }
+
 
   const char* getEvolutionDescriptor() const;          // e.g. "Hellspawn"
   void buildDisplayName(char* out, size_t outSize) const; // "Jan - Hellspawn"
@@ -152,8 +146,6 @@ public:
 };
 
 extern Pet pet;
-
-void centerPetOnScreen(Pet &pet);
 
 // Death / resurrection helpers
 void petEnterDeathState();

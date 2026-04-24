@@ -79,11 +79,6 @@ enum AnimId : uint16_t
   ANIM_ELD_ELDER_SICK_SNEEZE,
   ANIM_ELD_ELDER_SLEEPY_HOLD,
 
-  // Kaiju / Alien / Anubis / Axolotl
-  ANIM_KAI_IDLE_1F,
-  ANIM_AL_IDLE_1F,
-  ANIM_ANU_IDLE_1F,
-  ANIM_AXO_IDLE_1F,
 };
 
 struct AnimClip

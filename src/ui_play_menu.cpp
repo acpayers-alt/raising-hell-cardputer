@@ -1,41 +1,39 @@
 #include "ui_play_menu.h"
 
-#include "input.h"
 #include "mini_games.h" // startFlappyFireball(), startInfernalDodger(), startCrossyRoad()
 #include "pet.h"
 
-namespace {
+namespace
+{
 
-struct MenuItem {
-  const char* label;
-  void (*onSelect)(InputState&);
+struct MenuItem
+{
+  const char *label;
+  void (*onSelect)();
 };
 
-static void actFlappy(InputState& in)
+static void actFlappy()
 {
-  (void)in;
   startFlappyFireball();
 }
 
-static void actDodger(InputState& in)
+static void actDodger()
 {
-  (void)in;
   startInfernalDodger();
 }
 
-static void actCrossy(InputState& in)
+static void actCrossy()
 {
-  (void)in;
   startCrossyRoad();
 }
 
 static const MenuItem kItems[] = {
-  {"Flappy Fireball",  actFlappy},
-  {"Fireball Run",  actDodger},
-  {"Crossy Hell",      actCrossy},
+    {"Flappy Fireball", actFlappy},
+    {"Fireball Run", actDodger},
+    {"Crossy Hell", actCrossy},
 };
 
-static const char* flappyMenuLabelForPet()
+static const char *flappyMenuLabelForPet()
 {
   switch (pet.type)
   {
@@ -47,7 +45,7 @@ static const char* flappyMenuLabelForPet()
   }
 }
 
-static const char* dodgerMenuLabelForPet()
+static const char *dodgerMenuLabelForPet()
 {
   switch (pet.type)
   {
@@ -59,7 +57,7 @@ static const char* dodgerMenuLabelForPet()
   }
 }
 
-static const char* crossyMenuLabelForPet()
+static const char *crossyMenuLabelForPet()
 {
   switch (pet.type)
   {
@@ -78,7 +76,7 @@ int uiPlayMenuCount()
   return (int)(sizeof(kItems) / sizeof(kItems[0]));
 }
 
-const char* uiPlayMenuLabel(int idx)
+const char *uiPlayMenuLabel(int idx)
 {
   if (idx < 0 || idx >= uiPlayMenuCount())
     return "";
@@ -96,10 +94,13 @@ const char* uiPlayMenuLabel(int idx)
   }
 }
 
-bool uiPlayMenuActivate(int idx, InputState& in)
+bool uiPlayMenuActivate(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount()) return false;
-  if (!kItems[idx].onSelect) return false;
-  kItems[idx].onSelect(in);
+  if (idx < 0 || idx >= uiPlayMenuCount())
+    return false;
+  if (!kItems[idx].onSelect)
+    return false;
+
+  kItems[idx].onSelect();
   return true;
 }

@@ -19,6 +19,8 @@
 #include "controls_help_state.h"
 #include "save_manager.h"
 #include "sdcard.h"
+#include "timezone.h"
+#include "whats_new_state.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
@@ -35,6 +37,7 @@
 // -----------------------------------------------------------------------------
 #include "graphics.h"
 #include "led_status.h"
+#include "ui_actions.h"
 #include "ui_runtime.h"
 
 // -----------------------------------------------------------------------------
@@ -75,15 +78,22 @@
 // -----------------------------------------------------------------------------
 static bool g_consoleOpen = false;
 static bool g_consoleJustOpened = false;
+static bool g_consoleSupportMode = false;
 
 // Current editable input line
 static char g_buf[64];
 static uint8_t g_len = 0;
 
 // Scrollback (fixed ring)
-static constexpr int MAX_LINES = 16;
+static constexpr int MAX_LINES = 96;
 static char g_lines[MAX_LINES][64];
 static int g_lineCount = 0;
+
+// 0 = pinned to bottom/live tail
+// >0 = scrolled upward by this many lines
+static int g_scrollOffset = 0;
+
+static void consoleClampScroll();
 
 // Command history (fixed ring)
 static const int CONSOLE_HIST_MAX = 12;
@@ -100,6 +110,8 @@ static bool g_histHasDraft = false;
 static UIState g_consolePrevUiState{};
 static Tab g_consolePrevTab = Tab::TAB_PET;
 static bool g_consoleHadPrevState = false;
+
+static void logLine(const char *s);
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -150,6 +162,81 @@ static bool consoleSaveRuntimeLogToSd(const char *path, String *outErr)
   }
 
   f.println("--- LOGDUMP END ---");
+  f.flush();
+  f.close();
+
+  return true;
+}
+
+static bool consoleSaveSupportReportToSd(const char *path, String *outErr)
+{
+  if (outErr)
+    *outErr = "";
+
+  if (!g_sdReady)
+  {
+    if (outErr)
+      *outErr = "SD not ready";
+    return false;
+  }
+
+  if (!path || !path[0])
+  {
+    if (outErr)
+      *outErr = "Invalid path";
+    return false;
+  }
+
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+  if (!SD.exists("/raising_hell/logs"))
+    SD.mkdir("/raising_hell/logs");
+
+  if (SD.exists(path))
+    SD.remove(path);
+
+  File f = SD.open(path, FILE_WRITE);
+  if (!f)
+  {
+    if (outErr)
+      *outErr = "Open failed";
+    return false;
+  }
+
+  f.println("=== SUPPORT REPORT ===");
+
+  f.printf("Version: %s\n", RH_VERSION_STRING);
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  f.println("Build: PUBLIC");
+#else
+  f.println("Build: DEV");
+#endif
+
+  f.printf("Save version: %u\n", (unsigned)SAVE_VERSION);
+
+  const char *assetVer = assetOtaInstalledVersion();
+  f.printf("Assets: %s\n", (assetVer && assetVer[0]) ? assetVer : "none");
+
+  const AssetOtaConfig &cfg = assetOtaGetConfig();
+  f.printf("OTA channel: %s\n", ((AssetOtaChannel)cfg.channel == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
+
+  f.printf("Timezone idx: %d\n", tzIndex);
+  f.printf("Timezone name: %s\n", tzName(tzIndex));
+
+  f.printf("WiFi enabled: %s\n", wifiIsEnabled() ? "YES" : "NO");
+  f.printf("WiFi connected: %s\n", wifiIsConnectedNow() ? "YES" : "NO");
+
+  const char *ssid = wifiConsoleSsid();
+  f.printf("SSID: %s\n", (ssid && ssid[0]) ? ssid : "(none)");
+
+  const char *ip = wifiConsoleIpString();
+  f.printf("IP: %s\n", (ip && ip[0]) ? ip : "(none)");
+
+  f.printf("Free heap: %u\n", (unsigned)ESP.getFreeHeap());
+  f.printf("Largest block: %u\n", (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  f.println("======================");
   f.flush();
   f.close();
 
@@ -214,6 +301,42 @@ static bool consoleAssetPackTooOld()
 
 static const char *assetChannelToString(uint8_t ch) { return (ch == (uint8_t)AssetOtaChannel::DEV) ? "dev" : "public"; }
 
+static bool consoleSupportModeEnabled()
+{
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  return g_consoleSupportMode;
+#else
+  return true;
+#endif
+}
+
+static void consoleLogSupportModeStatus()
+{
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  if (g_consoleSupportMode)
+    logLine("Support mode: ON");
+  else
+    logLine("Support mode: OFF");
+
+  if (!g_consoleSupportMode)
+    logLine("Use 'support on' to enable support commands.");
+#else
+  logLine("Support mode: always available in dev build");
+#endif
+}
+
+static bool consoleRequireSupportMode()
+{
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  if (!consoleSupportModeEnabled())
+  {
+    logLine("Command locked. Use 'support on'.");
+    return false;
+  }
+#endif
+  return true;
+}
+
 static void resetLine()
 {
   g_len = 0;
@@ -245,6 +368,8 @@ static void pushLine(const char *s)
     strncpy(g_lines[MAX_LINES - 1], tmp, sizeof(g_lines[MAX_LINES - 1]) - 1);
     g_lines[MAX_LINES - 1][sizeof(g_lines[MAX_LINES - 1]) - 1] = '\0';
   }
+
+  consoleClampScroll();
 }
 
 static void logLine(const char *s)
@@ -266,8 +391,7 @@ static void consoleArmReprovisionRecovery()
   const bool wifiEnabledBefore = settingsWifiEnabled();
   const bool hasCredsBefore = wifiStoreHasCreds();
 
-  Serial.printf("[RESCUE] reprovision armed wifiEnabled=%d hasCreds=%d\n",
-                wifiEnabledBefore ? 1 : 0,
+  Serial.printf("[RESCUE] reprovision armed wifiEnabled=%d hasCreds=%d\n", wifiEnabledBefore ? 1 : 0,
                 hasCredsBefore ? 1 : 0);
 
   if (!bootFirmwareMarkerClear())
@@ -287,9 +411,7 @@ static void consoleArmReprovisionRecovery()
   const bool wifiEnabledAfter = settingsWifiEnabled();
   const bool hasCredsAfter = wifiStoreHasCreds();
 
-  Serial.printf("[RESCUE] wifiEnabledAfter=%d hasCreds=%d\n",
-                wifiEnabledAfter ? 1 : 0,
-                hasCredsAfter ? 1 : 0);
+  Serial.printf("[RESCUE] wifiEnabledAfter=%d hasCreds=%d\n", wifiEnabledAfter ? 1 : 0, hasCredsAfter ? 1 : 0);
 
   logLine("[OK] firmware marker cleared");
   logLine("[OK] asset provision boot flag set");
@@ -502,55 +624,29 @@ static const char *petTypeToString(PetType t)
   {
   case PET_DEVIL:
     return "devil";
-  case PET_KAIJU:
-    return "kaiju";
   case PET_ELDRITCH:
     return "eldritch";
-  case PET_ALIEN:
-    return "alien";
-  case PET_ANUBIS:
-    return "anubis";
-  case PET_AXOLOTL:
-    return "axolotl";
   default:
     return "unknown";
   }
 }
-
 static bool parsePetType(const char *s, PetType &out)
 {
   if (!s || !*s)
     return false;
+
   if (!strcmp(s, "devil"))
   {
     out = PET_DEVIL;
     return true;
   }
-  if (!strcmp(s, "kaiju"))
-  {
-    out = PET_KAIJU;
-    return true;
-  }
+
   if (!strcmp(s, "eldritch"))
   {
     out = PET_ELDRITCH;
     return true;
   }
-  if (!strcmp(s, "alien"))
-  {
-    out = PET_ALIEN;
-    return true;
-  }
-  if (!strcmp(s, "anubis"))
-  {
-    out = PET_ANUBIS;
-    return true;
-  }
-  if (!strcmp(s, "axolotl"))
-  {
-    out = PET_AXOLOTL;
-    return true;
-  }
+
   return false;
 }
 
@@ -567,6 +663,185 @@ void wifiBeginConnect(const char *ssid, const char *pass)
 {
   logf("wifi: connecting to '%s'...", ssid ? ssid : "");
   wifiConsoleBeginConnect(ssid, pass);
+}
+
+// -----------------------------------------------------------------------------
+// Timezone console helpers
+// -----------------------------------------------------------------------------
+static bool consoleParseNonNegativeInt(const char *s, int &out)
+{
+  if (!s || !s[0])
+    return false;
+
+  int v = 0;
+  for (const char *p = s; *p; ++p)
+  {
+    if (*p < '0' || *p > '9')
+      return false;
+    v = (v * 10) + (*p - '0');
+  }
+
+  out = v;
+  return true;
+}
+
+static void consoleFormatTm(char *buf, size_t bufSize, const tm &t)
+{
+  if (!buf || bufSize == 0)
+    return;
+
+  snprintf(buf, bufSize, "%04d-%02d-%02d %02d:%02d:%02d", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour,
+           t.tm_min, t.tm_sec);
+}
+
+static void consoleLogTimeSnapshot(const char *prefix)
+{
+  const time_t now = time(nullptr);
+
+  logf("%sepoch: %lu", prefix ? prefix : "", (unsigned long)now);
+
+  if (now <= 1600000000)
+  {
+    logf("%stime:  INVALID", prefix ? prefix : "");
+    return;
+  }
+
+  tm tmLocal = {};
+  tm tmUtc = {};
+  localtime_r(&now, &tmLocal);
+  gmtime_r(&now, &tmUtc);
+
+  char localBuf[32];
+  char utcBuf[32];
+  consoleFormatTm(localBuf, sizeof(localBuf), tmLocal);
+  consoleFormatTm(utcBuf, sizeof(utcBuf), tmUtc);
+
+  logf("%slocal: %s", prefix ? prefix : "", localBuf);
+  logf("%sutc:   %s", prefix ? prefix : "", utcBuf);
+}
+
+static void consoleLogTimezoneStatusForIndex(int idx, const char *prefix)
+{
+  const char *p = prefix ? prefix : "";
+
+  if (!tzIndexIsValid(idx))
+  {
+    logf("%sidx=%d INVALID", p, idx);
+    return;
+  }
+
+  logf("%sidx=%d", p, idx);
+  logf("%slabel=%s", p, tzName((uint8_t)idx));
+  logf("%siana=%s", p, tzIanaName((uint8_t)idx));
+  logf("%srule=%s", p, tzPosixRule((uint8_t)idx));
+}
+
+static bool consoleResolveTimezoneSpec(const char *spec, int &outIdx)
+{
+  if (!spec || !spec[0])
+    return false;
+
+  int numericIdx = -1;
+  if (consoleParseNonNegativeInt(spec, numericIdx))
+  {
+    if (!tzIndexIsValid(numericIdx))
+      return false;
+    outIdx = numericIdx;
+    return true;
+  }
+
+  const int mapped = tzFindIndexByIana(spec);
+  if (!tzIndexIsValid(mapped))
+    return false;
+
+  outIdx = mapped;
+  return true;
+}
+
+static void consoleApplyTimezoneForTest(int idx)
+{
+  if (!tzIndexIsValid(idx))
+    return;
+  applyTimezoneIndex((uint8_t)idx);
+}
+
+static void consoleLogTimezonePreview(int idx, const char *prefix)
+{
+  if (!tzIndexIsValid(idx))
+  {
+    logf("%sINVALID idx=%d", prefix ? prefix : "", idx);
+    return;
+  }
+
+  const int restoreIdx = tzIndexIsValid(tzIndex) ? tzIndex : (int)tzDefaultIndex();
+
+  consoleApplyTimezoneForTest(idx);
+  consoleLogTimezoneStatusForIndex(idx, prefix);
+  consoleLogTimeSnapshot(prefix);
+
+  consoleApplyTimezoneForTest(restoreIdx);
+}
+
+static void consoleShowCurrentTimezoneStatus()
+{
+  if (!tzIndexIsValid(tzIndex))
+  {
+    logf("tzIndex invalid (%d), defaulting to %u for display", tzIndex, (unsigned)tzDefaultIndex());
+  }
+
+  const int currentIdx = tzIndexIsValid(tzIndex) ? tzIndex : (int)tzDefaultIndex();
+
+  logLine("Timezone status:");
+  consoleLogTimezoneStatusForIndex(currentIdx, "  ");
+  consoleLogTimeSnapshot("  ");
+}
+
+static void consoleRunTimezoneCaseSuite()
+{
+  struct TzCase
+  {
+    const char *input;
+    const char *expectIana;
+  };
+
+  static const TzCase kCases[] = {
+      {"America/Chicago", "America/Chicago"},
+      {"America/Phoenix", "America/Phoenix"},
+      {"America/St_Johns", "America/St_Johns"},
+      {"Europe/Paris", "Europe/Paris"},
+      {"Asia/Kolkata", "Asia/Kolkata"},
+      {"Australia/Brisbane", "Australia/Brisbane"},
+      {"Australia/Adelaide", "Australia/Adelaide"},
+      {"Bad/Zone", nullptr},
+  };
+
+  logLine("TZ case suite:");
+
+  for (const TzCase &tc : kCases)
+  {
+    const int idx = tzFindIndexByIana(tc.input);
+
+    if (!tc.expectIana)
+    {
+      if (idx < 0)
+        logf("  PASS %-24s -> unsupported", tc.input);
+      else
+        logf("  FAIL %-24s -> mapped=%d iana=%s", tc.input, idx, tzIanaName((uint8_t)idx));
+      continue;
+    }
+
+    if (idx < 0)
+    {
+      logf("  FAIL %-24s -> unsupported (expected %s)", tc.input, tc.expectIana);
+      continue;
+    }
+
+    const char *actualIana = tzIanaName((uint8_t)idx);
+    if (strcmp(actualIana, tc.expectIana) == 0)
+      logf("  PASS %-24s -> idx=%d %s", tc.input, idx, actualIana);
+    else
+      logf("  FAIL %-24s -> idx=%d %s (expected %s)", tc.input, idx, actualIana, tc.expectIana);
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -594,13 +869,19 @@ static void execLine(char *line)
     logLine("  help | ?            show this");
     logLine("  clear               clear console");
     logLine("  exit                close console");
+    logLine("  reboot              reboot device");
 
-    logLine("Status / info:");
+    logLine("Pet Commands:");
     logLine("  mon                 show stats");
     logLine("  age                 show birth epoch + age string");
     logLine("  pet                 show current pet type");
+    logLine("  name <pet name>     set pet name");
+
+    logLine("Status / info:");
     logLine("  version             show firmware + asset version");
+    logLine("  assetstatus         show asset OTA/debug status");
     logLine("  uptime              show device uptime");
+    logLine("  whatsnew            show What's New screen");
 
     logLine("WiFi:");
     logLine("  wifi                show wifi status + saved ssid");
@@ -608,37 +889,51 @@ static void execLine(char *line)
     logLine("  wifi <ssid> <pass>  save + connect");
     logLine("  wifi clear          clear saved creds");
 
-    logLine("Recovery / repair:");
-    logLine("  name <pet name>     set pet name");
-    logLine("  saveheal            repair save name/pending-flag issues");
-    logLine("  bootflags           show boot/recovery flags");
-    logLine("  bootheal            clear common stuck boot flags");
-    logLine("  clearnamepending    clear name-pending flag");
-    logLine("  clearpostprov       clear post-provision help flag");
-    logLine("  clearbootsetup      clear boot setup pending flag");
-    logLine("  assetstatus         show asset OTA/debug status");
-    logLine("  assetflag           show asset provision boot flag");
-    logLine("  assetflag clear     clear asset provision boot flag");
-    logLine("  assetflag set       set asset provision boot flag");
-    logLine("  repair              alias for fwmark reprovision");
-    logLine("  repair assets       re-run asset provisioning (safe)");
-    logLine("  rescue ota          dev: clear firmware marker + reprovision");
-    logLine("  rescue              alias for fwmark reprovision");
-    logLine("  rescue ota          alias for fwmark reprovision");
-    logLine("  fwmark              show firmware marker status");
-    logLine("  fwmark show         show stored/current build id");
-    logLine("  fwmark clear        clear stored build id");
-    logLine("  fwmark reprovision  clear marker + set asset flag");
-    logLine("  reboot              reboot device");
-    logLine("  nvsclear            wipe NVS (factory clean) + reboot");
-    logLine("  ntpskip            bypass stalled NTP check");
-    logLine("  timeinvalidate            marks current time invalid");
-
     logLine("Logs:");
     logLine("  logdump             dump runtime log buffer");
     logLine("  logtail [n]         dump last n log lines");
     logLine("  logclear            clear runtime log buffer");
     logLine("  logsave             save runtime log to /raising_hell/logs/logdump.txt");
+
+    logLine("Support:");
+    logLine("  support             show support mode status");
+    logLine("  support status      show support mode status");
+    logLine("  support report      system diagnostic dump");
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    logLine("  support on|off      enable/disable support commands");
+#endif
+
+    if (consoleSupportModeEnabled())
+    {
+      logLine("Support commands:");
+      logLine("  tz                  show current timezone + local/UTC time");
+      logLine("  tz list             list supported timezone indices");
+      logLine("  tz map <IANA>       resolve IANA zone -> internal zone");
+      logLine("  tz test <IANA|idx>  apply temporarily, print local time, restore");
+      logLine("  tz save <IANA|idx>  apply + persist timezone");
+      logLine("  tz set <idx>        shortcut for tz save <idx>");
+      logLine("  tz cases            run tricky timezone mapping suite");
+      logLine("  assetflag           show asset provision boot flag");
+      logLine("  assetflag clear     clear asset provision boot flag");
+      logLine("  assetflag set       set asset provision boot flag");
+      logLine("  ntpskip             bypass stalled NTP check");
+      logLine("  bootflags           inspect boot / recovery flags");
+      logLine("  bootheal            clear stuck boot flags");
+      logLine("  saveheal            repair save name/pending-flag issues");
+      logLine("  clearnamepending    clear name-pending flag");
+      logLine("  clearpostprov       clear post-provision help flag");
+      logLine("  clearbootsetup      clear boot setup pending flag");
+      logLine("  repair              alias for fwmark reprovision");
+      logLine("  repair assets       re-run asset provisioning (safe)");
+      logLine("  rescue ota          clear firmware marker + reprovision");
+      logLine("  rescue              alias for fwmark reprovision");
+      logLine("  fwmark              show firmware marker status");
+      logLine("  fwmark show         show stored/current build id");
+      logLine("  fwmark clear        clear stored build id");
+      logLine("  fwmark reprovision  clear marker + set asset flag");
+      logLine("  timeinvalidate      mark current time invalid");
+      logLine("  nvsclear            wipe NVS + reboot");
+    }
 
 #if !PUBLIC_BUILD
     logLine("Dev / test:");
@@ -661,7 +956,7 @@ static void execLine(char *line)
     logLine("  hurtpet             set low stats + HP=25 (test death flow)");
     logLine("  killpet             instantly kill pet (test death/resurrection)");
     logLine("  healpet             restore HP + all core stats to 100");
-    logLine("  fadeboot        trigger pet intro fade on next boot");
+    logLine("  fadeboot            trigger pet intro fade on next boot");
 #endif
 
     return;
@@ -703,6 +998,107 @@ static void execLine(char *line)
   if (!strcmp(argv[0], "clear"))
   {
     consoleClear();
+    return;
+  }
+
+  // WHAT'S NEW
+  if (!strcmp(argv[0], "whatsnew"))
+  {
+    const UIReturnTarget ret = uiGetReturnTarget();
+    uiPopReturnTarget();
+
+    whatsNewBegin(ret.state, ret.tab);
+    return;
+  }
+
+  // SUPPORT MODE
+  if (!strcmp(argv[0], "support"))
+  {
+    if (argc == 1 || !strcmp(argv[1], "status"))
+    {
+      consoleLogSupportModeStatus();
+      return;
+    }
+
+    if (!strcmp(argv[1], "report"))
+    {
+      static const char *kSupportReportPath = "/raising_hell/logs/support_report.txt";
+
+      logLine("=== SUPPORT REPORT ===");
+
+      logf("Version: %s", RH_VERSION_STRING);
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+      logLine("Build: PUBLIC");
+#else
+      logLine("Build: DEV");
+#endif
+
+      logf("Save version: %u", (unsigned)SAVE_VERSION);
+
+      const char *assetVer = assetOtaInstalledVersion();
+      logf("Assets: %s", (assetVer && assetVer[0]) ? assetVer : "none");
+
+      const AssetOtaConfig &cfg = assetOtaGetConfig();
+      logf("OTA channel: %s", ((AssetOtaChannel)cfg.channel == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC");
+
+      logf("Timezone idx: %d", tzIndex);
+      logf("Timezone name: %s", tzName(tzIndex));
+
+      logf("WiFi enabled: %s", wifiIsEnabled() ? "YES" : "NO");
+      logf("WiFi connected: %s", wifiIsConnectedNow() ? "YES" : "NO");
+
+      const char *ssid = wifiConsoleSsid();
+      logf("SSID: %s", (ssid && ssid[0]) ? ssid : "(none)");
+
+      const char *ip = wifiConsoleIpString();
+      logf("IP: %s", (ip && ip[0]) ? ip : "(none)");
+
+      logf("Free heap: %u", (unsigned)ESP.getFreeHeap());
+      logf("Largest block: %u", (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+      logLine("======================");
+
+      String err;
+      if (!consoleSaveSupportReportToSd(kSupportReportPath, &err))
+        logf("support report save failed: %s", err.c_str());
+      else
+        logf("[OK] support report saved: %s", kSupportReportPath);
+
+      return;
+    }
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    if (!strcmp(argv[1], "on"))
+    {
+      g_consoleSupportMode = true;
+      logLine("[OK] Support mode enabled");
+      logLine("[OK] Additional support commands are now available");
+      return;
+    }
+
+    if (!strcmp(argv[1], "off"))
+    {
+      g_consoleSupportMode = false;
+      logLine("[OK] Support mode disabled");
+      return;
+    }
+#else
+    if (!strcmp(argv[1], "on") || !strcmp(argv[1], "off"))
+    {
+      logLine("Support mode is always available in dev build");
+      return;
+    }
+#endif
+
+    logLine("Usage:");
+    logLine("  support");
+    logLine("  support status");
+    logLine("  support report");
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+    logLine("  support on");
+    logLine("  support off");
+#endif
     return;
   }
 
@@ -1379,8 +1775,116 @@ static void execLine(char *line)
     return;
   }
 
+  if (!strcmp(argv[0], "tz"))
+  {
+    if (!consoleRequireSupportMode())
+      return;
+
+    if (argc == 1)
+    {
+      consoleShowCurrentTimezoneStatus();
+      return;
+    }
+
+    if (!strcmp(argv[1], "list"))
+    {
+      logf("Supported timezones: %u", (unsigned)tzCount());
+      for (uint8_t i = 0; i < tzCount(); ++i)
+      {
+        logf("  [%u] %s -> %s", (unsigned)i, tzName(i), tzIanaName(i));
+      }
+      return;
+    }
+
+    if (!strcmp(argv[1], "map"))
+    {
+      if (argc < 3)
+      {
+        logLine("Usage: tz map <IANA>");
+        return;
+      }
+
+      const int idx = tzFindIndexByIana(argv[2]);
+      if (idx < 0)
+      {
+        logf("tz map: unsupported IANA zone '%s'", argv[2]);
+        return;
+      }
+
+      logf("tz map: '%s' -> idx=%d", argv[2], idx);
+      consoleLogTimezoneStatusForIndex(idx, "  ");
+      return;
+    }
+
+    if (!strcmp(argv[1], "test"))
+    {
+      if (argc < 3)
+      {
+        logLine("Usage: tz test <IANA|idx>");
+        return;
+      }
+
+      int idx = -1;
+      if (!consoleResolveTimezoneSpec(argv[2], idx))
+      {
+        logf("tz test: unknown timezone '%s'", argv[2]);
+        return;
+      }
+
+      logf("tz test: previewing '%s'", argv[2]);
+      consoleLogTimezonePreview(idx, "  ");
+      logf("  restore idx=%d", tzIndexIsValid(tzIndex) ? tzIndex : (int)tzDefaultIndex());
+      return;
+    }
+
+    if (!strcmp(argv[1], "save") || !strcmp(argv[1], "set"))
+    {
+      if (argc < 3)
+      {
+        logLine(!strcmp(argv[1], "set") ? "Usage: tz set <idx>" : "Usage: tz save <IANA|idx>");
+        return;
+      }
+
+      int idx = -1;
+      if (!consoleResolveTimezoneSpec(argv[2], idx))
+      {
+        logf("tz save: unknown timezone '%s'", argv[2]);
+        return;
+      }
+
+      tzIndex = idx;
+      applyTimezoneIndex((uint8_t)tzIndex);
+      saveTzIndexToNVS((uint8_t)tzIndex);
+      saveManagerMarkDirty();
+
+      logLine("tz save: applied + persisted");
+      consoleLogTimezoneStatusForIndex(tzIndex, "  ");
+      consoleLogTimeSnapshot("  ");
+      return;
+    }
+
+    if (!strcmp(argv[1], "cases"))
+    {
+      consoleRunTimezoneCaseSuite();
+      return;
+    }
+
+    logLine("Usage:");
+    logLine("  tz");
+    logLine("  tz list");
+    logLine("  tz map <IANA>");
+    logLine("  tz test <IANA|idx>");
+    logLine("  tz save <IANA|idx>");
+    logLine("  tz set <idx>");
+    logLine("  tz cases");
+    return;
+  }
+
   if (!strcmp(argv[0], "timeinvalidate"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     struct timeval tv = {0, 0};
     settimeofday(&tv, nullptr);
 
@@ -1396,6 +1900,8 @@ static void execLine(char *line)
   // -------------------------------------------------
   if (!strcmp(argv[0], "ntpskip"))
   {
+    if (!consoleRequireSupportMode())
+      return;
     if (time(nullptr) > 1600000000)
     {
       logLine("[NTP] time already valid");
@@ -1423,6 +1929,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "bootflags"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     logLine("Boot / recovery flags:");
     logf("  save exists:        %s", saveManagerSaveFileExists() ? "YES" : "NO");
     logf("  import exists:      %s", saveManagerHasImportableBubJson() ? "YES" : "NO");
@@ -1436,6 +1945,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "clearnamepending"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool before = saveManagerNamePendingFlagExists();
     saveManagerClearNamePendingFlag();
     const bool after = saveManagerNamePendingFlagExists();
@@ -1446,6 +1958,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "clearpostprov"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool before = bootPostProvisionControlsHelpPending();
     bootPostProvisionControlsHelpClear();
     const bool after = bootPostProvisionControlsHelpPending();
@@ -1456,6 +1971,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "clearbootsetup"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool before = bootSetupPendingFlagExists();
     bootSetupClearPendingFlag();
     const bool after = bootSetupPendingFlagExists();
@@ -1466,6 +1984,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "bootheal"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     const bool namePendingBefore = saveManagerNamePendingFlagExists();
     const bool postProvBefore = bootPostProvisionControlsHelpPending();
     const bool bootSetupBefore = bootSetupPendingFlagExists();
@@ -1596,6 +2117,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "assetflag"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1)
     {
       logf("asset provision boot flag: %s", assetProvisionBootRequested() ? "SET" : "CLEAR");
@@ -1622,6 +2146,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "repair"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1 || (argc >= 2 && !strcmp(argv[1], "assets")))
     {
       consoleRequestAssetRepair();
@@ -1634,6 +2161,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "rescue"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1 || (argc >= 2 && !strcmp(argv[1], "ota")))
     {
       consoleArmReprovisionRecovery(); // dev path
@@ -1646,6 +2176,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "fwmark"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     if (argc == 1 || !strcmp(argv[1], "show"))
     {
       String stored;
@@ -1723,6 +2256,9 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "nvsclear"))
   {
+    if (!consoleRequireSupportMode())
+      return;
+
     logLine("[WARN] Erasing NVS partition...");
     delay(50);
 
@@ -1758,10 +2294,12 @@ static void execLine(char *line)
 // -----------------------------------------------------------------------------
 void consoleOpen()
 {
-  inputSetTextCapture(true);
-  g_textCaptureMode = true;
   g_consoleOpen = true;
   g_consoleJustOpened = true;
+
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+  g_consoleSupportMode = false;
+#endif
 
   requestFullUIRedraw();
   requestUIRedraw();
@@ -1775,8 +2313,6 @@ void consoleOpen()
 
 void consoleClose()
 {
-  inputSetTextCapture(false);
-  g_textCaptureMode = false;
   g_consoleOpen = false;
 
   requestFullUIRedraw();
@@ -1790,6 +2326,7 @@ bool consoleIsOpen() { return g_consoleOpen; }
 void consoleClear()
 {
   g_lineCount = 0;
+  g_scrollOffset = 0;
   for (int i = 0; i < MAX_LINES; i++)
     g_lines[i][0] = '\0';
   resetLine();
@@ -1805,6 +2342,82 @@ const char *consoleGetLine(int idx)
 }
 
 const char *consoleGetInputLine() { return g_buf; }
+
+int consoleGetScrollOffset() { return g_scrollOffset; }
+
+int consoleGetMaxVisibleLines()
+{
+  // Keep this aligned with graphics_console_screens.cpp current layout.
+  // Current Cardputer console body fits about 9 rows.
+  return 9;
+}
+
+static int consoleGetMaxScrollOffsetInternal(int maxLinesVisible)
+{
+  if (maxLinesVisible < 1)
+    maxLinesVisible = 1;
+
+  const int maxOffset = g_lineCount - maxLinesVisible;
+  return (maxOffset > 0) ? maxOffset : 0;
+}
+
+int consoleGetFirstVisibleLine(int maxLinesVisible)
+{
+  if (maxLinesVisible < 1)
+    maxLinesVisible = 1;
+
+  int first = g_lineCount - maxLinesVisible - g_scrollOffset;
+  if (first < 0)
+    first = 0;
+
+  const int maxFirst = (g_lineCount > maxLinesVisible) ? (g_lineCount - maxLinesVisible) : 0;
+  if (first > maxFirst)
+    first = maxFirst;
+
+  return first;
+}
+
+bool consoleIsScrolledUp() { return g_scrollOffset > 0; }
+
+static void consoleClampScroll()
+{
+  const int maxOffset = consoleGetMaxScrollOffsetInternal(consoleGetMaxVisibleLines());
+
+  if (g_scrollOffset < 0)
+    g_scrollOffset = 0;
+  if (g_scrollOffset > maxOffset)
+    g_scrollOffset = maxOffset;
+}
+
+static void consoleSnapToBottom()
+{
+  if (g_scrollOffset != 0)
+  {
+    g_scrollOffset = 0;
+    requestUIRedraw();
+  }
+}
+
+static bool consoleScrollUpOne()
+{
+  const int maxOffset = consoleGetMaxScrollOffsetInternal(consoleGetMaxVisibleLines());
+  if (g_scrollOffset >= maxOffset)
+    return false;
+
+  g_scrollOffset++;
+  requestUIRedraw();
+  return true;
+}
+
+static bool consoleScrollDownOne()
+{
+  if (g_scrollOffset <= 0)
+    return false;
+
+  g_scrollOffset--;
+  requestUIRedraw();
+  return true;
+}
 
 // -----------------------------------------------------------------------------
 // Input handling
@@ -1837,20 +2450,36 @@ void consoleUpdate(InputState &in)
     const bool isBackspace = (code == (uint8_t)RH_KEY_BACKSPACE) || (code == '\b') || (code == 127);
 
     // -------------------------------------------------
-    // Command history navigation (console-only)
-    //   ';' = previous
-    //   '.' = next
+    // Up/down behavior in console:
+    //   empty input -> scrollback
+    //   typed input -> command history
     // -------------------------------------------------
     if (code == (uint8_t)';')
     {
-      if (histPrev())
-        touched = true;
+      if (g_len == 0)
+      {
+        if (consoleScrollUpOne())
+          touched = true;
+      }
+      else
+      {
+        if (histPrev())
+          touched = true;
+      }
       continue;
     }
     if (code == (uint8_t)'.')
     {
-      if (histNext())
-        touched = true;
+      if (g_len == 0)
+      {
+        if (consoleScrollDownOne())
+          touched = true;
+      }
+      else
+      {
+        if (histNext())
+          touched = true;
+      }
       continue;
     }
 
@@ -1858,6 +2487,8 @@ void consoleUpdate(InputState &in)
     if (isEnter)
     {
       g_buf[g_len] = '\0';
+
+      consoleSnapToBottom();
 
       char echo[70];
       snprintf(echo, sizeof(echo), "> %s", g_buf);
@@ -1900,6 +2531,9 @@ void consoleUpdate(InputState &in)
     {
       if (g_len < sizeof(g_buf) - 1)
       {
+        if (g_scrollOffset > 0)
+          consoleSnapToBottom();
+
         g_buf[g_len++] = c;
         g_buf[g_len] = '\0';
         histCancelNav();

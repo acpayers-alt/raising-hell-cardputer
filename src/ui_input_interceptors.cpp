@@ -19,9 +19,6 @@
 #include "ui_actions.h"
 #include "ui_state_settings.h"
 
-// Keep the boot fix local to this module.
-static bool s_bootNamePetFixApplied = false;
-
 // Menu/ESC suppression is centralized in ui_suppress.*
 static inline bool menuSuppressedNow() { return uiIsMenuSuppressed(); }
 
@@ -59,10 +56,13 @@ static inline bool consoleBlockedInState(UIState s)
     case UIState::BOOT_WIFI_WAIT:
     case UIState::BOOT_TZ_PICK:
     case UIState::BOOT_NTP_WAIT:
-    case UIState::BOOT_ASSET_WIFI_REQUIRED:
     case UIState::WIFI_SETUP:
     case UIState::WIFI_CONNECT_WAIT:
       return true;
+
+    case UIState::BOOT_ASSET_WIFI_REQUIRED:
+      return false;
+
     default:
       return false;
   }
@@ -80,16 +80,8 @@ static bool uiInterceptGlobalShortcuts(InputState& in)
   // ESC key: open Settings menu from allowed states
   if (in.escOnce)
   {
-    // Always consume ESC if blocked, so nothing else misinterprets it.
-    if (escBlockedInState(g_app.uiState))
-    {
-      in.clearEdges();
-      return true;
-    }
-
     if (!menuSuppressedNow() && canOpenSettingsFrom(g_app.uiState))
     {
-      g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
       openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
       
       // Swallow everything this tick so ESC doesn't also act as HOME/tab-jump/etc.
@@ -117,10 +109,8 @@ bool uiHandleGlobalInterceptors(InputState &in)
     }
   }
 
-  // Never allow console entry during boot WiFi / provisioning flows.
   if (in.consoleOnce && consoleBlockedInState(g_app.uiState))
   {
-    Serial.printf("[INPUT] console blocked in state=%d\n", (int)g_app.uiState);
     uiActionSwallowEdges(in);
     return true;
   }

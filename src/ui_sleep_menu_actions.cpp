@@ -37,26 +37,21 @@ void uiSleepMenuSetForHours(uint32_t nowMs, uint32_t hours)
   g_app.sleepDurationMs    = (uint32_t)(hours) * 60UL * 60UL * 1000UL;
 }
 
-void uiSleepMenuEnterSleep(uint32_t nowMs)
+void uiSleepMenuEnterSleep(uint32_t nowMs, InputState& in)
 {
   (void)nowMs;
 
-  uiPetSleepingSetReturnState(g_app.uiState, g_app.currentTab);
-
   pet.isSleeping   = true;
   g_app.isSleeping = true;
-  uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
-  
-  requestUIRedraw();
+  g_app.sleepTargetEnergy = 0;
+  saveManagerMarkDirty();
+
+  uiEnterPetSleepingWithReturn(g_app.uiState, g_app.currentTab, in, 120);
 
   // Suppress wake detection so the same Enter press that selected
   // a sleep option can't immediately wake the pet on the next tick.
   uiSuppressSleepWakeForMs(400);
 
-  g_app.sleepTargetEnergy = 0;
   invalidateBackgroundCache();
-  saveManagerMarkDirty();
-
-  // Kick background sleep system (if present in your project)
   sleepBgKickNow();
 }

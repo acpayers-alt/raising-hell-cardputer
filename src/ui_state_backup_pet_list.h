@@ -1,10 +1,13 @@
 #pragma once
 
 #include "input.h"
-#include "save_manager.h"
+#include "settings_flow_state.h"
+
+struct PetExportEntry;
 
 void uiBackupPetListOnEnter(InputState& in);
 void uiBackupPetListHandle(InputState& in);
+void openBackupPetListFromSettings(SettingsPage returnPage, InputState &in);
 
 int uiBackupPetListCount();
 int uiBackupPetListVisibleCount();
@@ -17,3 +20,5 @@ bool uiBackupPetListConfirmDeleteActive();
 int uiBackupPetListConfirmDeleteIndex();
 bool uiBackupPetListConfirmRestoreActive();
 int uiBackupPetListConfirmRestoreIndex();
+bool uiBackupPetListConfirmDeleteActive();
+int uiBackupPetListConfirmDeleteIndex();

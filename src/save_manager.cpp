@@ -56,6 +56,7 @@
 #include "ui_runtime.h"
 
 // UI state / flows
+#include "auto_screen.h"
 #include "controls_help_state.h"
 #include "inventory_state.h"
 #include "new_pet_flow_state.h"
@@ -64,6 +65,7 @@
 #include "settings_toggles_state.h"
 #include "sleep_state.h"
 #include "user_toggles_state.h"
+#include "whats_new_state.h"
 
 // Misc
 #include "asset_ota.h"
@@ -77,6 +79,19 @@
 // Forward declarations for internal helpers used before definition
 static void clearNamePendingFlag();
 void resetRuntimeToCleanNoSaveState(bool resetName);
+static bool isFinalBubFilename(const char *nm);
+static uint32_t s_lastExportListHash = 0;
+
+static uint32_t hashExportEntry(const PetExportEntry &e)
+{
+  uint32_t h = 5381;
+
+  const char *p = e.path;
+  while (*p)
+    h = ((h << 5) + h) + (uint8_t)*p++;
+
+  return h ^ (uint32_t)e.createdAtEpoch;
+}
 
 static const char *getFirmwareVersionString()
 {
@@ -154,6 +169,11 @@ static const char *BACKUPS_DIR = "/raising_hell/backup";
 static const char *EXPORTS_DIR = "/raising_hell/exports";
 static const char *EXPORT_MAGIC = "raising_hell_bub_export";
 static const uint16_t EXPORT_VERSION = 1;
+static int s_lastExportScanInvalidCount = 0;
+static int s_lastExportScanValidCount = 0;
+
+int saveManagerLastExportScanInvalidCount() { return s_lastExportScanInvalidCount; }
+int saveManagerLastExportScanValidCount() { return s_lastExportScanValidCount; }
 
 static void wipeSdRecursive(const char *path)
 {
@@ -229,18 +249,9 @@ static const char *petTypeToStringForExport(PetType t)
 {
   switch (t)
   {
-  case PET_DEVIL:
-    return "devil";
   case PET_ELDRITCH:
     return "eldritch";
-  case PET_ALIEN:
-    return "alien";
-  case PET_KAIJU:
-    return "kaiju";
-  case PET_ANUBIS:
-    return "anubis";
-  case PET_AXOLOTL:
-    return "axolotl";
+  case PET_DEVIL:
   default:
     return "devil";
   }
@@ -250,36 +261,26 @@ static bool petTypeFromStringForImport(const char *s, PetType &out)
 {
   if (!s || !*s)
     return false;
+
   if (!strcmp(s, "devil"))
   {
     out = PET_DEVIL;
     return true;
   }
+
   if (!strcmp(s, "eldritch"))
   {
     out = PET_ELDRITCH;
     return true;
   }
-  if (!strcmp(s, "alien"))
+
+  // Legacy imports from removed pet lines collapse to Devil.
+  if (!strcmp(s, "alien") || !strcmp(s, "kaiju") || !strcmp(s, "anubis") || !strcmp(s, "axolotl"))
   {
-    out = PET_ALIEN;
+    out = PET_DEVIL;
     return true;
   }
-  if (!strcmp(s, "kaiju"))
-  {
-    out = PET_KAIJU;
-    return true;
-  }
-  if (!strcmp(s, "anubis"))
-  {
-    out = PET_ANUBIS;
-    return true;
-  }
-  if (!strcmp(s, "axolotl"))
-  {
-    out = PET_AXOLOTL;
-    return true;
-  }
+
   return false;
 }
 
@@ -350,8 +351,86 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
 
   File f = SD.open(path, FILE_READ);
   if (!f)
+    return false;
+
+  static uint32_t s_lastBadBubLogMs = 0;
+  auto logBadBub = [&](const char *reason)
   {
-    Serial.printf("[EXPORT LIST] open failed path=%s\n", path ? path : "(null)");
+    const uint32_t now = millis();
+    if (now - s_lastBadBubLogMs > 2000)
+    {
+      Serial.printf("[EXPORT LIST][BAD_BUB] path=%s reason=%s\n", path ? path : "(null)", reason ? reason : "unknown");
+      s_lastBadBubLogMs = now;
+    }
+  };
+
+  DynamicJsonDocument filter(256);
+  filter["format"] = true;
+  filter["exportVersion"] = true;
+  filter["createdAtEpoch"] = true;
+  filter["profile"]["name"] = true;
+  filter["profile"]["petType"] = true;
+  filter["profile"]["petId"] = true;
+
+  DynamicJsonDocument doc(1024);
+  DeserializationOption::Filter filtered(filter);
+  const DeserializationError err = deserializeJson(doc, f, filtered);
+  f.close();
+
+  if (err)
+    return false;
+
+  const char *format = doc["format"] | "";
+  const uint16_t exportVersion = doc["exportVersion"] | 0;
+  if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
+    return false;
+
+  const char *name = doc["profile"]["name"] | "";
+  const char *petType = doc["profile"]["petType"] | "";
+  const uint32_t createdAtEpoch = (uint32_t)(doc["createdAtEpoch"] | 0);
+  const char *petId = doc["profile"]["petId"] | "";
+
+  strncpy(out.path, path, sizeof(out.path) - 1);
+  out.path[sizeof(out.path) - 1] = '\0';
+
+  strncpy(out.name, (name && name[0]) ? name : "Bub", sizeof(out.name) - 1);
+  out.name[sizeof(out.name) - 1] = '\0';
+
+  strncpy(out.petType, (petType && petType[0]) ? petType : "DEVIL", sizeof(out.petType) - 1);
+  out.petType[sizeof(out.petType) - 1] = '\0';
+
+  strncpy(out.petId, petId, sizeof(out.petId) - 1);
+  out.petId[sizeof(out.petId) - 1] = '\0';
+
+  out.createdAtEpoch = createdAtEpoch;
+  out.valid = true;
+  return true;
+}
+
+static bool readExportMetadataQuiet(const char *path, PetExportEntry &out)
+{
+  out.valid = false;
+  out.path[0] = '\0';
+  out.name[0] = '\0';
+  out.petType[0] = '\0';
+  out.petId[0] = '\0';
+  out.createdAtEpoch = 0;
+
+  static uint32_t s_lastBadBubLogMs = 0;
+  auto logBadBub = [&](const char *reason)
+  {
+    const uint32_t now = millis();
+    if (now - s_lastBadBubLogMs > 2000)
+    {
+      Serial.printf("[EXPORT LIST][BAD_BUB] path=%s reason=%s\n", path ? path : "(null)", reason ? reason : "unknown");
+      s_lastBadBubLogMs = now;
+    }
+  };
+
+  File f = SD.open(path, FILE_READ);
+  if (!f)
+  {
+    logBadBub("open_failed");
     return false;
   }
 
@@ -370,7 +449,7 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
 
   if (err)
   {
-    Serial.printf("[EXPORT LIST] json failed path=%s err=%s\n", path, err.c_str());
+    logBadBub(err.c_str());
     return false;
   }
 
@@ -378,8 +457,7 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
   const uint16_t exportVersion = doc["exportVersion"] | 0;
   if (strcmp(format, EXPORT_MAGIC) != 0 || exportVersion != EXPORT_VERSION)
   {
-    Serial.printf("[EXPORT LIST] format/version failed path=%s format=%s version=%u\n", path, format,
-                  (unsigned)exportVersion);
+    logBadBub("format_version_bad");
     return false;
   }
 
@@ -402,10 +480,6 @@ static bool readExportMetadata(const char *path, PetExportEntry &out)
 
   out.createdAtEpoch = createdAtEpoch;
   out.valid = true;
-
-  Serial.printf("[EXPORT LIST] ok path=%s petId=%s name=%s created=%lu\n", out.path,
-                out.petId[0] ? out.petId : "(none)", out.name, (unsigned long)out.createdAtEpoch);
-
   return true;
 }
 
@@ -425,7 +499,7 @@ static void sortPetExportsNewestFirst(PetExportEntry *entries, int count)
   }
 }
 
-static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries, int maxEntries)
+static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries, int maxEntries, bool dedupeByPetId)
 {
   if (!outEntries || maxEntries <= 0)
     return 0;
@@ -433,62 +507,84 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
   if (!g_sdReady || !dirPath || !SD.exists(dirPath))
     return 0;
 
+  s_lastExportScanInvalidCount = 0;
+  s_lastExportScanValidCount = 0;
+
   File dir = SD.open(dirPath);
   if (!dir || !dir.isDirectory())
     return 0;
 
   int count = 0;
 
-  File file = dir.openNextFile();
-  while (file)
+  for (File file = dir.openNextFile(); file; file = dir.openNextFile())
   {
+    if (!file)
+      break;
+
     if (!file.isDirectory())
     {
       const char *nm = file.name();
-      if (nm && nm[0])
+      if (isFinalBubFilename(nm))
       {
-        size_t len = strlen(nm);
-        if (len >= 4 && strcmp(nm + len - 4, ".bub") == 0)
+        char full[128];
+        snprintf(full, sizeof(full), "%s/%s", dirPath, nm);
+
+        PetExportEntry entry{};
+        if (readExportMetadata(full, entry))
         {
-          char full[128];
-          snprintf(full, sizeof(full), "%s/%s", dirPath, nm);
+          s_lastExportScanValidCount++;
+          bool merged = false;
 
-          Serial.printf("[EXPORT LIST] scan nm=%s full=%s\n", nm, full);
-
-          PetExportEntry entry{};
-          if (readExportMetadata(full, entry))
+          if (dedupeByPetId && entry.petId[0])
           {
-            bool merged = false;
-
-            if (entry.petId[0])
+            for (int i = 0; i < count; ++i)
             {
-              for (int i = 0; i < count; ++i)
+              if (outEntries[i].valid && strcmp(outEntries[i].petId, entry.petId) == 0)
               {
-                if (strcmp(outEntries[i].petId, entry.petId) == 0)
-                {
-                  if (entry.createdAtEpoch >= outEntries[i].createdAtEpoch)
-                    outEntries[i] = entry;
+                if (entry.createdAtEpoch >= outEntries[i].createdAtEpoch)
+                  outEntries[i] = entry;
 
-                  merged = true;
-                  break;
-                }
+                merged = true;
+                break;
               }
             }
+          }
 
-            if (!merged)
-            {
-              if (count < maxEntries)
-              {
-                outEntries[count++] = entry;
-              }
-            }
+          if (!merged)
+          {
+            if (count < maxEntries)
+              outEntries[count++] = entry;
+          }
+        }
+        else
+        {
+          s_lastExportScanInvalidCount++;
+
+          // Surface corrupt .bub files so the UI can show and delete them.
+          if (count < maxEntries)
+          {
+            PetExportEntry bad{};
+            bad.valid = false;
+
+            strncpy(bad.path, full, sizeof(bad.path) - 1);
+            bad.path[sizeof(bad.path) - 1] = '\0';
+
+            strncpy(bad.name, "Corrupt Save File", sizeof(bad.name) - 1);
+            bad.name[sizeof(bad.name) - 1] = '\0';
+
+            strncpy(bad.petType, "BAD FILE", sizeof(bad.petType) - 1);
+            bad.petType[sizeof(bad.petType) - 1] = '\0';
+
+            bad.petId[0] = '\0';
+            bad.createdAtEpoch = (uint32_t)file.getLastWrite();
+
+            outEntries[count++] = bad;
           }
         }
       }
     }
 
     file.close();
-    file = dir.openNextFile();
   }
 
   sortPetExportsNewestFirst(outEntries, count);
@@ -497,12 +593,12 @@ static int listPetEntriesFromDir(const char *dirPath, PetExportEntry *outEntries
 
 int saveManagerListPetBackups(PetExportEntry *outEntries, int maxEntries)
 {
-  return listPetEntriesFromDir(BACKUPS_DIR, outEntries, maxEntries);
+  return listPetEntriesFromDir(BACKUPS_DIR, outEntries, maxEntries, false);
 }
 
 int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries)
 {
-  return listPetEntriesFromDir(EXPORTS_DIR, outEntries, maxEntries);
+  return listPetEntriesFromDir(EXPORTS_DIR, outEntries, maxEntries, true);
 }
 
 static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)
@@ -533,6 +629,22 @@ static void sanitizeExportFilename(const char *src, char *dst, size_t dstSize)
   dst[j] = '\0';
 }
 
+static bool isFinalBubFilename(const char *nm)
+{
+  if (!nm || !nm[0])
+    return false;
+
+  const char *lastDot = strrchr(nm, '.');
+  if (!lastDot)
+    return false;
+
+  const bool ok = (strcmp(lastDot, ".bub") == 0);
+  if (!ok && strstr(nm, ".bub"))
+    Serial.printf("[EXPORT LIST] reject non-final export filename='%s'\n", nm);
+
+  return ok;
+}
+
 static bool findLatestExportPath(char *outPath, size_t outPathSize)
 {
   if (!outPath || outPathSize == 0)
@@ -556,8 +668,7 @@ static bool findLatestExportPath(char *outPath, size_t outPathSize)
     if (!file.isDirectory())
     {
       const char *nm = file.name();
-      const size_t len = strlen(nm);
-      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
+      if (isFinalBubFilename(nm))
       {
         char full[128];
         snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
@@ -619,6 +730,12 @@ void saveManagerFullWipe()
   tryRemove(NAME_PENDING_FLAG_PATH);
   tryRemove(SLEEP_PENDING_FLAG_PATH);
 
+  // Re-arm onboarding screens (pair always)
+  g_controlsHelpSeen = 0;
+  g_whatsNewSeen = 0;
+
+  saveSettingsToSD();
+
   Serial.println("[DEV] FULL WIPE DONE → rebooting");
 
   delay(200);
@@ -627,8 +744,9 @@ void saveManagerFullWipe()
 
 // ------------------------------------------------------------
 // NEW PET FLOW BOOT RESUME FLAG
-//   - Present => user was mid "Name Pet" flow (resume NAME_PET on boot)
-//   - Missing => do NOT force NAME_PET; if name blank, go to CHOOSE_PET instead
+//   - Present => user was mid new-pet creation
+//   - Current policy does NOT resume NAME_PET on boot
+//   - If an incomplete/new-pet save is encountered, fall back to CHOOSE_PET
 // ------------------------------------------------------------
 
 static bool namePendingFlagExists()
@@ -761,8 +879,6 @@ static void forceChoosePetFlowFromBoot()
   clearInputLatch();
 }
 
-void saveManagerStartFreshPetFlow() { forceChoosePetFlowFromBoot(); }
-
 void saveManagerAbortFreshPetFlow()
 {
   // Abort any half-started new-pet lifecycle cleanly.
@@ -795,7 +911,6 @@ void saveManagerAssignFreshPetId()
 // Forward decls
 // ------------------------------------------------------------
 static void printState(const char *tag);
-static void forceChoosePetFlowFromBoot();
 static void pack(SavePayload &p);
 static void unpack(const SavePayload &p);
 static void newPetInternal();
@@ -847,9 +962,6 @@ void saveManagerEnterSleepState()
 
   // Critical: free large UI caches before entering the sleeping screen.
   graphicsReleaseUiCachesForMiniGame();
-  Serial.printf("[HEAPCHK] sleep-enter after-release free=%u largest=%u\n",
-                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 
   writeSleepPendingFlag();
   saveManagerMarkDirty();
@@ -1265,6 +1377,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   const size_t OLD_SZ_7 = 7;
   const size_t OLD_SZ_8 = 8;
   const size_t OLD_SZ_11 = 11;
+  const size_t OLD_SZ_13 = 13;
 
   SettingsData tmp{};
   bool ok = false;
@@ -1279,13 +1392,18 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
+
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
       if (tmp.shakeSensitivitySel > 3)
         tmp.shakeSensitivitySel = 1;
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
 
       tmp.soundEnabled = (tmp.soundEnabled != 0);
       tmp.wifiEnabled = (tmp.wifiEnabled != 0);
@@ -1293,8 +1411,49 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
       tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
       tmp.petScreenIntroFadeBootFlag = (tmp.petScreenIntroFadeBootFlag != 0);
+      tmp.whatsNewSeen = (tmp.whatsNewSeen != 0);
     }
   }
+  else if (sz == OLD_SZ_13)
+  {
+    uint8_t old[OLD_SZ_13];
+    const int r = f.read(old, OLD_SZ_13);
+    if (r == (int)OLD_SZ_13)
+    {
+      tmp.brightnessLevel = old[0];
+      tmp.autoScreenOffEnabled = (old[1] != 0);
+      tmp.soundEnabled = (old[2] != 0);
+      tmp.wifiEnabled = (old[3] != 0);
+      tmp.tzIndex = old[4];
+      tmp.autoScreenTimeoutSel = old[5];
+      tmp.shakeSensitivitySel = old[6];
+      tmp.petDeathEnabled = (old[7] != 0);
+      tmp.ledAlertsEnabled = (old[8] != 0);
+      tmp.controlsHelpSeen = (old[9] != 0);
+      tmp.petPerfHudEnabled = (old[10] != 0);
+      tmp.petScreenIntroFadeBootFlag = (old[11] != 0);
+      tmp.whatsNewSeen = (old[12] != 0);
+      tmp.autoClockTimeoutSel = 3; // new feature defaults Off
+
+      if (tmp.brightnessLevel > 2)
+        tmp.brightnessLevel = 1;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
+      if (tmp.autoScreenTimeoutSel > 3)
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
+
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
+
+      ok = true;
+      loadedOld = true;
+    }
+  }
+
   else if (sz == OLD_SZ_11)
   {
     uint8_t old[OLD_SZ_11];
@@ -1312,21 +1471,29 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.controlsHelpSeen = (old[8] != 0);
       tmp.petPerfHudEnabled = (old[9] != 0);
       tmp.petScreenIntroFadeBootFlag = (old[10] != 0);
-      tmp.shakeSensitivitySel = 1; // default old behavior = Low
+
+      tmp.autoClockTimeoutSel = 3;
+      tmp.shakeSensitivitySel = 1;
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
 
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
 
       ok = true;
       loadedOld = true;
     }
   }
+
   else if (sz == OLD_SZ_7)
   {
     uint8_t old[OLD_SZ_7];
@@ -1341,6 +1508,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.autoScreenTimeoutSel = old[5];
       tmp.petDeathEnabled = (old[6] != 0);
 
+      tmp.autoClockTimeoutSel = 3;
+
       tmp.shakeSensitivitySel = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
@@ -1348,16 +1517,22 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
 
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
       ok = true;
       loadedOld = true;
     }
   }
+
   else if (sz == OLD_SZ_8)
   {
     uint8_t old[OLD_SZ_8];
@@ -1373,22 +1548,31 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.petDeathEnabled = (old[6] != 0);
       tmp.ledAlertsEnabled = (old[7] != 0);
 
+      tmp.autoClockTimeoutSel = 3;
+
       tmp.controlsHelpSeen = 0;
       tmp.shakeSensitivitySel = 1;
       tmp.petScreenIntroFadeBootFlag = 0;
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
       if (tmp.autoScreenTimeoutSel > 3)
-        tmp.autoScreenTimeoutSel = 0;
-      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 0);
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
+
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
 
       ok = true;
       loadedOld = true;
     }
   }
+
   else if (sz == OLD_SZ_5)
   {
     uint8_t old[OLD_SZ_5];
@@ -1401,7 +1585,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.wifiEnabled = (old[3] != 0);
       tmp.tzIndex = old[4];
 
-      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
+      tmp.autoClockTimeoutSel = 3;
+      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
 
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
@@ -1411,13 +1596,14 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
       if (tmp.brightnessLevel > 2)
         tmp.brightnessLevel = 1;
-      if (tmp.tzIndex > 64)
-        tmp.tzIndex = 2;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
 
       ok = true;
       loadedOld = true;
     }
   }
+
   else if (sz == OLD_SZ_4)
   {
     uint8_t old[OLD_SZ_4];
@@ -1429,8 +1615,10 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.soundEnabled = (old[2] != 0);
       tmp.wifiEnabled = (old[3] != 0);
 
-      tmp.tzIndex = 2;
-      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 2 : 0;
+      tmp.autoClockTimeoutSel = 3;
+tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
+
+      tmp.tzIndex = tzDefaultIndex();
       tmp.petDeathEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
@@ -1471,13 +1659,22 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   soundEnabled = (g_settings.soundEnabled != 0);
 
   autoScreenTimeoutSel = g_settings.autoScreenTimeoutSel;
-  g_app.autoScreenOffEnabled = (autoScreenTimeoutSel != 0);
+  autoClockTimeoutSel = g_settings.autoClockTimeoutSel;
+
+  if (autoClockTimeoutSel != 3)
+    autoScreenTimeoutSel = 3;
+
+  autoScreenSetEnabled(autoScreenTimeoutSel != 3);
+  autoClockSetEnabled(autoClockTimeoutSel != 3);
+
+  g_app.autoScreenOffEnabled = (autoScreenTimeoutSel != 3);
   motionSetShakeSensitivity(g_settings.shakeSensitivitySel);
 
   petDeathEnabled = (g_settings.petDeathEnabled != 0);
   ledAlertsEnabled = (g_settings.ledAlertsEnabled != 0);
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
+  g_whatsNewSeen = (g_settings.whatsNewSeen != 0);
 
   // ------------------------------------------------------------
   // One-shot boot flag: pet intro fade
@@ -1502,11 +1699,17 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   }
   else
   {
-    tzIndex = g_settings.tzIndex;
-    saveTzIndexToNVS(tzIndex);
+    tzIndex = tzIndexIsValid(g_settings.tzIndex) ? g_settings.tzIndex : (int)tzDefaultIndex();
+    saveTzIndexToNVS((uint8_t)tzIndex);
   }
 
-  applyTimezoneIndex(tzIndex);
+  if (!tzIndexIsValid(tzIndex))
+    tzIndex = (int)tzDefaultIndex();
+
+  applyTimezoneIndex((uint8_t)tzIndex);
+
+  Serial.printf("[SAVE] timezone load idx=%d label='%s' iana='%s' rule='%s'\n", tzIndex, tzName((uint8_t)tzIndex),
+                tzIanaName((uint8_t)tzIndex), tzPosixRule((uint8_t)tzIndex));
 
   const bool wifiEn = (g_settings.wifiEnabled != 0);
 
@@ -1514,7 +1717,18 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   // Boot pipeline is the single owner of actual Wi-Fi bring-up.
   // Applying it here makes later boot logic think Wi-Fi is already enabled
   // even when the radio/connect path has not actually been restarted.
-  Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiEn ? 1 : 0, wifiIsEnabled() ? 1 : 0);
+  static int s_lastWifiLoadSetting = -1;
+  static int s_lastWifiLoadRuntime = -1;
+
+  const int wifiSettingNow = wifiEn ? 1 : 0;
+  const int wifiRuntimeNow = wifiIsEnabled() ? 1 : 0;
+
+  if (wifiSettingNow != s_lastWifiLoadSetting || wifiRuntimeNow != s_lastWifiLoadRuntime)
+  {
+    Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiSettingNow, wifiRuntimeNow);
+    s_lastWifiLoadSetting = wifiSettingNow;
+    s_lastWifiLoadRuntime = wifiRuntimeNow;
+  }
 
   return true;
 }
@@ -1536,11 +1750,16 @@ static bool saveSettingsToSD_internal()
                 wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
   g_settings.tzIndex = tzIndex;
 
+  if (autoClockTimeoutSel != 3)
+    autoScreenTimeoutSel = 3;
+
   g_settings.autoScreenTimeoutSel = autoScreenTimeoutSel;
-  g_settings.autoScreenOffEnabled = (autoScreenTimeoutSel != 0);
+  g_settings.autoClockTimeoutSel = autoClockTimeoutSel;
+  g_settings.autoScreenOffEnabled = (autoScreenTimeoutSel != 3);
   g_settings.petDeathEnabled = petDeathEnabled ? 1 : 0;
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
+  g_settings.whatsNewSeen = (g_whatsNewSeen != 0) ? 1 : 0;
   g_settings.petScreenIntroFadeBootFlag = (g_settings.petScreenIntroFadeBootFlag != 0) ? 1 : 0;
 
   tryRemove(SET_TMP_PATH);
@@ -1870,12 +2089,13 @@ static bool saveSaveToSD_internal()
   if (!ensureSaveDir())
     return false;
 
-  // Never persist a half-created pet during fresh new-pet flow.
-  // While name_pending.flag exists and the runtime pet name is blank,
-  // CHOOSE_PET / NAME_PET is still in progress, so save.bin must not be created.
-  // Never persist during new-pet flow.
-  // If name_pending.flag exists, the pet is not finalized yet.
-  // HARD BLOCK: do not save if there is no valid pet
+  // Never persist if there is no active finalized pet yet.
+  //
+  // Policy:
+  // - g_birthEpoch == 0 means "no active pet lifecycle exists yet"
+  // - name_pending.flag means fresh pet creation is still incomplete
+  //
+  // A finalized new pet must set a non-zero birth epoch before the first forced save.
   if (g_birthEpoch == 0)
   {
     Serial.println("[SAVE] SKIP (no active pet)");
@@ -1940,9 +2160,12 @@ void saveManagerBegin()
 
   g_settings.brightnessLevel = 1;
   g_settings.autoScreenOffEnabled = true;
+  g_settings.autoScreenTimeoutSel = 0;
+  g_settings.autoClockTimeoutSel = 3;
   g_settings.soundEnabled = true;
   g_settings.wifiEnabled = 1;
-  g_settings.tzIndex = 2;
+  g_settings.tzIndex = tzDefaultIndex();
+  g_settings.whatsNewSeen = 0;
   g_settings.shakeSensitivitySel = 1; // Low = current behavior
   motionSetShakeSensitivity(1);
   gameoptDefaults();
@@ -2023,11 +2246,7 @@ static bool autoHealLoadedSaveIfNeeded()
   switch (pet.type)
   {
   case PET_DEVIL:
-  case PET_KAIJU:
   case PET_ELDRITCH:
-  case PET_ALIEN:
-  case PET_ANUBIS:
-  case PET_AXOLOTL:
     break;
 
   default:
@@ -2156,16 +2375,6 @@ static bool autoHealLoadedSaveIfNeeded()
   return changed;
 }
 
-static void forceNamePetFlowFromBoot()
-{
-  inputSetTextCapture(true);
-  uiActionEnterState(UIState::NAME_PET, Tab::TAB_PET, true);
-
-  g_app.uiNeedsRedraw = true;
-  requestFullUIRedraw();
-  clearInputLatch();
-}
-
 // ------------------------------------------------------------
 // Public API
 // ------------------------------------------------------------
@@ -2246,7 +2455,10 @@ bool saveManagerLoad()
       Serial.printf("[PET] current '%s' lvl=%u xp=%lu type=%d\n", pet.name, (unsigned)pet.level, (unsigned long)pet.xp,
                     (int)pet.type);
     }
-
+    // Boot policy:
+    // If a loaded save is still in an unfinished fresh-pet state
+    // (name_pending.flag or blank pet name after heal), do not resume NAME_PET.
+    // Abort the incomplete lifecycle and restart from CHOOSE_PET.
     if (appLifecycleLoadedSaveRequiresChoosePet(namePending, blankPetName))
     {
       if (namePending)
@@ -2260,17 +2472,16 @@ bool saveManagerLoad()
   }
 
   // -----------------------------------------------------------------------
-  // No valid save found → initialize fresh state
+  // No valid save found → normalize runtime to a clean no-save state.
   // -----------------------------------------------------------------------
 
   DBGLN_ON("[SAVE] No valid save found -> initializing clean no-save state");
 
-  // Factory reset / no-save boot should land on the title menu with no save,
-  // not silently re-enter a half-started new-pet flow.
+  // Ownership split:
+  // - saveManagerLoad() owns save/runtime normalization for the no-save case
+  // - boot pipeline owns onboarding/provisioning flow and final landing state
   //
-  // Keep runtime state clean, but do NOT write name_pending.flag and do NOT
-  // enter CHOOSE_PET here. Let the boot pipeline decide whether to run the
-  // first-boot wizard and where to land afterward.
+  // Do not enter CHOOSE_PET here and do not recreate name_pending.flag.
   resetRuntimeToCleanNoSaveState(/*resetName=*/true);
 
   inputSetTextCapture(false);
@@ -2279,11 +2490,17 @@ bool saveManagerLoad()
 
   clearNamePendingFlag();
 
+  const bool hadBootSetupPending = bootSetupPendingFlagExists();
+
+  // Do not clear boot_setup_pending.flag here.
+  // The boot pipeline owns onboarding flow resolution and should be the one to
+  // consume/clear this intent once the boot flow has fully completed.
   dirty = false;
   clearInputLatch();
 
-  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d\n", g_app.newPetFlowActive ? 1 : 0,
-                saveManagerNamePendingFlagExists() ? 1 : 0);
+  Serial.printf("[SAVE] no-save boot state newPetFlowActive=%d namePending=%d bootSetupPendingStillSet=%d\n",
+                g_app.newPetFlowActive ? 1 : 0, saveManagerNamePendingFlagExists() ? 1 : 0,
+                hadBootSetupPending ? 1 : 0);
 
   return false;
 }
@@ -2301,6 +2518,13 @@ void saveManagerSetPetIntroFadeBootFlag()
 void saveManagerStampBirthNow()
 {
   uint32_t now = getNowEpochOrZero();
+
+  // A brand-new finalized pet must be saveable even before NTP/time is valid.
+  // If wall clock is unavailable, use a non-zero sentinel epoch for the first save.
+  // Auto-heal/load code can normalize this later once real time is available.
+  if (now == 0)
+    now = 1;
+
   g_birthEpoch = now;
   pet.birth_epoch = now;
   saveManagerMarkDirty();
@@ -2497,9 +2721,18 @@ void saveManagerFactoryReset()
   bootSetupClearPendingFlag();
   bootPostProvisionControlsHelpClear();
 
+  // Re-arm onboarding durably for the next boot.
+  bootWriteFirstRunFlag();
+  bootSetupWritePendingFlag();
+
+  g_controlsHelpSeen = 0;
+  g_whatsNewSeen = 0;
+
   // Also wipe the EEPROM-backed inventory mirror so a brand-new pet cannot
   // inherit inventory across a factory reset.
   g_app.inventory.wipePersistedEeprom();
+
+  saveSettingsToSD();
 
   delay(50);
   ESP.restart();
@@ -2520,8 +2753,7 @@ static void removeExportsWithPetId(const char *petIdStr)
     if (!file.isDirectory())
     {
       const char *nm = file.name();
-      const size_t len = strlen(nm);
-      if (len >= 4 && !strcmp(nm + len - 4, ".bub"))
+      if (isFinalBubFilename(nm))
       {
         char full[128];
         snprintf(full, sizeof(full), "%s/%s", EXPORTS_DIR, nm);
@@ -2636,7 +2868,7 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   }
 
   PetExportEntry verify{};
-  if (!readExportMetadata(tmpPath, verify))
+  if (!readExportMetadataQuiet(tmpPath, verify))
   {
     tryRemove(tmpPath);
     return false;
@@ -2671,10 +2903,17 @@ bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize)
 
 bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize)
 {
+  if (outPath && outPathSize > 0)
+    outPath[0] = '\0';
+
   if (!g_sdReady)
     return false;
 
   // 1) Export current pet to the locker/export system.
+  //
+  // Contract:
+  // - This function removes the live on-disk save after a successful export.
+  // - It does NOT reset runtime/UI state; callers must do that separately.
   if (!saveManagerExportCurrentBubJson(outPath, outPathSize))
     return false;
 

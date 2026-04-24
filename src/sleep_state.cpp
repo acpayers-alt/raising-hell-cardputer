@@ -1,7 +1,6 @@
 // sleep_state.cpp
 #include "sleep_state.h"
 #include "app_state.h"
-#include "auto_screen.h"
 #include "pet.h"
 #include "ui_runtime.h"
 #include "auto_screen.h"

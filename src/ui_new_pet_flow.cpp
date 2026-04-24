@@ -1,25 +1,25 @@
 #include "ui_new_pet_flow.h"
 
-#include <string.h>
 #include <Arduino.h>
+#include <string.h>
 
 #include "app_state.h"
+#include "boot_pipeline.h"
+#include "display.h"
 #include "graphics.h"
 #include "input.h"
 #include "name_entry_state.h"
 #include "new_pet_flow_state.h"
 #include "pet.h"
-#include "ui_runtime.h"
 #include "save_manager.h"
-#include "boot_pipeline.h"
 #include "ui_actions.h"
-#include "display.h"
+#include "ui_runtime.h"
 
 void beginNamePetFlow()
 {
   memset(g_pendingPetName, 0, sizeof(g_pendingPetName));
   inputSetTextCapture(true);
-  g_textCaptureMode   = true;
+  g_textCaptureMode = true;
   g_namePetJustOpened = true;
 
   uiActionEnterState(UIState::NAME_PET, Tab::TAB_PET, true);
@@ -29,7 +29,7 @@ void beginNamePetFlow()
   clearInputLatch();
 }
 
-void finalizeNewPetFromName(InputState& in)
+void finalizeNewPetFromName(InputState &in)
 {
   inputSetTextCapture(false); // restore normal UI mapping
   g_textCaptureMode = false;
@@ -58,6 +58,7 @@ void finalizeNewPetFromName(InputState& in)
 
   // Birth time starts when the pet is actually named/finalized.
   saveManagerStampBirthNow();
+  Serial.printf("[SAVE] first-finalize birthEpoch=%lu\n", (unsigned long)saveManagerGetBirthEpoch());
 
   // The pet is finalized now, so clear pending-flow flags BEFORE forcing the
   // first live save. Otherwise saveManagerForce() will skip save.bin creation.
@@ -65,17 +66,17 @@ void finalizeNewPetFromName(InputState& in)
   bootSetupClearPendingFlag();
 
   saveManagerForce();
-  
+
   g_app.newPetFlowActive = false;
 
   // Immediately arm AND start the fade BEFORE state change
   // Enter PET screen first
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
-  
+
   startPetIntroWalkFromLeft();
   // Now force black AFTER anything else had a chance to touch brightness
   setBacklight(0);
-  
+
   // Arm fade to begin on next frame
   g_app.petScreenIntroFadePending = true;
 
@@ -84,7 +85,8 @@ void finalizeNewPetFromName(InputState& in)
   requestUIRedraw();
 
   // Swallow any stray edges/typing
-  while (in.kbHasEvent()) (void)in.kbPop();
+  while (in.kbHasEvent())
+    (void)in.kbPop();
   inputForceClear();
   clearInputLatch();
 }

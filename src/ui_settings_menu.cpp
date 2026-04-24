@@ -20,7 +20,6 @@
 // --- UI Core ---
 #include "ui_actions.h"
 #include "ui_input_common.h"
-#include "ui_input_utils.h" // uiDrainKb
 #include "ui_input_utils.h"
 #include "ui_runtime.h"
 #include "ui_settings_actions.h"
@@ -32,6 +31,9 @@
 #include "name_entry_state.h"
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
+#include "system_status_state.h"
+#include "ui_state_backup_pet_list.h"
+#include "ui_state_import_pet_list.h"
 
 // --- Networking / Time ---
 #include "wifi_power.h"
@@ -52,7 +54,6 @@
 // --- Game / User Systems ---
 #include "game_options_state.h"
 #include "user_toggles_state.h"
-#include "save_manager.h"
 
 // --- Graphics ---
 #include "graphics.h" // ui_showMessage
@@ -214,7 +215,7 @@ static void actTop_Console(InputState &input)
 static void actTop_OpenStatus(InputState &)
 {
   g_settingsFlow.settingsPage = SettingsPage::STATUS;
-  g_app.statusScreenIndex = 0;
+  g_systemStatus.scrollOffset = 0;
   requestUIRedraw();
   playBeep();
   clearInputLatch();
@@ -232,7 +233,7 @@ static void actTop_MainMenu(InputState &in)
 {
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
-  g_settingsFlow.settingsReturnValid = false;
+  uiPopReturnTarget();
 
   playBeep();
   uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, in, 120);
@@ -314,6 +315,14 @@ static void actScreen_AutoScreenLeft(InputState &)
     sel = 3;
 
   autoScreenTimeoutSel = (uint8_t)sel;
+  autoScreenSetEnabled(autoScreenTimeoutSel != 3);
+
+  if (autoScreenTimeoutSel != 3)
+  {
+    autoClockTimeoutSel = 3;
+    autoClockSetEnabled(false);
+  }
+
   saveSettingsToSD();
   saveManagerMarkDirty();
   requestUIRedraw();
@@ -328,6 +337,14 @@ static void actScreen_AutoScreenRight(InputState &)
     sel = 0;
 
   autoScreenTimeoutSel = (uint8_t)sel;
+  autoScreenSetEnabled(autoScreenTimeoutSel != 3);
+
+  if (autoScreenTimeoutSel != 3)
+  {
+    autoClockTimeoutSel = 3;
+    autoClockSetEnabled(false);
+  }
+
   saveSettingsToSD();
   saveManagerMarkDirty();
   requestUIRedraw();
@@ -337,13 +354,51 @@ static void actScreen_AutoScreenRight(InputState &)
 
 static void actScreen_AutoScreenSelect(InputState &input) { actScreen_AutoScreenRight(input); }
 
-static void actScreen_ClockMode(InputState &input)
+static void actScreen_AutoClockLeft(InputState &)
 {
+  int sel = (int)autoClockTimeoutSel - 1;
+  if (sel < 0)
+    sel = 3;
+
+  autoClockTimeoutSel = (uint8_t)sel;
+  autoClockSetEnabled(autoClockTimeoutSel != 3);
+
+  if (autoClockTimeoutSel != 3)
+  {
+    autoScreenTimeoutSel = 3;
+    autoScreenSetEnabled(false);
+  }
+
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
   playBeep();
-  uiClockModeSetReturnState(g_app.uiState, g_app.currentTab);
-  uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, input, 120);
-  requestFullUIRedraw();
+  clearInputLatch();
 }
+
+static void actScreen_AutoClockRight(InputState &)
+{
+  int sel = (int)autoClockTimeoutSel + 1;
+  if (sel > 3)
+    sel = 0;
+
+  autoClockTimeoutSel = (uint8_t)sel;
+  autoClockSetEnabled(autoClockTimeoutSel != 3);
+
+  if (autoClockTimeoutSel != 3)
+  {
+    autoScreenTimeoutSel = 3;
+    autoScreenSetEnabled(false);
+  }
+
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actScreen_AutoClockSelect(InputState &input) { actScreen_AutoClockRight(input); }
 
 static void actScreen_ShakeSensitivityLeft(InputState &)
 {
@@ -465,12 +520,10 @@ static void actGame_RenamePet(InputState &input)
   inputSetTextCapture(true);
   g_textCaptureMode = true;
 
-  uiActionEnterState(UIState::NAME_PET, g_app.currentTab, true);
+  uiActionEnterStateClean(UIState::NAME_PET, g_app.currentTab, true, input, 120);
 
   requestUIRedraw();
   invalidateBackgroundCache();
-  uiDrainKb(input);
-  clearInputLatch();
   playBeep();
 }
 
@@ -493,11 +546,12 @@ static void actGame_ExportBub(InputState &)
   clearInputLatch();
 }
 
-static void actGame_ImportBub(InputState &)
+static void actGame_ImportBub(InputState &input)
 {
-  uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+  uiActionEnterState(UIState::IMPORT_PET_LIST, g_app.currentTab, true);
   requestFullUIRedraw();
   playBeep();
+  uiDrainKb(input);
   clearInputLatch();
 }
 
@@ -576,17 +630,17 @@ static void actPet_RenamePet(InputState &input)
   inputSetTextCapture(true);
   g_textCaptureMode = true;
 
-  uiActionEnterState(UIState::NAME_PET, g_app.currentTab, true);
+  uiActionEnterStateClean(UIState::NAME_PET, g_app.currentTab, true, input, 120);
 
   requestUIRedraw();
   invalidateBackgroundCache();
-  clearInputLatch();
   playBeep();
 }
 
 static void actPet_StorePet(InputState &input)
 {
-  char boxedPath[128];
+  char boxedPath[128] = {0};
+
   if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
   {
     ui_showMessage("Store failed");
@@ -599,8 +653,8 @@ static void actPet_StorePet(InputState &input)
 
   Serial.printf("[UI] Store Pet OK path=%s\n", boxedPath);
 
-  // Box/store succeeded, so there must no longer be an active runtime pet.
-  saveManagerDeletePetOnly();
+  // Box/store already removed the live save on disk.
+  // Only reset runtime/UI state here so Title correctly shows "New Pet".
   resetRuntimeToCleanNoSaveState(/*resetName=*/true);
   g_app.newPetFlowActive = false;
   saveManagerClearNamePendingFlag();
@@ -608,7 +662,7 @@ static void actPet_StorePet(InputState &input)
 
   resetSettingsNav(true);
   g_settingsFlow.settingsPage = SettingsPage::TOP;
-  g_settingsFlow.settingsReturnValid = false;
+  uiPopReturnTarget();
 
   playBeep();
   uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
@@ -617,14 +671,10 @@ static void actPet_StorePet(InputState &input)
 static void actPet_StoredPets(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::PET;
-  g_importPetListReturnToSettings = true;
-  g_importPetListReturnPage = SettingsPage::PET;
 
   playBeep();
-  uiActionEnterState(UIState::IMPORT_PET_LIST, Tab::TAB_PET, true);
+  openImportPetListFromSettings(SettingsPage::PET, input);
   requestUIRedraw();
-  uiDrainKb(input);
-  clearInputLatch();
 }
 
 static void actPet_BackupCurrentPet(InputState &input)
@@ -644,12 +694,9 @@ static void actPet_BackupCurrentPet(InputState &input)
 
 static void actPet_RestoreFromBackup(InputState &input)
 {
-  g_settingsFlow.settingsPage = SettingsPage::PET;
   playBeep();
-  uiActionEnterState(UIState::BACKUP_PET_LIST, Tab::TAB_PET, true);
+  openBackupPetListFromSettings(SettingsPage::PET, input);
   requestUIRedraw();
-  uiDrainKb(input);
-  clearInputLatch();
 }
 
 static void actPet_NewPet(InputState &input)
@@ -681,6 +728,16 @@ static void actSystem_SetTime(InputState &)
   clearInputLatch();
 }
 
+static void actSystem_TimeZoneSelect(InputState &)
+{
+  settingsCycleTimeZone(+1);
+  // settingsCycleTimeZone already redraws + beeps + clears latch
+}
+
+static void actSystem_TimeZoneLeft(InputState &) { settingsCycleTimeZone(-1); }
+
+static void actSystem_TimeZoneRight(InputState &) { settingsCycleTimeZone(+1); }
+
 static void actSystem_OpenWifi(InputState &input)
 {
   g_settingsFlow.settingsPage = SettingsPage::WIFI;
@@ -693,6 +750,7 @@ static void actSystem_OpenWifi(InputState &input)
 
 static MenuItem kSystemItems[] = {
     {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
+    {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
     {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
     {"WiFi", actSystem_OpenWifi, nullptr, nullptr, nullptr},
 };
@@ -717,7 +775,7 @@ static MenuItem kTopItems[] = {
 static MenuItem kScreenItems[] = {
     {"Brightness", actScreen_BrightnessSelect, actScreen_BrightnessLeft, actScreen_BrightnessRight, nullptr},
     {"Auto Screen", actScreen_AutoScreenSelect, actScreen_AutoScreenLeft, actScreen_AutoScreenRight, nullptr},
-    {"Clock Mode", actScreen_ClockMode, nullptr, nullptr, nullptr},
+    {"Auto Clock", actScreen_AutoClockSelect, actScreen_AutoClockLeft, actScreen_AutoClockRight, nullptr},
     {"Shake Sensitivity", actScreen_ShakeSensitivitySelect, actScreen_ShakeSensitivityLeft,
      actScreen_ShakeSensitivityRight, nullptr},
 };
@@ -744,7 +802,6 @@ static MenuItem kWifiItems[] = {
     {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
 };
 
 #else
@@ -753,7 +810,6 @@ static MenuItem kWifiItems[] = {
     {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-    {"Time Zone", actWifi_TzSelect, actWifi_TzLeft, actWifi_TzRight, nullptr},
     {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
 };
 
@@ -931,7 +987,7 @@ bool Handle(InputState &input, int move)
       g_app.newPetFlowActive = false;
       saveManagerClearNamePendingFlag();
       saveManagerClearSleepPendingFlag();
-      
+
       // Now enter egg selection clean
       uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
       uiChoosePetOnEnter(input);

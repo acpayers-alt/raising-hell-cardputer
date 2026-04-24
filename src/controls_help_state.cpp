@@ -9,13 +9,14 @@
 #include "flow_boot_wizard.h"
 #include "return_target.h"
 #include "ui_actions.h"
+#include "whats_new_state.h"
 
 // --- New pet flow -------------------------------------------------------------
 #include "new_pet_flow_state.h"
 
 // --- Input / rendering --------------------------------------------------------
-#include "input.h"
 #include "graphics.h"
+#include "input.h"
 
 // --- Persistence / storage ----------------------------------------------------
 #include "save_manager.h"
@@ -29,7 +30,6 @@ extern Tab g_bootWizardAfterOkTab;
 uint8_t g_controlsHelpSeen = 0;
 
 static uint32_t s_controlsHelpEnterMs = 0;
-static ReturnTarget s_controlsHelpReturn{};
 
 void controlsHelpOnEnter()
 {
@@ -39,21 +39,13 @@ void controlsHelpOnEnter()
   clearInputLatch();
 }
 
-bool controlsHelpDismissAllowed()
-{
-  return (uint32_t)(millis() - s_controlsHelpEnterMs) >= 250;
-}
+bool controlsHelpDismissAllowed() { return (uint32_t)(millis() - s_controlsHelpEnterMs) >= 250; }
 
 void controlsHelpBegin(UIState returnState, Tab returnTab)
 {
-  s_controlsHelpReturn.state = returnState;
-  s_controlsHelpReturn.tab = returnTab;
+  uiPushReturnTarget(returnState, returnTab);
 
   uiActionEnterState(UIState::CONTROLS_HELP, returnTab, true);
-
-  // Prevent the opening key from immediately dismissing help.
-  controlsHelpOnEnter();
-
   requestFullUIRedraw();
 }
 
@@ -61,7 +53,6 @@ void controlsHelpDismiss()
 {
   if (!g_controlsHelpSeen)
   {
-    // Only mark seen if we can persist it.
     if (sdReady())
     {
       g_controlsHelpSeen = 1;
@@ -72,21 +63,28 @@ void controlsHelpDismiss()
   inputForceClear();
   clearInputLatch();
 
-  // Special case: on first boot, Controls Help should continue into the
-  // boot wizard entry function, not directly into a wizard state.
-  if (s_controlsHelpReturn.state == UIState::BOOT_WIFI_PROMPT)
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
+
+  if (ret.state == UIState::BOOT_WIFI_PROMPT)
   {
     bootWizardBegin(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
     requestFullUIRedraw();
     return;
   }
-  
-  if (s_controlsHelpReturn.state == UIState::CHOOSE_PET)
-{
-  g_choosePetInputUnlockMs = millis() + 350;
-  g_choosePetBlockHatchUntilRelease = true;
-}
 
-  uiActionEnterState(s_controlsHelpReturn.state, s_controlsHelpReturn.tab, true);
+  if (ret.state == UIState::CHOOSE_PET)
+  {
+    g_choosePetInputUnlockMs = millis() + 350;
+    g_choosePetBlockHatchUntilRelease = true;
+  }
+
+  if (!g_whatsNewSeen && ret.state == UIState::TITLE_MENU)
+  {
+    whatsNewBegin(ret.state, ret.tab);
+    return;
+  }
+  
+  uiActionEnterState(ret.state, ret.tab, true);
   requestFullUIRedraw();
 }

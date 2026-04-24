@@ -150,41 +150,31 @@ static void modeColor(LedPetMode mode, uint8_t &r, uint8_t &g, uint8_t &b)
     g = 0;
     b = 0;
     break;
+
+  // Positive / okay
   case LED_PET_OK:
+  case LED_PET_BORED:
     r = 0;
-    g = 50;
+    g = 60;
     b = 0;
     break;
+
+  // Needs attention
   case LED_PET_HUNGRY:
-    r = 70;
+  case LED_PET_TIRED:
+  case LED_PET_SLEEPING:
+  case LED_PET_MAD:
+    r = 110;
     g = 45;
     b = 0;
     break;
-  case LED_PET_TIRED:
-    r = 0;
-    g = 0;
-    b = 90;
-    break;
-  case LED_PET_SLEEPING:
-    r = 55;
-    g = 0;
-    b = 70;
-    break;
+
+  // Critical
   case LED_PET_DANGER:
     r = 110;
     g = 0;
     b = 0;
     break;
-  case LED_PET_BORED:
-    r = 0;
-    g = 70;
-    b = 70;
-    break; // cyan-ish
-  case LED_PET_MAD:
-    r = 120;
-    g = 25;
-    b = 0;
-    break; // angry orange/red
   }
 }
 

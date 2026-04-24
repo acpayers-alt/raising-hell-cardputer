@@ -43,5 +43,6 @@ extern bool g_bootProvisionWifiOnboardingStarted;
 bool bootSetupPendingFlagExists();
 void bootSetupWritePendingFlag();
 void bootSetupClearPendingFlag();
+void bootWriteFirstRunFlag();
 bool bootPostProvisionControlsHelpPending();
 void bootPostProvisionControlsHelpClear();

@@ -18,4 +18,4 @@ struct PetVisualProfile {
 };
 
 // ---- Array indexed by PetType ----
-extern const PetVisualProfile PET_PROFILES[6];
+extern const PetVisualProfile PET_PROFILES[];

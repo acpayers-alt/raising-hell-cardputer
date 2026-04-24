@@ -18,7 +18,7 @@ static void actUntilAwakened(InputState& in)
   (void)in;
   const uint32_t nowMs = millis();
   uiSleepMenuSetUntilAwakened(nowMs);
-  uiSleepMenuEnterSleep(nowMs);
+  uiSleepMenuEnterSleep(nowMs, in);
 }
 
 static void actUntilRested(InputState& in)
@@ -26,7 +26,7 @@ static void actUntilRested(InputState& in)
   (void)in;
   const uint32_t nowMs = millis();
   uiSleepMenuSetUntilRested(nowMs);
-  uiSleepMenuEnterSleep(nowMs);
+  uiSleepMenuEnterSleep(nowMs, in);
 }
 
 static void act4Hours(InputState& in)
@@ -34,7 +34,7 @@ static void act4Hours(InputState& in)
   (void)in;
   const uint32_t nowMs = millis();
   uiSleepMenuSetForHours(nowMs, 4);
-  uiSleepMenuEnterSleep(nowMs);
+  uiSleepMenuEnterSleep(nowMs, in);
 }
 
 static void act8Hours(InputState& in)
@@ -42,7 +42,7 @@ static void act8Hours(InputState& in)
   (void)in;
   const uint32_t nowMs = millis();
   uiSleepMenuSetForHours(nowMs, 8);
-  uiSleepMenuEnterSleep(nowMs);
+  uiSleepMenuEnterSleep(nowMs, in);
 }
 
 static const MenuItem kItems[] = {

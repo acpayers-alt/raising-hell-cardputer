@@ -37,9 +37,6 @@ void uiChoosePetOnEnter(InputState &in)
   in.clearEdges();
   inputForceClear();
   clearInputLatch();
-
-  Serial.printf("[EGG] onEnter selectHeld=%d unlockMs=%lu blockUntilRelease=%d\n", (int)in.selectHeld,
-                (unsigned long)g_choosePetInputUnlockMs, (int)g_choosePetBlockHatchUntilRelease);
 }
 
 void uiChoosePetHandle(InputState &in)
@@ -60,8 +57,6 @@ void uiChoosePetHandle(InputState &in)
         (void)in.kbPop();
       in.clearEdges();
       clearInputLatch();
-      Serial.printf("[EGG] BLOCKED unlockMs still active now=%lu unlockMs=%lu\n", (unsigned long)now,
-                    (unsigned long)g_choosePetInputUnlockMs);
       return;
     }
 
@@ -71,48 +66,43 @@ void uiChoosePetHandle(InputState &in)
   // ---------------------------------------------------------------------------
   // Entry gate to prevent instant hatch
   // ---------------------------------------------------------------------------
-if (g_choosePetBlockHatchUntilRelease)
-{
-  // Always allow ESC to escape, even while blocked
-  if (in.escOnce)
+  if (g_choosePetBlockHatchUntilRelease)
   {
-    playBeep();
+    // Always allow ESC to escape, even while blocked
+    if (in.escOnce)
+    {
+      playBeep();
 
-    saveManagerAbortFreshPetFlow();
+      saveManagerAbortFreshPetFlow();
 
-    uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
-    requestFullUIRedraw();
+      uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, false, in, 150);
+      requestFullUIRedraw();
 
-    while (in.kbHasEvent())
-      (void)in.kbPop();
-    inputForceClear();
-    clearInputLatch();
-    return;
+      while (in.kbHasEvent())
+        (void)in.kbPop();
+      inputForceClear();
+      clearInputLatch();
+      return;
+    }
+
+    if (!in.selectHeld)
+    {
+      g_choosePetBlockHatchUntilRelease = false;
+    }
+    else
+    {
+      // swallow only select-related noise, not ESC
+      while (in.kbHasEvent())
+        (void)in.kbPop();
+      in.clearEdges();
+      inputForceClear();
+      clearInputLatch();
+      return;
+    }
   }
-
-  if (!in.selectHeld)
-  {
-    g_choosePetBlockHatchUntilRelease = false;
-  }
-  else
-  {
-    // swallow only select-related noise, not ESC
-    while (in.kbHasEvent())
-      (void)in.kbPop();
-    in.clearEdges();
-    inputForceClear();
-    clearInputLatch();
-    Serial.println("[EGG] BLOCKED waiting for release");
-    return;
-  }
-}
 
   // Enter edge derived from held state (more reliable than selectOnce)
   const bool enterEdge = (in.selectHeld && !s_prevSelectHeld);
-  if (enterEdge)
-  {
-    Serial.printf("[EGG] enterEdge DETECTED selectHeld=%d prev=%d\n", (int)in.selectHeld, (int)s_prevSelectHeld);
-  }
 
   s_prevSelectHeld = in.selectHeld;
 
@@ -160,7 +150,8 @@ if (g_choosePetBlockHatchUntilRelease)
   };
 #else
   static const PetType kChoices[] = {
-      PET_DEVIL, PET_ELDRITCH, PET_ALIEN, PET_KAIJU, PET_ANUBIS, PET_AXOLOTL,
+      PET_DEVIL,
+      PET_ELDRITCH,
   };
 #endif
 
@@ -235,6 +226,13 @@ if (g_choosePetBlockHatchUntilRelease)
     g_app.flow.hatch.frame = 0;
     g_app.flow.hatch.flashWhite = false;
     g_app.flow.hatch.flashStartMs = 0;
+    g_app.flow.hatch.inited = false;
+    g_app.flow.hatch.step = 0;
+    g_app.flow.hatch.stepStartMs = 0;
+    g_app.flow.hatch.flashActive = false;
+    g_app.flow.hatch.flashPhase = 0;
+    g_app.flow.hatch.flashPhaseStartMs = 0;
+    g_app.flow.hatch.lastStep = 255;
 
     // Enter the modal hatching state
     uiActionEnterStateClean(UIState::HATCHING, Tab::TAB_PET, false, in, 150);

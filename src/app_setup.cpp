@@ -129,7 +129,6 @@ static void serialBootHandshake(uint32_t waitMs)
   }
 
   // One-shot banner only.
-  Serial.println("[BOOT] serial up");
   clearStaleCoreDumpIfNeeded();
 }
 

@@ -57,7 +57,7 @@ void uiNamePetHandle(InputState &in)
 
   // Allow cancel only when this is a normal rename flow.
   // New-pet naming remains mandatory.
-  if (g_namePetRenameMode && (in.menuOnce || in.hotSettings))
+  if (g_namePetRenameMode && (in.escOnce || in.menuOnce || in.hotSettings))
   {
     inputSetTextCapture(false);
     g_textCaptureMode = false;
@@ -70,9 +70,22 @@ void uiNamePetHandle(InputState &in)
     inputForceClear();
     clearInputLatch();
 
-    uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
+    // Rename-from-settings should return to Settings / Pet page,
+    // not unwind the whole Settings return target back to Title.
+    g_settingsFlow.settingsPage = SettingsPage::PET;
+
+    playBeep();
+    uiActionEnterStateClean(UIState::SETTINGS, g_app.currentTab, true, in, 120);
     requestFullUIRedraw();
     requestUIRedraw();
+    return;
+  }
+  
+  // New-pet naming: ESC is intentionally inert
+  if (!g_namePetRenameMode && in.escOnce)
+  {
+    playBeep();
+    clearInputLatch();
     return;
   }
 
@@ -103,16 +116,17 @@ void uiNamePetHandle(InputState &in)
 
         g_namePetRenameMode = false;
         g_namePetJustOpened = false;
-        uiActionEnterState(UIState::SETTINGS, Tab::TAB_PET, true);
-        requestFullUIRedraw();
-        requestUIRedraw();
-        invalidateBackgroundCache();
 
         while (in.kbHasEvent())
           (void)in.kbPop();
         inputForceClear();
         clearInputLatch();
+
         playBeep();
+        closeSettingsAndReturn(in);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        invalidateBackgroundCache();
         return;
       }
 

@@ -54,6 +54,7 @@
 #include "ui_actions.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
+#include "whats_new_state.h"
 
 // Flow / boot UX
 #include "flow_boot_wifi.h"
@@ -205,6 +206,25 @@ static bool bootAssetPackTooOld()
 static const char *kFirstRunFlagPath = "/raising_hell/first_run.flag";
 static const char *kPostProvisionControlsHelpFlagPath = "/raising_hell/post_provision_controls.flag";
 static const char *kBootSetupPendingFlagPath = "/raising_hell/boot_setup_pending.flag";
+
+static bool writeFirstRunFlag()
+{
+  if (!g_sdReady)
+    return false;
+
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+
+  File f = SD.open(kFirstRunFlagPath, FILE_WRITE);
+  if (!f)
+    return false;
+
+  f.print("1\n");
+  f.close();
+  return true;
+}
+
+void bootWriteFirstRunFlag() { (void)writeFirstRunFlag(); }
 
 bool bootSetupPendingFlagExists()
 {
@@ -562,6 +582,10 @@ static bool runBootAssetProvision()
       if (!saveExistsNow)
       {
         writePostProvisionControlsHelpFlag();
+
+        // Ensure full onboarding sequence runs (controls + what's new)
+        g_controlsHelpSeen = 0;
+        g_whatsNewSeen = 0;
       }
 
       settingsSetWifiEnabled(true);
@@ -617,9 +641,33 @@ static bool bootAssetProvisionWifiReady()
     const bool haveStoredCreds = wifiStoreHasCreds();
     const bool wifiConnected = (WiFi.status() == WL_CONNECTED);
 
-    Serial.printf("[BOOT][PROVISION][WIFICHK] mandatory=%d wifiEnabled=%d haveStoredCreds=%d wifiConnected=%d ui=%d\n",
-                  g_bootAssetProvisionMustComplete ? 1 : 0, shouldEnableWifi ? 1 : 0, haveStoredCreds ? 1 : 0,
-                  wifiConnected ? 1 : 0, (int)g_app.uiState);
+    static int s_prevMandatory = -1;
+    static int s_prevWifiEnabled = -1;
+    static int s_prevHaveCreds = -1;
+    static int s_prevConnected = -1;
+    static int s_prevUi = -1;
+
+    const int mandatoryNow = g_bootAssetProvisionMustComplete ? 1 : 0;
+    const int wifiEnabledNow = shouldEnableWifi ? 1 : 0;
+    const int haveCredsNow = haveStoredCreds ? 1 : 0;
+    const int connectedNow = wifiConnected ? 1 : 0;
+    const int uiNow = (int)g_app.uiState;
+
+    const bool changed = (mandatoryNow != s_prevMandatory) || (wifiEnabledNow != s_prevWifiEnabled) ||
+                         (haveCredsNow != s_prevHaveCreds) || (connectedNow != s_prevConnected) || (uiNow != s_prevUi);
+
+    if (changed)
+    {
+      Serial.printf(
+          "[BOOT][PROVISION][WIFICHK] mandatory=%d wifiEnabled=%d haveStoredCreds=%d wifiConnected=%d ui=%d\n",
+          mandatoryNow, wifiEnabledNow, haveCredsNow, connectedNow, uiNow);
+
+      s_prevMandatory = mandatoryNow;
+      s_prevWifiEnabled = wifiEnabledNow;
+      s_prevHaveCreds = haveCredsNow;
+      s_prevConnected = connectedNow;
+      s_prevUi = uiNow;
+    }
 
     // If provisioning needs Wi-Fi but we do not have stored creds to auto-connect,
     // fall back to the boot Wi-Fi connection flow instead of idling and later
@@ -631,17 +679,23 @@ static bool bootAssetProvisionWifiReady()
     //   3) fall back to manual Wi-Fi setup
     if (shouldEnableWifi && !wifiConnected && !haveStoredCreds)
     {
-      Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
-
       g_bootProvisionWifiOnboardingStarted = true;
       g_bootAssetProvisionActive = false;
 
       ui_setBootSplashActive(false);
-      uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
-      requestFullUIRedraw();
-      requestUIRedraw();
-      renderUI();
-      clearInputLatch();
+
+      if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
+      {
+
+        Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
+
+        uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        renderUI();
+        clearInputLatch();
+      }
+
       return false;
     }
 
@@ -707,60 +761,55 @@ static void finalizeBootLanding()
     g_wifiApplied = true;
   }
 
-  // If we are landing on the title screen with no save file, this is a
-  // "no-save title menu" landing, not an active new-pet flow.
-  //
-  // saveManagerLoad() may already have staged a fresh in-memory new-pet flow
-  // and written name_pending.flag before the first-boot wizard ran.
-  // If we keep those flags here, the next reboot will incorrectly think
-  // onboarding/new-pet flow is still pending.
-  if (s_bootFinalLandingState == UIState::TITLE_MENU && !bootSaveFileExists())
+  // Prewarm the PET background cache once per boot so the first visible
+  // return to the PET screen does not expose a one-frame background rebuild.
+  if (bootSaveFileExists())
   {
-    const bool hadNamePending = saveManagerNamePendingFlagExists();
-    const bool hadBootSetupPending = bootSetupPendingFlagExists();
-
-    if (hadNamePending)
-      saveManagerClearNamePendingFlag();
-
-    if (hadBootSetupPending)
-      bootSetupClearPendingFlag();
-
-    g_app.newPetFlowActive = false;
-
-    Serial.printf("[BOOT][LAND] no-save title cleanup namePending=%d bootSetupPending=%d\n", hadNamePending ? 1 : 0,
-                  hadBootSetupPending ? 1 : 0);
-
-    Serial.printf("[BOOT][LAND] post-cleanup namePending=%d bootSetupPending=%d saveExists=%d\n",
-                  saveManagerNamePendingFlagExists() ? 1 : 0, bootSetupPendingFlagExists() ? 1 : 0,
-                  bootSaveFileExists() ? 1 : 0);
+    graphicsPrewarmPetBackgroundCache();
   }
 
+  // ------------------------------------------------------------
+  // Onboarding (Controls Help + What's New)
+  // MUST run as a single sequence, and MUST be last before TITLE_MENU
+  // ------------------------------------------------------------
+
+  // ------------------------------------------------------------
+  // Onboarding sequence
+  // Controls Help + What's New must run together, in order,
+  // and only as the final stop before TITLE_MENU.
+  // ------------------------------------------------------------
   if (g_postProvisionControlsHelpPending)
   {
     g_postProvisionControlsHelpPending = false;
-    g_controlsHelpSeen = 0;
-    clearInputLatch();
-    inputForceClear();
 
-    controlsHelpBegin(UIState::TITLE_MENU, Tab::TAB_PET);
-    return;
+    // Re-arm the full onboarding pair, not just controls help.
+    g_controlsHelpSeen = 0;
+    g_whatsNewSeen = 0;
   }
 
-  if (!g_controlsHelpSeen)
+  if (s_bootFinalLandingState == UIState::TITLE_MENU)
   {
-    clearInputLatch();
-    inputForceClear();
-
-    if (s_bootFinalLandingState == UIState::CHOOSE_PET)
+    if (!g_controlsHelpSeen)
     {
-      g_choosePetInputUnlockMs = millis() + 350;
-      g_choosePetBlockHatchUntilRelease = true;
+      clearInputLatch();
+      inputForceClear();
+
+      Serial.println("[BOOT][LAND] controlsHelpBegin (onboarding)");
+
+      controlsHelpBegin(UIState::TITLE_MENU, Tab::TAB_PET);
+      return;
     }
 
-    Serial.printf("[BOOT][LAND] controlsHelpBegin returnState=%d\n", (int)s_bootFinalLandingState);
+    if (!g_whatsNewSeen)
+    {
+      clearInputLatch();
+      inputForceClear();
 
-    controlsHelpBegin(s_bootFinalLandingState, Tab::TAB_PET);
-    return;
+      Serial.println("[BOOT][LAND] whatsNewBegin (onboarding)");
+
+      whatsNewBegin(UIState::TITLE_MENU, Tab::TAB_PET);
+      return;
+    }
   }
 
   uint16_t seedMarkNow = 0;
@@ -778,13 +827,11 @@ static void finalizeBootLanding()
     {
       // Critical: free any stale UI/sleep buffers before entering sleep screen.
       graphicsReleaseUiCachesForMiniGame();
-      Serial.printf("[HEAPCHK] boot-sleep-landing after-release free=%u largest=%u\n",
-                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
     }
 
-    enterState(s_bootFinalLandingState, Tab::TAB_PET, false);
-
+    const bool fullRedraw = (s_bootFinalLandingState == UIState::TITLE_MENU);
+    enterState(s_bootFinalLandingState, Tab::TAB_PET, fullRedraw);
+    
     if (s_bootFinalLandingState == UIState::PET_SLEEPING)
     {
       uiPetSleepingBootEnter();
@@ -799,6 +846,13 @@ static void finalizeBootLanding()
   {
     requestFullUIRedraw();
     sleepBgKickNow();
+    return;
+  }
+
+  if (s_bootFinalLandingState == UIState::TITLE_MENU)
+  {
+    requestFullUIRedraw();
+    renderUI();
     return;
   }
 
@@ -947,11 +1001,12 @@ void postBootInitTick()
       // (including Wi-Fi preference) and then write the correct defaults.
     }
 
-    // FIRST RUN FLAG (from factory reset)
+    // FIRST RUN FLAG (from factory reset / forced onboarding)
     const bool forcedFirstRun = consumeFirstRunFlagIfPresent();
     if (forcedFirstRun)
     {
       g_controlsHelpSeen = 0;
+      g_whatsNewSeen = 0;
       saveSettingsToSD();
     }
 
@@ -1053,15 +1108,17 @@ void postBootInitTick()
       if (g_bootAssetProvisionMustComplete)
       {
         g_bootAssetProvisionActive = false;
-        Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED sdReady=%d assetsMissing=%d must=%d "
-                      "active=%d requested=%d ui=%d\n",
-                      g_sdReady ? 1 : 0, g_assetsMissing ? 1 : 0, g_bootAssetProvisionMustComplete ? 1 : 0,
-                      g_bootAssetProvisionActive ? 1 : 0, bootAssetProvisionRequested() ? 1 : 0, (int)g_app.uiState);
-        uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
-        requestFullUIRedraw();
-        requestUIRedraw();
-        renderUI();
-        clearInputLatch();
+        if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
+        {
+          Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED ...");
+
+          uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+          requestFullUIRedraw();
+          requestUIRedraw();
+          renderUI();
+          clearInputLatch();
+        }
+
         return;
       }
 
@@ -1085,14 +1142,9 @@ void postBootInitTick()
       g_bootWizardAfterOkState = afterOk;
       g_bootWizardAfterOkTab = Tab::TAB_PET;
 
-      if (!g_controlsHelpSeen)
-      {
-        controlsHelpBegin(UIState::BOOT_WIFI_PROMPT, Tab::TAB_PET);
-        return;
-      }
-
       // First prefer creds we previously saved ourselves.
       String storedSsid, storedPwd;
+
       if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
       {
         Serial.printf("[BOOTPIPE] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
@@ -1184,8 +1236,16 @@ void postBootInitTick()
 
   if (bootAssetProvisionRequired())
   {
+    // If user opened console during the asset intro/provision phase,
+    // freeze boot pipeline UI activity so we do not fight the overlay.
+    if (g_app.uiState == UIState::CONSOLE && bootAssetProvisionWaitingAtIntroScreen())
+    {
+      return;
+    }
+
     const int wifiNow = (WiFi.status() == WL_CONNECTED) ? 1 : 0;
     const int uiNow = (int)g_app.uiState;
+
     const int onboardingNow = g_bootProvisionWifiOnboardingStarted ? 1 : 0;
     const int activeNow = g_bootAssetProvisionActive ? 1 : 0;
 
@@ -1212,7 +1272,8 @@ void postBootInitTick()
     }
 
     if (bootAssetProvisionRequired() && g_bootLandingDeferredForAssetProvision && !g_bootAssetProvisionActive &&
-        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED && g_app.uiState != UIState::BOOT)
+        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED && g_app.uiState != UIState::BOOT &&
+        g_app.uiState != UIState::CONSOLE)
     {
       Serial.printf("[BOOT][ASSET_STAGE35] forcing return to BOOT from ui=%d\n", (int)g_app.uiState);
       uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
@@ -1246,12 +1307,14 @@ void postBootInitTick()
     g_ntpSaved = true;
     saveTimeAnchor();
 
-    // If boot was paused for time recovery, time is now valid and we may still
-    // be sitting on the splash/BOOT state without ever completing the normal
-    // post-boot landing. Finish that handoff now.
-    if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone && g_app.uiState == UIState::BOOT)
+    // If boot was paused for time recovery, finish the normal post-boot
+    // landing as soon as time becomes valid. Do not require the UI to still
+    // be sitting in BOOT, because the WiFi/NTP flow may already have moved
+    // through other boot states.
+    if (!g_bootLandingDeferredForAssetProvision && !g_bootLandingDone)
     {
-      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d\n", (int)s_bootFinalLandingState);
+      Serial.printf("[BOOT][TIME_RECOVERY] synced -> finalize landing=%d ui=%d\n", (int)s_bootFinalLandingState,
+                    (int)g_app.uiState);
       finalizeBootLanding();
       return;
     }

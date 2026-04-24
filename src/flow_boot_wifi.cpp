@@ -77,97 +77,6 @@ void bootWifiClearImportedInfo()
 
 const char *bootWifiImportedSsid() { return s_bootWifiImportedSsid; }
 
-static int tzIndexFromDetectedName(const String &tzNameStr)
-{
-  if (tzNameStr.isEmpty())
-    return -1;
-
-  if (tzNameStr == "UTC" || tzNameStr == "Etc/UTC")
-    return 0;
-
-  if (tzNameStr == "America/New_York" || tzNameStr == "America/Detroit" ||
-      tzNameStr == "America/Indiana/Indianapolis" || tzNameStr == "America/Indiana/Marengo" ||
-      tzNameStr == "America/Indiana/Petersburg" || tzNameStr == "America/Indiana/Vevay" ||
-      tzNameStr == "America/Indiana/Vincennes" || tzNameStr == "America/Indiana/Winamac" ||
-      tzNameStr == "America/Kentucky/Louisville" || tzNameStr == "America/Kentucky/Monticello")
-    return 1;
-
-  if (tzNameStr == "America/Chicago" || tzNameStr == "America/Indiana/Knox" ||
-      tzNameStr == "America/Indiana/Tell_City" || tzNameStr == "America/Menominee" ||
-      tzNameStr == "America/North_Dakota/Beulah" || tzNameStr == "America/North_Dakota/Center" ||
-      tzNameStr == "America/North_Dakota/New_Salem")
-    return 2;
-
-  if (tzNameStr == "America/Denver" || tzNameStr == "America/Boise")
-    return 3;
-
-  if (tzNameStr == "America/Los_Angeles")
-    return 4;
-
-  if (tzNameStr == "America/Anchorage" || tzNameStr == "America/Juneau" || tzNameStr == "America/Nome" ||
-      tzNameStr == "America/Sitka" || tzNameStr == "America/Yakutat" || tzNameStr == "America/Metlakatla")
-    return 5;
-
-  if (tzNameStr == "Pacific/Honolulu")
-    return 6;
-
-  if (tzNameStr == "Europe/London")
-    return 7;
-
-  if (tzNameStr == "Europe/Paris" || tzNameStr == "Europe/Berlin" || tzNameStr == "Europe/Rome" ||
-      tzNameStr == "Europe/Madrid" || tzNameStr == "Europe/Amsterdam" || tzNameStr == "Europe/Brussels" ||
-      tzNameStr == "Europe/Vienna" || tzNameStr == "Europe/Zurich" || tzNameStr == "Europe/Prague" ||
-      tzNameStr == "Europe/Warsaw" || tzNameStr == "Europe/Stockholm" || tzNameStr == "Europe/Copenhagen" ||
-      tzNameStr == "Europe/Oslo" || tzNameStr == "Europe/Budapest")
-    return 8;
-
-  if (tzNameStr == "Europe/Helsinki" || tzNameStr == "Europe/Athens" || tzNameStr == "Europe/Bucharest" ||
-      tzNameStr == "Europe/Kyiv" || tzNameStr == "Europe/Sofia" || tzNameStr == "Europe/Riga" ||
-      tzNameStr == "Europe/Tallinn" || tzNameStr == "Europe/Vilnius")
-    return 9;
-
-  if (tzNameStr == "Europe/Moscow")
-    return 10;
-
-  if (tzNameStr == "Asia/Tokyo")
-    return 11;
-
-  if (tzNameStr == "Asia/Seoul")
-    return 12;
-
-  if (tzNameStr == "Asia/Shanghai" || tzNameStr == "Asia/Hong_Kong")
-    return 13;
-
-  if (tzNameStr == "Asia/Kolkata")
-    return 14;
-
-  if (tzNameStr == "Asia/Singapore")
-    return 15;
-
-  if (tzNameStr == "Australia/Sydney" || tzNameStr == "Australia/Melbourne" || tzNameStr == "Australia/Brisbane")
-    return 16;
-
-  if (tzNameStr == "Australia/Adelaide")
-    return 17;
-
-  if (tzNameStr == "Pacific/Auckland")
-    return 18;
-
-  if (tzNameStr == "America/Halifax")
-    return 19;
-
-  if (tzNameStr == "America/Sao_Paulo")
-    return 20;
-
-  if (tzNameStr == "America/Argentina/Buenos_Aires")
-    return 21;
-
-  if (tzNameStr == "Africa/Johannesburg")
-    return 22;
-
-  return -1;
-}
-
 static bool bootTryDetectTimezoneFromWifi()
 {
   if (!wifiIsConnectedNow())
@@ -217,17 +126,25 @@ static bool bootTryDetectTimezoneFromWifi()
     return false;
   }
 
-  String tzNameStr = String(tzNameRaw);
-  const int detectedIdx = tzIndexFromDetectedName(tzNameStr);
+  const int detectedIdx = tzFindIndexByIana(tzNameRaw);
 
-  Serial.printf("[BOOTWIFI] timezone detect raw='%s' mapped=%d\n", tzNameStr.c_str(), detectedIdx);
+  Serial.printf("[BOOTWIFI] timezone detect raw='%s' mapped=%d\n", tzNameRaw, detectedIdx);
 
   if (detectedIdx < 0)
+  {
+    Serial.printf("[BOOTWIFI] timezone detect unsupported IANA zone '%s'\n", tzNameRaw);
     return false;
+  }
 
   tzIndex = detectedIdx;
   applyTimezoneIndex((uint8_t)tzIndex);
   saveTzIndexToNVS((uint8_t)tzIndex);
+
+  Serial.printf("[BOOTWIFI] timezone applied idx=%d label='%s' iana='%s' rule='%s'\n",
+                tzIndex,
+                tzName((uint8_t)tzIndex),
+                tzIanaName((uint8_t)tzIndex),
+                tzPosixRule((uint8_t)tzIndex));
 
   return true;
 }

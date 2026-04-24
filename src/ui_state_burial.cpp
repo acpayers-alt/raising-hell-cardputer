@@ -11,8 +11,17 @@
 void ui_showMessage(const char* msg);
 void forceRenderUIOnce();
 
+static bool s_burialDirgeStarted = false;
+
 void uiBurialHandle(InputState& in)
 {
+  if (!s_burialDirgeStarted)
+  {
+    soundResetDeathDirgeLatch();
+    soundFuneralDirge();
+    s_burialDirgeStarted = true;
+  }
+
   if (!(in.selectOnce || in.encoderPressOnce)) {
     uiDrainKb(in);
     clearInputLatch();
@@ -27,6 +36,8 @@ void uiBurialHandle(InputState& in)
 
   soundResetDeathDirgeLatch();
   saveManagerDeletePetOnly();
+
+  s_burialDirgeStarted = false;
 
   delay(50);
   ESP.restart();

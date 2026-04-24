@@ -11,6 +11,7 @@
 #include "settings_flow_state.h"
 #include "settings_nav_state.h"
 #include "sound.h"
+#include "system_status_state.h"
 #include "ui_actions.h"
 #include "ui_defs.h"
 #include "ui_input_common.h"
@@ -127,7 +128,7 @@ void Handle_TOP(InputState &input, int move)
     case 7:
     { // System Status
       g_settingsFlow.settingsPage = SettingsPage::STATUS;
-      g_app.statusScreenIndex = 0;
+      g_systemStatus.scrollOffset = 0;
       requestUIRedraw();
       playBeep();
       clearInputLatch();
@@ -143,30 +144,44 @@ void Handle_TOP(InputState &input, int move)
       return;
     }
 
-    case 9: { // Store Pet
-      char parkedPath[128];
-      if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
+    case 9:
+    { // Store Pet
+      char boxedPath[128] = {0};
+
+      if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
       {
         ui_showMessage("Store failed");
+        Serial.println("[UI] Store Pet FAILED");
         requestUIRedraw();
         playBeep();
         clearInputLatch();
         return;
       }
-    
+
+      Serial.printf("[UI] Store Pet OK path=%s\n", boxedPath);
+
+      // Box/store already removed the live save on disk.
+      // Reset runtime/UI state so Title correctly shows "New Pet".
+      resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+      g_app.newPetFlowActive = false;
+      saveManagerClearNamePendingFlag();
+      saveManagerClearSleepPendingFlag();
+
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
-      g_settingsFlow.settingsReturnValid = false;
-    
+      uiPopReturnTarget();
+
       playBeep();
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
       return;
     }
     
-    case 10: { // Main Menu
+    case 10:
+    { // Main Menu
       resetSettingsNav(true);
       g_settingsFlow.settingsPage = SettingsPage::TOP;
-      g_settingsFlow.settingsReturnValid = false;
+      uiPopReturnTarget();
+
       playBeep();
       uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, input, 120);
       return;

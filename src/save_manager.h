@@ -1,45 +1,89 @@
 // save_manager.h
 #pragma once
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-// Game Options persistence (stored in /raising_hell/save/gameopt.bin)
-uint8_t saveManagerGetDecayMode(); // 0=Normal, 1=Slow, 2=Off (example)
-void saveManagerSetDecayMode(uint8_t mode);
-
-// SD-backed save system (game + settings)
-bool saveManagerLoad();      // returns true only if save.bin loaded OK
-bool saveManagerSave();      // returns true if write succeeded
-void saveManagerBegin();     // optional init hook (safe to call)
-void saveManagerMarkDirty(); // call when anything changes
+// ─────────────────────────────────────
+// Core Save System (game + settings)
+// ─────────────────────────────────────
+bool saveManagerLoad();      // true if save.bin loaded OK
+bool saveManagerSave();      // true if write succeeded
+void saveManagerBegin();     // optional init hook
+void saveManagerMarkDirty(); // mark dirty for deferred save
 void saveManagerTick();      // call in loop()
-void saveManagerForce();     // force a save (and settings), used before reboot/sleep
-bool saveManagerAutoHeal();
+void saveManagerForce();     // force immediate save
+
+bool saveManagerSaveFileExists();
+
+int saveManagerLastExportScanInvalidCount();
+int saveManagerLastExportScanValidCount();
+
+// ─────────────────────────────────────
+// Pet Lifecycle
+// ─────────────────────────────────────
 void saveManagerNewPet();
 void saveManagerNewPetNoSave();
-bool saveManagerSaveFileExists();
-bool saveManagerHasImportableBubJson();
-void saveManagerStartFreshPetFlow();
-bool saveManagerAutoHeal();
 void saveManagerFullWipe();
 
-uint32_t saveManagerGetBirthEpoch(); // handy for stats screen later
+uint32_t saveManagerGetBirthEpoch();
+void saveManagerStampBirthNow();
 
-// Settings persistence (settings.bin under /raising_hell/save/)
+// ─────────────────────────────────────
+// Auto-heal / integrity
+// ─────────────────────────────────────
+bool saveManagerAutoHeal();
+
+// ─────────────────────────────────────
+// Delete / reset
+// ─────────────────────────────────────
+void saveManagerDeleteAll();      // delete everything
+void saveManagerDeletePetOnly();  // delete only pet save
+void saveManagerFactoryReset();
+
+// ─────────────────────────────────────
+// Game Options (gameopt.bin)
+// ─────────────────────────────────────
+uint8_t saveManagerGetDecayMode(); // 0=Normal, 1=Slow, 2=Off
+void saveManagerSetDecayMode(uint8_t mode);
+
+// ─────────────────────────────────────
+// Settings persistence (settings.bin)
+// ─────────────────────────────────────
 bool loadSettingsFromSD();
 void saveSettingsToSD();
-void saveManagerNewPet();
-uint8_t saveManagerGetDecayMode();
-void saveManagerSetDecayMode(uint8_t mode);
+
 extern bool ledAlertsEnabled;
 
-// Persisted WiFi preference (settings.bin)
+// WiFi preference
 bool settingsWifiEnabled();
 void settingsSetWifiEnabled(bool en);
 
-void saveManagerFactoryReset();
+// ─────────────────────────────────────
+// Sleep state persistence
+// ─────────────────────────────────────
+void saveManagerSetSleepPendingFlag();
+void saveManagerClearSleepPendingFlag();
+bool saveManagerSleepPendingFlagExists();
+void saveManagerEnterSleepState();
 
+// ─────────────────────────────────────
+// Name / intro flags
+// ─────────────────────────────────────
+void saveManagerClearNamePendingFlag();
+bool saveManagerNamePendingFlagExists();
+void saveManagerSetPetIntroFadeBootFlag();
+
+// ─────────────────────────────────────
+// Fresh pet flow control
+// ─────────────────────────────────────
+void saveManagerAbortFreshPetFlow();
+void resetRuntimeToCleanNoSaveState(bool resetName);
+
+// ─────────────────────────────────────
+// Backup / Export / Import
+// ─────────────────────────────────────
 struct PetExportEntry
 {
   char path[128];
@@ -50,15 +94,23 @@ struct PetExportEntry
   bool valid;
 };
 
-int saveManagerListPetBackups(PetExportEntry *outEntries, int maxEntries);
+int  saveManagerListPetBackups(PetExportEntry *outEntries, int maxEntries);
 bool saveManagerBackupCurrentPet(char *outPath, size_t outPathSize);
 bool saveManagerValidateBubAtPath(const char *path);
 bool saveManagerDeletePetBackupAtPath(const char *path);
-int saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries);
+
+int  saveManagerListPetExports(PetExportEntry *outEntries, int maxEntries);
 bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathSize, bool backupCurrentFirst = true);
 bool saveManagerBoxCurrentPet(char *outPath, size_t outPathSize);
+
+bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize);
+bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize);
+
 void saveManagerAssignFreshPetId();
 
+// ─────────────────────────────────────
+// Load diagnostics
+// ─────────────────────────────────────
 enum SaveLoadErr : uint8_t
 {
   SLE_OK = 0,
@@ -71,29 +123,10 @@ enum SaveLoadErr : uint8_t
   SLE_VERSION_BAD
 };
 
-uint8_t saveManagerLastLoadErr();
+uint8_t  saveManagerLastLoadErr();
 uint32_t saveManagerLastLoadSize();
 
-// Deletes all save files (used when the pet is buried)
-void saveManagerDeleteAll();
-// Delete ONLY the pet save (used for burial). Keeps settings/game options.
-void saveManagerDeletePetOnly();
-
-void saveManagerStampBirthNow();
-
-void saveManagerClearNamePendingFlag();
-bool saveManagerNamePendingFlagExists();
-
-bool saveManagerExportCurrentBubJson(char *outPath, size_t outPathSize);
-bool saveManagerImportLatestBubJson(char *outPath, size_t outPathSize);
-
-void saveManagerSetPetIntroFadeBootFlag();
-
-void saveManagerAbortFreshPetFlow();
-
-void saveManagerSetSleepPendingFlag();
-void saveManagerClearSleepPendingFlag();
-bool saveManagerSleepPendingFlagExists();
-
-void saveManagerEnterSleepState();
-void resetRuntimeToCleanNoSaveState(bool resetName);
+// ─────────────────────────────────────
+// Import helpers
+// ─────────────────────────────────────
+bool saveManagerHasImportableBubJson();

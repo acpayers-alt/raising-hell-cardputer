@@ -41,6 +41,7 @@
 #include "ui_input_router.h"
 #include "ui_level_popup.h"
 #include "ui_runtime.h"
+#include "ui_state_clock_mode.h"
 #include "ui_state_console.h"
 #include "ui_state_pet_sleeping.h"
 #include "ui_tabs.h"
@@ -85,7 +86,6 @@
 bool handleMenuInput(InputState &in);
 
 static bool s_forcedFirstRender = false;
-static uint32_t s_hbNextMs = 0;
 static bool s_bootKeepAwakeInited = false;
 static uint32_t s_bootKeepAwakeUntilMs = 0;
 static bool s_prevSleeping = false;
@@ -232,7 +232,7 @@ void appMainLoopTick()
   const bool inDeathFlow = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::DEATH_TRANSITION) ||
                            (g_app.uiState == UIState::MINI_GAME) || (g_app.uiState == UIState::MG_PAUSE) ||
                            (g_app.uiState == UIState::BURIAL_SCREEN);
-                           
+
   const bool screenOnNow = isScreenOn();
 
   if (!s_prevScreenOn && screenOnNow)
@@ -340,7 +340,7 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-  #if LED_STATUS_ENABLED
+#if LED_STATUS_ENABLED
   if (ledInputLockActive())
   {
     // Keep alert system in logical screen-off mode during the pulse.
@@ -350,7 +350,7 @@ void appMainLoopTick()
     if (motionAvailable && motionShakeDetected())
     {
       screenWake();
-      motionResetShakeDetector(2500); 
+      motionResetShakeDetector(2500);
       setLastInputActivityMs(now);
       invalidateBackgroundCache();
       requestFullUIRedraw();
@@ -677,14 +677,18 @@ void appMainLoopTick()
     }
   }
 
-  if (g_app.uiState != UIState::CONSOLE)
+  if (g_app.uiState != UIState::CONSOLE && g_app.uiState != UIState::MINI_GAME)
   {
     if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
       soundMenuTick();
     if (input.leftOnce || input.rightOnce)
       soundClick();
-    if (input.selectOnce || input.encoderPressOnce)
+
+    const bool suppressGlobalConfirm = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::SHOP);
+
+    if ((input.selectOnce || input.encoderPressOnce) && !suppressGlobalConfirm)
       soundConfirm();
+
     if (input.menuOnce || input.homeOnce || input.escOnce)
       soundCancel();
   }
@@ -709,7 +713,48 @@ void appMainLoopTick()
     if (hasUserActivity(input))
       noteUserActivity();
 
-    autoScreenTick();
+    // Non-pet settings-owned flows should eventually unwind back to PET.
+    // Keep this separate from Auto Screen / Auto Clock so menus don't just sit forever.
+    const bool settingsOwnedFlow = (g_app.uiState == UIState::SETTINGS);
+
+    static const uint32_t kSettingsIdleReturnMs = 120000;
+
+    if (settingsOwnedFlow && settingsHasReturnTarget())
+    {
+      const uint32_t nowMs = millis();
+      if ((uint32_t)(nowMs - g_lastInputActivityMs) >= kSettingsIdleReturnMs)
+      {
+        if (g_app.uiState == UIState::SETTINGS)
+        {
+          closeSettingsAndReturn(input);
+
+          invalidateBackgroundCache();
+
+          if (g_app.uiState == UIState::TITLE_MENU)
+            requestFullUIRedraw();
+          else
+            requestUIRedraw();
+
+          renderUI();
+        }
+        else
+        {
+          returnToSettingsPage(g_settingsFlow.settingsPage, g_app.currentTab, input);
+          invalidateBackgroundCache();
+          requestUIRedraw();
+          renderUI();
+        }
+
+        input = InputState{};
+        clearInputLatch();
+        return;
+      }
+    }
+
+    if (autoClockIsEnabled())
+      autoClockTick();
+    else
+      autoScreenTick();
   }
 
   if (!isScreenOn())
@@ -760,7 +805,7 @@ void appMainLoopTick()
     const uint32_t nowMs = millis();
     if ((uint32_t)(nowMs - getLastInputActivityMs()) >= 60000UL)
     {
-      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, false);
+      uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 120);
       clearInputLatch();
     }
   }
@@ -811,10 +856,15 @@ void appMainLoopTick()
     input.homeOnce = false;
     input.tabJump = 255;
   }
+  else if (g_app.uiState == UIState::NAME_PET)
+  {
+    // Name entry owns its own cancel behavior locally.
+    input.homeOnce = false;
+    input.tabJump = 255;
+  }
   else if (g_app.uiState == UIState::CLOCK_MODE)
   {
     input.hotSettings = false;
-    input.homeOnce = false;
     input.tabJump = 255;
   }
   else
@@ -879,17 +929,56 @@ void appMainLoopTick()
   }
 
   // ---------------------------------------------------------------------------
-  // HOME KEY (Q): return to PET tab from anywhere reasonable
+  // HOME KEY (Q): unwind modal flows first, otherwise return to the main pet flow
   // IMPORTANT: this is separate from MENU/ESC which are for opening/dismissing menus.
+  // ---------------------------------------------------------------------------  //
   // ---------------------------------------------------------------------------
   if (input.homeOnce)
   {
-    if (g_app.uiState == UIState::SETTINGS && settingsHasReturnTarget())
+    const bool settingsOwnedFlow = (g_app.uiState == UIState::SETTINGS) ||
+                                   (g_app.uiState == UIState::IMPORT_PET_LIST) ||
+                                   (g_app.uiState == UIState::BACKUP_PET_LIST);
+
+    if (settingsOwnedFlow && settingsHasReturnTarget())
     {
       noteUserActivity();
-      closeSettingsAndReturn(input);
-      invalidateBackgroundCache();
-      requestUIRedraw();
+
+      if (g_app.uiState == UIState::SETTINGS)
+      {
+        closeSettingsAndReturn(input);
+
+        invalidateBackgroundCache();
+
+        if (g_app.uiState == UIState::TITLE_MENU)
+          requestFullUIRedraw();
+        else
+          requestUIRedraw();
+      }
+      else
+      {
+        returnToSettingsPage(g_settingsFlow.settingsPage, g_app.currentTab, input);
+        invalidateBackgroundCache();
+        requestUIRedraw();
+      }
+
+      input = InputState{};
+      clearInputLatch();
+      return;
+    }
+
+    if (g_app.uiState == UIState::CLOCK_MODE)
+    {
+      noteUserActivity();
+      uiClockModeExitToReturn(input, 120);
+      input = InputState{};
+      clearInputLatch();
+      return;
+    }
+
+    if (g_app.uiState == UIState::PET_SLEEPING)
+    {
+      noteUserActivity();
+      uiPetSleepingWakeAndReturn(input, 120, true);
       input = InputState{};
       clearInputLatch();
       return;
@@ -910,10 +999,7 @@ void appMainLoopTick()
 
       if (shouldEnterSleeping)
       {
-        uiPetSleepingSetReturnState(UIState::TITLE_MENU, Tab::TAB_PET);
-        uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, false, input, 200);
-        uiPetSleepingBootEnter();
-        sleepBgKickNow();
+        enterSleepFlow(g_app.uiState, g_app.currentTab, input, 200);
       }
       else
       {
@@ -933,21 +1019,11 @@ void appMainLoopTick()
   // ---------------------------------------------------------------------------
   if (g_app.uiState == UIState::PET_SCREEN && isPetSleepingNow())
   {
-    uiPetSleepingSetReturnState(UIState::PET_SCREEN, Tab::TAB_PET);
-    uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, false, input, 200);
-    sleepBgKickNow();
+    enterSleepFlow(UIState::PET_SCREEN, Tab::TAB_PET, input, 200);
     invalidateBackgroundCache();
-    requestFullUIRedraw();
     input = InputState{};
     clearInputLatch();
     return;
-  }
-
-  if (g_app.uiState == UIState::PET_SLEEPING && !isPetSleepingNow())
-  {
-    petResetUpdateTimers();
-    uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, false, input, 200);
-    invalidateBackgroundCache();
   }
 
   // ---------------------------------------------------------------------------

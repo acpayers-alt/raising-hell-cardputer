@@ -3,7 +3,6 @@
 #include "app_state.h"
 #include "console.h"
 #include "input.h"
-#include "return_target.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_input_common.h"
@@ -11,23 +10,22 @@
 #include "ui_runtime.h"
 
 // Console return target
-static ReturnTarget g_consoleReturn{};
-
-// Special case: console was opened from inside Settings and should return back into Settings
-static bool g_consoleReturnToSettings = false;
-static SettingsPage g_consoleReturnPage = SettingsPage::TOP;
+static bool s_consoleReturnToSettings = false;
+static SettingsPage s_consoleReturnPage = SettingsPage::TOP;
 
 void openConsoleWithReturn(UIState returnState, Tab returnTab, bool retToSettings, SettingsPage retSettingsPage)
 {
-  g_consoleReturn.state = returnState;
-  g_consoleReturn.tab = returnTab;
-  g_consoleReturnToSettings = retToSettings;
-  g_consoleReturnPage = retSettingsPage;
+  s_consoleReturnToSettings = retToSettings;
+  s_consoleReturnPage = retSettingsPage;
 
-  consoleOpen();
+  uiPushReturnTarget(returnState, returnTab);
 
-  // Centralized transition (no raw g_app.uiState writes)
+  if (retToSettings)
+    g_settingsFlow.settingsReturnPage = retSettingsPage;
+
   uiActionEnterState(UIState::CONSOLE, returnTab, true);
+
+  clearInputLatch();
   requestUIRedraw();
 }
 
@@ -50,23 +48,22 @@ void uiConsoleHandle(InputState &input)
 {
   if (input.menuOnce || input.escOnce)
   {
-    consoleClose();
-
     // IMPORTANT: swallow BEFORE changing state so no edge leaks into the next state
     swallowTypingAndEdges(input);
 
-    if (g_consoleReturnToSettings)
-    {
-      // Only restore the settings page. Do NOT touch settingsReturnValid/state/tab.
-      // Settings already knows where to exit to; we just want to go back into it.
-      g_settingsFlow.settingsPage = g_consoleReturnPage;
+    const UIReturnTarget ret = uiGetReturnTarget();
 
-      uiActionEnterState(UIState::SETTINGS, g_consoleReturn.tab, true);      requestUIRedraw();
+    if (s_consoleReturnToSettings)
+    {
+      g_settingsFlow.settingsPage = s_consoleReturnPage;
+      closeSettingsAndReturn(input);
+      requestUIRedraw();
       return;
     }
 
-    // Normal behavior: return to the UI state we came from
-    uiActionEnterState(g_consoleReturn.state, g_consoleReturn.tab, true);    requestUIRedraw();
+    uiPopReturnTarget();
+    uiActionEnterStateClean(ret.state, ret.tab, true, input, 120);
+    requestUIRedraw();
     return;
   }
 
@@ -81,20 +78,21 @@ bool closeConsoleAndReturn(InputState &input)
   if (g_app.uiState != UIState::CONSOLE)
     return false;
 
-  consoleClose();
-
   // Swallow BEFORE changing state so no edge leaks into the next state
   swallowTypingAndEdges(input);
 
-  if (g_consoleReturnToSettings)
-  {
-    // Restore settings page only; do NOT touch settings return plumbing.
-    g_settingsFlow.settingsPage = g_consoleReturnPage;
+  const UIReturnTarget ret = uiGetReturnTarget();
 
-    uiActionEnterState(UIState::SETTINGS, g_consoleReturn.tab, true);    requestUIRedraw();
+  if (s_consoleReturnToSettings)
+  {
+    g_settingsFlow.settingsPage = s_consoleReturnPage;
+    closeSettingsAndReturn(input);
+    requestUIRedraw();
     return true;
   }
 
-  uiActionEnterState(g_consoleReturn.state, g_consoleReturn.tab, true);  requestUIRedraw();
+  uiPopReturnTarget();
+  uiActionEnterStateClean(ret.state, ret.tab, true, input, 120);
+  requestUIRedraw();
   return true;
 }

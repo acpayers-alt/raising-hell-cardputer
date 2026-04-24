@@ -12,10 +12,10 @@
 #include "pet.h"
 #include "save_manager.h"
 #include "sound.h"
-#include "ui_menu_state.h" // feedMenuIndex, playMenuIndex
-#include "ui_actions.h"    // uiActionSwallowEdges, uiActionDrainKb
-#include "ui_play_menu.h"
+#include "ui_actions.h" // uiActionSwallowEdges, uiActionDrainKb
 #include "ui_feed_menu.h"
+#include "ui_menu_state.h" // feedMenuIndex, playMenuIndex
+#include "ui_play_menu.h"
 
 // PET/STATS/FEED/PLAY all ride UIState::PET_SCREEN.
 //
@@ -25,7 +25,7 @@
 // which can get stuck and prevent escOnce from ever firing on PET_SCREEN tabs.
 // Use uiActionSwallowEdges + uiActionDrainKb to swallow without touching key latches.
 
-static inline void swallowThisFrame(InputState& in)
+static inline void swallowThisFrame(InputState &in)
 {
   uiActionSwallowEdges(in);
   uiActionDrainKb(in);
@@ -43,6 +43,8 @@ static void handlePetScreen_local(InputState &input)
   if (g_app.currentTab == Tab::TAB_FEED)
   {
     const int kFeedItems = uiFeedMenuCount();
+    if (kFeedItems <= 0)
+      return;
 
     int mv = 0;
     if (input.leftOnce || input.upOnce || (input.encoderDelta < 0))
@@ -64,15 +66,12 @@ static void handlePetScreen_local(InputState &input)
       return;
     }
 
-    const bool confirmOnce =
-        input.selectOnce || input.encoderPressOnce || input.mgSelectOnce;
+    const bool confirmOnce = input.selectOnce || input.encoderPressOnce || input.mgSelectOnce;
 
     if (confirmOnce)
     {
       inputForceClear();
-
       uiFeedMenuActivate(feedMenuIndex, input);
-
       swallowThisFrame(input);
     }
     return;
@@ -81,6 +80,8 @@ static void handlePetScreen_local(InputState &input)
   if (g_app.currentTab == Tab::TAB_PLAY)
   {
     const int kPlayItems = uiPlayMenuCount();
+    if (kPlayItems <= 0)
+      return;
 
     int mv = 0;
     if (input.leftOnce || input.upOnce || (input.encoderDelta < 0))
@@ -102,12 +103,10 @@ static void handlePetScreen_local(InputState &input)
       return;
     }
 
-    const bool confirmOnce =
-        input.selectOnce || input.encoderPressOnce || input.mgSelectOnce;
+    const bool confirmOnce = input.selectOnce || input.encoderPressOnce || input.mgSelectOnce;
 
     if (confirmOnce)
     {
-      // Cost to play: 10 energy (regular Play tab only)
       if (pet.energy < 10)
       {
         ui_showMessage("Too tired!");
@@ -116,17 +115,20 @@ static void handlePetScreen_local(InputState &input)
         return;
       }
 
-      pet.energy = constrain(pet.energy - 10, 0, 100);
-      saveManagerMarkDirty();
+      const int selectedIndex = playMenuIndex;
 
       // Clear any queued/held input so Enter doesn't immediately act in the game.
       inputForceClear();
 
-      // Launch selected game
-      uiPlayMenuActivate(playMenuIndex, input);
+      if (!uiPlayMenuActivate(selectedIndex))
+      {
+        soundError();
+        swallowThisFrame(input);
+        return;
+      }
 
-      // Swallow leftover edges for this frame (no latch reset).
-      swallowThisFrame(input);
+      pet.energy = constrain(pet.energy - 10, 0, 100);
+      saveManagerMarkDirty();
       return;
     }
 
@@ -136,7 +138,4 @@ static void handlePetScreen_local(InputState &input)
   // PET / STATS tabs: passive; no special input here.
 }
 
-void uiPetScreenHandle(InputState &input)
-{
-  handlePetScreen_local(input);
-}
+void uiPetScreenHandle(InputState &input) { handlePetScreen_local(input); }

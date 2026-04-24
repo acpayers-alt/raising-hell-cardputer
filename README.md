@@ -255,7 +255,6 @@ If the game fails to start:
 - Ensure the device has **Wi-Fi connectivity** for asset provisioning
 - Restart the device after flashing
 
-
 ------------------------------------------------------------
 Development Direction
 ------------------------------------------------------------

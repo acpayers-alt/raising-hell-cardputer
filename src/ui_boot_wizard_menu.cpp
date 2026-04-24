@@ -64,6 +64,13 @@ static void tzPrev()
   const uint8_t n = tzCount();
   if (n == 0)
     return;
+
+  if (!tzIndexIsValid(tzIndex))
+  {
+    tzIndex = (int)tzDefaultIndex();
+    return;
+  }
+
   if (tzIndex <= 0)
     tzIndex = (int)n - 1;
   else
@@ -75,6 +82,13 @@ static void tzNext()
   const uint8_t n = tzCount();
   if (n == 0)
     return;
+
+  if (!tzIndexIsValid(tzIndex))
+  {
+    tzIndex = (int)tzDefaultIndex();
+    return;
+  }
+
   tzIndex++;
   if (tzIndex >= (int)n)
     tzIndex = 0;
@@ -82,8 +96,17 @@ static void tzNext()
 
 static void tzCommit()
 {
+  if (!tzIndexIsValid(tzIndex))
+    tzIndex = (int)tzDefaultIndex();
+
   applyTimezoneIndex((uint8_t)tzIndex);
   saveTzIndexToNVS((uint8_t)tzIndex);
+
+  Serial.printf("[BOOT][TZ] manual commit idx=%d label='%s' iana='%s' rule='%s'\n",
+                tzIndex,
+                tzName((uint8_t)tzIndex),
+                tzIanaName((uint8_t)tzIndex),
+                tzPosixRule((uint8_t)tzIndex));
 }
 
 // -----------------------------------------------------------------------------

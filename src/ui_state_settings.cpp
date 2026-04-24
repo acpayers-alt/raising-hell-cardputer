@@ -89,12 +89,11 @@ void uiSettingsHandle(InputState &input)
 
   auto exitSettings = [&]()
   {
-    resetSettingsNav(true);
     playBeep();
     closeSettingsAndReturn(input);
     clearInputLatch();
   };
-
+  
   int move = input.encoderDelta;
   if (input.upOnce)
     move = -1;

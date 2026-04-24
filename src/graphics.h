@@ -3,6 +3,8 @@
 #include "activity.h"
 #include "ui_defs.h"
 #include <Arduino.h>
+#include <M5GFX.h>
+#include "graphics_sd_draw.h"
 
 #ifndef TFT_BLACK
 #define TFT_BLACK 0x0000
@@ -11,6 +13,7 @@
 void graphicsRecoverAfterOta();
 void graphicsReleasePetLayerForOta();
 void graphicsReleaseUiCachesForMiniGame();
+void graphicsPrewarmPetBackgroundCache();
 
 // -----------------------------------------------------------------------------
 // Modal / messages
@@ -43,19 +46,18 @@ void sleepBgNotifyScreenWake();
 
 void sleepBgKickNow();
 
-bool sprDrawPngFromSD(const char *path, int x, int y);
-bool sprDrawJpgFromSD(const char *path, int x, int y);
-
 // -----------------------------------------------------------------------------
 // RAW streaming helpers for sprites/icons
 // -----------------------------------------------------------------------------
 bool streamRawImage(const char *path, int x, int y, int w, int h);
 bool streamRawImageFast(const char *path, int x, int y, int w, int h);
+void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100, const char *label);
+void drawTinyBar(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100);
+void drawTinyBarV(int x, int y, int w, int h, uint16_t fill, uint16_t outline, int value01_100);
 
 // -----------------------------------------------------------------------------
 // Screen renderers / UI
 // -----------------------------------------------------------------------------
-void drawPetScreen();
 void drawSleepScreen();
 
 void drawSettingsMenu();
@@ -68,6 +70,9 @@ void drawTitleMenuScreen(bool redrawBg);
 void controlsHelpResetScroll();
 bool controlsHelpScrollUp();
 bool controlsHelpScrollDown();
+void whatsNewResetScroll();
+bool whatsNewScrollUp();
+bool whatsNewScrollDown();
 void uiResetLevelUpPopupState();
 bool isPetScreenIntroFadeActive();
 void startPetScreenIntroFadeNow();
@@ -86,7 +91,7 @@ void forceRenderUIOnce();
 // Main UI dispatcher
 void renderUI();
 
-//UI Resets
+// UI Resets
 void resetPetScreenPositionToHome();
 void startPetIntroWalkFromLeft();
 

@@ -12,6 +12,7 @@
 #include "asset_ota.h"
 #include "graphics.h"
 #include "menu_actions.h"
+#include "ui_actions.h"
 #include "ui_input_common.h"
 #include "ui_input_utils.h"
 #include "ui_settings_actions.h"
@@ -19,19 +20,18 @@
 #include "wifi_setup_state.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include "ui_actions.h"
 
 namespace UiSettingsPages
 {
 
 void Handle_WIFI(InputState &input, int move)
 {
-  #if PUBLIC_BUILD
-  const int totalItems = 5;
+#if PUBLIC_BUILD
+  const int totalItems = 3;
   const int otaChannelRow = -1;
 #else
-  const int totalItems = 6;
-  const int otaChannelRow = 5;
+  const int totalItems = 4;
+  const int otaChannelRow = 3;
 #endif
 
   if (move != 0)
@@ -48,15 +48,8 @@ void Handle_WIFI(InputState &input, int move)
     return;
   }
 
-  // Timezone cycling on the TZ row (row 3)
-  if (g_wifi.wifiSettingsIndex == 3 && (input.leftOnce || input.rightOnce))
-  {
-    settingsCycleTimeZone(input.leftOnce ? -1 : 1);
-    return;
-  }
-
-  #if !PUBLIC_BUILD
-    // Asset OTA channel cycle on row 5
+#if !PUBLIC_BUILD
+  // Asset OTA channel cycle on the OTA row
   if (g_wifi.wifiSettingsIndex == otaChannelRow && (input.leftOnce || input.rightOnce))
   {
     const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
@@ -78,11 +71,8 @@ void Handle_WIFI(InputState &input, int move)
       const bool en = !wifiIsEnabled();
 
       wifiSetEnabled(en);
-      Serial.printf("[WIFI PREF WRITE] source=ui_settings_page_wifi en=%d index=%d state=%d tab=%d\n",
-        en ? 1 : 0,
-        g_wifi.wifiSettingsIndex,
-        (int)g_app.uiState,
-        (int)g_app.currentTab);
+      Serial.printf("[WIFI PREF WRITE] source=ui_settings_page_wifi en=%d index=%d state=%d tab=%d\n", en ? 1 : 0,
+                    g_wifi.wifiSettingsIndex, (int)g_app.uiState, (int)g_app.currentTab);
       settingsSetWifiEnabled(en);
       applyWifiPower(en);
 
@@ -111,7 +101,7 @@ void Handle_WIFI(InputState &input, int move)
       g_wifi.returnState = UIState::SETTINGS;
       g_wifi.returnTab = g_app.currentTab;
       g_wifi.aborted = false;
-      
+
       uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
       requestUIRedraw();
 
@@ -138,12 +128,6 @@ void Handle_WIFI(InputState &input, int move)
     }
 
     case 3:
-    { // Time zone row: cycle forward on select
-      settingsCycleTimeZone(+1);
-      return;
-    }
-
-    case 4:
     { // Check Asset OTA
       assetOtaSetConfirmActive(true);
       requestUIRedraw();
@@ -152,7 +136,7 @@ void Handle_WIFI(InputState &input, int move)
       return;
     }
 
-    #if !PUBLIC_BUILD
+#if !PUBLIC_BUILD
     case 5:
     { // Asset OTA Channel
       const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;

@@ -36,8 +36,7 @@ void openPowerMenuFromHere(uint32_t nowMs)
   if (g_app.uiState == UIState::POWER_MENU)
     return;
 
-  g_settingsFlow.powerMenuReturn.state = g_app.uiState;
-  g_settingsFlow.powerMenuReturn.tab = g_app.currentTab;
+  uiPushReturnTarget(g_app.uiState, g_app.currentTab);
 
   powerMenuIndex = 0;
   uiActionEnterState(UIState::POWER_MENU, g_app.currentTab, true);
@@ -52,7 +51,8 @@ void powerMenuActSleep()
 {
   // Sleep (pet sleep, not deep sleep)
   powerMenuClose();
-  uiSleepMenuEnterSleep(millis());
+  InputState in{};
+  uiSleepMenuEnterSleep(millis(), in);
 }
 
 void powerMenuActReboot()
@@ -80,28 +80,33 @@ void emergencyBatteryShutdown()
   esp_deep_sleep_start();
 }
 
-void powerMenuActShutdown()
-{
-  emergencyBatteryShutdown();
-}
+void powerMenuActShutdown() { emergencyBatteryShutdown(); }
 
-void powerMenuClose()
+void powerMenuClose(InputState *in, uint32_t suppressMs)
 {
   const bool returningToSleep = g_settingsFlow.powerMenuReturnToSleep;
 
   if (returningToSleep)
   {
-    uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
+    uiPopReturnTarget();
+
+    if (in)
+      uiActionEnterStateClean(UIState::PET_SLEEPING, Tab::TAB_PET, true, *in, suppressMs);
+    else
+      uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
   }
   else
   {
-    uiActionEnterState(g_settingsFlow.powerMenuReturn.state,
-                       g_settingsFlow.powerMenuReturn.tab,
-                       true);
+    const UIReturnTarget ret = uiGetReturnTarget();
+    uiPopReturnTarget();
+
+    if (in)
+      uiActionEnterStateClean(ret.state, ret.tab, true, *in, suppressMs);
+    else
+      uiActionEnterState(ret.state, ret.tab, true);
   }
 
   g_settingsFlow.powerMenuReturnToSleep = false;
-  g_settingsFlow.powerMenuReturn = ReturnTarget{};
 }
 
 static void handlePowerMenuInput(InputState &input)
@@ -116,8 +121,7 @@ static void handlePowerMenuInput(InputState &input)
       const uint8_t c = e.code;
 
       const bool isQ = (c == 'q' || c == 'Q');
-      const bool isDelOrBackspace =
-          (c == (uint8_t)KEY_BACKSPACE) || (c == '\b') || (c == 127) || (c == 0x2A);
+      const bool isDelOrBackspace = (c == (uint8_t)KEY_BACKSPACE) || (c == '\b') || (c == 127) || (c == 0x2A);
       const bool isEsc = (c == 27);
 
       if (isQ || isDelOrBackspace || isEsc)
@@ -135,21 +139,7 @@ static void handlePowerMenuInput(InputState &input)
   if (exitPressed)
   {
     const bool returningToSleep = g_settingsFlow.powerMenuReturnToSleep;
-
-    if (returningToSleep)
-    {
-      uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
-    }
-    else
-    {
-      uiActionEnterState(g_settingsFlow.powerMenuReturn.state,
-                         g_settingsFlow.powerMenuReturn.tab,
-                         true);
-    }
-
-    g_settingsFlow.powerMenuReturnToSleep = false;
-    g_settingsFlow.powerMenuReturn = ReturnTarget{};
-
+    powerMenuClose(&input, returningToSleep ? 400 : 0);
     uiGuardTransition(input, returningToSleep ? 400 : 0);
     return;
   }
@@ -157,15 +147,20 @@ static void handlePowerMenuInput(InputState &input)
   const int itemCount = uiPowerMenuCount();
 
   int mv = 0;
-  if (input.upOnce) mv = -1;
-  else if (input.downOnce) mv = +1;
-  else if (input.encoderDelta < 0) mv = -1;
-  else if (input.encoderDelta > 0) mv = +1;
+  if (input.upOnce)
+    mv = -1;
+  else if (input.downOnce)
+    mv = +1;
+  else if (input.encoderDelta < 0)
+    mv = -1;
+  else if (input.encoderDelta > 0)
+    mv = +1;
 
   if (mv != 0)
   {
     powerMenuIndex += mv;
-    while (powerMenuIndex < 0) powerMenuIndex += itemCount;
+    while (powerMenuIndex < 0)
+      powerMenuIndex += itemCount;
     powerMenuIndex %= itemCount;
 
     requestUIRedraw();
@@ -192,4 +187,4 @@ static void handlePowerMenuInput(InputState &input)
   input.clearEdges();
 }
 
-  void uiPowerMenuHandle(InputState & in) { handlePowerMenuInput(in); }
+void uiPowerMenuHandle(InputState &in) { handlePowerMenuInput(in); }

@@ -2,6 +2,10 @@
 #include <Arduino.h>
 #include "system_status_state.h"
 
+SystemStatusState g_systemStatus = {
+    0  // scrollOffset
+  };
+  
 uint32_t bootTime = 0;
 
 int batteryPercent = -1;

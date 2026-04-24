@@ -8,7 +8,6 @@
 #include "ui_state_clock_mode.h"
 #include "app_state.h"
 #include "pet.h"
-#include "settings_flow_state.h"
 #include "save_manager.h"
 
 namespace {
@@ -22,11 +21,13 @@ static void actClockMode(InputState &in)
 {
   resetClockModePetPresentation();
 
-  // Return to whatever screen was underneath the power menu.
-  uiClockModeSetReturnState(g_settingsFlow.powerMenuReturn.state,
-                            g_settingsFlow.powerMenuReturn.tab);
+  const UIReturnTarget ret = uiGetReturnTarget();
 
-  uiActionEnterStateClean(UIState::CLOCK_MODE, Tab::TAB_PET, true, in, 120);
+  // Return to whatever screen was underneath the power menu.
+  openClockModeWithReturn(ret.state,
+                          ret.tab,
+                          in,
+                          120);
 }
 
 static void actReboot(InputState& in)

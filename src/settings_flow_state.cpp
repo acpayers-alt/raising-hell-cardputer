@@ -1,25 +1,24 @@
 #include "settings_flow_state.h"
-
-#include "input.h"
+#include "settings_nav_state.h"
 #include "settings_state.h"
+#include "input.h"
+
+#include "ui_defs.h"
 #include "ui_actions.h"
 #include "ui_runtime.h"
 
 // Single global instance
 SettingsFlowState g_settingsFlow;
 
-bool g_importPetListReturnToSettings = false;
-SettingsPage g_importPetListReturnPage = SettingsPage::TOP;
-
 void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage page)
 {
-  g_settingsFlow.settingsReturnValid = true;
-  g_settingsFlow.settingsReturnState = returnState;
-  g_settingsFlow.settingsReturnTab   = returnTab;
-  g_settingsFlow.settingsPage        = page;
+  g_settingsFlow.settingsPage = page;
+  g_settingsFlow.settingsReturnPage = page;
 
   if (page == SettingsPage::TOP)
     resetSettingsNav(false);
+
+  uiPushReturnTarget(returnState, returnTab);
 
   uiActionEnterState(UIState::SETTINGS, returnTab, true);
   requestFullUIRedraw();
@@ -27,34 +26,28 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
   clearInputLatch();
 }
 
-void closeSettingsAndReturn(InputState& in)
+void closeSettingsAndReturn(InputState &in)
 {
-  const UIState targetState =
-      g_settingsFlow.settingsReturnValid
-          ? g_settingsFlow.settingsReturnState
-          : UIState::PET_SCREEN;
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
 
-  const Tab targetTab =
-      g_settingsFlow.settingsReturnValid
-          ? g_settingsFlow.settingsReturnTab
-          : Tab::TAB_PET;
+  resetSettingsNav(true);
+  g_settingsFlow.settingsPage = SettingsPage::TOP;
+  g_settingsFlow.settingsReturnPage = SettingsPage::TOP;
 
-  g_settingsFlow.settingsReturnValid = false;
-
-  uiActionEnterStateClean(targetState, targetTab, true, in, 120);
+  uiActionEnterStateClean(ret.state, ret.tab, true, in, 120);
 }
 
-bool settingsHasReturnTarget()
+void returnToSettingsPage(SettingsPage page, Tab tab, InputState &in)
 {
-  return g_settingsFlow.settingsReturnValid;
+  // Re-enter Settings on a specific page without resetting the whole settings nav.
+  g_settingsFlow.settingsPage = page;
+  uiActionEnterStateClean(UIState::SETTINGS, tab, true, in, 120);
+  requestFullUIRedraw();
 }
 
-UIState settingsReturnState()
-{
-  return g_settingsFlow.settingsReturnState;
-}
+bool settingsHasReturnTarget() { return uiHasReturnTarget(); }
 
-Tab settingsReturnTab()
-{
-  return g_settingsFlow.settingsReturnTab;
-}
+UIState settingsReturnState() { return uiGetReturnTarget().state; }
+
+Tab settingsReturnTab() { return uiGetReturnTarget().tab; }

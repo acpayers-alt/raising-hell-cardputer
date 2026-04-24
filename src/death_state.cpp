@@ -6,6 +6,7 @@
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_invalidate.h"
+#include "pet.h"
 
 // Default to first option (Resurrect).
 int deathMenuIndex = 0;
@@ -20,7 +21,6 @@ static constexpr uint32_t kDeathFadeMs = 2200;
 static constexpr uint32_t kDeathBlackHoldMs = 600;
 static bool s_restoreBrightnessOnDeathScreen = false;
 static bool s_startDeathScreenFadeIn = false;
-static constexpr bool kLogDeathTransition = true;
 } // namespace
 
 void resetDeathMenu() { deathMenuIndex = 0; }
@@ -33,10 +33,7 @@ void beginDeathTransition()
   s_deathTransitionSoundStarted = false;
   s_deathTransitionStartMs = millis();
 
-  if (kLogDeathTransition)
-  {
-    Serial.printf("[DEATHX] begin t=%lu\n", (unsigned long)s_deathTransitionStartMs);
-  }
+  Serial.printf("[PET] %s has died\n", pet.name[0] ? pet.name : "Your pet");
 
   resetDeathMenu();
 
@@ -69,10 +66,7 @@ void tickDeathTransition(uint32_t now)
     if (!s_deathTransitionSoundStarted)
     {
       s_deathTransitionSoundStarted = true;
-  
-      if (kLogDeathTransition)
-        Serial.println("[DEATHX] flatline start");
-  
+    
       soundDeathFlatline();
     }
   
@@ -95,11 +89,6 @@ void tickDeathTransition(uint32_t now)
 
   if (elapsed < (kDeathFadeMs + kDeathBlackHoldMs))
     return;
-
-  if (kLogDeathTransition)
-  {
-    Serial.printf("[DEATHX] end elapsed=%lu\n", (unsigned long)elapsed);
-  }
 
   s_deathTransitionActive = false;
   s_deathTransitionSoundStarted = false;
