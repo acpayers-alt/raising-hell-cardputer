@@ -20,6 +20,7 @@
 #include "save_manager.h"
 #include "sdcard.h"
 #include "timezone.h"
+#include "whats_new_state.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
@@ -36,6 +37,7 @@
 // -----------------------------------------------------------------------------
 #include "graphics.h"
 #include "led_status.h"
+#include "ui_actions.h"
 #include "ui_runtime.h"
 
 // -----------------------------------------------------------------------------
@@ -874,11 +876,12 @@ static void execLine(char *line)
     logLine("  age                 show birth epoch + age string");
     logLine("  pet                 show current pet type");
     logLine("  name <pet name>     set pet name");
-    
+
     logLine("Status / info:");
     logLine("  version             show firmware + asset version");
     logLine("  assetstatus         show asset OTA/debug status");
     logLine("  uptime              show device uptime");
+    logLine("  whatsnew            show What's New screen");
 
     logLine("WiFi:");
     logLine("  wifi                show wifi status + saved ssid");
@@ -995,6 +998,16 @@ static void execLine(char *line)
   if (!strcmp(argv[0], "clear"))
   {
     consoleClear();
+    return;
+  }
+
+  // WHAT'S NEW
+  if (!strcmp(argv[0], "whatsnew"))
+  {
+    const UIReturnTarget ret = uiGetReturnTarget();
+    uiPopReturnTarget();
+
+    whatsNewBegin(ret.state, ret.tab);
     return;
   }
 

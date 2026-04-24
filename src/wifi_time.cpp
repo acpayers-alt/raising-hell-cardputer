@@ -290,6 +290,30 @@ static void onWiFiEvent(WiFiEvent_t event)
 
 static void tryWiFiConnect()
 {
+  String ssid;
+  String pass;
+
+  if (wifiStoreLoad(ssid, pass) && ssid.length() > 0)
+  {
+    Serial.printf("[WIFI] retry stored ssid='%s'\n", ssid.c_str());
+
+    if (!s_wifiEventHooked)
+    {
+      WiFi.onEvent(onWiFiEvent);
+      s_wifiEventHooked = true;
+    }
+
+    WiFi.persistent(false);
+    WiFi.setAutoReconnect(true);
+    WiFi.setSleep(false);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), pass.c_str());
+
+    strncpy(s_consoleSsidBuf, ssid.c_str(), sizeof(s_consoleSsidBuf) - 1);
+    s_consoleSsidBuf[sizeof(s_consoleSsidBuf) - 1] = '\0';
+    return;
+  }
+
 #if defined(WIFI_SSID) && defined(WIFI_PASS)
   if (strlen(WIFI_SSID) == 0)
   {
