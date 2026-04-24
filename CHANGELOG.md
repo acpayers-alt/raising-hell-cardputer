@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 2.1.0 — Stability & Polish Update
+## 2.1.0 - Stability & Polish Update
 
 This release focuses on improving overall stability, consistency, and user experience across the entire game.
 
@@ -21,6 +21,39 @@ Under the hood, the graphics system has been modularized into dedicated componen
 
 ---
 
+## 2.0 Branch Bugfix Releases
+
+## 2.0.3: (Depricated) 
+This patch fixes a boot-time issue where the device could get stuck waiting on network time sync indefinitely on some networks.
+
+Added a timeout fallback for BOOT_NTP_WAIT
+
+Fixed the manual timezone path so it starts the NTP wait timer correctly
+Added support for the Moscow timezone in boot-time timezone detection
+
+This release improves recovery when NTP is unavailable or blocked and prevents users from getting trapped in the boot time-sync flow.
+
+## 2.0.2: (Deprecated) 
+Fixes an issue where asset provisioning could fail with “Enable WiFi first” after using recovery commands.
+
+Fixed reprovision loop triggered by rescue flow
+Unified WiFi handling for asset provisioning
+repair assets now runs without requiring reboot
+Falls back to WiFi setup when credentials are missing
+
+## 2.0.1: (Deprecated) 
+Hotfix release to resolve a rare boot stall during time sync.
+Added: ntpskip console command to bypass stalled NTP checks
+If your device appears stuck during boot:
+
+Open the console (/ key)
+Run: ntpskip
+This will allow the device to continue booting normally.
+
+No other changes included.
+
+
+---
 ## 2.0.0
 
 ### Added
