@@ -720,9 +720,28 @@ static bool bootAssetProvisionWifiReady()
   wifiTimeInit();
 
   if (WiFi.status() == WL_CONNECTED)
+  {
+    runtimeLogLine("[BOOT][ASSET_PROVISION] WiFi connected; starting asset OTA");
     return true;
+  }
+  
+  const uint32_t elapsed = millis() - g_bootProvisionWifiStartMs;
 
-  if ((uint32_t)(millis() - g_bootProvisionWifiStartMs) >= 8000)
+  // Mandatory asset provisioning must not start OTA until Wi-Fi is actually up.
+  // Otherwise asset OTA latches "WiFi not connected" and the user gets stuck
+  // in the asset recovery loop even though Wi-Fi may connect shortly afterward.
+  if (g_bootAssetProvisionMustComplete)
+  {
+    if (elapsed >= 30000)
+      drawBootAssetProvisionScreen("WiFi not connected.", "Press ENTER to set up.");
+    else
+      drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
+
+    return false;
+  }
+
+  // Optional asset checks should not block boot forever.
+  if (elapsed >= 8000)
     return true;
 
   drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
