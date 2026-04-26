@@ -35,10 +35,30 @@ static Adafruit_NeoPixel g_led(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 static bool g_inited = false;
 
-bool ledInputLockActive()
+static bool ledAlertsSuppressedForUiState()
 {
-  return s_screenIsOff && s_pulseActive;
+  switch (g_app.uiState)
+  {
+  case UIState::BOOT:
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_WIFI_IMPORTED:
+  case UIState::BOOT_WIFI_WAIT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+  case UIState::WIFI_SETUP:
+  case UIState::WIFI_CONNECT_WAIT:
+  case UIState::SET_TIME:
+  case UIState::CONTROLS_HELP:
+  case UIState::WHATS_NEW:
+    return true;
+
+  default:
+    return false;
+  }
 }
+
+bool ledInputLockActive() { return s_screenIsOff && s_pulseActive; }
 
 void ledSetScreenOff(bool isOff)
 {
@@ -105,6 +125,8 @@ static void pulseBacklightEndIfNeeded()
 void ledSetRGB(uint8_t r, uint8_t g, uint8_t b)
 {
   if (!ledAlertsEnabled)
+    return;
+  if (ledAlertsSuppressedForUiState())
     return;
   if (g_ledLocked)
     return;
@@ -258,6 +280,33 @@ void ledUpdatePetStatus(LedPetMode mode)
   ledInit();
 
   // ------------------------------------------------------------------
+  // BOOT / ONBOARDING GATE:
+  // Do not allow pet LED alerts or screen-color alert overlays while boot,
+  // provisioning, Wi-Fi setup, time setup, controls help, or What's New screens
+  // own the display. These screens can otherwise flicker between their UI and
+  // the alert color overlay if a loaded pet needs attention during early boot.
+  // ------------------------------------------------------------------
+  if (ledAlertsSuppressedForUiState())
+  {
+    g_lastMode = mode;
+    g_nextHeartbeatMs = millis() + heartbeatIntervalMs(mode);
+
+    g_burstActive = false;
+    g_burstFlashesRemaining = 0;
+    g_burstLedOn = false;
+    g_burstNextMs = 0;
+
+    ledOff();
+    pulseBacklightEndIfNeeded();
+    uiEndAlertScreenFlash();
+
+    if (s_screenIsOff)
+      SET_BACKLIGHT(0);
+
+    return;
+  }
+
+  // ------------------------------------------------------------------
   // HARD GATE: if LED alerts are disabled, force everything OFF and
   // clear any scheduled heartbeats/bursts immediately.
   // ------------------------------------------------------------------
@@ -280,7 +329,7 @@ void ledUpdatePetStatus(LedPetMode mode)
       SET_BACKLIGHT(0);
     return;
   }
-  
+
   const uint32_t now = millis();
 
   // Mode change: restart soon
