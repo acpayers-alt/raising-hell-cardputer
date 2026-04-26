@@ -105,6 +105,20 @@ void appServicesTick(uint32_t nowMs)
   }
 }
 
+static bool petWarningAudioAllowedForUi(UIState ui)
+{
+  switch (ui)
+  {
+  case UIState::PET_SCREEN:
+  case UIState::PET_SLEEPING:
+  case UIState::CLOCK_MODE:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 static inline UIState uiStateForTab(Tab t)
 {
   switch (t)
@@ -282,8 +296,10 @@ void appMainLoopTick()
       return;
     }
 
-    // Near-death beep MUST work even with screen off.
-    if (g_app.uiState != UIState::DEATH_TRANSITION)
+    // Near-death beep MUST work even with screen off, but only while a pet-owned
+    // screen owns the experience. Title/settings/boot should not beep without
+    // on-screen pet context.
+    if (petWarningAudioAllowedForUi(g_app.uiState))
     {
       soundLowHealthTick((uint8_t)pet.health, sleepingNow_off,
                          /*screenOn=*/isScreenOn(),
@@ -351,7 +367,7 @@ void appMainLoopTick()
     // but the low-health scheduler lives in the main loop paths and would
     // otherwise pause for the duration of the LED alert pulse.
     const bool sleepingNow_ledLock = isPetSleepingNow();
-    if (g_app.uiState != UIState::DEATH_TRANSITION)
+    if (petWarningAudioAllowedForUi(g_app.uiState))
     {
       soundLowHealthTick((uint8_t)pet.health, sleepingNow_ledLock,
                          /*screenOn=*/false,
@@ -1157,9 +1173,12 @@ void appMainLoopTick()
 
   if (!inDeathTransition)
   {
-    soundLowHealthTick((uint8_t)pet.health, sleepingNow2,
-                       /*screenOn=*/isScreenOn(),
-                       /*inDeathScreen=*/inDeathFlow);
+    if (petWarningAudioAllowedForUi(g_app.uiState))
+    {
+      soundLowHealthTick((uint8_t)pet.health, sleepingNow2,
+                         /*screenOn=*/isScreenOn(),
+                         /*inDeathScreen=*/inDeathFlow);
+    }
 
     if (g_sdReady)
     {
