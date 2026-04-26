@@ -29,16 +29,16 @@ const char *assetOtaLocalManifestPath() { return kLocalManifestPath; }
 const char *assetOtaLocalManifestTmpPath() { return kLocalManifestTmpPath; }
 const char *assetOtaStagingRoot() { return kStagingRoot; }
 
-const char* assetOtaManifestUrlForChannel(AssetOtaChannel ch)
+const char *assetOtaManifestUrlForChannel(AssetOtaChannel ch)
 {
   switch (ch)
   {
-    case AssetOtaChannel::DEV:
-      return kDevManifestUrl;
+  case AssetOtaChannel::DEV:
+    return kDevManifestUrl;
 
-    case AssetOtaChannel::PUBLIC:
-    default:
-      return kPublicManifestUrl;
+  case AssetOtaChannel::PUBLIC:
+  default:
+    return kPublicManifestUrl;
   }
 }
 
@@ -216,7 +216,8 @@ bool assetOtaConfigLoad(AssetOtaConfig *outCfg)
     return false;
   if (tmp.magic != 0x41544346UL || tmp.version != 1)
     return false;
-    if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
+
+  if (tmp.channel > (uint8_t)AssetOtaChannel::DEV)
     tmp.channel = RH_BUILD_DEFAULT_OTA_CHANNEL;
 
   *outCfg = tmp;
