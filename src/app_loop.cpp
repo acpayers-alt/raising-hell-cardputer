@@ -340,12 +340,24 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-#if LED_STATUS_ENABLED
+  #if LED_STATUS_ENABLED
   if (ledInputLockActive())
   {
     // Keep alert system in logical screen-off mode during the pulse.
     ledSetScreenOff(true);
     ledUpdatePetStatus(computeLedMode());
+
+    // Keep critical background warning audio alive while the LED/backlight
+    // alert owns input/display. soundTick() still runs from appServicesTick(),
+    // but the low-health scheduler lives in the main loop paths and would
+    // otherwise pause for the duration of the LED alert pulse.
+    const bool sleepingNow_ledLock = isPetSleepingNow();
+    if (g_app.uiState != UIState::DEATH_TRANSITION)
+    {
+      soundLowHealthTick((uint8_t)pet.health, sleepingNow_ledLock,
+                         /*screenOn=*/false,
+                         /*inDeathScreen=*/inDeathFlow);
+    }
 
     if (motionAvailable && motionShakeDetected())
     {
