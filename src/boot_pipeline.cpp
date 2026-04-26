@@ -700,6 +700,24 @@ static bool bootAssetProvisionWifiReady()
     }
 
     wifiSetEnabled(shouldEnableWifi);
+
+    if (wifiConnected)
+    {
+      // Boot Wi-Fi/onboarding already brought the interface up. Do not restart
+      // Wi-Fi or call wifiTimeInit() here; either can briefly drop the station
+      // and cause asset OTA to report a false "Connect WiFi first" failure.
+      if (g_bootAssetProvisionMustComplete && shouldEnableWifi)
+      {
+        settingsSetWifiEnabled(true);
+        saveSettingsToSD();
+      }
+
+      g_bootProvisionWifiStarted = true;
+      g_bootProvisionWifiStartMs = millis();
+
+      return true;
+    }
+    
     applyWifiPower(shouldEnableWifi);
 
     if (g_bootAssetProvisionMustComplete && shouldEnableWifi)
@@ -717,14 +735,14 @@ static bool bootAssetProvisionWifiReady()
     return false;
   }
 
-  wifiTimeInit();
+  wifiTimeTick();
 
   if (WiFi.status() == WL_CONNECTED)
   {
     runtimeLogLine("[BOOT][ASSET_PROVISION] WiFi connected; starting asset OTA");
     return true;
   }
-  
+
   const uint32_t elapsed = millis() - g_bootProvisionWifiStartMs;
 
   // Mandatory asset provisioning must not start OTA until Wi-Fi is actually up.
