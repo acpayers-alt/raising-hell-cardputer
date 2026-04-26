@@ -33,10 +33,26 @@
 // Newer firmware should use v2 manifest endpoints.
 // These can be overridden from platformio.ini if needed.
 // -----------------------------------------------------------------------------
+#ifndef RH_PRIMARY_ASSET_BASE_URL
+#define RH_PRIMARY_ASSET_BASE_URL "https://assets.raisinghellgame.com/assets/"
+#endif
+
+#ifndef RH_FALLBACK_ASSET_BASE_URL
+#define RH_FALLBACK_ASSET_BASE_URL "https://backup-assets.raisinghellgame.com/assets/"
+#endif
+
 #ifndef RH_PUBLIC_MANIFEST_URL
 #define RH_PUBLIC_MANIFEST_URL "https://assets.raisinghellgame.com/manifest-public-v2.json"
 #endif
 
+#ifndef RH_PUBLIC_MANIFEST_FALLBACK_URL
+#define RH_PUBLIC_MANIFEST_FALLBACK_URL "https://backup-assets.raisinghellgame.com/manifest-public-v2.json"
+#endif
+
 #ifndef RH_DEV_MANIFEST_URL
 #define RH_DEV_MANIFEST_URL "https://assets.raisinghellgame.com/manifest-dev-v2.json"
+#endif
+
+#ifndef RH_DEV_MANIFEST_FALLBACK_URL
+#define RH_DEV_MANIFEST_FALLBACK_URL "https://backup-assets.raisinghellgame.com/manifest-dev-v2.json"
 #endif

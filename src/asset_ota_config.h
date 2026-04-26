@@ -23,3 +23,4 @@ bool assetOtaStateLoad(AssetOtaState *outState);
 bool assetOtaStateSave(const AssetOtaState &st);
 
 const char *assetOtaManifestUrlForChannel(AssetOtaChannel ch);
+const char *assetOtaFallbackManifestUrlForChannel(AssetOtaChannel ch);

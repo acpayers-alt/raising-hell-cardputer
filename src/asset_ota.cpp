@@ -15,6 +15,7 @@
 #include "asset_manifest.h"
 #include "asset_ota_config.h"
 #include "boot_pipeline.h"
+#include "build_flags.h"
 #include "display.h"
 #include "graphics.h"
 #include "sdcard.h"
@@ -149,16 +150,9 @@ static bool s_assetOtaConfirmActive = false;
 // URL resolution
 // -----------------------------------------------------------------------------
 
-static String assetFileResolvedUrl(const String &packVersion, const AssetManifestFile &f)
+static String assetFileResolvedUrl(const String &packVersion, const AssetManifestFile &f, bool fallback)
 {
-  String url;
-
-  const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
-
-  if (ch == AssetOtaChannel::DEV)
-    url = "https://pub-a9c969dd35ff4978af986e2e2b6a0d00.r2.dev/assets/";
-  else
-    url = "https://assets.raisinghellgame.com/assets/";
+  String url = fallback ? RH_FALLBACK_ASSET_BASE_URL : RH_PRIMARY_ASSET_BASE_URL;
 
   if (!url.endsWith("/"))
     url += "/";
@@ -767,8 +761,11 @@ bool assetOtaCheckNow(String *outMessage)
 
   const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
   const char *manifestUrl = assetOtaManifestUrlForChannel(ch);
+  const char *fallbackManifestUrl = assetOtaFallbackManifestUrlForChannel(ch);
 
   Serial.printf("[OTA] manifestUrl=%s\n", manifestUrl ? manifestUrl : "(null)");
+  Serial.printf("[OTA] fallbackManifestUrl=%s\n", fallbackManifestUrl ? fallbackManifestUrl : "(null)");
+
   if (!manifestUrl || !manifestUrl[0])
   {
     setFailure(AssetOtaError::NO_MANIFEST);
@@ -792,7 +789,17 @@ bool assetOtaCheckNow(String *outMessage)
   String remotePackVersion;
   uint16_t changedCount = 0;
 
-  if (!assetManifestBuildWorklistFromRemote(manifestUrl, &remotePackVersion, &changedCount))
+  bool manifestOk = assetManifestBuildWorklistFromRemote(manifestUrl, &remotePackVersion, &changedCount);
+
+  if (!manifestOk && fallbackManifestUrl && fallbackManifestUrl[0])
+  {
+    Serial.printf("[OTA] primary manifest failed; trying fallback: %s\n", fallbackManifestUrl);
+    remotePackVersion = "";
+    changedCount = 0;
+    manifestOk = assetManifestBuildWorklistFromRemote(fallbackManifestUrl, &remotePackVersion, &changedCount);
+  }
+
+  if (!manifestOk)
   {
     setFailure(AssetOtaError::JSON_FAIL);
     if (outMessage)
@@ -1005,14 +1012,30 @@ bool assetOtaCheckNow(String *outMessage)
         delay(1);
         yield();
 
-        String url = assetFileResolvedUrl(remotePackVersion, dlFile);
+        String url = assetFileResolvedUrl(remotePackVersion, dlFile, false);
         if (assetDownloadToStaging(url, dlFile, &stagingPath, &dlErr))
         {
           dlOk = true;
           break;
         }
 
-        Serial.printf("[OTA] file attempt failed: %s\n", dlErr.c_str());
+        Serial.printf("[OTA] primary file attempt failed: %s\n", dlErr.c_str());
+
+        String fallbackErr;
+        String fallbackUrl = assetFileResolvedUrl(remotePackVersion, dlFile, true);
+        Serial.printf("[OTA] trying fallback file url=%s\n", fallbackUrl.c_str());
+
+        if (assetDownloadToStaging(fallbackUrl, dlFile, &stagingPath, &fallbackErr))
+        {
+          Serial.printf("[OTA] fallback file OK: %s\n", rel.c_str());
+          dlOk = true;
+          break;
+        }
+
+        Serial.printf("[OTA] fallback file attempt failed: %s\n", fallbackErr.c_str());
+
+        if (fallbackErr.length())
+          dlErr = fallbackErr;
 
         if (dlErr.indexOf("HTTP -1") >= 0)
         {
@@ -1044,7 +1067,10 @@ bool assetOtaCheckNow(String *outMessage)
         ++skipCount;
         ++processedCount;
         Serial.printf("[OTA] SKIP FAILED FILE: rel=%s err=%s\n", rel.c_str(), dlErr.c_str());
-        Serial.printf("[OTA] SKIP FAILED URL: %s\n", assetFileResolvedUrl(remotePackVersion, dlFile).c_str());
+        Serial.printf("[OTA] SKIP FAILED PRIMARY URL: %s\n",
+                      assetFileResolvedUrl(remotePackVersion, dlFile, false).c_str());
+        Serial.printf("[OTA] SKIP FAILED FALLBACK URL: %s\n",
+                      assetFileResolvedUrl(remotePackVersion, dlFile, true).c_str());
         continue;
       }
 

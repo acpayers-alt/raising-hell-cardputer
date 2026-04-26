@@ -119,8 +119,13 @@ static void clearStaleCoreDumpIfNeeded()
 
 static void serialBootHandshake(uint32_t waitMs)
 {
-  // CDC can take a moment; don't hang forever (battery / no host).
+// CDC can take a moment; don't hang forever (battery / no host).
+#if defined(ARDUINO_USB_CDC_ON_BOOT)
+// Only available on newer cores; guard to avoid compile break
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
   Serial.setTxTimeoutMs(10);
+#endif
+#endif
 
   const uint32_t t0 = millis();
   while (!Serial && (millis() - t0) < waitMs)
@@ -147,9 +152,13 @@ void appSetup()
   Serial.printf("[HEAP] free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
-  // DO NOT use 0 here; on some ESP32 CDC builds this can cause "no output ever".
-  // Keep it small so we still don't block hard when host isn't ready.
+// DO NOT use 0 here; on some ESP32 CDC builds this can cause "no output ever".
+// Keep it small so we still don't block hard when host isn't ready.
+#if defined(ARDUINO_USB_CDC_ON_BOOT)
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
   Serial.setTxTimeoutMs(10);
+#endif
+#endif
 
   // Give the USB stack a moment to come up.
   delay(50);

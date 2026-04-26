@@ -16,8 +16,10 @@ static const char *kLocalManifestTmpPath = "/raising_hell/assets/manifest_local.
 static const char *kStagingRoot = "/raising_hell/assets_staging";
 
 static const char *kPublicManifestUrl = RH_PUBLIC_MANIFEST_URL;
+static const char *kPublicManifestFallbackUrl = RH_PUBLIC_MANIFEST_FALLBACK_URL;
 
 static const char *kDevManifestUrl = RH_DEV_MANIFEST_URL;
+static const char *kDevManifestFallbackUrl = RH_DEV_MANIFEST_FALLBACK_URL;
 
 const char *assetOtaConfigPath() { return kCfgPath; }
 const char *assetOtaConfigTmpPath() { return kCfgTmpPath; }
@@ -37,6 +39,19 @@ const char* assetOtaManifestUrlForChannel(AssetOtaChannel ch)
     case AssetOtaChannel::PUBLIC:
     default:
       return kPublicManifestUrl;
+  }
+}
+
+const char *assetOtaFallbackManifestUrlForChannel(AssetOtaChannel ch)
+{
+  switch (ch)
+  {
+  case AssetOtaChannel::DEV:
+    return kDevManifestFallbackUrl;
+
+  case AssetOtaChannel::PUBLIC:
+  default:
+    return kPublicManifestFallbackUrl;
   }
 }
 
