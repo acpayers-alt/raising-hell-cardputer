@@ -53,6 +53,7 @@ void soundMuteUi(uint32_t ms);
 // -----------------------------------------------------------------------------
 void soundFuneralDirge();            // longer dirge for burial screen (one-shot latched)
 void soundResetDeathDirgeLatch();    // resets one-shot latch for dirge
+void soundResetDeathAudioState();    // cancels death/flatline audio and restores configured volume
 
 // Low-health warning pulse (call each loop; will self-rate-limit)
 void soundLowHealthTick(uint8_t hp, bool sleeping, bool screenOn, bool inDeathScreen);

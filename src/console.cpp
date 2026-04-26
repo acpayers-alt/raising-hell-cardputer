@@ -19,6 +19,7 @@
 #include "controls_help_state.h"
 #include "save_manager.h"
 #include "sdcard.h"
+#include "sound.h"
 #include "timezone.h"
 #include "whats_new_state.h"
 #include "wifi_power.h"
@@ -933,6 +934,7 @@ static void execLine(char *line)
       logLine("  fwmark reprovision  clear marker + set asset flag");
       logLine("  timeinvalidate      mark current time invalid");
       logLine("  nvsclear            wipe NVS + reboot");
+      logLine("  resurrect          revive dead pet before burial");
     }
 
 #if !PUBLIC_BUILD
@@ -1514,6 +1516,59 @@ static void execLine(char *line)
     return;
   }
 #endif
+
+  // -------------------------------------------------
+  // RESURRECT (support mode)
+  // -------------------------------------------------
+  if (!strcmp(argv[0], "resurrect"))
+  {
+    if (!consoleRequireSupportMode())
+      return;
+
+    // Only allow if pet is dead and not yet buried.
+    const UIReturnTarget ret = uiGetReturnTarget();
+
+    const bool currentUiRecoverable = (g_app.uiState == UIState::DEATH) || (g_app.uiState == UIState::DEATH_TRANSITION);
+
+    const bool returnUiRecoverable = (ret.state == UIState::DEATH) || (ret.state == UIState::DEATH_TRANSITION) ||
+                                     (ret.state == UIState::BURIAL_SCREEN);
+
+    const bool statRecoverable = (pet.health <= 0);
+
+    const bool inRecoverableDeathFlow = currentUiRecoverable || returnUiRecoverable || statRecoverable;
+
+    if (inRecoverableDeathFlow)
+    {
+      // Stop any active death/flatline/dirge sequence before restoring the pet.
+      soundResetDeathAudioState();
+
+      petResurrectFull();
+
+      // Make sure recovery does not inherit death-flow audio/alert state.
+      soundResetDeathAudioState();
+
+      uiEndAlertScreenFlash();
+
+#if LED_STATUS_ENABLED
+      ledSetScreenOff(false);
+      ledUpdatePetStatus(LED_PET_OFF);
+#endif
+
+      uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+      invalidateBackgroundCache();
+      requestFullUIRedraw();
+      requestUIRedraw();
+      clearInputLatch();
+
+      logLine("[OK] Pet revived");
+    }
+    else
+    {
+      logLine("No dead pet to revive");
+    }
+
+    return;
+  }
 
   // WIFI
   if (!strcmp(argv[0], "wifi"))

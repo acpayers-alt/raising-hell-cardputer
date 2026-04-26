@@ -798,6 +798,23 @@ void appMainLoopTick()
   // DEATH/BURIAL special flow
   if (g_app.uiState == UIState::DEATH)
   {
+    // Allow support console access from the death menu so recovery commands
+    // like 'resurrect' are reachable before burial.
+    if (input.consoleOnce)
+    {
+      noteUserActivity();
+
+      openConsoleWithReturn(g_app.uiState, g_app.currentTab,
+                            /*retToSettings=*/false,
+                            g_settingsFlow.settingsPage);
+
+      invalidateBackgroundCache();
+      requestUIRedraw();
+      input = InputState{};
+      clearInputLatch();
+      return;
+    }
+
     const UIState before = g_app.uiState;
     handleMenuInput(input);
 
@@ -819,13 +836,30 @@ void appMainLoopTick()
 
   if (g_app.uiState == UIState::BURIAL_SCREEN)
   {
+    // Allow support console access while the burial confirmation screen is up.
+    // If the user has not confirmed burial yet, 'resurrect' can still recover.
+    if (input.consoleOnce)
+    {
+      noteUserActivity();
+
+      openConsoleWithReturn(g_app.uiState, g_app.currentTab,
+                            /*retToSettings=*/false,
+                            g_settingsFlow.settingsPage);
+
+      invalidateBackgroundCache();
+      requestUIRedraw();
+      input = InputState{};
+      clearInputLatch();
+      return;
+    }
+
     handleMenuInput(input);
     if (input.selectOnce || input.encoderPressOnce)
       requestUIRedraw();
     renderUI();
     return;
   }
-
+  
   // AUTO-RETURN TO PET TAB
   if (g_app.uiState == UIState::PET_SCREEN && g_app.currentTab != Tab::TAB_PET)
   {

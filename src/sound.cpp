@@ -568,6 +568,27 @@ void soundDeathFlatline()
 
 void soundResetDeathDirgeLatch() { s_deathDirgePlayed = false; }
 
+void soundResetDeathAudioState()
+{
+  M5Cardputer.Speaker.end();
+
+  s_playing = false;
+  s_seq = nullptr;
+  s_seqCount = 0;
+  s_seqIdx = 0;
+  s_nextChangeMs = 0;
+
+  s_flatlineFadeActive = false;
+  s_flatlineStartMs = 0;
+  s_flatlineDurationMs = 0;
+  s_flatlineStartVol = 0;
+
+  s_restoreVolumeAfterSequence = false;
+  s_deathDirgePlayed = false;
+
+  applySpeakerVolume();
+}
+
 void soundFuneralDirge()
 {
   if (soundGetVolumeLevel() == SOUND_VOL_OFF)
