@@ -530,9 +530,15 @@ static bool bootAssetProvisionWifiOnboardingActive()
   case UIState::BOOT_WIFI_WAIT:
   case UIState::BOOT_TZ_PICK:
   case UIState::BOOT_NTP_WAIT:
-  case UIState::BOOT_ASSET_WIFI_REQUIRED:
   case UIState::WIFI_SETUP:
     return true;
+
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+    // This is the provisioning holding screen, not a Wi-Fi flow that should
+    // block backend provisioning. If we block on this state, the UI can show
+    // "Idle" forever while OTA never starts.
+    return false;
+
   default:
     return false;
   }
@@ -1145,20 +1151,20 @@ void postBootInitTick()
       if (g_bootAssetProvisionMustComplete)
       {
         g_bootAssetProvisionActive = false;
-        if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
-        {
-          Serial.printf("[BOOT][PROVISION_UI] enter BOOT_ASSET_WIFI_REQUIRED ...");
 
-          uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
-          requestFullUIRedraw();
-          requestUIRedraw();
-          renderUI();
-          clearInputLatch();
-        }
+        // Do not immediately enter BOOT_ASSET_WIFI_REQUIRED here. That screen is
+        // only needed when we truly need user Wi-Fi input. Let Stage 3.5 run
+        // first so stored Wi-Fi creds / already-connected Wi-Fi can start OTA
+        // automatically instead of leaving the screen stuck at IDLE.
+        drawBootAssetProvisionScreen("Preparing asset download.", "Please wait...");
+        requestFullUIRedraw();
+        requestUIRedraw();
+        renderUI();
+        clearInputLatch();
 
         return;
       }
-
+      
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
       g_bootAssetProvisionActive = true;
       requestUIRedraw();

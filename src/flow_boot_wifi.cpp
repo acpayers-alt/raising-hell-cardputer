@@ -140,11 +140,8 @@ static bool bootTryDetectTimezoneFromWifi()
   applyTimezoneIndex((uint8_t)tzIndex);
   saveTzIndexToNVS((uint8_t)tzIndex);
 
-  Serial.printf("[BOOTWIFI] timezone applied idx=%d label='%s' iana='%s' rule='%s'\n",
-                tzIndex,
-                tzName((uint8_t)tzIndex),
-                tzIanaName((uint8_t)tzIndex),
-                tzPosixRule((uint8_t)tzIndex));
+  Serial.printf("[BOOTWIFI] timezone applied idx=%d label='%s' iana='%s' rule='%s'\n", tzIndex,
+                tzName((uint8_t)tzIndex), tzIanaName((uint8_t)tzIndex), tzPosixRule((uint8_t)tzIndex));
 
   return true;
 }
@@ -469,15 +466,30 @@ void uiBootWifiWaitHandle(InputState &in)
                     (unsigned)strlen(wifiSetupPass), (unsigned)strlen(g_wifi.pass), wifiSetupSsid, g_wifi.ssid);
     }
 
+    if (g_bootAssetProvisionMustComplete && bootAssetProvisionRequired())
+    {
+      Serial.printf("[BOOTWIFI] WiFi connected -> returning to BOOT for mandatory asset provisioning afterOk=%d\n",
+                    (int)g_bootWizardAfterOkState);
+
+      bootSetupClearPendingFlag();
+      g_bootProvisionWifiOnboardingStarted = false;
+
+      ui_setBootSplashActive(false);
+      uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+      requestFullUIRedraw();
+      requestUIRedraw();
+      return;
+    }
+
     const bool tzDetected = bootTryDetectTimezoneFromWifi();
 
     if (tzDetected)
     {
       wifiStartSntpNow();
       bootWifiBeginNtpWait();
-      
+
       Serial.println("[BOOT][NTP] wait started (auto TZ)");
-      
+
       uiActionEnterState(UIState::BOOT_NTP_WAIT, g_bootWizardAfterOkTab, true);
       requestUIRedraw();
       return;

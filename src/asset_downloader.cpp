@@ -177,24 +177,54 @@ bool assetDownloadToStaging(const String &fileUrl, const AssetManifestFile &file
   uint8_t buf[1024];
   uint32_t total = 0;
   uint32_t idleLoops = 0;
+  const uint32_t expectedTotal = (contentLength >= 0) ? (uint32_t)contentLength : file.size;
 
-  while (http.connected() || (stream && stream->available() > 0))
+  while (expectedTotal == 0 || total < expectedTotal)
   {
     const size_t avail = stream ? stream->available() : 0;
     if (avail == 0)
     {
       ++idleLoops;
-      if (idleLoops > 5000)
+
+      if (!http.connected() && idleLoops > 250)
+      {
+        Serial.printf("[OTA] stream closed early total=%u expected=%u\n",
+                      (unsigned)total, (unsigned)expectedTotal);
         break;
+      }
+
+      if (idleLoops > 30000)
+      {
+        Serial.printf("[OTA] stream idle timeout total=%u expected=%u connected=%d\n",
+                      (unsigned)total, (unsigned)expectedTotal, http.connected() ? 1 : 0);
+        break;
+      }
+
       delay(1);
+      yield();
       continue;
     }
 
     idleLoops = 0;
-    const size_t want = (avail > sizeof(buf)) ? sizeof(buf) : avail;
+
+    size_t want = avail;
+    if (want > sizeof(buf))
+      want = sizeof(buf);
+
+    if (expectedTotal > 0)
+    {
+      const uint32_t remaining = expectedTotal - total;
+      if (want > remaining)
+        want = remaining;
+    }
+
     const int n = stream->readBytes((char *)buf, want);
     if (n <= 0)
+    {
+      delay(1);
+      yield();
       continue;
+    }
 
     const size_t w = out.write(buf, (size_t)n);
     if (w != (size_t)n)
@@ -234,7 +264,7 @@ bool assetDownloadToStaging(const String &fileUrl, const AssetManifestFile &file
       *outErr = "HTTP size mismatch";
     return false;
   }
-
+  
   if (total != file.size)
   {
     SD.remove(stagingPath.c_str());
