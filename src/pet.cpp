@@ -769,8 +769,7 @@ void Pet::update()
     {
       health = 0;
 
-      if (ui != UIState::DEATH && ui != UIState::DEATH_TRANSITION && ui != UIState::MINI_GAME &&
-          ui != UIState::BURIAL_SCREEN)
+      if (petDeathShouldAutoEnterForUi(ui))
       {
         petEnterDeathState();
       }
@@ -930,6 +929,20 @@ void Pet::setName(const char *n)
 // -----------------------------------------------------
 // DEATH / RESURRECTION
 // -----------------------------------------------------
+bool petDeathShouldAutoEnterForUi(UIState ui)
+{
+  switch (ui)
+  {
+  case UIState::PET_SCREEN:
+  case UIState::PET_SLEEPING:
+  case UIState::CLOCK_MODE:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 void petEnterDeathState()
 {
   g_app.inMiniGame = false;

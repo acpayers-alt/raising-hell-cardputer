@@ -270,8 +270,7 @@ void appMainLoopTick()
       pet.update();
     }
 
-    if (pet.health <= 0 && petDeathEnabled && g_app.uiState != UIState::DEATH &&
-        g_app.uiState != UIState::DEATH_TRANSITION && g_app.uiState != UIState::BURIAL_SCREEN)
+    if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
     {
       uiEndAlertScreenFlash();
 #if LED_STATUS_ENABLED
@@ -340,7 +339,7 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-  #if LED_STATUS_ENABLED
+#if LED_STATUS_ENABLED
   if (ledInputLockActive())
   {
     // Keep alert system in logical screen-off mode during the pulse.
@@ -1122,8 +1121,7 @@ void appMainLoopTick()
       uiMaybeShowLevelUpPopup();
     }
 
-    if (pet.health <= 0 && petDeathEnabled && g_app.uiState != UIState::DEATH &&
-        g_app.uiState != UIState::DEATH_TRANSITION && g_app.uiState != UIState::BURIAL_SCREEN)
+    if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
     {
       petEnterDeathState();
       requestUIRedraw();

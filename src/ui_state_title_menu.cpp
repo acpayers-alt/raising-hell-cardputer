@@ -3,6 +3,8 @@
 #include <Arduino.h>
 
 #include "app_state.h"
+#include "death_state.h"
+#include "game_options_state.h"
 #include "graphics.h"
 #include "input.h"
 #include "pet.h"
@@ -30,6 +32,11 @@ static bool s_titleHasImport = false;
 static bool titleHasLivePet()
 {
   return saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
+}
+
+static bool titleHasPendingDeath()
+{
+  return petDeathEnabled && pet.hunger <= 0 && pet.health <= 0;
 }
 
 static void refreshTitleMenuAvailability()
@@ -132,6 +139,16 @@ static void titleActivateContinue(InputState &in)
     return;
   }
 
+  if (titleHasPendingDeath())
+  {
+    playBeep();
+    beginDeathTransition();
+    inputForceClear();
+    clearInputLatch();
+    (void)in;
+    return;
+  }
+  
   const bool shouldEnterSleeping = pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
                                    g_app.sleepUntilRested || g_app.sleepUntilAwakened ||
                                    saveManagerSleepPendingFlagExists();

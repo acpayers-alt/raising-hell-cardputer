@@ -5,6 +5,7 @@
 #include "inventory.h"
 #include "savegame.h"
 #include "pet_defs.h"
+#include "ui_defs.h"
 
 // Global helpers (keep only if these are truly free functions)
 void addInf(int amount);
@@ -148,5 +149,6 @@ public:
 extern Pet pet;
 
 // Death / resurrection helpers
+bool petDeathShouldAutoEnterForUi(UIState ui);
 void petEnterDeathState();
 void petResurrectFull();
