@@ -73,6 +73,13 @@ static uint32_t s_rewardShownAtMs = 0;
 static bool s_prevSelectHeld = false;
 static uint32_t s_mgInputLockoutUntilMs = 0;
 
+// Repeated-game boredom tracking.
+// This is intentionally runtime-only. It nudges players toward variety without
+// making game choice a permanent/save-affecting system.
+static MiniGame s_lastCompletedMiniGame = MiniGame::NONE;
+static uint8_t s_sameMiniGameStreak = 0;
+static bool s_showBoredomMessageOnExit = false;
+
 static const uint32_t kRewardAcceptDelayMs = 180;
 static const uint32_t kRewardAutoDismissMs = 15000;
 
@@ -184,6 +191,89 @@ static bool tryAwardWinItem_1in4(ItemType *outType)
   return true;
 }
 
+static const char *mgGameName(MiniGame game)
+{
+  switch (game)
+  {
+  case MiniGame::FLAPPY_FIREBALL:
+    return "Flappy Fireball";
+  case MiniGame::CROSSY_ROAD:
+    return "Crossy Road";
+  case MiniGame::INFERNAL_DODGER:
+    return "Infernal Dodger";
+  case MiniGame::RESURRECTION:
+    return "Resurrection Run";
+  default:
+    return "Unknown";
+  }
+}
+
+static bool mgCountsForRepeatBoredom(MiniGame game)
+{
+  switch (game)
+  {
+  case MiniGame::FLAPPY_FIREBALL:
+  case MiniGame::CROSSY_ROAD:
+  case MiniGame::INFERNAL_DODGER:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
+static uint8_t mgRepeatBoredomPenaltyForStreak(uint8_t streak)
+{
+  if (streak >= 5)
+    return 6;
+  if (streak == 4)
+    return 4;
+  if (streak == 3)
+    return 2;
+
+  return 0;
+}
+
+static bool mgApplyRepeatGameBoredom(MiniGame completedGame, uint8_t *outStreak, uint8_t *outPenalty)
+{
+  if (outStreak)
+    *outStreak = 0;
+  if (outPenalty)
+    *outPenalty = 0;
+
+  if (!mgCountsForRepeatBoredom(completedGame))
+    return false;
+
+  if (completedGame == s_lastCompletedMiniGame)
+  {
+    if (s_sameMiniGameStreak < 255)
+      ++s_sameMiniGameStreak;
+  }
+  else
+  {
+    s_lastCompletedMiniGame = completedGame;
+    s_sameMiniGameStreak = 1;
+  }
+
+  const uint8_t penalty = mgRepeatBoredomPenaltyForStreak(s_sameMiniGameStreak);
+
+  if (outStreak)
+    *outStreak = s_sameMiniGameStreak;
+  if (outPenalty)
+    *outPenalty = penalty;
+
+  if (penalty == 0)
+    return false;
+
+  const int oldHappy = pet.happiness;
+  pet.happiness = constrain(pet.happiness - (int)penalty, 0, 100);
+
+  Serial.printf("[PET] repeat game boredom game=%s streak=%u happiness %d->%d penalty=%u\n", mgGameName(completedGame),
+                (unsigned)s_sameMiniGameStreak, oldHappy, pet.happiness, (unsigned)penalty);
+
+  return true;
+}
+
 void mgApplyResultAndShowReward(bool won)
 {
   if (currentMiniGame == MiniGame::RESURRECTION)
@@ -240,6 +330,15 @@ void mgApplyResultAndShowReward(bool won)
     pet.addXP(5);
     pet.happiness = constrain(pet.happiness + 10, 0, 100);
     snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5  MOOD +10");
+  }
+
+  uint8_t repeatStreak = 0;
+  uint8_t boredomPenalty = 0;
+  const bool boredomApplied = mgApplyRepeatGameBoredom(currentMiniGame, &repeatStreak, &boredomPenalty);
+
+  if (boredomApplied && repeatStreak == 5)
+  {
+    s_showBoredomMessageOnExit = true;
   }
 
   saveManagerMarkDirty();
@@ -303,6 +402,16 @@ void miniGameExitToReturnUi(bool beginLockout)
 
   invalidateBackgroundCache();
   requestFullUIRedraw();
+
+  if (s_showBoredomMessageOnExit)
+  {
+    s_showBoredomMessageOnExit = false;
+
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%s is getting bored of this game.", pet.getName());
+
+    ui_showTimedMessage(msg, 1800);
+  }
 
   if (beginLockout)
     mgBeginInputLockout(220);

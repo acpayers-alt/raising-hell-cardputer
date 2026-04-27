@@ -62,6 +62,7 @@
 #include "evolution_flow.h"
 #include "game_options_state.h"
 #include "hatching_flow.h"
+#include "passive_xp.h"
 #include "pet.h"
 #include "sleep_state.h"
 #include "sound.h"
@@ -282,6 +283,7 @@ void appMainLoopTick()
     else
     {
       pet.update();
+      passiveXpTick(now);
     }
 
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
@@ -805,8 +807,7 @@ void appMainLoopTick()
       noteUserActivity();
 
       openConsoleWithReturn(g_app.uiState, g_app.currentTab,
-                            /*retToSettings=*/false,
-                            g_settingsFlow.settingsPage);
+                            /*retToSettings=*/false, g_settingsFlow.settingsPage);
 
       invalidateBackgroundCache();
       requestUIRedraw();
@@ -843,8 +844,7 @@ void appMainLoopTick()
       noteUserActivity();
 
       openConsoleWithReturn(g_app.uiState, g_app.currentTab,
-                            /*retToSettings=*/false,
-                            g_settingsFlow.settingsPage);
+                            /*retToSettings=*/false, g_settingsFlow.settingsPage);
 
       invalidateBackgroundCache();
       requestUIRedraw();
@@ -859,7 +859,7 @@ void appMainLoopTick()
     renderUI();
     return;
   }
-  
+
   // AUTO-RETURN TO PET TAB
   if (g_app.uiState == UIState::PET_SCREEN && g_app.currentTab != Tab::TAB_PET)
   {
@@ -1168,9 +1168,10 @@ void appMainLoopTick()
     else
     {
       pet.update();
+      passiveXpTick(now);
       uiMaybeShowLevelUpPopup();
     }
-
+    
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
     {
       petEnterDeathState();
