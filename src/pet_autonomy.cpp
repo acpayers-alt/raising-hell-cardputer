@@ -7,10 +7,10 @@
 #include "graphics.h"
 #include "pet.h"
 #include "save_manager.h"
-#include <SD.h>
 #include "sdcard.h"
 #include "sleep_state.h"
 #include "ui_actions.h"
+#include <SD.h>
 
 static constexpr uint32_t kAutonomyRollIntervalMs = 60UL * 60UL * 1000UL;
 
@@ -27,6 +27,7 @@ static constexpr int kAutoSleepHealthThreshold = 20;
 static constexpr int kAutoSleepTargetEnergy = 40;
 
 static constexpr uint32_t kAutoSleepWakeGraceMs = 10UL * 60UL * 1000UL;
+static constexpr uint32_t kPizzaCooldownMs = 6UL * 60UL * 60UL * 1000UL;
 
 static uint32_t s_lastPizzaRollMs = 0;
 static uint32_t s_lastAutoSleepRollMs = 0;
@@ -65,10 +66,7 @@ static void writeAutoSleepNoticeFlag()
   }
 }
 
-bool petAutonomyPassOutNoticePending()
-{
-  return g_sdReady && SD.exists(kAutoSleepNoticeFlagPath);
-}
+bool petAutonomyPassOutNoticePending() { return g_sdReady && SD.exists(kAutoSleepNoticeFlagPath); }
 
 void petAutonomyClearPassOutNotice()
 {
@@ -281,20 +279,11 @@ static void doMischief()
   Serial.printf("[PET][AUTO] mischief name='%s' INF=-%d remaining=%d\n", pet.getName(), loss, getInf());
 }
 
-void petAutonomyDebugTriggerPizza()
-{
-  doPizza();
-}
+void petAutonomyDebugTriggerPizza() { doPizza(); }
 
-void petAutonomyDebugTriggerAutoSleep()
-{
-  doAutoSleep();
-}
+void petAutonomyDebugTriggerAutoSleep() { doAutoSleep(); }
 
-void petAutonomyDebugTriggerMischief()
-{
-  doMischief();
-}
+void petAutonomyDebugTriggerMischief() { doMischief(); }
 
 void petAutonomyDebugNotifyNow(uint32_t nowMs)
 {
@@ -324,27 +313,47 @@ void petAutonomyTick(uint32_t nowMs)
   const bool shouldPassOut = !autoSleepSuppressed && (exhausted || criticallyStarving);
   const bool angry = (pet.getMood() == MOOD_MAD);
 
-  if (hourlyRollReady(starving, nowMs, s_lastPizzaRollMs) && rollPercent(kPizzaChancePct))
+  // --- Pizza: immediate + deterministic, but cooldown-gated ---
+  if (starving)
   {
-    doPizza();
-  }
-
-  if (shouldPassOut)
-  {
-    if (rollPercent(kAutoSleepChancePct))
+    const bool pizzaReady =
+        s_lastPizzaRollMs == 0 || (uint32_t)(nowMs - s_lastPizzaRollMs) >= kPizzaCooldownMs;
+  
+    if (pizzaReady)
     {
-      doAutoSleep();
+      doPizza();
+      s_lastPizzaRollMs = nowMs;
       return;
     }
+  }
+  else
+  {
+    s_lastPizzaRollMs = 0;
+  }
+  
+  // --- Auto sleep: immediate + deterministic ---
+  if (shouldPassOut)
+  {
+    doAutoSleep();
+    return;
   }
   else
   {
     s_lastAutoSleepRollMs = 0;
   }
 
-  if (hourlyRollReady(angry, nowMs, s_lastMischiefRollMs) && rollPercent(kMischiefChancePct))
+  // --- Mischief: immediate eligibility + chance ---
+  if (angry)
   {
-    doMischief();
+    if (rollPercent(kMischiefChancePct))
+    {
+      doMischief();
+      return;
+    }
+  }
+  else
+  {
+    s_lastMischiefRollMs = 0;
   }
 }
 
