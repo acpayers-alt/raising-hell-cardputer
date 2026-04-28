@@ -422,15 +422,18 @@ static void drawGameOptionsMenu()
   char decayLine[32];
   snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
 
+  char passiveXpLine[32];
+  snprintf(passiveXpLine, sizeof(passiveXpLine), "Passive XP: %s", passiveXpEnabled ? "ON" : "OFF");
+
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
 
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {decayLine, deathLine, ledLine};
-  const int totalItems = 3;
-
+  const char *labels[] = {decayLine, passiveXpLine, deathLine, ledLine};
+  const int totalItems = 4;
+  
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;

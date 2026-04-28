@@ -34,135 +34,69 @@ void HideGameNewPetConfirm() { s_newPetConfirmActive = false; }
 
 void SetGameNewPetConfirmIndex(int idx) { s_newPetConfirmIndex = (idx != 0) ? 1 : 0; }
 
-void Handle_GAME(InputState &input, int move)
+bool HandleGameNewPetConfirm(InputState &input)
 {
-  (void)move;
+  // This file no longer owns Game menu navigation/actions.
+  // The authoritative Game menu handler is UiSettingsMenu in ui_settings_menu.cpp.
+  // This legacy page now only owns the New Pet confirmation overlay.
+  if (!s_newPetConfirmActive)
+    return false;
 
-  // ---------------------------------------------------------------------------
-  // New Pet confirm overlay input
-  // ---------------------------------------------------------------------------
-  if (s_newPetConfirmActive)
+  if (input.leftOnce || input.upOnce)
   {
-    if (input.leftOnce || input.upOnce)
-    {
-      s_newPetConfirmIndex = 0;
-      playBeep();
-      requestUIRedraw();
-      clearInputLatch();
-      return;
-    }
-
-    if (input.rightOnce || input.downOnce)
-    {
-      s_newPetConfirmIndex = 1;
-      playBeep();
-      requestUIRedraw();
-      clearInputLatch();
-      return;
-    }
-
-    if (input.menuOnce || input.escOnce)
-    {
-      s_newPetConfirmActive = false;
-      requestUIRedraw();
-      clearInputLatch();
-      return;
-    }
-
-    if (uiIsSelect(input))
-    {
-      const bool storeFirst = (s_newPetConfirmIndex == 0);
-
-      if (storeFirst)
-      {
-        char parkedPath[128];
-        if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
-        {
-          playBeep();
-          ui_showMessage("Store failed");
-          s_newPetConfirmActive = false;
-          requestUIRedraw();
-          clearInputLatch();
-          return;
-        }
-      }
-
-      s_newPetConfirmActive = false;
-      playBeep();
-      uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
-      uiChoosePetOnEnter(input);
-      requestFullUIRedraw();
-      requestUIRedraw();
-      clearInputLatch();
-      return;
-    }
-
-    return;
+    s_newPetConfirmIndex = 0;
+    playBeep();
+    requestUIRedraw();
+    clearInputLatch();
+    return true;
   }
 
-  const int totalItems = 3;
-
-  int mv = input.encoderDelta;
-  if (input.upOnce)
-    mv = -1;
-  if (input.downOnce)
-    mv = 1;
-
-  if (mv != 0)
+  if (input.rightOnce || input.downOnce)
   {
-    g_app.gameOptionsIndex += mv;
-    if (g_app.gameOptionsIndex < 0)
-      g_app.gameOptionsIndex = totalItems - 1;
-    if (g_app.gameOptionsIndex >= totalItems)
-      g_app.gameOptionsIndex = 0;
-
-    requestUIRedraw();
+    s_newPetConfirmIndex = 1;
     playBeep();
+    requestUIRedraw();
     clearInputLatch();
-    return;
+    return true;
+  }
+
+  if (input.menuOnce || input.escOnce)
+  {
+    s_newPetConfirmActive = false;
+    requestUIRedraw();
+    clearInputLatch();
+    return true;
   }
 
   if (uiIsSelect(input))
   {
-    // 0 = Decay Mode
-    if (g_app.gameOptionsIndex == 0)
+    const bool storeFirst = (s_newPetConfirmIndex == 0);
+
+    if (storeFirst)
     {
-      g_app.decayModeIndex = (int)saveManagerGetDecayMode();
-      g_settingsFlow.settingsReturnPage = SettingsPage::GAME;
-      g_settingsFlow.settingsPage = SettingsPage::DECAY_MODE;
-      requestUIRedraw();
-      playBeep();
-      clearInputLatch();
-      return;
+      char parkedPath[128];
+      if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
+      {
+        playBeep();
+        ui_showMessage("Store failed");
+        s_newPetConfirmActive = false;
+        requestUIRedraw();
+        clearInputLatch();
+        return true;
+      }
     }
 
-    // 1 = Pet Death
-    if (g_app.gameOptionsIndex == 1)
-    {
-      petDeathEnabled = !petDeathEnabled;
-      saveSettingsToSD();
-      saveManagerMarkDirty();
-      requestUIRedraw();
-      playBeep();
-      clearInputLatch();
-      return;
-    }
-
-    // 2 = LED Alerts
-    if (g_app.gameOptionsIndex == 2)
-    {
-      ledAlertsEnabled = !ledAlertsEnabled;
-#if LED_STATUS_ENABLED
-      ledUpdatePetStatus(LED_PET_OFF);
-#endif
-      saveSettingsToSD();
-      saveManagerMarkDirty();
-      requestUIRedraw();
-      playBeep();
-      clearInputLatch();
-      return;
-    }
+    s_newPetConfirmActive = false;
+    playBeep();
+    uiActionEnterState(UIState::CHOOSE_PET, Tab::TAB_PET, true);
+    uiChoosePetOnEnter(input);
+    requestFullUIRedraw();
+    requestUIRedraw();
+    clearInputLatch();
+    return true;
   }
+
+  return true;
 }
 
 } // namespace UiSettingsPages

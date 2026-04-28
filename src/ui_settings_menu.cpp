@@ -593,6 +593,16 @@ static void actGame_DecayModeRight(InputState &)
 
 static void actGame_DecayModeSelect(InputState &input) { actGame_DecayModeRight(input); }
 
+static void actGame_TogglePassiveXp(InputState &)
+{
+  passiveXpEnabled = !passiveXpEnabled;
+  saveSettingsToSD();
+  saveManagerMarkDirty();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 static void actGame_ToggleDeath(InputState &)
 {
   petDeathEnabled = !petDeathEnabled;
@@ -823,9 +833,10 @@ static MenuItem kPetItems[] = {
 };
 
 static MenuItem kGameItems[] = {
-    {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
-    {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
-    {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
+  {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
+  {"Passive XP", actGame_TogglePassiveXp, nullptr, nullptr, nullptr},
+  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+  {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {
