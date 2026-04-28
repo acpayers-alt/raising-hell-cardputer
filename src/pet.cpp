@@ -246,6 +246,9 @@ static uint16_t evoMinLevelForStage(uint8_t stageNext)
 // -----------------------------------------------------
 // Sleep tick (member)
 // -----------------------------------------------------
+static constexpr int kSleepHealthRecoveryFloor = 61;
+static bool s_sleepRecoveryMessageShown = false;
+
 void Pet::petSleepTick()
 {
   // Pre-birth: never allow sleep flags or sleep tick to run.
@@ -310,6 +313,7 @@ void Pet::petSleepTick()
   static uint32_t sleepAccMs = 0;
   static uint8_t sleepSubTick = 0;  // gate small sleep effects
   static uint8_t sleepHealTick = 0; // gate HP regen during sleep
+  static bool s_sleepRecoveryMessageShown = false;
 
   bool changed = false;
 
@@ -399,18 +403,54 @@ void Pet::petSleepTick()
     }
 
     // HP regen during sleep (since Pet::update() does not run while sleeping).
-    const bool canSleepRegen = (hunger >= 25 && energy >= 10);
-    if (canSleepRegen && health < 100)
+    //
+    // Sleep always restores enough health to clear Sick, even if the pet is
+    // starving. Above that recovery floor, normal sleep regen still requires
+    // basic care so sleep does not become a free full-heal button.
+    const bool needsRecoveryFloor = (health < kSleepHealthRecoveryFloor);
+    const bool canBonusSleepRegen = (hunger >= 25 && energy >= 10);
+
+    if (needsRecoveryFloor || (canBonusSleepRegen && health < 100))
     {
       if (sleepHealTick < 255)
         sleepHealTick++;
+
       if (sleepHealTick >= 2)
       {
         sleepHealTick = 0;
-        health++;
-        if (health > 100)
-          health = 100;
-        changed = true;
+
+        const int oldHealth = health;
+
+        if (needsRecoveryFloor)
+        {
+          health++;
+          if (health > kSleepHealthRecoveryFloor)
+            health = kSleepHealthRecoveryFloor;
+        }
+        else
+        {
+          health++;
+          if (health > 100)
+            health = 100;
+        }
+
+        changed = (health != oldHealth) || changed;
+
+        Serial.printf("[PET] sleep health recovery %d->%d floor=%d hunger=%d energy=%d\n",
+                      oldHealth,
+                      health,
+                      kSleepHealthRecoveryFloor,
+                      hunger,
+                      energy);
+
+        if (!s_sleepRecoveryMessageShown && oldHealth < kSleepHealthRecoveryFloor && health >= kSleepHealthRecoveryFloor)
+        {
+          s_sleepRecoveryMessageShown = true;
+
+          char msg[64];
+          snprintf(msg, sizeof(msg), "%s recovered enough to move again.", getName());
+          ui_showTimedMessage(msg, 2200);
+        }
       }
     }
     else

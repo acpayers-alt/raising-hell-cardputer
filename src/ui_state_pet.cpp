@@ -107,6 +107,17 @@ static void handlePetScreen_local(InputState &input)
 
     if (confirmOnce)
     {
+      if (pet.getMood() == MOOD_SICK)
+      {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "%s is too sick to play.", pet.getName());
+
+        ui_showMessage(msg);
+        soundError();
+        swallowThisFrame(input);
+        return;
+      }
+
       if (pet.energy < 10)
       {
         ui_showMessage("Too tired!");
@@ -116,7 +127,7 @@ static void handlePetScreen_local(InputState &input)
       }
 
       const int selectedIndex = playMenuIndex;
-
+      
       // Clear any queued/held input so Enter doesn't immediately act in the game.
       inputForceClear();
 
