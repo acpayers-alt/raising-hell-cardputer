@@ -17,10 +17,11 @@ static constexpr int kPizzaHungerGain = 35;
 static constexpr int kPizzaHappinessGain = 5;
 
 static constexpr uint8_t kPizzaChancePct = 35;
-static constexpr uint8_t kAutoSleepChancePct = 50;
+static constexpr uint8_t kAutoSleepChancePct = 100;
 static constexpr uint8_t kMischiefChancePct = 25;
 
 static constexpr int kAutoSleepEnergyThreshold = 5;
+static constexpr int kAutoSleepHealthThreshold = 20;
 static constexpr int kAutoSleepTargetEnergy = 40;
 
 static uint32_t s_lastPizzaRollMs = 0;
@@ -58,6 +59,9 @@ static bool petAutonomyUiAllowsActions()
   {
   case UIState::PET_SCREEN:
   case UIState::CLOCK_MODE:
+  case UIState::INVENTORY:
+  case UIState::SHOP:
+  case UIState::SLEEP_MENU:
     return true;
 
   default:
@@ -242,6 +246,8 @@ void petAutonomyTick(uint32_t nowMs)
 
   const bool starving = (pet.hunger <= 10);
   const bool exhausted = (pet.energy <= kAutoSleepEnergyThreshold);
+  const bool criticallyStarving = (pet.hunger <= 0 && pet.health <= kAutoSleepHealthThreshold);
+  const bool shouldPassOut = exhausted || criticallyStarving;
   const bool angry = (pet.getMood() == MOOD_MAD);
 
   if (hourlyRollReady(starving, nowMs, s_lastPizzaRollMs) && rollPercent(kPizzaChancePct))
@@ -249,7 +255,7 @@ void petAutonomyTick(uint32_t nowMs)
     doPizza();
   }
 
-  if (hourlyRollReady(exhausted, nowMs, s_lastAutoSleepRollMs) && rollPercent(kAutoSleepChancePct))
+  if (hourlyRollReady(shouldPassOut, nowMs, s_lastAutoSleepRollMs) && rollPercent(kAutoSleepChancePct))
   {
     doAutoSleep();
     return;

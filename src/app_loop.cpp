@@ -286,9 +286,18 @@ void appMainLoopTick()
     }
     else
     {
-      pet.update();
-      passiveXpTick(now);
       petAutonomyTick(now);
+
+      if (isPetSleepingNow())
+      {
+        pet.petSleepTick();
+        petResetUpdateTimers();
+      }
+      else
+      {
+        pet.update();
+        passiveXpTick(now);
+      }
     }
 
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
@@ -1172,11 +1181,20 @@ void appMainLoopTick()
     }
     else
     {
-      pet.update();
-      passiveXpTick(now);
       petAutonomyTick(now);
-      petAutonomyNotifyIfPending(now);
-      uiMaybeShowLevelUpPopup();
+
+      if (isPetSleepingNow())
+      {
+        pet.petSleepTick();
+        petResetUpdateTimers();
+      }
+      else
+      {
+        pet.update();
+        passiveXpTick(now);
+        petAutonomyNotifyIfPending(now);
+        uiMaybeShowLevelUpPopup();
+      }
     }
 
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
