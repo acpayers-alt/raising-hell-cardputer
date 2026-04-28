@@ -239,7 +239,7 @@ static void doAutoSleep()
 {
   tallyAutoSleep();
   writeAutoSleepNoticeFlag();
-  
+
   saveManagerEnterSleepState();
 
   // Bad sleep: the pet only sleeps itself to a low recovery target instead of
@@ -348,7 +348,7 @@ void petAutonomyTick(uint32_t nowMs)
   }
 }
 
-static bool hasPendingSummary() { return s_pizzaCount || s_autoSleepCount || s_mischiefCount; }
+static bool hasPendingSummary() { return s_pizzaCount || s_mischiefCount; }
 
 static void clearPendingSummary()
 {
@@ -387,11 +387,6 @@ void petAutonomyNotifyIfPending(uint32_t nowMs)
     snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%sMischief -%d INF", first ? "" : "\n",
              (int)s_mischiefInfLost);
     first = false;
-  }
-
-  if (s_autoSleepCount)
-  {
-    snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%s%s passed out", first ? "" : "\n", pet.getName());
   }
 
   ui_showTimedMessage(msg, 3200);

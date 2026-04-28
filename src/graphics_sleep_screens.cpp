@@ -11,6 +11,7 @@
 #include "graphics_sd_draw.h"
 #include "graphics_sleep_anim_assets.h"
 #include "graphics_sleep_frame_cache.h"
+#include "graphics_ui_common.h"
 #include "pet.h"
 #include "pet_autonomy.h"
 
@@ -75,23 +76,22 @@ static void drawPassOutNotice()
   if (!petAutonomyPassOutNoticePending())
     return;
 
-  const int boxW = 190;
-  const int boxH = 32;
-  const int x = (SCREEN_W - boxW) / 2;
-  const int y = SCREEN_H - TAB_BAR_H - boxH - 6;
+  const uint16_t modalOutline = uiModalOutline(pet.type);
 
-  spr.fillRoundRect(x, y, boxW, boxH, 6, TFT_BLACK);
-  spr.drawRoundRect(x, y, boxW, boxH, 6, TFT_ORANGE);
+  const int pad = 10;
+  const int boxW = SCREEN_W - (pad * 2);
+  const int boxH = 42;
+  const int x = pad;
+  const int y = (SCREEN_H - boxH) / 2;
+
+  spr.fillRoundRect(x, y, boxW, boxH, 8, TFT_BLACK);
+  spr.drawRoundRect(x, y, boxW, boxH, 8, modalOutline);
 
   spr.setTextDatum(MC_DATUM);
   spr.setTextFont(2);
   spr.setTextSize(1);
-  spr.setTextColor(TFT_ORANGE, TFT_BLACK);
-  spr.drawString("Pet passed out", SCREEN_W / 2, y + 10);
-
-  spr.setTextFont(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("Wake and care for them", SCREEN_W / 2, y + 23);
+  spr.drawString("Pet passed out", SCREEN_W / 2, y + (boxH / 2));
 
   spr.setTextDatum(TL_DATUM);
 }

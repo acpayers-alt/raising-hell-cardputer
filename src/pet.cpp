@@ -442,10 +442,6 @@ void Pet::petSleepTick()
             health >= kSleepHealthRecoveryFloor)
         {
           s_sleepRecoveryMessageShown = true;
-
-          char msg[64];
-          snprintf(msg, sizeof(msg), "%s recovered enough to move again.", getName());
-          ui_showTimedMessage(msg, 2200);
         }
       }
     }

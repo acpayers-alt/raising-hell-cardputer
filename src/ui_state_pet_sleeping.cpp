@@ -79,8 +79,7 @@ void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs, bool forceRend
   g_app.sleepDurationMs = 0;
 
   pet.isSleeping = false;
-  petAutonomyClearPassOutNotice();
-  
+
   // Manual wake gets a grace window so auto-sleep does not immediately
   // bounce the pet back to sleep before the player can feed/heal it.
   petAutonomySuppressAutoSleepUntil(millis() + 10UL * 60UL * 1000UL);
@@ -93,7 +92,18 @@ void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs, bool forceRend
 
   graphicsReleaseUiCachesForMiniGame();
 
-  leavePetSleepingToReturnTarget(in, drainMs, forceRenderNow);
+  // Manual wake should always return to the active pet view.
+  // The sleep return target may be TITLE_MENU when the user entered
+  // sleep from the title screen, but waking is an explicit pet action.
+  if (uiHasReturnTarget())
+    uiPopReturnTarget();
+
+  uiActionEnterStateClean(UIState::PET_SCREEN, Tab::TAB_PET, true, in, drainMs);
+  invalidateBackgroundCache();
+  requestFullUIRedraw();
+
+  if (forceRenderNow)
+    forceRenderUIOnce();
 }
 
 void uiPetSleepingHandle(InputState &in)
@@ -117,6 +127,19 @@ void uiPetSleepingHandle(InputState &in)
     inputForceClear(); // critical: kill carried input
     openSettingsWithReturn(g_app.uiState, g_app.currentTab, SettingsPage::TOP);
     uiActionSwallowAll(in);
+    return;
+  }
+
+  // If the pass-out notice is visible, ENTER dismisses the notice only.
+  // The pet remains asleep; a second deliberate ENTER wakes them.
+  if (petAutonomyPassOutNoticePending() &&
+      (in.selectOnce || in.encoderPressOnce || in.mgSelectOnce || selectEdgeFallback))
+  {
+    petAutonomyClearPassOutNotice();
+    uiActionSwallowAll(in);
+    inputForceClear();
+    clearInputLatch();
+    requestFullUIRedraw();
     return;
   }
 
