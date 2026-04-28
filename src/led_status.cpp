@@ -145,9 +145,6 @@ void ledSetRGB(uint8_t r, uint8_t g, uint8_t b)
   {
     pulseBacklightBeginIfNeeded();
 
-    // Send twice to be extra robust if the first show races power-up
-    g_led.show();
-    delay(8);
     g_led.show();
   }
   else
