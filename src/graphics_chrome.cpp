@@ -15,29 +15,15 @@ PetUIColorScheme uiSchemeForPet(PetType t)
   switch (t)
   {
   case PET_ELDRITCH:
-    return PetUIColorScheme{
-        0x0010,
-        0x001F,
-        0xFFFF,
+    return PetUIColorScheme{0x0010, 0x001F, 0xFFFF,
 
-        0x0010,
-        0x001F,
-        0x07FF,
-        0xFFFF,
-        0x0000};
+                            0x0010, 0x001F, 0x07FF, 0xFFFF, 0x0000};
 
   case PET_DEVIL:
   default:
-    return PetUIColorScheme{
-        0x2000,
-        0xF800,
-        0xFFFF,
+    return PetUIColorScheme{0x2000, 0xF800, 0xFFFF,
 
-        0x2000,
-        0xF800,
-        0xFBE0,
-        0xFFFF,
-        0x0000};
+                            0x2000, 0xF800, 0xFBE0, 0xFFFF, 0x0000};
   }
 }
 
@@ -202,10 +188,10 @@ void drawTopBar()
   const unsigned int inf = (unsigned int)pet.inf;
 
   char titleBuf[64];
-  snprintf(titleBuf, sizeof(titleBuf), "%s - %u Inf", petName, inf);
+  snprintf(titleBuf, sizeof(titleBuf), "%s - H %u", petName, inf);
 
   char shortBuf[32];
-  snprintf(shortBuf, sizeof(shortBuf), "$%u", inf);
+  snprintf(shortBuf, sizeof(shortBuf), "H %u", inf);
 
   const char *useTitle = titleBuf;
 

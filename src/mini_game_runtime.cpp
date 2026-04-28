@@ -87,6 +87,33 @@ void mgSetRewardMessage(const char *msg);
 
 bool mgRewardShowing() { return s_showReward; }
 
+static uint32_t mgXpForMoodWin(PetMood mood)
+{
+  switch (mood)
+  {
+  case MOOD_HAPPY:
+    return 50;
+
+  case MOOD_BORED:
+    return 30;
+
+  case MOOD_TIRED:
+    return 20;
+
+  case MOOD_HUNGRY:
+    return 10;
+
+  case MOOD_MAD:
+    return 10;
+
+  case MOOD_SICK:
+    return 0;
+
+  default:
+    return 20;
+  }
+}
+
 void mgClearRewardState()
 {
   s_showReward = false;
@@ -304,7 +331,10 @@ void mgApplyResultAndShowReward(bool won)
 
   if (won)
   {
-    pet.addXP(20);
+    const PetMood mood = pet.getMood();
+    const uint32_t xp = mgXpForMoodWin(mood);
+    
+    pet.addXP(xp);
 
     const int infReward = rollMiniGameInfReward();
     addInf(infReward);
@@ -317,12 +347,12 @@ void mgApplyResultAndShowReward(bool won)
     if (wonItem)
     {
       const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +20  INF +%d  MOOD +20\nRandom Reward: %s +1", infReward,
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1", infReward,
                (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +20  INF +%d  MOOD +20", infReward);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20", infReward);
     }
   }
   else
