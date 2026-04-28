@@ -99,10 +99,7 @@ void toggleScreenPower() { SET_SCREEN_POWER(!isScreenOn()); }
 
 bool isScreenOn() { return g_app.screenOn; }
 
-bool isBacklightPulseActive()
-{
-  return g_backlightPulseActive;
-}
+bool isBacklightPulseActive() { return g_backlightPulseActive; }
 
 uint32_t screenPowerLastManualToggleMs() { return s_lastManualScreenToggleMs; }
 
@@ -136,12 +133,8 @@ static void applyBacklightRaw(uint8_t level)
 
   if (kLogBacklightChanges && Serial && Serial.availableForWrite() >= 120)
   {
-    Serial.printf("[POWER][BL] req=%u final=%u screenOn=%d pulse=%d ui=%d\n",
-                  (unsigned)level,
-                  (unsigned)finalLevel,
-                  isScreenOn() ? 1 : 0,
-                  g_backlightPulseActive ? 1 : 0,
-                  (int)g_app.uiState);
+    Serial.printf("[POWER][BL] req=%u final=%u screenOn=%d pulse=%d ui=%d\n", (unsigned)level, (unsigned)finalLevel,
+                  isScreenOn() ? 1 : 0, g_backlightPulseActive ? 1 : 0, (int)g_app.uiState);
   }
 
   M5Cardputer.Display.setBrightness(finalLevel);
@@ -225,10 +218,7 @@ void setScreenPowerTagged(bool on, const char *file, int line)
 
   if (kLogScreenPower && s_last != (int)on)
   {
-    Serial.printf("[POWER] screen=%d ui=%d tab=%d\n",
-                  (int)on,
-                  (int)g_app.uiState,
-                  (int)g_app.currentTab);
+    Serial.printf("[POWER] screen=%d ui=%d tab=%d\n", (int)on, (int)g_app.uiState, (int)g_app.currentTab);
     s_last = (int)on;
   }
 
@@ -270,6 +260,45 @@ void displayInit()
 
 static bool s_backlightPulseWasScreenOn = false;
 static int s_backlightPulsePrevLevel = -1;
+
+static bool s_backlightRailPulseActive = false;
+
+void backlightRailPulseBegin(uint8_t level)
+{
+  if (s_backlightRailPulseActive)
+    return;
+
+  s_backlightRailPulseActive = true;
+  g_backlightPulseActive = true;
+
+  // Hardware-only wake for the shared LED/display rail.
+  // Do not change g_app.screenOn and do not request UI redraw.
+  M5Cardputer.Display.wakeup();
+  applyBacklightRaw(clampU8((int)level));
+}
+
+void backlightRailPulseEnd()
+{
+  if (!s_backlightRailPulseActive)
+    return;
+
+  applyBacklightRaw(0);
+  delay(10);
+  M5Cardputer.Display.sleep();
+  f s_backlightRailPulseActive = false;
+  g_backlightPulseActive = false;
+}
+
+void backlightRailPulseAdoptScreenOn()
+{
+  if (!s_backlightRailPulseActive)
+    return;
+
+  // A real logical screen wake happened while the rail pulse was active.
+  // Do not sleep the display or force brightness to 0; just clear pulse ownership.
+  s_backlightRailPulseActive = false;
+  g_backlightPulseActive = false;
+}
 
 void backlightPulseBegin(uint8_t level)
 {
@@ -589,13 +618,8 @@ void setBacklightTagged(uint8_t level, const char *file, int line)
 
   if (Serial && Serial.availableForWrite() >= 160)
   {
-    Serial.printf("[BL SRC] req=%u @ %s:%d t=%lu ui=%d tab=%d\n",
-                  (unsigned)level,
-                  file,
-                  line,
-                  (unsigned long)millis(),
-                  (int)g_app.uiState,
-                  (int)g_app.currentTab);
+    Serial.printf("[BL SRC] req=%u @ %s:%d t=%lu ui=%d tab=%d\n", (unsigned)level, file, line, (unsigned long)millis(),
+                  (int)g_app.uiState, (int)g_app.currentTab);
   }
 
   setBacklight(level);

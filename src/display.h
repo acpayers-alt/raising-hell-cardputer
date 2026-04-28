@@ -83,3 +83,7 @@ void displayRememberUserBrightness(uint8_t level);
 
 void forceBacklightDuringFade(uint8_t level);
 bool displayUsbPowerLikely();
+
+void backlightRailPulseBegin(uint8_t level);
+void backlightRailPulseEnd();
+void backlightRailPulseAdoptScreenOn();

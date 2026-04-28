@@ -62,11 +62,11 @@ bool ledInputLockActive() { return s_screenIsOff && s_pulseActive; }
 
 void ledSetScreenOff(bool isOff)
 {
-  // Ignore the temporary ON state created by the rail-power pulse.
-  // Otherwise the pulse teardown path gets disabled and the screen
-  // never turns back off after an LED alert.
-  if (s_pulseActive && !isOff)
-    return;
+  if (!isOff && s_pulseActive)
+  {
+    backlightRailPulseAdoptScreenOn();
+    s_pulseActive = false;
+  }
 
   s_screenIsOff = isOff;
 }
@@ -104,8 +104,8 @@ static void pulseBacklightBeginIfNeeded()
   if (s_pulseActive)
     return;
 
-  s_pulseActive = true;
-  backlightPulseBegin(255);
+    s_pulseActive = true;
+    backlightRailPulseBegin(255);
 }
 
 static void pulseBacklightEndIfNeeded()
@@ -115,8 +115,8 @@ static void pulseBacklightEndIfNeeded()
   if (!s_pulseActive)
     return;
 
-  s_pulseActive = false;
-  backlightPulseEnd();
+    backlightRailPulseEnd();
+    s_pulseActive = false;
 }
 
 // ------------------------------------------------------------
@@ -382,13 +382,8 @@ void ledUpdatePetStatus(LedPetMode mode)
     // If screen-off: start pulse and give rail a moment BEFORE first LED show
     pulseBacklightBeginIfNeeded();
 
-    // Screen-color flash is only for true screen-off alerts.
-    if (wasScreenOff)
-    {
-      uint8_t r, g, b;
-      modeColor(mode, r, g, b);
-      uiBeginAlertScreenFlash(r, g, b);
-    }
+    // Rail-only screen-off alerts do not use the UI overlay.
+    // The app remains logically screen-off during the LED pulse.
 
     g_burstNextMs = now + 120;
   }
@@ -412,9 +407,6 @@ void ledUpdatePetStatus(LedPetMode mode)
     pulseBacklightEndIfNeeded();
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
-
-    if (wasScreenOff)
-      uiEndAlertScreenFlash();
 
     return;
   }
