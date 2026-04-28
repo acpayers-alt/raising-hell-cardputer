@@ -12,22 +12,16 @@
 #include "ui_actions.h"
 #include <SD.h>
 
-static constexpr uint32_t kAutonomyRollIntervalMs = 60UL * 60UL * 1000UL;
-
 static constexpr int kPizzaCost = 25;
 static constexpr int kPizzaHungerGain = 35;
 static constexpr int kPizzaHappinessGain = 5;
 
-static constexpr uint8_t kPizzaChancePct = 35;
-static constexpr uint8_t kAutoSleepChancePct = 100;
 static constexpr uint8_t kMischiefChancePct = 25;
 
 static constexpr int kAutoSleepEnergyThreshold = 5;
 static constexpr int kAutoSleepHealthThreshold = 20;
-static constexpr int kAutoSleepTargetEnergy = 40;
-
-static constexpr uint32_t kAutoSleepWakeGraceMs = 10UL * 60UL * 1000UL;
 static constexpr uint32_t kPizzaCooldownMs = 6UL * 60UL * 60UL * 1000UL;
+static constexpr uint32_t kMischiefCooldownMs = 6UL * 60UL * 60UL * 1000UL;
 
 static uint32_t s_lastPizzaRollMs = 0;
 static uint32_t s_lastAutoSleepRollMs = 0;
@@ -153,27 +147,6 @@ static bool petAutonomyEligible()
     return false;
   }
 
-  return true;
-}
-
-static bool hourlyRollReady(bool conditionActive, uint32_t nowMs, uint32_t &lastRollMs)
-{
-  if (!conditionActive)
-  {
-    lastRollMs = 0;
-    return false;
-  }
-
-  if (lastRollMs == 0)
-  {
-    lastRollMs = nowMs;
-    return false;
-  }
-
-  if ((uint32_t)(nowMs - lastRollMs) < kAutonomyRollIntervalMs)
-    return false;
-
-  lastRollMs = nowMs;
   return true;
 }
 
@@ -316,9 +289,8 @@ void petAutonomyTick(uint32_t nowMs)
   // --- Pizza: immediate + deterministic, but cooldown-gated ---
   if (starving)
   {
-    const bool pizzaReady =
-        s_lastPizzaRollMs == 0 || (uint32_t)(nowMs - s_lastPizzaRollMs) >= kPizzaCooldownMs;
-  
+    const bool pizzaReady = s_lastPizzaRollMs == 0 || (uint32_t)(nowMs - s_lastPizzaRollMs) >= kPizzaCooldownMs;
+
     if (pizzaReady)
     {
       doPizza();
@@ -330,7 +302,7 @@ void petAutonomyTick(uint32_t nowMs)
   {
     s_lastPizzaRollMs = 0;
   }
-  
+
   // --- Auto sleep: immediate + deterministic ---
   if (shouldPassOut)
   {
@@ -342,12 +314,16 @@ void petAutonomyTick(uint32_t nowMs)
     s_lastAutoSleepRollMs = 0;
   }
 
-  // --- Mischief: immediate eligibility + chance ---
+  // --- Mischief: immediate eligibility + chance, but cooldown-gated ---
   if (angry)
   {
-    if (rollPercent(kMischiefChancePct))
+    const bool mischiefReady =
+        s_lastMischiefRollMs == 0 || (uint32_t)(nowMs - s_lastMischiefRollMs) >= kMischiefCooldownMs;
+
+    if (mischiefReady && rollPercent(kMischiefChancePct))
     {
       doMischief();
+      s_lastMischiefRollMs = nowMs;
       return;
     }
   }
