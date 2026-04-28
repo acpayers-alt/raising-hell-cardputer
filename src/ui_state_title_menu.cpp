@@ -15,8 +15,8 @@
 #include "ui_input_common.h"
 #include "ui_runtime.h"
 #include "ui_state_choose_pet.h"
-#include "ui_state_pet_sleeping.h"
 #include "ui_state_import_pet_list.h"
+#include "ui_state_pet_sleeping.h"
 
 int g_titleMenuIndex = 0;
 
@@ -28,16 +28,15 @@ static void swallowTitleInput(InputState &in);
 
 static bool s_titleHasSave = false;
 static bool s_titleHasImport = false;
+static uint32_t s_titleEnteredMs = 0;
+static bool s_titleActivationArmed = false;
 
 static bool titleHasLivePet()
 {
   return saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
 }
 
-static bool titleHasPendingDeath()
-{
-  return petDeathEnabled && pet.hunger <= 0 && pet.health <= 0;
-}
+static bool titleHasPendingDeath() { return petDeathEnabled && pet.hunger <= 0 && pet.health <= 0; }
 
 static void refreshTitleMenuAvailability()
 {
@@ -55,12 +54,10 @@ static void refreshTitleMenuAvailability()
   {
     if (now - s_lastBlankNameLogMs > 2000)
     {
-      Serial.printf("[TITLE][WARN] save exists but runtime pet name is blank birth=%lu ui=%d tab=%d sleep=%d newPet=%d\n",
-                    (unsigned long)saveManagerGetBirthEpoch(),
-                    (int)g_app.uiState,
-                    (int)g_app.currentTab,
-                    g_app.isSleeping ? 1 : 0,
-                    g_app.newPetFlowActive ? 1 : 0);
+      Serial.printf(
+          "[TITLE][WARN] save exists but runtime pet name is blank birth=%lu ui=%d tab=%d sleep=%d newPet=%d\n",
+          (unsigned long)saveManagerGetBirthEpoch(), (int)g_app.uiState, (int)g_app.currentTab,
+          g_app.isSleeping ? 1 : 0, g_app.newPetFlowActive ? 1 : 0);
       s_lastBlankNameLogMs = now;
     }
   }
@@ -148,7 +145,7 @@ static void titleActivateContinue(InputState &in)
     (void)in;
     return;
   }
-  
+
   const bool shouldEnterSleeping = pet.isSleeping || g_app.isSleeping || g_app.sleepingByTimer ||
                                    g_app.sleepUntilRested || g_app.sleepUntilAwakened ||
                                    saveManagerSleepPendingFlagExists();
@@ -183,6 +180,9 @@ static void swallowTitleInput(InputState &in)
 
 void uiTitleMenuOnEnter(InputState &in)
 {
+  s_titleEnteredMs = millis();
+  s_titleActivationArmed = false;
+
   swallowTitleInput(in);
   refreshTitleMenuAvailability();
 
@@ -202,6 +202,24 @@ void uiTitleMenuOnEnter(InputState &in)
 void uiTitleMenuHandle(InputState &in)
 {
   refreshTitleMenuAvailability();
+
+  const bool activationHeld = in.selectHeld || in.menuHeld || in.encoderHeld;
+
+  if (!activationHeld && (uint32_t)(millis() - s_titleEnteredMs) > 500)
+    s_titleActivationArmed = true;
+
+  if (!s_titleActivationArmed)
+  {
+    in.selectOnce = false;
+    in.menuOnce = false;
+    in.escOnce = false;
+    in.encoderPressOnce = false;
+
+    while (in.kbHasEvent())
+      (void)in.kbPop();
+
+    return;
+  }
 
   if (!titleItemEnabled(g_titleMenuIndex))
     g_titleMenuIndex = titleFirstEnabledItem();

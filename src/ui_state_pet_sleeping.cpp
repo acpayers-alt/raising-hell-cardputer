@@ -5,6 +5,7 @@
 #include "input.h"
 #include "led_status.h"
 #include "pet.h"
+#include "pet_autonomy.h"
 #include "save_manager.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
@@ -78,6 +79,14 @@ void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs, bool forceRend
   g_app.sleepDurationMs = 0;
 
   pet.isSleeping = false;
+  petAutonomyClearPassOutNotice();
+  
+  // Manual wake gets a grace window so auto-sleep does not immediately
+  // bounce the pet back to sleep before the player can feed/heal it.
+  petAutonomySuppressAutoSleepUntil(millis() + 10UL * 60UL * 1000UL);
+
+  if (pet.energy < 10)
+    pet.energy = 10;
 
   saveManagerClearSleepPendingFlag();
   saveManagerMarkDirty();

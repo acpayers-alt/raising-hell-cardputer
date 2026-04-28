@@ -32,6 +32,7 @@
 #include "currency.h"
 #include "pet.h"
 #include "pet_age.h"
+#include "pet_autonomy.h"
 
 // -----------------------------------------------------------------------------
 // Project: UI / Rendering
@@ -959,6 +960,12 @@ static void execLine(char *line)
     logLine("  killpet             instantly kill pet (test death/resurrection)");
     logLine("  healpet             restore HP + all core stats to 100");
     logLine("  fadeboot            trigger pet intro fade on next boot");
+    logLine("  auto pizza          trigger autonomous pizza action");
+    logLine("  auto sleep          trigger autonomous pass-out sleep");
+    logLine("  auto mischief       trigger autonomous mischief action");
+    logLine("  auto notify         force pending autonomy popup");
+    logLine("  auto reset          clear autonomy pending counters");
+
 #endif
 
     return;
@@ -1424,6 +1431,58 @@ static void execLine(char *line)
     pet.clampStats();
     saveManagerMarkDirty();
     logf("[OK] Health set to %d", pet.health);
+    return;
+  }
+#endif
+
+// -------------------------------------------------
+// Autonomous Actions Triggers
+// -------------------------------------------------
+#if !PUBLIC_BUILD
+  if (!strcmp(argv[0], "auto"))
+  {
+    if (argc < 2)
+    {
+      logLine("Usage: auto pizza|sleep|mischief|notify|reset");
+      return;
+    }
+
+    if (!strcmp(argv[1], "pizza"))
+    {
+      petAutonomyDebugTriggerPizza();
+      logLine("[OK] autonomous pizza triggered");
+      return;
+    }
+
+    if (!strcmp(argv[1], "sleep"))
+    {
+      petAutonomyDebugTriggerAutoSleep();
+      logLine("[OK] autonomous pass-out sleep triggered");
+      return;
+    }
+
+    if (!strcmp(argv[1], "mischief"))
+    {
+      petAutonomyDebugTriggerMischief();
+      logLine("[OK] autonomous mischief triggered");
+      return;
+    }
+
+    if (!strcmp(argv[1], "notify"))
+    {
+      petAutonomyDebugNotifyNow(millis());
+      logLine("[OK] autonomy notification tick forced");
+      return;
+    }
+
+    if (!strcmp(argv[1], "reset"))
+    {
+      petAutonomyReset();
+      logLine("[OK] autonomy counters reset");
+      return;
+    }
+
+    logLine("Usage: auto pizza|sleep|mischief|notify|reset");
     return;
   }
 #endif

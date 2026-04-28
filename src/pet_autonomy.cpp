@@ -7,6 +7,8 @@
 #include "graphics.h"
 #include "pet.h"
 #include "save_manager.h"
+#include <SD.h>
+#include "sdcard.h"
 #include "sleep_state.h"
 #include "ui_actions.h"
 
@@ -24,6 +26,8 @@ static constexpr int kAutoSleepEnergyThreshold = 5;
 static constexpr int kAutoSleepHealthThreshold = 20;
 static constexpr int kAutoSleepTargetEnergy = 40;
 
+static constexpr uint32_t kAutoSleepWakeGraceMs = 10UL * 60UL * 1000UL;
+
 static uint32_t s_lastPizzaRollMs = 0;
 static uint32_t s_lastAutoSleepRollMs = 0;
 static uint32_t s_lastMischiefRollMs = 0;
@@ -38,6 +42,40 @@ static int16_t s_mischiefInfLost = 0;
 
 static uint32_t s_lastNotifyMs = 0;
 
+static uint32_t s_autoSleepSuppressUntilMs = 0;
+
+static const char *kAutoSleepNoticeFlagPath = "/raising_hell/save/autosleep_passout.flag";
+
+static void writeAutoSleepNoticeFlag()
+{
+  if (!g_sdReady)
+    return;
+
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+
+  if (!SD.exists("/raising_hell/save"))
+    SD.mkdir("/raising_hell/save");
+
+  File f = SD.open(kAutoSleepNoticeFlagPath, FILE_WRITE);
+  if (f)
+  {
+    f.print("1");
+    f.close();
+  }
+}
+
+bool petAutonomyPassOutNoticePending()
+{
+  return g_sdReady && SD.exists(kAutoSleepNoticeFlagPath);
+}
+
+void petAutonomyClearPassOutNotice()
+{
+  if (g_sdReady && SD.exists(kAutoSleepNoticeFlagPath))
+    SD.remove(kAutoSleepNoticeFlagPath);
+}
+
 void petAutonomyReset()
 {
   s_lastPizzaRollMs = 0;
@@ -49,6 +87,7 @@ void petAutonomyReset()
   s_autoSleepCount = 0;
   s_mischiefCount = 0;
   s_mischiefInfLost = 0;
+  s_autoSleepSuppressUntilMs = 0;
 
   s_lastNotifyMs = 0;
 }
@@ -199,7 +238,8 @@ static void doPizza()
 static void doAutoSleep()
 {
   tallyAutoSleep();
-
+  writeAutoSleepNoticeFlag();
+  
   saveManagerEnterSleepState();
 
   // Bad sleep: the pet only sleeps itself to a low recovery target instead of
@@ -241,6 +281,33 @@ static void doMischief()
   Serial.printf("[PET][AUTO] mischief name='%s' INF=-%d remaining=%d\n", pet.getName(), loss, getInf());
 }
 
+void petAutonomyDebugTriggerPizza()
+{
+  doPizza();
+}
+
+void petAutonomyDebugTriggerAutoSleep()
+{
+  doAutoSleep();
+}
+
+void petAutonomyDebugTriggerMischief()
+{
+  doMischief();
+}
+
+void petAutonomyDebugNotifyNow(uint32_t nowMs)
+{
+  s_lastNotifyMs = 0;
+  petAutonomyNotifyIfPending(nowMs);
+}
+
+void petAutonomySuppressAutoSleepUntil(uint32_t untilMs)
+{
+  s_autoSleepSuppressUntilMs = untilMs;
+  s_lastAutoSleepRollMs = 0;
+}
+
 void petAutonomyTick(uint32_t nowMs)
 {
   if (!petAutonomyEligible())
@@ -249,7 +316,12 @@ void petAutonomyTick(uint32_t nowMs)
   const bool starving = (pet.hunger <= 10);
   const bool exhausted = (pet.energy <= kAutoSleepEnergyThreshold);
   const bool criticallyStarving = (pet.hunger <= 0 && pet.health <= kAutoSleepHealthThreshold);
-  const bool shouldPassOut = exhausted || criticallyStarving;
+  const bool autoSleepSuppressed = s_autoSleepSuppressUntilMs != 0 && (int32_t)(s_autoSleepSuppressUntilMs - nowMs) > 0;
+
+  if (s_autoSleepSuppressUntilMs != 0 && !autoSleepSuppressed)
+    s_autoSleepSuppressUntilMs = 0;
+
+  const bool shouldPassOut = !autoSleepSuppressed && (exhausted || criticallyStarving);
   const bool angry = (pet.getMood() == MOOD_MAD);
 
   if (hourlyRollReady(starving, nowMs, s_lastPizzaRollMs) && rollPercent(kPizzaChancePct))
@@ -269,7 +341,7 @@ void petAutonomyTick(uint32_t nowMs)
   {
     s_lastAutoSleepRollMs = 0;
   }
-  
+
   if (hourlyRollReady(angry, nowMs, s_lastMischiefRollMs) && rollPercent(kMischiefChancePct))
   {
     doMischief();
