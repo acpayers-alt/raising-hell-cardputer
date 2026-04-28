@@ -197,7 +197,47 @@ static const char *mgItemName(ItemType t)
   }
 }
 
-static int rollMiniGameInfReward() { return 10; }
+static int rollMiniGameInfReward(PetMood mood)
+{
+  int minReward = 12;
+  int maxReward = 20;
+
+  switch (mood)
+  {
+  case MOOD_HAPPY:
+    minReward = 22;
+    maxReward = 35;
+    break;
+
+  case MOOD_BORED:
+    minReward = 18;
+    maxReward = 28;
+    break;
+
+  case MOOD_TIRED:
+    minReward = 14;
+    maxReward = 22;
+    break;
+
+  case MOOD_HUNGRY:
+  case MOOD_MAD:
+    minReward = 10;
+    maxReward = 18;
+    break;
+
+  case MOOD_SICK:
+    minReward = 5;
+    maxReward = 10;
+    break;
+
+  default:
+    minReward = 12;
+    maxReward = 20;
+    break;
+  }
+
+  return (int)random(minReward, maxReward + 1);
+}
 
 static bool tryAwardWinItem_1in4(ItemType *outType)
 {
@@ -336,7 +376,7 @@ void mgApplyResultAndShowReward(bool won)
 
     pet.addXP(xp);
 
-    const int infReward = rollMiniGameInfReward();
+    const int infReward = rollMiniGameInfReward(mood);
     addInf(infReward);
 
     pet.happiness = constrain(pet.happiness + 20, 0, 100);
@@ -347,12 +387,12 @@ void mgApplyResultAndShowReward(bool won)
     if (wonItem)
     {
       const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1",
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1",
                (unsigned long)xp, infReward, (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20", (unsigned long)xp, infReward);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +20", (unsigned long)xp, infReward);
     }
   }
   else
