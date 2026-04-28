@@ -285,7 +285,7 @@ void backlightRailPulseEnd()
   applyBacklightRaw(0);
   delay(10);
   M5Cardputer.Display.sleep();
-  f s_backlightRailPulseActive = false;
+  s_backlightRailPulseActive = false;
   g_backlightPulseActive = false;
 }
 
