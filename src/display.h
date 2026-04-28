@@ -87,3 +87,4 @@ bool displayUsbPowerLikely();
 void backlightRailPulseBegin(uint8_t level);
 void backlightRailPulseEnd();
 void backlightRailPulseAdoptScreenOn();
+void backlightRailPulseShowColor(uint8_t r, uint8_t g, uint8_t b);

@@ -277,6 +277,15 @@ void backlightRailPulseBegin(uint8_t level)
   applyBacklightRaw(clampU8((int)level));
 }
 
+void backlightRailPulseShowColor(uint8_t r, uint8_t g, uint8_t b)
+{
+  if (!s_backlightRailPulseActive)
+    return;
+
+  const uint16_t color = M5Cardputer.Display.color565(r, g, b);
+  M5Cardputer.Display.fillScreen(color);
+}
+
 void backlightRailPulseEnd()
 {
   if (!s_backlightRailPulseActive)

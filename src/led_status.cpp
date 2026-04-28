@@ -90,6 +90,7 @@ void ledOff()
 {
   if (!g_inited)
     return;
+
   g_led.clear();
   g_led.show();
 }
@@ -104,8 +105,8 @@ static void pulseBacklightBeginIfNeeded()
   if (s_pulseActive)
     return;
 
-    s_pulseActive = true;
-    backlightRailPulseBegin(255);
+  s_pulseActive = true;
+  backlightRailPulseBegin(255);
 }
 
 static void pulseBacklightEndIfNeeded()
@@ -115,8 +116,8 @@ static void pulseBacklightEndIfNeeded()
   if (!s_pulseActive)
     return;
 
-    backlightRailPulseEnd();
-    s_pulseActive = false;
+  backlightRailPulseEnd();
+  s_pulseActive = false;
 }
 
 // ------------------------------------------------------------
@@ -130,6 +131,7 @@ void ledSetRGB(uint8_t r, uint8_t g, uint8_t b)
     return;
   if (g_ledLocked)
     return;
+
   ledInit();
 
 #if defined(ESP32)
@@ -142,15 +144,9 @@ void ledSetRGB(uint8_t r, uint8_t g, uint8_t b)
 
   // If screen is off, make sure pulse is active and rail is stable BEFORE show().
   if (s_screenIsOff)
-  {
     pulseBacklightBeginIfNeeded();
 
-    g_led.show();
-  }
-  else
-  {
-    g_led.show();
-  }
+  g_led.show();
 
   delay(1);
   yield();
@@ -278,10 +274,8 @@ void ledUpdatePetStatus(LedPetMode mode)
 
   // ------------------------------------------------------------------
   // BOOT / ONBOARDING GATE:
-  // Do not allow pet LED alerts or screen-color alert overlays while boot,
-  // provisioning, Wi-Fi setup, time setup, controls help, or What's New screens
-  // own the display. These screens can otherwise flicker between their UI and
-  // the alert color overlay if a loaded pet needs attention during early boot.
+  // Do not allow pet LED alerts while boot, provisioning, Wi-Fi setup,
+  // time setup, controls help, or What's New screens own the display.
   // ------------------------------------------------------------------
   if (ledAlertsSuppressedForUiState())
   {
@@ -295,7 +289,6 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     ledOff();
     pulseBacklightEndIfNeeded();
-    uiEndAlertScreenFlash();
 
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
@@ -319,17 +312,17 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     ledOff();
     pulseBacklightEndIfNeeded();
-    uiEndAlertScreenFlash();
 
-    // Only force backlight low in true screen-off mode
+    // Only force backlight low in true screen-off mode.
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
+
     return;
   }
 
   const uint32_t now = millis();
 
-  // Mode change: restart soon
+  // Mode change: restart soon.
   if (mode != g_lastMode)
   {
     g_lastMode = mode;
@@ -342,21 +335,21 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     ledOff();
     pulseBacklightEndIfNeeded();
-    uiEndAlertScreenFlash();
   }
 
-  // OFF means fully off
+  // OFF means fully off.
   if (mode == LED_PET_OFF)
   {
     ledOff();
+
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
+
     pulseBacklightEndIfNeeded();
-    uiEndAlertScreenFlash();
     return;
   }
 
-  // Not bursting: wait for heartbeat time
+  // Not bursting: wait for heartbeat time.
   if (!g_burstActive)
   {
     if (g_nextHeartbeatMs == 0)
@@ -364,31 +357,36 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     if ((int32_t)(now - g_nextHeartbeatMs) < 0)
     {
-      // keep dark between heartbeats
+      // Keep dark between heartbeats.
       ledOff();
+
       if (s_screenIsOff)
         SET_BACKLIGHT(0);
+
       pulseBacklightEndIfNeeded();
       return;
     }
 
-    // Start burst
+    // Start burst.
     g_burstActive = true;
     g_burstFlashesRemaining = flashesForMode(mode);
     g_burstLedOn = false;
 
-    const bool wasScreenOff = s_screenIsOff;
-
-    // If screen-off: start pulse and give rail a moment BEFORE first LED show
+    // If screen-off: start rail-only pulse and paint the hardware color
+    // directly. This does not wake app/UI state.
     pulseBacklightBeginIfNeeded();
 
-    // Rail-only screen-off alerts do not use the UI overlay.
-    // The app remains logically screen-off during the LED pulse.
+    if (s_screenIsOff)
+    {
+      uint8_t r, g, b;
+      modeColor(mode, r, g, b);
+      backlightRailPulseShowColor(r, g, b);
+    }
 
     g_burstNextMs = now + 120;
   }
 
-  // Waiting for next toggle
+  // Waiting for next toggle.
   if ((int32_t)(now - g_burstNextMs) < 0)
     return;
 
@@ -400,18 +398,16 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     ledOff();
 
-    // If this was a screen-off alert, keep the screen fully covered until
-    // the pulse is actually torn down, then clear the overlay.
-    const bool wasScreenOff = s_screenIsOff;
-
+    // End rail-only pulse after final LED off.
     pulseBacklightEndIfNeeded();
+
     if (s_screenIsOff)
       SET_BACKLIGHT(0);
 
     return;
   }
 
-  // Toggle
+  // Toggle.
   g_burstLedOn = !g_burstLedOn;
 
   if (g_burstLedOn)
