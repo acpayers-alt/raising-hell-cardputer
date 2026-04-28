@@ -333,7 +333,7 @@ void mgApplyResultAndShowReward(bool won)
   {
     const PetMood mood = pet.getMood();
     const uint32_t xp = mgXpForMoodWin(mood);
-    
+
     pet.addXP(xp);
 
     const int infReward = rollMiniGameInfReward();
@@ -347,12 +347,12 @@ void mgApplyResultAndShowReward(bool won)
     if (wonItem)
     {
       const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1", infReward,
-               (nm && nm[0]) ? nm : "ITEM");
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1",
+               (unsigned long)xp, infReward, (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20", infReward);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +20", (unsigned long)xp, infReward);
     }
   }
   else
