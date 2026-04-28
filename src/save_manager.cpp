@@ -28,6 +28,7 @@
 #include "savegame.h"
 
 // Game systems
+#include "game_options_state.h"
 #include "inventory.h"
 #include "pet.h"
 
@@ -1378,6 +1379,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   const size_t OLD_SZ_8 = 8;
   const size_t OLD_SZ_11 = 11;
   const size_t OLD_SZ_13 = 13;
+  const size_t OLD_SZ_14 = 14;
 
   SettingsData tmp{};
   bool ok = false;
@@ -1408,10 +1410,54 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.soundEnabled = (tmp.soundEnabled != 0);
       tmp.wifiEnabled = (tmp.wifiEnabled != 0);
       tmp.petDeathEnabled = (tmp.petDeathEnabled != 0);
+      tmp.passiveXpEnabled = (tmp.passiveXpEnabled != 0);
       tmp.ledAlertsEnabled = (tmp.ledAlertsEnabled != 0);
       tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
       tmp.petScreenIntroFadeBootFlag = (tmp.petScreenIntroFadeBootFlag != 0);
       tmp.whatsNewSeen = (tmp.whatsNewSeen != 0);
+    }
+  }
+  else if (sz == OLD_SZ_14)
+  {
+    uint8_t old[OLD_SZ_14];
+    const int r = f.read(old, OLD_SZ_14);
+    if (r == (int)OLD_SZ_14)
+    {
+      tmp.brightnessLevel = old[0];
+      tmp.autoScreenOffEnabled = (old[1] != 0);
+      tmp.soundEnabled = (old[2] != 0);
+      tmp.wifiEnabled = (old[3] != 0);
+      tmp.tzIndex = old[4];
+      tmp.autoScreenTimeoutSel = old[5];
+      tmp.autoClockTimeoutSel = old[6];
+      tmp.shakeSensitivitySel = old[7];
+      tmp.petDeathEnabled = (old[8] != 0);
+      tmp.passiveXpEnabled = 1; // new setting defaults ON for existing users
+      tmp.ledAlertsEnabled = (old[9] != 0);
+      tmp.controlsHelpSeen = (old[10] != 0);
+      tmp.petPerfHudEnabled = (old[11] != 0);
+      tmp.petScreenIntroFadeBootFlag = (old[12] != 0);
+      tmp.whatsNewSeen = (old[13] != 0);
+
+      if (tmp.brightnessLevel > 2)
+        tmp.brightnessLevel = 1;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
+      if (tmp.autoScreenTimeoutSel > 3)
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
+
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      if (tmp.shakeSensitivitySel > 3)
+        tmp.shakeSensitivitySel = 1;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
+
+      ok = true;
+      loadedOld = true;
     }
   }
   else if (sz == OLD_SZ_13)
@@ -1428,6 +1474,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.autoScreenTimeoutSel = old[5];
       tmp.shakeSensitivitySel = old[6];
       tmp.petDeathEnabled = (old[7] != 0);
+      tmp.passiveXpEnabled = 1;
       tmp.ledAlertsEnabled = (old[8] != 0);
       tmp.controlsHelpSeen = (old[9] != 0);
       tmp.petPerfHudEnabled = (old[10] != 0);
@@ -1467,6 +1514,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.tzIndex = old[4];
       tmp.autoScreenTimeoutSel = old[5];
       tmp.petDeathEnabled = (old[6] != 0);
+      tmp.passiveXpEnabled = 1;
       tmp.ledAlertsEnabled = (old[7] != 0);
       tmp.controlsHelpSeen = (old[8] != 0);
       tmp.petPerfHudEnabled = (old[9] != 0);
@@ -1507,6 +1555,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.tzIndex = old[4];
       tmp.autoScreenTimeoutSel = old[5];
       tmp.petDeathEnabled = (old[6] != 0);
+      tmp.passiveXpEnabled = 1;
 
       tmp.autoClockTimeoutSel = 3;
 
@@ -1546,6 +1595,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.tzIndex = old[4];
       tmp.autoScreenTimeoutSel = old[5];
       tmp.petDeathEnabled = (old[6] != 0);
+      tmp.passiveXpEnabled = 1;
       tmp.ledAlertsEnabled = (old[7] != 0);
 
       tmp.autoClockTimeoutSel = 3;
@@ -1589,6 +1639,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
 
       tmp.petDeathEnabled = 1;
+      tmp.passiveXpEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
       tmp.shakeSensitivitySel = 1;
@@ -1616,10 +1667,11 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.wifiEnabled = (old[3] != 0);
 
       tmp.autoClockTimeoutSel = 3;
-tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
+      tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
 
       tmp.tzIndex = tzDefaultIndex();
       tmp.petDeathEnabled = 1;
+      tmp.passiveXpEnabled = 1;
       tmp.ledAlertsEnabled = 1;
       tmp.controlsHelpSeen = 0;
       tmp.shakeSensitivitySel = 1;
@@ -1671,6 +1723,7 @@ tmp.autoScreenTimeoutSel = tmp.autoScreenOffEnabled ? 0 : 3;
   motionSetShakeSensitivity(g_settings.shakeSensitivitySel);
 
   petDeathEnabled = (g_settings.petDeathEnabled != 0);
+  passiveXpEnabled = (g_settings.passiveXpEnabled != 0);
   ledAlertsEnabled = (g_settings.ledAlertsEnabled != 0);
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
@@ -1757,6 +1810,7 @@ static bool saveSettingsToSD_internal()
   g_settings.autoClockTimeoutSel = autoClockTimeoutSel;
   g_settings.autoScreenOffEnabled = (autoScreenTimeoutSel != 3);
   g_settings.petDeathEnabled = petDeathEnabled ? 1 : 0;
+  g_settings.passiveXpEnabled = passiveXpEnabled ? 1 : 0;
   g_settings.ledAlertsEnabled = ledAlertsEnabled ? 1 : 0;
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
   g_settings.whatsNewSeen = (g_whatsNewSeen != 0) ? 1 : 0;

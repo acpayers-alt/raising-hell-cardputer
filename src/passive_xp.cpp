@@ -2,6 +2,7 @@
 
 #include "app_state.h"
 #include "asset_ota.h"
+#include "game_options_state.h"
 #include "pet.h"
 
 static constexpr uint32_t kPassiveXpIntervalMs = 5UL * 60UL * 1000UL;
@@ -64,9 +65,12 @@ static bool passiveXpHasPerfectCareBonus()
 
 static bool passiveXpEligible()
 {
-  if (!passiveXpUiEligible(g_app.uiState))
+  if (!passiveXpEnabled)
     return false;
 
+  if (!passiveXpUiEligible(g_app.uiState))
+    return false;
+    
   if (pet.health <= 0)
     return false;
 

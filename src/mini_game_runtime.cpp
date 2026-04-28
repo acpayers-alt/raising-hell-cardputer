@@ -408,7 +408,7 @@ void miniGameExitToReturnUi(bool beginLockout)
     s_showBoredomMessageOnExit = false;
 
     char msg[64];
-    snprintf(msg, sizeof(msg), "%s is getting bored of this game.", pet.getName());
+    snprintf(msg, sizeof(msg), "%s is bored of this game.", pet.getName());
 
     ui_showTimedMessage(msg, 1800);
   }

@@ -96,6 +96,7 @@ struct SettingsData {
   uint8_t autoClockTimeoutSel;
   uint8_t shakeSensitivitySel;
   uint8_t petDeathEnabled;
+  uint8_t passiveXpEnabled;
   uint8_t ledAlertsEnabled;
 
   // v2+ (added later): 0 = not seen, 1 = seen

@@ -3,3 +3,4 @@
 
 // Game options / settings
 extern bool petDeathEnabled;
+extern bool passiveXpEnabled;
