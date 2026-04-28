@@ -246,19 +246,6 @@ static uint16_t onTimeMs(LedPetMode mode)
 
 static uint16_t gapTimeMs(LedPetMode /*mode*/) { return 300; }
 
-static uint32_t totalBurstDurationMs(LedPetMode mode)
-{
-  const uint8_t flashes = flashesForMode(mode);
-  if (flashes == 0)
-    return 0;
-
-  const uint32_t onMs = onTimeMs(mode);
-  const uint32_t gapMs = gapTimeMs(mode);
-
-  // Entire alert from first ON through final ON, including gaps between flashes.
-  return (uint32_t)flashes * onMs + (uint32_t)(flashes - 1) * gapMs;
-}
-
 // Driver state
 static LedPetMode g_lastMode = LED_PET_OFF;
 static uint32_t g_nextHeartbeatMs = 0;

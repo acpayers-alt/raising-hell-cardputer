@@ -1,24 +1,29 @@
 #pragma once
+
 #include <Arduino.h>
 #include <FS.h>
 #include <SD.h>
-#include "M5Cardputer.h"
 #include <stdint.h>
-#include "display_dims_state.h"
+
 #include <M5GFX.h>
+#include "M5Cardputer.h"
+#include "display_dims_state.h"
 
-void updateBattery();
-bool displayUsbPowerLikely();
+// Cardputer canvas framebuffer
+extern M5Canvas spr;
 
-// Public API
+// Public screen/backlight API
+bool isScreenOn();
 void setScreenPower(bool on);
-void setBacklight(uint8_t level);
+void toggleScreenPower();
 
-// Debug-tagged variants (if you have them)
-void setScreenPowerTagged(bool on, const char* file, int line);
+void initBacklight();
+void setBacklight(uint8_t level); // level 0..255
+bool isBacklightPulseActive();
+
+void setScreenPowerTagged(bool on, const char *file, int line);
 void setBacklightTagged(uint8_t level, const char *file, int line);
 
-// Macros used across codebase
 #ifndef SET_SCREEN_POWER
 #define SET_SCREEN_POWER(on) setScreenPowerTagged((on), __FILE__, __LINE__)
 #endif
@@ -27,33 +32,16 @@ void setBacklightTagged(uint8_t level, const char *file, int line);
 #define SET_BACKLIGHT(level) setBacklightTagged((level), __FILE__, __LINE__)
 #endif
 
-// Screen power API (AppState-owned)
-bool isScreenOn();
-void setScreenPower(bool on);
-void toggleScreenPower();
-
-void setBacklightTagged(uint8_t level, const char* file, int line);
-#define SET_BACKLIGHT(level) setBacklightTagged((level), __FILE__, __LINE__)
-
-void setScreenPowerTagged(bool on, const char* file, int line);
-#define SET_SCREEN_POWER(on) setScreenPowerTagged((on), __FILE__, __LINE__)
-
-void batteryProtectionTick(uint32_t now);
-
-// Cardputer canvas framebuffer
-extern M5Canvas spr;
-
-// Backlight
-void initBacklight();
-void setBacklight(uint8_t level); // level 0..255
-bool isBacklightPulseActive();
-
 // Init / power helpers
 void displayInit();
 void screenOff();
 void screenOnRestore();
 
-// Screen
+void batteryProtectionTick(uint32_t now);
+void updateBattery();
+bool displayUsbPowerLikely();
+
+// Screen dimensions
 constexpr int SCREEN_W = 240;
 constexpr int SCREEN_H = 135;
 
@@ -67,24 +55,20 @@ constexpr int PET_AREA_H = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
 constexpr int CONTENT_Y = TOP_BAR_H;
 constexpr int CONTENT_H = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
 
+// Backlight pulse helpers
 void backlightPulseBegin(uint8_t level);
 void backlightPulseEnd();
-
-uint32_t screenPowerLastManualToggleMs();
-void markScreenPowerManualToggle(uint32_t now);
-
-uint32_t screenPowerLastManualToggleMs();
-void markScreenPowerManualToggle(uint32_t now);
-
-void displayRememberUserBrightness(uint8_t level);
-
-uint8_t displayGetUserBrightnessLevel();
-void displayRememberUserBrightness(uint8_t level);
-
-void forceBacklightDuringFade(uint8_t level);
-bool displayUsbPowerLikely();
 
 void backlightRailPulseBegin(uint8_t level);
 void backlightRailPulseEnd();
 void backlightRailPulseAdoptScreenOn();
 void backlightRailPulseShowColor(uint8_t r, uint8_t g, uint8_t b);
+
+// Manual screen toggle tracking
+uint32_t screenPowerLastManualToggleMs();
+void markScreenPowerManualToggle(uint32_t now);
+
+// Brightness helpers
+uint8_t displayGetUserBrightnessLevel();
+void displayRememberUserBrightness(uint8_t level);
+void forceBacklightDuringFade(uint8_t level);
