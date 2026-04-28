@@ -114,6 +114,9 @@ static bool petWarningAudioAllowedForUi(UIState ui)
   case UIState::PET_SCREEN:
   case UIState::PET_SLEEPING:
   case UIState::CLOCK_MODE:
+  case UIState::INVENTORY:
+  case UIState::SHOP:
+  case UIState::SLEEP_MENU:
     return true;
 
   default:
@@ -1175,7 +1178,7 @@ void appMainLoopTick()
       petAutonomyNotifyIfPending(now);
       uiMaybeShowLevelUpPopup();
     }
-        
+
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
     {
       petEnterDeathState();
