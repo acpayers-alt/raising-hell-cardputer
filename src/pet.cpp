@@ -313,7 +313,6 @@ void Pet::petSleepTick()
   static uint32_t sleepAccMs = 0;
   static uint8_t sleepSubTick = 0;  // gate small sleep effects
   static uint8_t sleepHealTick = 0; // gate HP regen during sleep
-  static bool s_sleepRecoveryMessageShown = false;
 
   bool changed = false;
 
@@ -436,14 +435,11 @@ void Pet::petSleepTick()
 
         changed = (health != oldHealth) || changed;
 
-        Serial.printf("[PET] sleep health recovery %d->%d floor=%d hunger=%d energy=%d\n",
-                      oldHealth,
-                      health,
-                      kSleepHealthRecoveryFloor,
-                      hunger,
-                      energy);
+        Serial.printf("[PET] sleep health recovery %d->%d floor=%d hunger=%d energy=%d\n", oldHealth, health,
+                      kSleepHealthRecoveryFloor, hunger, energy);
 
-        if (!s_sleepRecoveryMessageShown && oldHealth < kSleepHealthRecoveryFloor && health >= kSleepHealthRecoveryFloor)
+        if (!s_sleepRecoveryMessageShown && oldHealth < kSleepHealthRecoveryFloor &&
+            health >= kSleepHealthRecoveryFloor)
         {
           s_sleepRecoveryMessageShown = true;
 
@@ -476,6 +472,37 @@ void Pet::petSleepTick()
         hunger--;
         changed = true;
       }
+    }
+
+    // Auto-sleep / bad sleep ends at a low target energy.
+    if (g_app.sleepTargetEnergy > 0 && energy >= g_app.sleepTargetEnergy)
+    {
+      if (energy > g_app.sleepTargetEnergy)
+        energy = g_app.sleepTargetEnergy;
+
+      this->isSleeping = false;
+      g_app.isSleeping = false;
+      g_app.sleepingByTimer = false;
+
+      g_app.sleepUntilRested = false;
+      g_app.sleepUntilAwakened = false;
+      g_app.sleepTargetEnergy = 0;
+      g_app.sleepStartTime = 0;
+      g_app.sleepDurationMs = 0;
+
+      saveManagerClearSleepPendingFlag();
+      saveManagerMarkDirty();
+      requestUIRedraw();
+
+      if (g_app.uiState == UIState::PET_SLEEPING)
+      {
+        graphicsReleaseUiCachesForMiniGame();
+        uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
+        requestFullUIRedraw();
+        forceRenderUIOnce();
+      }
+
+      return;
     }
 
     // "Until rested" ends at full energy

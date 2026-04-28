@@ -64,6 +64,7 @@
 #include "hatching_flow.h"
 #include "passive_xp.h"
 #include "pet.h"
+#include "pet_autonomy.h"
 #include "sleep_state.h"
 #include "sound.h"
 
@@ -284,6 +285,7 @@ void appMainLoopTick()
     {
       pet.update();
       passiveXpTick(now);
+      petAutonomyTick(now);
     }
 
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
@@ -1169,9 +1171,11 @@ void appMainLoopTick()
     {
       pet.update();
       passiveXpTick(now);
+      petAutonomyTick(now);
+      petAutonomyNotifyIfPending(now);
       uiMaybeShowLevelUpPopup();
     }
-    
+        
     if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
     {
       petEnterDeathState();
