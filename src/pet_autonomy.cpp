@@ -59,6 +59,7 @@ static bool petAutonomyUiAllowsActions()
   {
   case UIState::PET_SCREEN:
   case UIState::CLOCK_MODE:
+  case UIState::TITLE_MENU:
   case UIState::INVENTORY:
   case UIState::SHOP:
   case UIState::SLEEP_MENU:
@@ -203,9 +204,11 @@ static void doAutoSleep()
 
   // Bad sleep: the pet only sleeps itself to a low recovery target instead of
   // using the player's nicer "until rested" sleep flow.
-  g_app.sleepTargetEnergy = kAutoSleepTargetEnergy;
+  // Overnight/pass-out sleep should protect the pet until the player returns.
+  // Do not wake automatically at a low energy target.
+  g_app.sleepTargetEnergy = 0;
   g_app.sleepUntilRested = false;
-  g_app.sleepUntilAwakened = false;
+  g_app.sleepUntilAwakened = true;
   g_app.sleepingByTimer = false;
   g_app.sleepStartTime = millis();
   g_app.sleepDurationMs = 0;
@@ -213,8 +216,7 @@ static void doAutoSleep()
   saveManagerMarkDirty();
   requestUIRedraw();
 
-  Serial.printf("[PET][AUTO] passed out name='%s' targetEnergy=%d energy=%d\n", pet.getName(), kAutoSleepTargetEnergy,
-                pet.energy);
+  Serial.printf("[PET][AUTO] passed out name='%s' untilAwakened=1 energy=%d\n", pet.getName(), pet.energy);
 }
 
 static void doMischief()
@@ -255,12 +257,19 @@ void petAutonomyTick(uint32_t nowMs)
     doPizza();
   }
 
-  if (hourlyRollReady(shouldPassOut, nowMs, s_lastAutoSleepRollMs) && rollPercent(kAutoSleepChancePct))
+  if (shouldPassOut)
   {
-    doAutoSleep();
-    return;
+    if (rollPercent(kAutoSleepChancePct))
+    {
+      doAutoSleep();
+      return;
+    }
   }
-
+  else
+  {
+    s_lastAutoSleepRollMs = 0;
+  }
+  
   if (hourlyRollReady(angry, nowMs, s_lastMischiefRollMs) && rollPercent(kMischiefChancePct))
   {
     doMischief();
