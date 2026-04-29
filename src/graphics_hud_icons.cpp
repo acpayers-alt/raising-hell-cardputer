@@ -13,6 +13,8 @@ static M5Canvas s_hudCoinIconSmall(&spr);
 static bool s_hudCoinIconSmallReady = false;
 static M5Canvas s_hudInfTopBarIcon(&spr);
 static bool s_hudInfTopBarIconReady = false;
+static M5Canvas s_hudInfLargeIcon(&spr);
+static bool s_hudInfLargeIconReady = false;
 
 static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h, uint16_t fillColor)
 {
@@ -75,6 +77,16 @@ bool drawHudIconCached(const char *path, int x, int y)
     fillColor = TFT_BLACK;
   }
 
+  else if (path == INF_ICON_LARGE_PATH)
+  {
+    canvas = &s_hudInfLargeIcon;
+    ready = &s_hudInfLargeIconReady;
+    w = INF_ICON_LARGE_W;
+    h = INF_ICON_LARGE_H;
+    useColorKey = false;
+    fillColor = TFT_BLACK;
+  }
+
   if (canvas && ready && ensureHudIconCache(*canvas, *ready, path, w, h, fillColor))
   {
     if (useColorKey)
@@ -101,4 +113,7 @@ void graphicsReleaseHudIconCaches()
 
   s_hudInfTopBarIcon.deleteSprite();
   s_hudInfTopBarIconReady = false;
+
+  s_hudInfLargeIcon.deleteSprite();
+  s_hudInfLargeIconReady = false;
 }

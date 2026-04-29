@@ -305,8 +305,8 @@ void drawShopScreen()
   const int textW = spr.textWidth(priceStr);
   
   // Icon placement (to the left of text)
-  const int iconW = INF_ICON_W;
-  const int iconH = INF_ICON_H;
+  const int iconW = INF_ICON_LARGE_W;
+  const int iconH = INF_ICON_LARGE_H;
   
   // total width = icon + spacing + text
   const int totalW = iconW + 3 + textW;
@@ -318,8 +318,8 @@ void drawShopScreen()
   const int iconY = imgY + (imgH - iconH) / 2;
   
   // draw icon
-  drawHudIconCached(INF_ICON_PATH, startX, iconY);
-  
+  drawHudIconCached(INF_ICON_LARGE_PATH, startX, iconY);
+    
   // draw number
   spr.setTextDatum(TL_DATUM);
   spr.drawString(priceStr, startX + iconW + 3, priceY);
