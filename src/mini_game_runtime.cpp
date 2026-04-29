@@ -14,6 +14,7 @@
 #include "mini_game_assets.h"
 #include "mini_game_return_ui.h"
 #include "pet.h"
+#include "pet_autonomy.h"
 #include "save_manager.h"
 #include "sound.h"
 #include "ui_actions.h"
@@ -56,6 +57,8 @@ extern uint32_t s_dodgerLastStepMs;
 extern uint32_t s_dodgerMoveLastMs;
 extern uint32_t s_crossyLastLaneMs;
 extern uint32_t rr_lastMs;
+
+static constexpr uint32_t POST_GAME_PASSOUT_GRACE_MS = 5UL * 60UL * 1000UL;
 
 // Shared runtime state
 MiniGame currentMiniGame = MiniGame::NONE;
@@ -387,8 +390,8 @@ void mgApplyResultAndShowReward(bool won)
     if (wonItem)
     {
       const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1",
-               (unsigned long)xp, infReward, (nm && nm[0]) ? nm : "ITEM");
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1", (unsigned long)xp,
+               infReward, (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
@@ -438,6 +441,9 @@ void miniGameExitToReturnUi(bool beginLockout)
 
   miniGameClearReturnUi();
 
+  petAutonomySuppressAutoSleepUntil(millis() + POST_GAME_PASSOUT_GRACE_MS);
+  Serial.println("[PET][AUTO] pass-out suppressed for 5m after mini-game");
+  
   uiActionEnterState(target, targetTab, true);
 
   g_app.inMiniGame = false;
