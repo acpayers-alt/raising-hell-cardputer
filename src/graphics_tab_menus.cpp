@@ -141,7 +141,7 @@ void drawShopScreen()
     g_shopScreen.selectedIndex = SHOP_ITEM_COUNT - 1;
 
   // Windowing for visible rows
-  constexpr int MAX_VISIBLE = 4; // shop list tends to look good with 4
+  constexpr int MAX_VISIBLE = 3;
   int start = 0, visCount = 0;
   listWindow(totalItems, g_shopScreen.selectedIndex, MAX_VISIBLE, start, visCount);
 
@@ -164,15 +164,15 @@ void drawShopScreen()
   const int panelX = listRight + gapLR;
   const int panelW = SCREEN_W - panelX - margin;
 
-  // List pill sizing
-  int itemH = 22;
-  int gapY = 6;
+  // Pill sizing: match Inventory list style
+  int itemH = 20;
+  int gapY = 5;
 
   int totalListH = visCount * itemH + (visCount - 1) * gapY;
   if (totalListH > contentH)
   {
-    itemH = 20;
-    gapY = 5;
+    itemH = 18;
+    gapY = 4;
     totalListH = visCount * itemH + (visCount - 1) * gapY;
   }
 
@@ -215,8 +215,8 @@ void drawShopScreen()
     const int th = spr.fontHeight();
     const int ty = y + (itemH - th) / 2;
 
-    spr.setTextColor(textCol);
-    spr.drawString(itemName, listX + 10, ty);
+    spr.setTextColor(textCol, fill);
+    spr.drawString(itemName, listX + 8, ty);
   }
 
   // Scroll arrows (to the right of the left list)
@@ -708,7 +708,7 @@ void drawInventoryMenu()
   const int dmood = deltas.happiness;
   const int drest = deltas.energy;
   const int dhp = deltas.health;
-  
+
   // Draw stats as integers, optionally with "+X" appended
   const int pad = 8;
   int x = panelX + pad;
