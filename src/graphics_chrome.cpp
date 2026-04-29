@@ -3,6 +3,7 @@
 #include "app_state.h"
 #include "display.h"
 #include "graphics_shared_utils.h"
+#include "graphics_hud_icons.h"
 #include "pet.h"
 #include "system_status_state.h"
 #include "time_state.h"
@@ -187,28 +188,54 @@ void drawTopBar()
 
   const unsigned int inf = (unsigned int)pet.inf;
 
-  char titleBuf[64];
-  snprintf(titleBuf, sizeof(titleBuf), "%s - H %u", petName, inf);
+  static const char *TOP_BAR_INF_ICON = "/raising_hell/graphics/ui/icons/inf_icon.png";
+  static constexpr int TOP_BAR_INF_ICON_W = 8;
+  static constexpr int TOP_BAR_INF_ICON_H = 11;
+  static constexpr int TOP_BAR_INF_ICON_GAP = 1;
+  
+  char infBuf[16];
+  snprintf(infBuf, sizeof(infBuf), "%u", inf);
 
-  char shortBuf[32];
-  snprintf(shortBuf, sizeof(shortBuf), "H %u", inf);
+  char nameBuf[48];
+  snprintf(nameBuf, sizeof(nameBuf), "%s - ", petName);
 
-  const char *useTitle = titleBuf;
+  const int minRight = (titleMaxRight < padL + 10) ? (padL + 10) : titleMaxRight;
 
-  int minRight = titleMaxRight;
-  if (minRight < padL + 10)
-    minRight = padL + 10;
+  const int nameW = spr.textWidth(nameBuf);
+  const int infW = spr.textWidth(infBuf);
+  const int iconY = (TOP_BAR_H - TOP_BAR_INF_ICON_H) / 2;
 
-  int wFull = spr.textWidth(titleBuf);
-  int wShort = spr.textWidth(shortBuf);
-
-  if (padL + wFull > minRight)
-    useTitle = shortBuf;
-  if (padL + wShort > minRight)
-    useTitle = "";
+  const int fullW = nameW + TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP + infW;
+  const int shortW = TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP + infW;
 
   spr.setTextDatum(TL_DATUM);
-  spr.drawString(useTitle, padL, titleY);
+
+if (padL + fullW <= minRight)
+{
+  int x = padL;
+
+  // name
+  spr.drawString(nameBuf, x, titleY);
+  x += nameW;
+
+  // icon
+  const int iconX = x;
+  drawHudIconCached(TOP_BAR_INF_ICON, iconX, iconY);
+
+  // number (locked to icon)
+  const int infX = iconX + TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP;
+  spr.drawString(infBuf, infX, titleY);
+}
+else if (padL + shortW <= minRight)
+{
+  const int iconX = padL;
+
+  drawHudIconCached(TOP_BAR_INF_ICON, iconX, iconY);
+
+  const int infX = iconX + TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP;
+  spr.drawString(infBuf, infX, titleY);
+}
+
   spr.setTextDatum(TL_DATUM);
 }
 

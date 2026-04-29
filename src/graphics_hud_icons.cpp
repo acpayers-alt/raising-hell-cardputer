@@ -4,7 +4,8 @@
 #include "graphics_sd_draw.h"
 #include "sdcard.h"
 
-static const char *PATH_INF_COIN  = "/raising_hell/graphics/ui/icons/inf_coin.png";
+static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
+static const char *PATH_INF_TOPBAR = "/raising_hell/graphics/ui/icons/inf_icon.png";
 static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
 static const char *PATH_FOOD_ICON = "/raising_hell/graphics/ui/icons/food_icon.png";
 static const char *PATH_MOOD_ICON = "/raising_hell/graphics/ui/icons/mood_icon.png";
@@ -20,6 +21,8 @@ static M5Canvas s_hudLifeIconSmall(&spr);
 static bool s_hudLifeIconSmallReady = false;
 static M5Canvas s_hudCoinIconSmall(&spr);
 static bool s_hudCoinIconSmallReady = false;
+static M5Canvas s_hudInfTopBarIcon(&spr);
+static bool s_hudInfTopBarIconReady = false;
 
 static M5Canvas s_hudFoodIcon(&spr);
 static bool s_hudFoodIconReady = false;
@@ -28,7 +31,7 @@ static bool s_hudMoodIconReady = false;
 static M5Canvas s_hudRestIcon(&spr);
 static bool s_hudRestIconReady = false;
 
-static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h)
+static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h, uint16_t fillColor)
 {
   if (ready)
     return true;
@@ -43,7 +46,7 @@ static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, 
       return false;
   }
 
-  canvas.fillSprite(HUD_ICON_TRANSPARENT);
+  canvas.fillSprite(fillColor);
 
   if (!canvasDrawPngFromSD(canvas, path, 0, 0))
   {
@@ -62,6 +65,8 @@ bool drawHudIconCached(const char *path, int x, int y)
   bool *ready = nullptr;
   int w = 0;
   int h = 0;
+  bool useColorKey = true;
+  uint16_t fillColor = HUD_ICON_TRANSPARENT;
 
   if (path == PATH_LIFE_ICON)
   {
@@ -76,6 +81,15 @@ bool drawHudIconCached(const char *path, int x, int y)
     ready = &s_hudCoinIconSmallReady;
     w = HUD_HEADER_ICON_W;
     h = HUD_HEADER_ICON_H;
+  }
+  else if (path == PATH_INF_TOPBAR)
+  {
+    canvas = &s_hudInfTopBarIcon;
+    ready = &s_hudInfTopBarIconReady;
+    w = 8;
+    h = 11;
+    useColorKey = false;
+    fillColor = TFT_BLACK;
   }
   else if (path == PATH_FOOD_ICON)
   {
@@ -99,9 +113,13 @@ bool drawHudIconCached(const char *path, int x, int y)
     h = HUD_STAT_ICON_H;
   }
 
-  if (canvas && ready && ensureHudIconCache(*canvas, *ready, path, w, h))
+  if (canvas && ready && ensureHudIconCache(*canvas, *ready, path, w, h, fillColor))
   {
-    canvas->pushSprite(x, y, HUD_ICON_TRANSPARENT);
+    if (useColorKey)
+      canvas->pushSprite(x, y, HUD_ICON_TRANSPARENT);
+    else
+      canvas->pushSprite(x, y);
+
     return true;
   }
 
@@ -118,6 +136,9 @@ void graphicsReleaseHudIconCaches()
 
   s_hudCoinIconSmall.deleteSprite();
   s_hudCoinIconSmallReady = false;
+
+  s_hudInfTopBarIcon.deleteSprite();
+  s_hudInfTopBarIconReady = false;
 
   s_hudFoodIcon.deleteSprite();
   s_hudFoodIconReady = false;
