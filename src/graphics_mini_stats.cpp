@@ -165,7 +165,7 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin)
     const int hpTextX = x0 + panelW - 2 - hpTextW;
 
     drawMiniStatIconCached(LIFE_ICON_PATH, heartIconX, headerIconY);
-    
+
     spr.setTextDatum(TL_DATUM);
 
     // fake-bold / slightly larger-looking text
@@ -243,6 +243,17 @@ void drawMiniStatPreviewSleepLeft()
     // fake-bold
     spr.drawString(hpBuf, hpTextX, topTextY);
     spr.drawString(hpBuf, hpTextX + 1, topTextY);
+
+    char sleepBuf[24];
+    snprintf(sleepBuf, sizeof(sleepBuf), "Sleep: %s", pet.getSleepQualityLabel());
+
+    spr.setTextFont(1);
+    spr.setTextSize(1);
+    spr.setTextDatum(TL_DATUM);
+    spr.drawString(sleepBuf, x0 + 2, topTextY + 18);
+
+    spr.setTextFont(2);
+    spr.setTextSize(1);
   }
 
   spr.setTextDatum(TL_DATUM);

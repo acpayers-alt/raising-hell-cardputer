@@ -204,8 +204,7 @@ uint16_t Pet::getSleepQualityMultQ8() const
   // Map score 0..100 to multiplier 0.5x..1.5x in Q8:
   // 0.5x = 128, 1.0x = 256, 1.5x = 384
   const uint8_t score = getSleepQualityScore();
-  const uint16_t mult = (uint16_t)(128 + ((uint32_t)score * 256) / 100);
-  return mult;
+  return (uint16_t)(128U + (((uint32_t)score * 256UL) / 100UL));
 }
 
 const char *Pet::getSleepQualityLabel() const
@@ -326,60 +325,17 @@ void Pet::petSleepTick()
   sleepAccMs += dt;
 
   // ---------------------------------------------------------------------------
-  // Sleep rest recovery rate (energy) now scales by "sleep quality"
+  // Sleep rest recovery rate (energy) scales by sleep quality.
+  // Baseline: 8 hours -> 100 energy.
+  //
+  // Keep sleep-quality tuning centralized in:
+  //   getSleepQualityScore()
+  //   getSleepQualityMultQ8()
+  //   getSleepQualityLabel()
   // ---------------------------------------------------------------------------
-  // Baseline: 8 hours -> 100 energy
   const uint32_t baseSleepRateMs = (8UL * 60UL * 60UL * 1000UL) / 100UL;
   const uint32_t baseRateMs = applyDecayModeToStep(baseSleepRateMs);
-
-  // Compute sleep quality score 0..100 (simple, tunable)
-  int score = 50;
-
-  // Hunger influence
-  if (hunger < 25)
-    score -= 20;
-  else if (hunger < 50)
-    score -= 10;
-  else if (hunger > 75)
-    score += 10;
-
-  // Mood influence (priority mood)
-  const PetMood mood = getMood();
-  switch (mood)
-  {
-  case MOOD_HAPPY:
-    score += 15;
-    break;
-  case MOOD_BORED:
-    score += 5;
-    break;
-  case MOOD_MAD:
-    score -= 15;
-    break;
-  case MOOD_HUNGRY:
-    score -= 10;
-    break;
-  case MOOD_TIRED:
-    score -= 10;
-    break;
-  case MOOD_SICK:
-    score -= 30;
-    break;
-  default:
-    break;
-  }
-
-  // Health influence (gentle)
-  score += (health - 50) / 5; // about -10..+10
-
-  if (score < 0)
-    score = 0;
-  if (score > 100)
-    score = 100;
-
-  // Map score 0..100 -> multiplier 0.5x..1.5x in Q8:
-  // 0.5x = 128, 1.0x = 256, 1.5x = 384
-  const uint16_t multQ8 = (uint16_t)(128 + ((uint32_t)score * 256UL) / 100UL);
+  const uint16_t multQ8 = getSleepQualityMultQ8();
 
   // Effective ms per +1 energy:
   uint32_t sleepRateMs = (uint32_t)(((uint64_t)baseRateMs * 256ULL) / (uint64_t)multQ8);
