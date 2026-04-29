@@ -447,7 +447,7 @@ case ITEM_SOUL_FOOD: {
 
     case ITEM_DEMON_BONE:
       pet.energy = constrain(pet.energy + 30, 0, 100);
-      ui_showMessage("Energy +20");
+      ui_showMessage("Energy +30");
       changedPet = true;
       break;
 
