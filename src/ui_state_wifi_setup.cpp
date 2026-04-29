@@ -10,12 +10,12 @@
 #include "ui_actions.h"
 #include "ui_input_common.h" // uiDrainKb
 #include "ui_runtime.h"      // requestUIRedraw
+#include "ui_state_wifi_connect_wait.h"
 #include "wifi_power.h"
 #include "wifi_setup_state.h" // g_wifi, g_wifiSetupFromBootWizard
 #include "wifi_store.h"
 #include "wifi_time.h"
 #include <WiFi.h>
-#include "ui_state_wifi_connect_wait.h"
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -64,6 +64,8 @@ static void wifiSetupStartScan()
   requestUIRedraw();
 }
 
+static int wifiSetupScanTotalItems() { return (g_wifi.scanCount > 0) ? (g_wifi.scanCount + 2) : 2; }
+
 static void wifiSetupRunBlockingScan()
 {
   wifiConsoleDisconnect(false);
@@ -80,8 +82,8 @@ static void wifiSetupRunBlockingScan()
 
   const int n = WiFi.scanNetworks(false, true);
 
-  Serial.printf("[WIFI SETUP] blocking scan result n=%d mode=%d status=%d\n",
-                n, (int)WiFi.getMode(), (int)WiFi.status());
+  Serial.printf("[WIFI SETUP] blocking scan result n=%d mode=%d status=%d\n", n, (int)WiFi.getMode(),
+                (int)WiFi.status());
 
   g_wifi.scanInProgress = false;
   g_wifi.scanCount = 0;
@@ -120,7 +122,11 @@ static void wifiSetupRunBlockingScan()
 
   WiFi.scanDelete();
 
-  const int totalItems = (g_wifi.scanCount > 0) ? (g_wifi.scanCount + 1) : 2;
+  const int totalItems = wifiSetupScanTotalItems();
+
+  // move selection off Rescan after scan completes
+  if (g_wifi.scanCount > 0 && g_wifi.scanIndex == 0)
+    g_wifi.scanIndex = 1;
   if (g_wifi.scanIndex >= totalItems)
     g_wifi.scanIndex = totalItems - 1;
   if (g_wifi.scanIndex < 0)
@@ -176,17 +182,30 @@ static void wifiSetupSelectScanItem()
   }
 
   // After results exist:
-  //   0..scanCount-1 = networks
-  //   scanCount      = Manual entry
-  if (g_wifi.scanIndex < g_wifi.scanCount)
+  //   0              = Rescan
+  //   1..scanCount   = networks
+  //   scanCount + 1  = Manual entry
+
+  if (g_wifi.scanIndex == 0)
   {
-    strlcpy(g_wifi.ssid, g_wifi.scanSsids[g_wifi.scanIndex], sizeof(g_wifi.ssid));
+    Serial.println("[WIFI SETUP] rescan selected");
+
+    wifiSetupResetScanState();
+    wifiSetupStartScan();
+    return;
+  }
+
+  if (g_wifi.scanIndex >= 1 && g_wifi.scanIndex <= g_wifi.scanCount)
+  {
+    const int realIndex = g_wifi.scanIndex - 1;
+
+    strlcpy(g_wifi.ssid, g_wifi.scanSsids[realIndex], sizeof(g_wifi.ssid));
     g_wifi.connectFailCount = 0;
     wifiSetupBeginPasswordEntry();
     return;
   }
 
-  if (g_wifi.scanIndex == g_wifi.scanCount)
+  if (g_wifi.scanIndex == g_wifi.scanCount + 1)
   {
     g_wifi.ssid[0] = '\0';
     g_wifi.buf[0] = '\0';
@@ -310,9 +329,7 @@ static void wifiSetupSelect()
   }
   else
   {
-    Serial.printf("[WIFI] setup skip save: ssid='%s' passLen=%u\n",
-                  g_wifi.ssid,
-                  (unsigned)strlen(g_wifi.pass));
+    Serial.printf("[WIFI] setup skip save: ssid='%s' passLen=%u\n", g_wifi.ssid, (unsigned)strlen(g_wifi.pass));
   }
 
   wifiResetConnectUiState();
@@ -357,7 +374,7 @@ static void wifiSetupNavUp()
   if (g_wifi.setupStage != WIFI_SETUP_STAGE_SCAN || g_wifi.scanInProgress)
     return;
 
-  const int totalItems = (g_wifi.scanCount > 0) ? (g_wifi.scanCount + 1) : 2;
+  const int totalItems = wifiSetupScanTotalItems();
   if (totalItems <= 0)
     return;
 
@@ -372,7 +389,7 @@ static void wifiSetupNavDown()
   if (g_wifi.setupStage != WIFI_SETUP_STAGE_SCAN || g_wifi.scanInProgress)
     return;
 
-  const int totalItems = (g_wifi.scanCount > 0) ? (g_wifi.scanCount + 1) : 2;
+  const int totalItems = wifiSetupScanTotalItems();
   if (totalItems <= 0)
     return;
 

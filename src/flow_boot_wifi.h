@@ -16,6 +16,10 @@ void uiBootTzPickHandle(InputState &in);
 void uiBootNtpWaitHandle(InputState &in);
 void uiBootAssetWifiRequiredHandle(InputState &in);
 void bootWifiBeginNtpWait();
+bool bootWifiBeginStoredProfileConnect(int profileIndex);
+void bootWifiBeginStoredProfileFailover();
+void bootWifiClearStoredProfileFailover();
+bool bootWifiTryNextStoredProfile();
 
 //Launcher Import Handlers
 void bootWifiSetImportedInfo(const char *ssid);

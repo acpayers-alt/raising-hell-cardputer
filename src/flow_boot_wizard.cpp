@@ -22,18 +22,20 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
   ui_setBootSplashActive(false);
   requestFullUIRedraw();
 
-  // Try stored creds first.
+  // Try stored Wi-Fi profiles first.
+  if (wifiStoreHasCreds())
   {
-    String storedSsid, storedPwd;
-    if (wifiStoreHasCreds() && wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
+    bootWifiBeginStoredProfileFailover();
+
+    if (bootWifiBeginStoredProfileConnect(0))
     {
-      Serial.printf("[BOOTWIZ] entering BOOT_WIFI_WAIT from stored creds ssid='%s'\n", storedSsid.c_str());
-      wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
-      uiActionEnterState(UIState::BOOT_WIFI_WAIT, Tab::TAB_PET, true);
+      Serial.println("[BOOTWIZ] entering BOOT_WIFI_WAIT from stored wifi profile");
       return;
     }
-  }
 
+    bootWifiClearStoredProfileFailover();
+  }
+  
   // If no stored creds, try launcher import once.
   {
     String importedSsid, importedPwd;

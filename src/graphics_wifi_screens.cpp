@@ -38,7 +38,7 @@ void drawWifiSetupScreen()
     }
 
     const bool hasResults = (g_wifi.scanCount > 0);
-    const int totalItems = hasResults ? (g_wifi.scanCount + 1) : 2;
+    const int totalItems = hasResults ? (g_wifi.scanCount + 2) : 2;
     const int itemH = 20;
     const int gap = 5;
     const int maxVisible = 5;
@@ -83,10 +83,19 @@ void drawWifiSetupScreen()
       }
       else
       {
-        if (i < g_wifi.scanCount)
-          snprintf(line, sizeof(line), "%s (%d)", g_wifi.scanSsids[i], (int)g_wifi.scanRssi[i]);
+        if (i == 0)
+        {
+          snprintf(line, sizeof(line), "Rescan");
+        }
+        else if (i <= g_wifi.scanCount)
+        {
+          const int realIndex = i - 1;
+          snprintf(line, sizeof(line), "%s (%d)", g_wifi.scanSsids[realIndex], (int)g_wifi.scanRssi[realIndex]);
+        }
         else
+        {
           snprintf(line, sizeof(line), "Manual entry");
+        }
       }
 
       spr.setTextDatum(TL_DATUM);
@@ -100,9 +109,7 @@ void drawWifiSetupScreen()
   }
 
   const bool isPass = (g_wifi.setupStage == WIFI_SETUP_STAGE_PASS);
-  ui_drawMessageWindow("WiFi Setup",
-                       isPass ? "Password:" : "SSID:",
-                       wifiSetupBuf,
+  ui_drawMessageWindow("WiFi Setup", isPass ? "Password:" : "SSID:", wifiSetupBuf,
                        /*maskLine2=*/isPass,
                        /*showCursor=*/true);
 }
@@ -131,13 +138,27 @@ void drawWifiConnectWaitScreen()
   const char *st = nullptr;
   switch (wl)
   {
-  case WL_CONNECTED:        st = "Connected"; break;
-  case WL_IDLE_STATUS:      st = "Idle"; break;
-  case WL_NO_SSID_AVAIL:    st = "SSID not found"; break;
-  case WL_CONNECT_FAILED:   st = "Connect failed"; break;
-  case WL_CONNECTION_LOST:  st = "Connection lost"; break;
-  case WL_DISCONNECTED:     st = "Disconnected"; break;
-  default:                  st = "Connecting..."; break;
+  case WL_CONNECTED:
+    st = "Connected";
+    break;
+  case WL_IDLE_STATUS:
+    st = "Idle";
+    break;
+  case WL_NO_SSID_AVAIL:
+    st = "SSID not found";
+    break;
+  case WL_CONNECT_FAILED:
+    st = "Connect failed";
+    break;
+  case WL_CONNECTION_LOST:
+    st = "Connection lost";
+    break;
+  case WL_DISCONNECTED:
+    st = "Disconnected";
+    break;
+  default:
+    st = "Connecting...";
+    break;
   }
 
   spr.drawString("Connecting WiFi...", 10, contentY + 10);

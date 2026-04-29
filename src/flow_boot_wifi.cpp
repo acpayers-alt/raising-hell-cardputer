@@ -38,6 +38,9 @@ extern Tab g_bootWizardAfterOkTab;
 static uint32_t s_bootNtpWaitStartMs = 0;
 static bool s_bootNtpWaitStarted = false;
 static constexpr uint32_t kBootNtpWaitTimeoutMs = 20000;
+static bool s_bootWifiTryingStoredProfiles = false;
+static int s_bootWifiProfileIndex = 0;
+static int s_bootWifiProfileCount = 0;
 
 // -----------------------------------------------------------------------------
 // Launcher Import
@@ -51,6 +54,71 @@ void bootWifiBeginNtpWait()
 {
   s_bootNtpWaitStartMs = millis();
   s_bootNtpWaitStarted = true;
+}
+
+void bootWifiClearStoredProfileFailover()
+{
+  s_bootWifiTryingStoredProfiles = false;
+  s_bootWifiProfileIndex = 0;
+  s_bootWifiProfileCount = 0;
+}
+
+void bootWifiBeginStoredProfileFailover()
+{
+  s_bootWifiTryingStoredProfiles = true;
+  s_bootWifiProfileIndex = 0;
+  s_bootWifiProfileCount = wifiStoreCount();
+}
+
+bool bootWifiBeginStoredProfileConnect(int profileIndex)
+{
+  String ssid;
+  String pass;
+
+  if (!wifiStoreLoadProfile(profileIndex, ssid, pass) || ssid.length() == 0)
+    return false;
+
+  Serial.printf("[BOOTWIFI] trying stored wifi profile %d/%d ssid='%s'\n", profileIndex + 1, s_bootWifiProfileCount,
+                ssid.c_str());
+
+  settingsSetWifiEnabled(true);
+  saveSettingsToSD();
+
+  g_wifi.connectFailCount = 0;
+  g_wifi.aborted = false;
+  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnTab = g_bootWizardAfterOkTab;
+
+  strlcpy(wifiSetupSsid, ssid.c_str(), sizeof(wifiSetupSsid));
+  strlcpy(wifiSetupPass, pass.c_str(), sizeof(wifiSetupPass));
+  wifiSetupBuf[0] = 0;
+
+  wifiResetConnectUiState();
+  wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
+
+  uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
+  requestUIRedraw();
+  return true;
+}
+
+bool bootWifiTryNextStoredProfile()
+{
+  if (!s_bootWifiTryingStoredProfiles)
+    return false;
+
+  ++s_bootWifiProfileIndex;
+
+  while (s_bootWifiProfileIndex < s_bootWifiProfileCount && s_bootWifiProfileIndex < WIFI_PROFILE_MAX)
+  {
+    if (bootWifiBeginStoredProfileConnect(s_bootWifiProfileIndex))
+      return true;
+
+    ++s_bootWifiProfileIndex;
+  }
+
+  Serial.println("[BOOTWIFI] no more stored wifi profiles to try");
+  bootWifiClearStoredProfileFailover();
+  return false;
 }
 
 void bootWifiSetImportedInfo(const char *ssid)
@@ -196,37 +264,23 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
 
   g_bootProvisionWifiOnboardingStarted = true;
 
-  String storedSsid;
-  String storedPwd;
   String importedSsid;
   String importedPwd;
 
-  // Prefer creds we already saved ourselves.
-  if (wifiStoreLoad(storedSsid, storedPwd) && storedSsid.length() > 0)
+  // Prefer saved Wi-Fi profiles.
+  if (wifiStoreHasCreds())
   {
-    settingsSetWifiEnabled(true);
-    saveSettingsToSD();
+    bootWifiBeginStoredProfileFailover();
 
-    Serial.printf("[BOOTWIFI] using stored wifi creds ssid='%s'\n", storedSsid.c_str());
+    if (bootWifiBeginStoredProfileConnect(0))
+    {
+      uiActionSwallowAll(in);
+      uiDrainKb(in);
+      clearInputLatch();
+      return;
+    }
 
-    g_wifi.connectFailCount = 0;
-    g_wifi.aborted = false;
-    g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
-    g_wifi.returnTab = g_bootWizardAfterOkTab;
-
-    strlcpy(wifiSetupSsid, storedSsid.c_str(), sizeof(wifiSetupSsid));
-    strlcpy(wifiSetupPass, storedPwd.c_str(), sizeof(wifiSetupPass));
-    wifiSetupBuf[0] = 0;
-
-    wifiResetConnectUiState();
-    wifiConsoleBeginConnect(storedSsid.c_str(), storedPwd.c_str());
-
-    uiActionEnterState(UIState::BOOT_WIFI_WAIT, g_bootWizardAfterOkTab, true);
-    requestUIRedraw();
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
-    return;
+    bootWifiClearStoredProfileFailover();
   }
 
   // If no stored creds exist, try launcher import once.
@@ -295,6 +349,8 @@ void uiBootWifiPromptHandle(InputState &in) { (void)UiBootWizardMenu::HandleWifi
 // -----------------------------------------------------------------------------
 static void bootWifiFallBackToManualEntry(InputState &in)
 {
+  bootWifiClearStoredProfileFailover();
+
   wifiConsoleDisconnect(false);
   bootWifiClearImportedInfo();
 
@@ -426,14 +482,27 @@ void uiBootWifiWaitHandle(InputState &in)
   if (failedStatus || timedOut)
   {
     if (bootWifiImportedSsid()[0] != 0)
+    {
       bootWifiFallBackToManualEntry(in);
+    }
+    else if (bootWifiTryNextStoredProfile())
+    {
+      uiActionSwallowAll(in);
+      uiDrainKb(in);
+      clearInputLatch();
+      return;
+    }
     else
+    {
       bootWifiRetryOrReturnToScan(in);
+    }
+
     return;
   }
 
   if (reallyConnected)
   {
+    bootWifiClearStoredProfileFailover();
     g_wifi.connectFailCount = 0;
     uiActionSwallowAll(in);
     uiDrainKb(in);
