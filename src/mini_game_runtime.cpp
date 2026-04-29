@@ -90,6 +90,25 @@ void mgSetRewardMessage(const char *msg);
 
 bool mgRewardShowing() { return s_showReward; }
 
+static PetMood mgRewardMoodIgnoringRest()
+{
+  // Reward payouts should not punish low rest. Mini-games already drain rest,
+  // and pass-out/autosleep handles exhaustion separately.
+  if (pet.health <= 60)
+    return MOOD_SICK;
+
+  if (pet.hunger <= 10)
+    return MOOD_HUNGRY;
+
+  if (pet.happiness <= 10)
+    return MOOD_MAD;
+
+  if (pet.happiness < 60)
+    return MOOD_BORED;
+
+  return MOOD_HAPPY;
+}
+
 static uint32_t mgXpForMoodWin(PetMood mood)
 {
   switch (mood)
@@ -374,7 +393,7 @@ void mgApplyResultAndShowReward(bool won)
 
   if (won)
   {
-    const PetMood mood = pet.getMood();
+    const PetMood mood = mgRewardMoodIgnoringRest();
     const uint32_t xp = mgXpForMoodWin(mood);
 
     pet.addXP(xp);
@@ -443,7 +462,7 @@ void miniGameExitToReturnUi(bool beginLockout)
 
   petAutonomySuppressAutoSleepUntil(millis() + POST_GAME_PASSOUT_GRACE_MS);
   Serial.println("[PET][AUTO] pass-out suppressed for 5m after mini-game");
-  
+
   uiActionEnterState(target, targetTab, true);
 
   g_app.inMiniGame = false;
