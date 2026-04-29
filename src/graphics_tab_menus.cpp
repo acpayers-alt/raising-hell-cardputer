@@ -9,6 +9,7 @@
 #include "display.h"
 #include "feed_menu_state.h"
 #include "graphics_chrome.h"
+#include "graphics_hud_icons.h"
 #include "graphics_nonpet_bg.h"
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
@@ -24,6 +25,7 @@
 #include "ui_feed_menu.h"
 #include "ui_menu_state.h"
 #include "ui_sleep_menu.h"
+#include "ui_icons.h"
 
 // Shop item icons (per-pet theme)
 static const char *PATH_SHOP_DEV_FOOD = "/raising_hell/graphics/ui/shop_items/dev/dev_food.png";
@@ -287,21 +289,41 @@ void drawShopScreen()
     spr.drawEllipse(imgX + imgW / 2, imgY + imgH / 2, imgW / 2, imgH / 2, TFT_RED);
   }
 
-  // Price (safe: selectedIndex is guaranteed < SHOP_ITEM_COUNT here)
+  // Price (icon + value)
   const int cost = availableItems[g_shopScreen.selectedIndex].price;
-  char priceLine[16];
-  snprintf(priceLine, sizeof(priceLine), "$%d", cost);
-
+  
   spr.setTextFont(2);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  spr.setTextDatum(TR_DATUM);
-  const int priceX = panelX + panelW - 8;
+  
+  // Right-aligned anchor
+  const int priceRightX = panelX + panelW - 8;
   const int priceY = imgY + (imgH - spr.fontHeight()) / 2;
-  spr.drawString(priceLine, priceX, priceY);
+  
+  // Measure text first so we can right-align the whole block
+  String priceStr = String(cost);
+  const int textW = spr.textWidth(priceStr);
+  
+  // Icon placement (to the left of text)
+  const int iconW = INF_ICON_W;
+  const int iconH = INF_ICON_H;
+  
+  // total width = icon + spacing + text
+  const int totalW = iconW + 3 + textW;
+  
+  // starting X so the whole thing is right-aligned
+  const int startX = priceRightX - totalW;
+  
+  // vertically center icon relative to image block
+  const int iconY = imgY + (imgH - iconH) / 2;
+  
+  // draw icon
+  drawHudIconCached(INF_ICON_PATH, startX, iconY);
+  
+  // draw number
   spr.setTextDatum(TL_DATUM);
-
+  spr.drawString(priceStr, startX + iconW + 3, priceY);
+  
   // Effects at the bottom
   String eff;
   switch (selType)
