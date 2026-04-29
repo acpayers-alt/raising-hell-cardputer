@@ -10,3 +10,5 @@ int wifiStoreCount();
 void wifiStoreSave(const String &ssid, const String &pass);
 void wifiStoreClear();
 bool wifiStoreHasCreds();
+
+bool wifiStoreDeleteProfile(int index);

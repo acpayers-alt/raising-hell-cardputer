@@ -18,7 +18,10 @@ struct WifiSetupState
 {
   // WiFi settings page cursor (Settings -> WiFi)
   int wifiSettingsIndex = 0;
-
+  int storedNetworkIndex = 0;
+  int storedNetworkActionIndex = 0; // 0 Connect, 1 Delete
+  bool storedNetworkActionActive = false;
+  
   // Setup stage
   uint8_t setupStage = WIFI_SETUP_STAGE_SCAN;
 

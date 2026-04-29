@@ -35,6 +35,7 @@
 #include "user_toggles_state.h"
 #include "version.h"
 #include "wifi_setup_state.h"
+#include "wifi_store.h"
 #include "wifi_time.h"
 
 static const char *brightnessToText(int level)
@@ -269,8 +270,17 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-      "Manual",    nullptr,           "Pet Options >", "Screen Settings >", "System Settings >", "Game Options >",
-      "Console >", "System Status >", "Credits",       "Store Pet",         "Main Menu",
+      "Manual",
+      nullptr,
+      "WiFi Settings >",
+      "Pet Options >",
+      "Game Options >",
+      "Screen Settings >",
+      "System Settings >",
+      "Console >",
+      "Credits",
+      "Store Pet",
+      "Main Menu",
   };
 
   const int totalItems = 11;
@@ -433,7 +443,7 @@ static void drawGameOptionsMenu()
 
   const char *labels[] = {decayLine, passiveXpLine, deathLine, ledLine};
   const int totalItems = 4;
-  
+
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;
@@ -726,6 +736,114 @@ static void drawWifiSettingsMenu()
   }
 }
 
+static void drawStoredNetworksMenu()
+{
+  drawNonPetTabBackground();
+  drawTopBar();
+
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H;
+
+  const int totalItems = wifiStoreCount();
+
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextDatum(TL_DATUM);
+
+  if (totalItems <= 0)
+  {
+    spr.setTextDatum(TC_DATUM);
+  
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("No stored networks", SCREEN_W / 2, contentY + 36);
+  
+    spr.drawString("ESC to return", SCREEN_W / 2, contentY + 62);
+  
+    spr.setTextDatum(TL_DATUM);
+    return;
+  }
+  
+  g_wifi.storedNetworkIndex = clampi(g_wifi.storedNetworkIndex, 0, totalItems - 1);
+
+  constexpr int MAX_VISIBLE = 4;
+  int start = 0, visCount = 0;
+  listWindow(totalItems, g_wifi.storedNetworkIndex, MAX_VISIBLE, start, visCount);
+
+  const int itemH = 22;
+  const int gap = 6;
+  const int totalH = visCount * itemH + (visCount - 1) * gap;
+  const int startY = contentY + (contentH - totalH) / 2;
+
+  const int boxW = (SCREEN_W * 3) / 4;
+  const int boxX = (SCREEN_W - boxW) / 2;
+  const int radius = 10;
+
+  for (int row = 0; row < visCount; row++)
+  {
+    const int i = start + row;
+    const int y = startY + row * (itemH + gap);
+    const bool sel = (i == g_wifi.storedNetworkIndex);
+
+    const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
+    const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
+    const uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
+
+    spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);
+    spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);
+
+    String ssid;
+    String pass;
+    if (!wifiStoreLoadProfile(i, ssid, pass) || ssid.length() == 0)
+      ssid = "(missing)";
+
+    char label[48];
+    snprintf(label, sizeof(label), "%d. %s", i + 1, ssid.c_str());
+
+    const int ty = y + (itemH - spr.fontHeight()) / 2;
+    spr.setTextColor(textCol, fill);
+    spr.drawString(label, boxX + 10, ty);
+  }
+
+  if (g_wifi.storedNetworkActionActive)
+  {
+    const int overlayW = 170;
+    const int overlayH = 58;
+    const int overlayX = (SCREEN_W - overlayW) / 2;
+    const int overlayY = (SCREEN_H - overlayH) / 2;
+
+    spr.fillRoundRect(overlayX, overlayY, overlayW, overlayH, 10, TFT_BLACK);
+    spr.drawRoundRect(overlayX, overlayY, overlayW, overlayH, 10, uiPillOutline(pet.type));
+
+    spr.setTextDatum(TC_DATUM);
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawString("Stored Network", SCREEN_W / 2, overlayY + 7);
+
+    const int btnY = overlayY + 31;
+    const int btnW = 70;
+    const int btnH = 18;
+    const int leftX = overlayX + 13;
+    const int rightX = overlayX + overlayW - btnW - 13;
+
+    const bool connectSel = (g_wifi.storedNetworkActionIndex == 0);
+    const bool deleteSel = (g_wifi.storedNetworkActionIndex == 1);
+
+    spr.fillRoundRect(leftX, btnY, btnW, btnH, 8, connectSel ? uiPillFillSelected(pet.type) : TFT_BLACK);
+    spr.drawRoundRect(leftX, btnY, btnW, btnH, 8, connectSel ? uiPillOutline(pet.type) : TFT_DARKGREY);
+
+    spr.fillRoundRect(rightX, btnY, btnW, btnH, 8, deleteSel ? uiPillFillSelected(pet.type) : TFT_BLACK);
+    spr.drawRoundRect(rightX, btnY, btnW, btnH, 8, deleteSel ? uiPillOutline(pet.type) : TFT_DARKGREY);
+
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(connectSel ? TFT_WHITE : TFT_LIGHTGREY, connectSel ? uiPillFillSelected(pet.type) : TFT_BLACK);
+    spr.drawString("Connect", leftX + btnW / 2, btnY + btnH / 2);
+
+    spr.setTextColor(deleteSel ? TFT_WHITE : TFT_LIGHTGREY, deleteSel ? uiPillFillSelected(pet.type) : TFT_BLACK);
+    spr.drawString("Delete", rightX + btnW / 2, btnY + btnH / 2);
+
+    spr.setTextDatum(TL_DATUM);
+  }
+}
+
 static void drawSystemSettingsMenu()
 {
   drawNonPetTabBackground();
@@ -734,7 +852,7 @@ static void drawSystemSettingsMenu()
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
 
-  const char *labels[] = {"Set Time", "Time Zone", "Factory Reset", "WiFi Settings >"};
+  const char *labels[] = {"Set Time", "Time Zone", "System Status >", "Factory Reset"};
   const int totalItems = 4;
 
   g_app.systemSettingsIndex = clampi(g_app.systemSettingsIndex, 0, totalItems - 1);
@@ -871,7 +989,7 @@ static void drawCreditsScreen()
   versionCol = TFT_RED;
 #endif
 
-spr.setTextColor(versionCol);
+  spr.setTextColor(versionCol);
 
   char verLine[48];
   snprintf(verLine, sizeof(verLine), "Version %s", RH_VERSION_STRING);
@@ -1044,6 +1162,9 @@ void drawSettingsMenu()
     break;
   case SettingsPage::WIFI:
     drawWifiSettingsMenu();
+    break;
+  case SettingsPage::STORED_NETWORKS:
+    drawStoredNetworksMenu();
     break;
   case SettingsPage::CONSOLE:
     drawPlaceholderMenu("Console");

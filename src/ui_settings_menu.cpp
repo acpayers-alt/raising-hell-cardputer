@@ -182,6 +182,16 @@ static void actTop_OpenSystem(InputState &input)
   clearInputLatch();
 }
 
+static void actTop_OpenWifi(InputState &input)
+{
+  g_settingsFlow.settingsPage = SettingsPage::WIFI;
+  g_wifi.wifiSettingsIndex = 0;
+  requestUIRedraw();
+  inputForceClear();
+  playBeep();
+  clearInputLatch();
+}
+
 static void actTop_OpenGame(InputState &)
 {
   g_settingsFlow.settingsPage = SettingsPage::GAME;
@@ -475,6 +485,19 @@ static void actWifi_SetNetwork(InputState &input)
   clearInputLatch();
 }
 
+static void actWifi_StoredNetworks(InputState &input)
+{
+  g_settingsFlow.settingsPage = SettingsPage::STORED_NETWORKS;
+  g_wifi.storedNetworkIndex = 0;
+  g_wifi.storedNetworkActionIndex = 0;
+  g_wifi.storedNetworkActionActive = false;
+
+  requestUIRedraw();
+  uiDrainKb(input);
+  playBeep();
+  clearInputLatch();
+}
+
 static void actWifi_Reset(InputState &)
 {
   wifiResetSettings();
@@ -761,8 +784,8 @@ static void actSystem_OpenWifi(InputState &input)
 static MenuItem kSystemItems[] = {
     {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
     {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
+    {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
     {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
-    {"WiFi", actSystem_OpenWifi, nullptr, nullptr, nullptr},
 };
 
 // ------------------------------------------------------------
@@ -771,12 +794,12 @@ static MenuItem kSystemItems[] = {
 static MenuItem kTopItems[] = {
     {"Manual", actTop_Controls, nullptr, nullptr, nullptr},
     {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
+    {"WiFi Settings", actTop_OpenWifi, nullptr, nullptr, nullptr},
     {"Pet Options", actTop_OpenPet, nullptr, nullptr, nullptr},
-    {"Screen", actTop_OpenScreen, nullptr, nullptr, nullptr},
-    {"System", actTop_OpenSystem, nullptr, nullptr, nullptr},
-    {"Game", actTop_OpenGame, nullptr, nullptr, nullptr},
+    {"Game Options", actTop_OpenGame, nullptr, nullptr, nullptr},
+    {"Screen Settings", actTop_OpenScreen, nullptr, nullptr, nullptr},
+    {"System Settings", actTop_OpenSystem, nullptr, nullptr, nullptr},
     {"Console", actTop_Console, nullptr, nullptr, enConsole},
-    {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
     {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
     {"Store Pet", actPet_StorePet, nullptr, nullptr, nullptr},
     {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
@@ -790,40 +813,18 @@ static MenuItem kScreenItems[] = {
      actScreen_ShakeSensitivityRight, nullptr},
 };
 
-static void actWifi_AssetOtaChannelToggle(InputState &)
-{
-  const AssetOtaChannel cur = (AssetOtaChannel)assetOtaGetConfig().channel;
-  const AssetOtaChannel next = (cur == AssetOtaChannel::DEV) ? AssetOtaChannel::PUBLIC : AssetOtaChannel::DEV;
-  assetOtaSetChannel(next);
-  requestUIRedraw();
-  playBeep();
-  clearInputLatch();
-}
-
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
 #pragma message("\033[42m\033[30m [ PUBLIC BUILD ] \033[0m")
 #else
 #pragma message("\033[41m\033[37m [ DEV BUILD - DO NOT SHIP ] \033[0m")
 #endif
 
-#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
-
 static MenuItem kWifiItems[] = {
     {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
     {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
+    {"Stored Networks", actWifi_StoredNetworks, nullptr, nullptr, nullptr},
     {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
 };
-
-#else
-
-static MenuItem kWifiItems[] = {
-    {"WiFi", actWifi_Toggle, nullptr, nullptr, nullptr},
-    {"Set Network", actWifi_SetNetwork, nullptr, nullptr, nullptr},
-    {"Reset WiFi", actWifi_Reset, nullptr, nullptr, nullptr},
-    {"OTA Channel", actWifi_AssetOtaChannelToggle, actWifi_AssetOtaChannelToggle, nullptr, nullptr},
-};
-
-#endif
 
 static MenuItem kPetItems[] = {
     {"Rename Pet", actPet_RenamePet, nullptr, nullptr, nullptr},
@@ -833,10 +834,10 @@ static MenuItem kPetItems[] = {
 };
 
 static MenuItem kGameItems[] = {
-  {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
-  {"Passive XP", actGame_TogglePassiveXp, nullptr, nullptr, nullptr},
-  {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
-  {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
+    {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
+    {"Passive XP", actGame_TogglePassiveXp, nullptr, nullptr, nullptr},
+    {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
+    {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
 
 static MenuItem kAutoScreenItems[] = {
@@ -877,6 +878,172 @@ static const MenuPageDef *findPage(SettingsPage page)
   return nullptr;
 }
 
+static bool handleStoredNetworksPage(InputState &input, int move)
+{
+  int count = wifiStoreCount();
+
+  if (count <= 0)
+  {
+    g_wifi.storedNetworkIndex = 0;
+    g_wifi.storedNetworkActionActive = false;
+
+    if (input.menuOnce || input.escOnce)
+    {
+      g_settingsFlow.settingsPage = SettingsPage::WIFI;
+      g_wifi.wifiSettingsIndex = 2;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+    
+    if (input.hotSettings)
+    {
+      g_settingsFlow.settingsPage = SettingsPage::TOP;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+
+    clearInputLatch();
+    return true;
+  }
+
+  if (g_wifi.storedNetworkIndex < 0)
+    g_wifi.storedNetworkIndex = 0;
+  if (g_wifi.storedNetworkIndex >= count)
+    g_wifi.storedNetworkIndex = count - 1;
+
+  if (g_wifi.storedNetworkActionActive)
+  {
+    if (input.leftOnce || input.upOnce)
+    {
+      g_wifi.storedNetworkActionIndex = 0;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+
+    if (input.rightOnce || input.downOnce)
+    {
+      g_wifi.storedNetworkActionIndex = 1;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+
+    if (input.menuOnce || input.escOnce)
+    {
+      g_settingsFlow.settingsPage = SettingsPage::WIFI;
+      g_wifi.wifiSettingsIndex = 2;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+    
+    if (input.hotSettings)
+    {
+      g_settingsFlow.settingsPage = SettingsPage::TOP;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+
+    if (uiIsSelect(input))
+    {
+      const int selectedProfile = g_wifi.storedNetworkIndex;
+
+      if (g_wifi.storedNetworkActionIndex == 0)
+      {
+        String ssid;
+        String pass;
+
+        if (wifiStoreLoadProfile(selectedProfile, ssid, pass) && ssid.length() > 0)
+        {
+          settingsSetWifiEnabled(true);
+          wifiSetEnabled(true);
+          saveSettingsToSD();
+          saveManagerMarkDirty();
+
+          strlcpy(g_wifi.ssid, ssid.c_str(), sizeof(g_wifi.ssid));
+          strlcpy(g_wifi.pass, pass.c_str(), sizeof(g_wifi.pass));
+
+          wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
+          ui_showMessage("Connecting...");
+        }
+        else
+        {
+          ui_showMessage("Network missing");
+          soundError();
+        }
+      }
+      else
+      {
+        if (wifiStoreDeleteProfile(selectedProfile))
+        {
+          ui_showMessage("Network deleted");
+
+          count = wifiStoreCount();
+          if (g_wifi.storedNetworkIndex >= count)
+            g_wifi.storedNetworkIndex = count - 1;
+          if (g_wifi.storedNetworkIndex < 0)
+            g_wifi.storedNetworkIndex = 0;
+        }
+        else
+        {
+          ui_showMessage("Delete failed");
+          soundError();
+        }
+      }
+
+      g_wifi.storedNetworkActionActive = false;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return true;
+    }
+
+    clearInputLatch();
+    return true;
+  }
+
+  if (input.menuOnce || input.escOnce || input.hotSettings)
+  {
+    g_settingsFlow.settingsPage = SettingsPage::WIFI;
+    g_wifi.wifiSettingsIndex = 2;
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
+    return true;
+  }
+
+  if (move != 0)
+  {
+    wrapMove(g_wifi.storedNetworkIndex, count, move);
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
+    return true;
+  }
+
+  if (uiIsSelect(input))
+  {
+    g_wifi.storedNetworkActionActive = true;
+    g_wifi.storedNetworkActionIndex = 0;
+    requestUIRedraw();
+    playBeep();
+    clearInputLatch();
+    return true;
+  }
+
+  return true;
+}
+
 // ------------------------------------------------------------
 // Public entry point
 // ------------------------------------------------------------
@@ -906,6 +1073,9 @@ const char *WifiItemLabel(int index)
 
 bool Handle(InputState &input, int move)
 {
+  if (g_settingsFlow.settingsPage == SettingsPage::STORED_NETWORKS)
+    return handleStoredNetworksPage(input, move);
+
   const MenuPageDef *def = findPage(g_settingsFlow.settingsPage);
   if (!def)
     return false;

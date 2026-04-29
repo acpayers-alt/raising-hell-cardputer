@@ -84,6 +84,7 @@ enum class SettingsPage : uint8_t
   GAME,
   DECAY_MODE,
   WIFI,
+  STORED_NETWORKS,
   CONSOLE,
   STATUS,
   CREDITS,

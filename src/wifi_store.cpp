@@ -202,6 +202,74 @@ void wifiStoreSave(const String &ssid, const String &pass)
                 wifiStoreCount());
 }
 
+bool wifiStoreDeleteProfile(int index)
+{
+  if (index < 0 || index >= WIFI_PROFILE_MAX)
+    return false;
+
+  Preferences p;
+  if (!p.begin(NS, false))
+    return false;
+
+  String ssids[WIFI_PROFILE_MAX];
+  String passes[WIFI_PROFILE_MAX];
+
+  for (int i = 0; i < WIFI_PROFILE_MAX; ++i)
+    readProfile(p, i, ssids[i], passes[i]);
+
+  if (ssids[0].length() == 0)
+  {
+    String legacySsid;
+    String legacyPass;
+    if (loadLegacy(p, legacySsid, legacyPass))
+    {
+      ssids[0] = legacySsid;
+      passes[0] = legacyPass;
+    }
+  }
+
+  if (ssids[index].length() == 0)
+  {
+    p.end();
+    return false;
+  }
+
+  String newSsids[WIFI_PROFILE_MAX];
+  String newPasses[WIFI_PROFILE_MAX];
+
+  int out = 0;
+  for (int i = 0; i < WIFI_PROFILE_MAX; ++i)
+  {
+    if (i == index)
+      continue;
+    if (ssids[i].length() == 0)
+      continue;
+
+    newSsids[out] = ssids[i];
+    newPasses[out] = passes[i];
+    ++out;
+  }
+
+  for (int i = 0; i < WIFI_PROFILE_MAX; ++i)
+    writeProfile(p, i, newSsids[i], newPasses[i]);
+
+  if (newSsids[0].length() > 0)
+  {
+    p.putString(K_LEGACY_SSID, newSsids[0]);
+    p.putString(K_LEGACY_PASS, newPasses[0]);
+  }
+  else
+  {
+    p.remove(K_LEGACY_SSID);
+    p.remove(K_LEGACY_PASS);
+  }
+
+  p.end();
+
+  Serial.printf("[WIFI STORE] deleted profile index=%d remaining=%d\n", index, wifiStoreCount());
+  return true;
+}
+
 void wifiStoreClear()
 {
   Preferences p;

@@ -151,6 +151,17 @@ void uiSettingsHandle(InputState &input)
       
   if (input.menuOnce || input.escOnce)
   {
+    if (g_settingsFlow.settingsPage == SettingsPage::STORED_NETWORKS)
+    {
+      g_settingsFlow.settingsPage = SettingsPage::WIFI;
+      g_wifi.wifiSettingsIndex = 2;
+      g_wifi.storedNetworkActionActive = false;
+      requestUIRedraw();
+      playBeep();
+      clearInputLatch();
+      return;
+    }
+
     if (backToReturnPage())
       return;
 
@@ -160,7 +171,7 @@ void uiSettingsHandle(InputState &input)
     exitSettings();
     return;
   }
-
+  
   if (UiSettingsMenu::Handle(input, move))
   {
     return;

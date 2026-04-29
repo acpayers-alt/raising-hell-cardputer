@@ -10,6 +10,7 @@
 #include "pet.h"
 #include "wifi_setup_state.h"
 #include "wifi_time.h"
+#include "graphics_nonpet_bg.h"
 
 extern M5Canvas spr;
 
@@ -17,12 +18,11 @@ void drawWifiSetupScreen()
 {
   if (g_wifi.setupStage == WIFI_SETUP_STAGE_SCAN)
   {
+    drawNonPetTabBackground();
     drawTopBar();
 
     const int contentY = TOP_BAR_H;
     const int contentH = SCREEN_H - TOP_BAR_H;
-    spr.fillRect(0, contentY, SCREEN_W, contentH, TFT_BLACK);
-
     spr.setTextFont(2);
     spr.setTextSize(1);
 
