@@ -221,40 +221,40 @@ static const char *mgItemName(ItemType t)
 
 static int rollMiniGameInfReward(PetMood mood)
 {
-  int minReward = 12;
-  int maxReward = 20;
+  int minReward = 5;
+  int maxReward = 12;
 
   switch (mood)
   {
   case MOOD_HAPPY:
-    minReward = 22;
-    maxReward = 35;
+    minReward = 18;
+    maxReward = 25;
     break;
 
   case MOOD_BORED:
-    minReward = 18;
-    maxReward = 28;
+    minReward = 14;
+    maxReward = 20;
     break;
 
   case MOOD_TIRED:
-    minReward = 14;
-    maxReward = 22;
+    minReward = 12;
+    maxReward = 18;
     break;
 
   case MOOD_HUNGRY:
   case MOOD_MAD:
-    minReward = 10;
-    maxReward = 18;
+    minReward = 8;
+    maxReward = 14;
     break;
 
   case MOOD_SICK:
     minReward = 5;
-    maxReward = 10;
+    maxReward = 8;
     break;
 
   default:
-    minReward = 12;
-    maxReward = 20;
+    minReward = 10;
+    maxReward = 16;
     break;
   }
 
