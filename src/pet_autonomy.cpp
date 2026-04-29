@@ -301,7 +301,7 @@ void petAutonomyTick(uint32_t nowMs)
       return;
     }
   }
-  
+
   // --- Auto sleep: immediate + deterministic ---
   if (shouldPassOut)
   {
@@ -332,6 +332,12 @@ void petAutonomyTick(uint32_t nowMs)
   }
 }
 
+static const char *petAutonomyDisplayName()
+{
+  const char *name = pet.getName();
+  return (name && name[0]) ? name : "Pet";
+}
+
 static bool hasPendingSummary() { return s_pizzaCount || s_mischiefCount; }
 
 static void clearPendingSummary()
@@ -358,19 +364,22 @@ void petAutonomyNotifyIfPending(uint32_t nowMs)
   char msg[128];
   msg[0] = '\0';
 
+  const char *name = petAutonomyDisplayName();
+
   bool first = true;
 
   if (s_pizzaCount)
   {
-    snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%sPizza -%d INF", first ? "" : "\n", (int)s_pizzaInfSpent);
+    snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%s%s bought pizza\n-%d INF", first ? "" : "\n", name,
+             (int)s_pizzaInfSpent);
     first = false;
   }
 
   if (s_mischiefCount)
   {
-    snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%sMischief -%d INF", first ? "" : "\n",
+    snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%s%s caused mischief\n-%d INF", first ? "" : "\n", name,
              (int)s_mischiefInfLost);
-    first = false;
+                 first = false;
   }
 
   ui_showTimedMessage(msg, 3200);

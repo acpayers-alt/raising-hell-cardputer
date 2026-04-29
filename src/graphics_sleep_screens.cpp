@@ -91,8 +91,13 @@ static void drawPassOutNotice()
   spr.setTextFont(2);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("Pet passed out", SCREEN_W / 2, y + (boxH / 2));
-
+  char msg[64];
+  const char *name = pet.name && pet.name[0] ? pet.name : "Pet";
+  
+  snprintf(msg, sizeof(msg), "%s passed out", name);
+  
+  spr.drawString(msg, SCREEN_W / 2, y + (boxH / 2));
+  
   spr.setTextDatum(TL_DATUM);
 }
 
