@@ -20,7 +20,7 @@ static constexpr uint8_t kMischiefChancePct = 25;
 
 static constexpr int kAutoSleepEnergyThreshold = 5;
 static constexpr int kAutoSleepHealthThreshold = 20;
-static constexpr uint32_t kPizzaCooldownMs = 6UL * 60UL * 60UL * 1000UL;
+static constexpr uint32_t kPizzaCooldownMs = 12UL * 60UL * 60UL * 1000UL;
 static constexpr uint32_t kMischiefCooldownMs = 6UL * 60UL * 60UL * 1000UL;
 
 static uint32_t s_lastPizzaRollMs = 0;
@@ -286,7 +286,10 @@ void petAutonomyTick(uint32_t nowMs)
   const bool shouldPassOut = !autoSleepSuppressed && (exhausted || criticallyStarving);
   const bool angry = (pet.getMood() == MOOD_MAD);
 
-  // --- Pizza: immediate + deterministic, but cooldown-gated ---
+  // --- Pizza: emergency rescue, cooldown-gated ---
+  // Do not reset this cooldown when hunger recovers. Otherwise autonomy can
+  // keep rescuing the pet every time hunger dips again, which makes starvation
+  // death nearly impossible for a pet with enough INF.
   if (starving)
   {
     const bool pizzaReady = s_lastPizzaRollMs == 0 || (uint32_t)(nowMs - s_lastPizzaRollMs) >= kPizzaCooldownMs;
@@ -298,11 +301,7 @@ void petAutonomyTick(uint32_t nowMs)
       return;
     }
   }
-  else
-  {
-    s_lastPizzaRollMs = 0;
-  }
-
+  
   // --- Auto sleep: immediate + deterministic ---
   if (shouldPassOut)
   {
