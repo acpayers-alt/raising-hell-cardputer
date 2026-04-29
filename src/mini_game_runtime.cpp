@@ -90,9 +90,11 @@ void mgSetRewardMessage(const char *msg);
 
 bool mgRewardShowing() { return s_showReward; }
 
-static PetMood mgRewardMoodIgnoringRest()
+static PetMood mgRewardCondition()
 {
-  // Reward payouts should not punish low rest. Mini-games already drain rest,
+  // Resolve "condition" for reward scaling.
+  // This is a composite state derived from health, hunger, and happiness.
+  // Rest is intentionally ignored because mini-games already consume it.
   // and pass-out/autosleep handles exhaustion separately.
   if (pet.health <= 60)
     return MOOD_SICK;
@@ -109,9 +111,9 @@ static PetMood mgRewardMoodIgnoringRest()
   return MOOD_HAPPY;
 }
 
-static uint32_t mgXpForMoodWin(PetMood mood)
+static uint32_t mgXpForConditionWin(PetMood condition)
 {
-  switch (mood)
+  switch (condition)
   {
   case MOOD_HAPPY:
     return 50;
@@ -219,12 +221,12 @@ static const char *mgItemName(ItemType t)
   }
 }
 
-static int rollMiniGameInfReward(PetMood mood)
+static int rollMiniGameInfRewardForCondition(PetMood condition)
 {
   int minReward = 5;
   int maxReward = 12;
 
-  switch (mood)
+  switch (condition)
   {
   case MOOD_HAPPY:
     minReward = 18;
@@ -393,12 +395,12 @@ void mgApplyResultAndShowReward(bool won)
 
   if (won)
   {
-    const PetMood mood = mgRewardMoodIgnoringRest();
-    const uint32_t xp = mgXpForMoodWin(mood);
+    const PetMood condition = mgRewardCondition();
+    const uint32_t xp = mgXpForConditionWin(condition);
 
     pet.addXP(xp);
 
-    const int infReward = rollMiniGameInfReward(mood);
+    const int infReward = rollMiniGameInfRewardForCondition(condition);
     addInf(infReward);
 
     pet.happiness = constrain(pet.happiness + 5, 0, 100);
@@ -409,18 +411,19 @@ void mgApplyResultAndShowReward(bool won)
     if (wonItem)
     {
       const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +5\nRandom Reward: %s +1", (unsigned long)xp,
-               infReward, (nm && nm[0]) ? nm : "ITEM");
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +5\nRandom Reward: %s +1\n-5 Rest",
+               (unsigned long)xp, infReward, (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +5", (unsigned long)xp, infReward);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You win! XP +%lu  INF +%d  MOOD +5\n-5 Rest", (unsigned long)xp,
+               infReward);
     }
   }
   else
   {
     pet.addXP(5);
-    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5");
+    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose!\n-5 Rest  +5 XP");
   }
 
   uint8_t repeatStreak = 0;
