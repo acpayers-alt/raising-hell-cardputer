@@ -755,7 +755,10 @@ void appMainLoopTick()
   else
   {
     if (hasUserActivity(input))
+    {
       noteUserActivity();
+      anomalyNotifyUserActivity(now);
+    }
 
     // Non-pet settings-owned flows should eventually unwind back to PET.
     // Keep this separate from Auto Screen / Auto Clock so menus don't just sit forever.
@@ -841,8 +844,10 @@ void appMainLoopTick()
       return;
     }
 
-    if (input.upOnce || input.downOnce || input.selectOnce || input.encoderPressOnce || (input.encoderDelta != 0))
+    if (input.upOnce || input.downOnce || input.leftOnce || input.rightOnce || input.selectOnce || input.menuOnce ||
+        input.escOnce || input.encoderPressOnce || input.encoderDelta != 0)
     {
+      anomalyNotifyUserActivity(now);
       requestUIRedraw();
     }
 
@@ -1247,7 +1252,7 @@ void appMainLoopTick()
     }
 
     anomalyTick(now);
-    
+
     sleepAnimHeartbeat(now);
     sleepMiniStatsHeartbeat(now);
   }

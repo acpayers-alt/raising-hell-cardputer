@@ -31,6 +31,8 @@ AnomalyType s_type = AnomalyType::Scanline;
 uint32_t s_untilMs = 0;
 uint32_t s_nextCheckMs = 0;
 uint32_t s_cooldownUntilMs = 0;
+uint32_t s_recentActivityUntilMs = 0;
+uint32_t s_earliestActivityAnomalyMs = 0;
 uint8_t s_frame = 0;
 
 constexpr uint32_t kCheckIntervalMs = 3000;
@@ -45,7 +47,12 @@ bool uiAllowsAnomaly(UIState s)
 {
   switch (s)
   {
-  case UIState::PET_SCREEN:
+  // Core pet + tabbed experience
+  case UIState::PET_SCREEN:     // covers stats/feed/play in your current routing
+  case UIState::PET_SLEEPING:
+  case UIState::SLEEP_MENU:
+  case UIState::INVENTORY:
+  case UIState::SHOP:
   case UIState::CLOCK_MODE:
     return true;
 
@@ -184,6 +191,16 @@ bool anomalyActive()
 #endif
 }
 
+void anomalyNotifyUserActivity(uint32_t nowMs)
+{
+#if RH_ANOMALY_TEASER_ENABLED
+  s_recentActivityUntilMs = nowMs + 45000UL;
+  s_earliestActivityAnomalyMs = nowMs + 2500UL;
+#else
+  (void)nowMs;
+#endif
+}
+
 void anomalyTick(uint32_t nowMs)
 {
 #if RH_ANOMALY_TEASER_ENABLED
@@ -209,7 +226,14 @@ void anomalyTick(uint32_t nowMs)
   if ((int32_t)(nowMs - s_cooldownUntilMs) < 0)
     return;
 
-  if (!hardSafetyAllowsAnomaly())
+    if (!hardSafetyAllowsAnomaly())
+    return;
+
+  // Only roll shortly after real player activity, but never on the exact input moment.
+  if ((int32_t)(nowMs - s_recentActivityUntilMs) >= 0)
+    return;
+
+  if ((int32_t)(nowMs - s_earliestActivityAnomalyMs) < 0)
     return;
 
   if (random(kBaseChanceDenom) != 0)
