@@ -3,18 +3,8 @@
 #include "display.h"
 #include "graphics_sd_draw.h"
 #include "sdcard.h"
+#include "ui_icons.h"
 
-static const char *PATH_INF_COIN = "/raising_hell/graphics/ui/icons/inf_coin.png";
-static const char *PATH_INF_TOPBAR = "/raising_hell/graphics/ui/icons/inf_icon.png";
-static const char *PATH_LIFE_ICON = "/raising_hell/graphics/ui/icons/life_icon.png";
-static const char *PATH_FOOD_ICON = "/raising_hell/graphics/ui/icons/food_icon.png";
-static const char *PATH_MOOD_ICON = "/raising_hell/graphics/ui/icons/mood_icon.png";
-static const char *PATH_REST_ICON = "/raising_hell/graphics/ui/icons/rest_icon.png";
-
-static constexpr int HUD_HEADER_ICON_W = 12;
-static constexpr int HUD_HEADER_ICON_H = 12;
-static constexpr int HUD_STAT_ICON_W = 10;
-static constexpr int HUD_STAT_ICON_H = 10;
 static constexpr uint16_t HUD_ICON_TRANSPARENT = 0xF81F;
 
 static M5Canvas s_hudLifeIconSmall(&spr);
@@ -23,13 +13,6 @@ static M5Canvas s_hudCoinIconSmall(&spr);
 static bool s_hudCoinIconSmallReady = false;
 static M5Canvas s_hudInfTopBarIcon(&spr);
 static bool s_hudInfTopBarIconReady = false;
-
-static M5Canvas s_hudFoodIcon(&spr);
-static bool s_hudFoodIconReady = false;
-static M5Canvas s_hudMoodIcon(&spr);
-static bool s_hudMoodIconReady = false;
-static M5Canvas s_hudRestIcon(&spr);
-static bool s_hudRestIconReady = false;
 
 static bool ensureHudIconCache(M5Canvas &canvas, bool &ready, const char *path, int w, int h, uint16_t fillColor)
 {
@@ -68,49 +51,28 @@ bool drawHudIconCached(const char *path, int x, int y)
   bool useColorKey = true;
   uint16_t fillColor = HUD_ICON_TRANSPARENT;
 
-  if (path == PATH_LIFE_ICON)
+  if (path == LIFE_ICON_PATH)
   {
     canvas = &s_hudLifeIconSmall;
     ready = &s_hudLifeIconSmallReady;
     w = HUD_HEADER_ICON_W;
     h = HUD_HEADER_ICON_H;
   }
-  else if (path == PATH_INF_COIN)
+  else if (path == INF_COIN_ICON_PATH)
   {
     canvas = &s_hudCoinIconSmall;
     ready = &s_hudCoinIconSmallReady;
     w = HUD_HEADER_ICON_W;
     h = HUD_HEADER_ICON_H;
   }
-  else if (path == PATH_INF_TOPBAR)
+  else if (path == INF_ICON_PATH)
   {
     canvas = &s_hudInfTopBarIcon;
     ready = &s_hudInfTopBarIconReady;
-    w = 8;
-    h = 11;
+    w = INF_ICON_W;
+    h = INF_ICON_H;
     useColorKey = false;
     fillColor = TFT_BLACK;
-  }
-  else if (path == PATH_FOOD_ICON)
-  {
-    canvas = &s_hudFoodIcon;
-    ready = &s_hudFoodIconReady;
-    w = HUD_STAT_ICON_W;
-    h = HUD_STAT_ICON_H;
-  }
-  else if (path == PATH_MOOD_ICON)
-  {
-    canvas = &s_hudMoodIcon;
-    ready = &s_hudMoodIconReady;
-    w = HUD_STAT_ICON_W;
-    h = HUD_STAT_ICON_H;
-  }
-  else if (path == PATH_REST_ICON)
-  {
-    canvas = &s_hudRestIcon;
-    ready = &s_hudRestIconReady;
-    w = HUD_STAT_ICON_W;
-    h = HUD_STAT_ICON_H;
   }
 
   if (canvas && ready && ensureHudIconCache(*canvas, *ready, path, w, h, fillColor))
@@ -139,13 +101,4 @@ void graphicsReleaseHudIconCaches()
 
   s_hudInfTopBarIcon.deleteSprite();
   s_hudInfTopBarIconReady = false;
-
-  s_hudFoodIcon.deleteSprite();
-  s_hudFoodIconReady = false;
-
-  s_hudMoodIcon.deleteSprite();
-  s_hudMoodIconReady = false;
-
-  s_hudRestIcon.deleteSprite();
-  s_hudRestIconReady = false;
 }

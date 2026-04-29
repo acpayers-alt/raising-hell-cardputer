@@ -2,11 +2,12 @@
 
 #include "app_state.h"
 #include "display.h"
-#include "graphics_shared_utils.h"
 #include "graphics_hud_icons.h"
+#include "graphics_shared_utils.h"
 #include "pet.h"
 #include "system_status_state.h"
 #include "time_state.h"
+#include "ui_icons.h"
 #include "wifi_time.h"
 
 extern Pet pet;
@@ -188,11 +189,8 @@ void drawTopBar()
 
   const unsigned int inf = (unsigned int)pet.inf;
 
-  static const char *TOP_BAR_INF_ICON = "/raising_hell/graphics/ui/icons/inf_icon.png";
-  static constexpr int TOP_BAR_INF_ICON_W = 8;
-  static constexpr int TOP_BAR_INF_ICON_H = 11;
   static constexpr int TOP_BAR_INF_ICON_GAP = 1;
-  
+
   char infBuf[16];
   snprintf(infBuf, sizeof(infBuf), "%u", inf);
 
@@ -203,38 +201,37 @@ void drawTopBar()
 
   const int nameW = spr.textWidth(nameBuf);
   const int infW = spr.textWidth(infBuf);
-  const int iconY = (TOP_BAR_H - TOP_BAR_INF_ICON_H) / 2;
+  const int iconY = (TOP_BAR_H - INF_ICON_H) / 2;
 
-  const int fullW = nameW + TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP + infW;
-  const int shortW = TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP + infW;
+  const int fullW = nameW + INF_ICON_W + TOP_BAR_INF_ICON_GAP + infW;
+  const int shortW = INF_ICON_W + TOP_BAR_INF_ICON_GAP + infW;
 
   spr.setTextDatum(TL_DATUM);
 
-if (padL + fullW <= minRight)
-{
-  int x = padL;
+  if (padL + fullW <= minRight)
+  {
+    int x = padL;
 
-  // name
-  spr.drawString(nameBuf, x, titleY);
-  x += nameW;
+    // name
+    spr.drawString(nameBuf, x, titleY);
+    x += nameW;
 
-  // icon
-  const int iconX = x;
-  drawHudIconCached(TOP_BAR_INF_ICON, iconX, iconY);
+    // icon
+    const int iconX = x;
+    drawHudIconCached(INF_ICON_PATH, iconX, iconY);
+    // number (locked to icon)
+    const int infX = iconX + INF_ICON_W + TOP_BAR_INF_ICON_GAP;
+    spr.drawString(infBuf, infX, titleY);
+  }
+  else if (padL + shortW <= minRight)
+  {
+    const int iconX = padL;
 
-  // number (locked to icon)
-  const int infX = iconX + TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP;
-  spr.drawString(infBuf, infX, titleY);
-}
-else if (padL + shortW <= minRight)
-{
-  const int iconX = padL;
+    drawHudIconCached(INF_ICON_PATH, iconX, iconY);
 
-  drawHudIconCached(TOP_BAR_INF_ICON, iconX, iconY);
-
-  const int infX = iconX + TOP_BAR_INF_ICON_W + TOP_BAR_INF_ICON_GAP;
-  spr.drawString(infBuf, infX, titleY);
-}
+    const int infX = iconX + INF_ICON_W + TOP_BAR_INF_ICON_GAP;
+    spr.drawString(infBuf, infX, titleY);
+  }
 
   spr.setTextDatum(TL_DATUM);
 }
