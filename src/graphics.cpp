@@ -42,6 +42,7 @@
 // -----------------------------------------------------------------------------
 // Game Systems
 // -----------------------------------------------------------------------------
+#include "anomaly_manager.h"
 #include "inventory.h"
 #include "pet.h"
 #include "pet_age.h"
@@ -589,7 +590,8 @@ void renderUI()
 
   uiDrawAlertScreenFlashOverlay();
   uiDrawToastOverlay();
-
+  anomalyDrawOverlay();
+  
   spr.pushSprite(0, 0);
 
   bgDrawnForState = true;

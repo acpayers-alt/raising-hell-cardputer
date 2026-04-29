@@ -58,6 +58,7 @@
 // Gameplay / simulation
 // -----------------------------------------------------------------------------
 #include "anim_engine.h"
+#include "anomaly_manager.h"
 #include "death_state.h"
 #include "evolution_flow.h"
 #include "game_options_state.h"
@@ -1245,6 +1246,8 @@ void appMainLoopTick()
       animTick();
     }
 
+    anomalyTick(now);
+    
     sleepAnimHeartbeat(now);
     sleepMiniStatsHeartbeat(now);
   }
