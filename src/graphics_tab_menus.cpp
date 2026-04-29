@@ -316,7 +316,7 @@ void drawShopScreen()
     eff = "+30 Energy";
     break;
   case ITEM_RITUAL_CHALK:
-    eff = "+30 HP";
+    eff = "Full Health";
     break;
   case ITEM_ELDRITCH_EYE:
     eff = "Evolve Now";
@@ -702,37 +702,13 @@ void drawInventoryMenu()
   const uint16_t evoLevel = pet.nextEvoMinLevel(); // 0 if no further evolution
   const bool evoReady = (evoLevel != 0) && pet.canEvolveNext();
 
-  int dhunger = 0;
-  int dmood = 0; // happiness
-  int drest = 0; // energy
-  int dhp = 0;
+  const ItemDeltas deltas = inventoryPreviewDeltas(hoveredType);
 
-  // Match the real effects in applyItemMeta() / inventoryUseOne()
-  switch (hoveredType)
-  {
-  case ITEM_SOUL_FOOD:
-    dhunger = 30;
-    dmood = 10;
-    drest = 10;
-    break;
-
-  case ITEM_CURSED_RELIC:
-    dmood = 30;
-    break;
-
-  case ITEM_DEMON_BONE:
-    drest = 30;
-    break;
-
-  case ITEM_RITUAL_CHALK:
-    dhp = 30;
-    break;
-
-  case ITEM_ELDRITCH_EYE:
-  default:
-    break;
-  }
-
+  const int dhunger = deltas.hunger;
+  const int dmood = deltas.happiness;
+  const int drest = deltas.energy;
+  const int dhp = deltas.health;
+  
   // Draw stats as integers, optionally with "+X" appended
   const int pad = 8;
   int x = panelX + pad;
