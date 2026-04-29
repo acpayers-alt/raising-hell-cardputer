@@ -11,6 +11,7 @@
 #include "wifi_setup_state.h"
 #include "wifi_time.h"
 #include "graphics_nonpet_bg.h"
+#include "graphics_shared_utils.h"
 
 extern M5Canvas spr;
 
@@ -39,22 +40,16 @@ void drawWifiSetupScreen()
 
     const bool hasResults = (g_wifi.scanCount > 0);
     const int totalItems = hasResults ? (g_wifi.scanCount + 2) : 2;
+    constexpr int MAX_VISIBLE = 4;
     const int itemH = 20;
-    const int gap = 5;
-    const int maxVisible = 5;
+    const int gap = 6;
 
     int start = 0;
-    int visCount = totalItems;
-    if (visCount > maxVisible)
-      visCount = maxVisible;
-
-    if (g_wifi.scanIndex < start)
-      start = g_wifi.scanIndex;
-    if (g_wifi.scanIndex >= start + visCount)
-      start = g_wifi.scanIndex - visCount + 1;
+    int visCount = 0;
+    listWindow(totalItems, g_wifi.scanIndex, MAX_VISIBLE, start, visCount);
 
     const int totalH = visCount * itemH + (visCount - 1) * gap;
-    const int startY = contentY + (contentH - totalH) / 2;
+    const int startY = contentY + (contentH - totalH) / 2 + 1;
 
     const int boxW = (SCREEN_W * 3) / 4;
     const int boxX = (SCREEN_W - boxW) / 2;
@@ -104,6 +99,23 @@ void drawWifiSetupScreen()
       const int ty = y + (itemH - th) / 2;
       spr.drawString(line, boxX + 8, ty);
     }
+
+    spr.setTextFont(1);
+    spr.setTextSize(1);
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.setTextDatum(TL_DATUM);
+
+    const int arrowX = boxX + boxW + 6;
+    const int arrowUpY = startY - 2;
+    const int arrowDownY = startY + totalH - 10;
+
+    if (start > 0)
+      spr.drawString("^", arrowX, arrowUpY);
+    if (start + visCount < totalItems)
+      spr.drawString("v", arrowX, arrowDownY);
+
+    spr.setTextFont(2);
+    spr.setTextDatum(TL_DATUM);
 
     return;
   }

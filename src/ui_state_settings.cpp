@@ -93,7 +93,7 @@ void uiSettingsHandle(InputState &input)
     closeSettingsAndReturn(input);
     clearInputLatch();
   };
-  
+
   int move = input.encoderDelta;
   if (input.upOnce)
     move = -1;
@@ -104,7 +104,8 @@ void uiSettingsHandle(InputState &input)
   {
     if (input.menuOnce || input.escOnce)
     {
-      g_settingsFlow.settingsPage = SettingsPage::TOP;
+      g_settingsFlow.settingsPage = SettingsPage::SYSTEM;
+      g_app.systemSettingsIndex = 2; // System Status row
       requestUIRedraw();
       playBeep();
       clearInputLatch();
@@ -148,7 +149,7 @@ void uiSettingsHandle(InputState &input)
     if (consumed)
       return;
   }
-      
+
   if (input.menuOnce || input.escOnce)
   {
     if (g_settingsFlow.settingsPage == SettingsPage::STORED_NETWORKS)
@@ -171,7 +172,7 @@ void uiSettingsHandle(InputState &input)
     exitSettings();
     return;
   }
-  
+
   if (UiSettingsMenu::Handle(input, move))
   {
     return;
