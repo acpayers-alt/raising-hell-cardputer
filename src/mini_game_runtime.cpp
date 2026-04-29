@@ -401,7 +401,7 @@ void mgApplyResultAndShowReward(bool won)
     const int infReward = rollMiniGameInfReward(mood);
     addInf(infReward);
 
-    pet.happiness = constrain(pet.happiness + 20, 0, 100);
+    pet.happiness = constrain(pet.happiness + 5, 0, 100);
 
     ItemType rewardType = ITEM_NONE;
     const bool wonItem = tryAwardWinItem_1in4(&rewardType);
@@ -409,19 +409,18 @@ void mgApplyResultAndShowReward(bool won)
     if (wonItem)
     {
       const char *nm = mgItemName(rewardType);
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +20\nRandom Reward: %s +1", (unsigned long)xp,
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +5\nRandom Reward: %s +1", (unsigned long)xp,
                infReward, (nm && nm[0]) ? nm : "ITEM");
     }
     else
     {
-      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +20", (unsigned long)xp, infReward);
+      snprintf(s_rewardMsg, sizeof(s_rewardMsg), "XP +%lu  INF +%d  MOOD +5", (unsigned long)xp, infReward);
     }
   }
   else
   {
     pet.addXP(5);
-    pet.happiness = constrain(pet.happiness + 10, 0, 100);
-    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5  MOOD +10");
+    snprintf(s_rewardMsg, sizeof(s_rewardMsg), "You lose! XP +5");
   }
 
   uint8_t repeatStreak = 0;
