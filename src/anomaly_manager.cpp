@@ -35,13 +35,12 @@ uint32_t s_recentActivityUntilMs = 0;
 uint32_t s_earliestActivityAnomalyMs = 0;
 uint8_t s_frame = 0;
 
-constexpr uint32_t kCheckIntervalMs = 3000;
-constexpr uint32_t kCooldownMs = 5000;
-constexpr uint32_t kVisualMs = 90UL;
-
 // About 1 in 220 checks. At 45s/check, average is roughly once per 2.75 hours
 // while sitting in eligible states.
-constexpr long kBaseChanceDenom = 5;
+constexpr long kBaseChanceDenom = 220;
+constexpr uint32_t kCheckIntervalMs = 45000UL;
+constexpr uint32_t kCooldownMs = 45UL * 60UL * 1000UL;
+constexpr uint32_t kVisualMs = 90UL;
 
 bool uiAllowsAnomaly(UIState s)
 {
