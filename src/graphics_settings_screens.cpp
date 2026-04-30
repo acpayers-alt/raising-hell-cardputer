@@ -483,6 +483,22 @@ static void drawGameOptionsMenu()
     spr.setTextColor(textCol, fill);
     spr.drawString(labels[i], boxX + 10, ty);
   }
+
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.setTextDatum(TL_DATUM);
+
+  const int arrowX = boxX + boxW + 6;
+  const int arrowUpY = startY - 2;
+  const int arrowDownY = startY + totalH - 10;
+
+  if (start > 0)
+    spr.drawString("^", arrowX, arrowUpY);
+  if (start + visCount < totalItems)
+    spr.drawString("v", arrowX, arrowDownY);
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 static void drawAutoScreenPickerMenu()

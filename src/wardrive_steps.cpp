@@ -10,6 +10,12 @@
 #include "inventory.h"
 #include "motion.h"
 #include "save_manager.h"
+#include "sdcard.h"
+#include <SD.h>
+
+static const char *WARDRIVE_PATH = "/raising_hell/save/warwalk.bin";
+static uint32_t s_lastPersistMs = 0;
+static uint32_t s_lastPersistSteps = 0;
 
 static constexpr uint32_t kSampleScreenOnMs = 50;
 static constexpr uint32_t kSamplePocketModeMs = 120;
@@ -39,6 +45,81 @@ static int s_dayKey = -1;
 static uint16_t s_pendingHits = 0;
 static int s_pendingInf = 0;
 static ItemType s_pendingItem = ITEM_NONE;
+
+struct WarwalkPersist
+{
+  uint32_t magic;
+  int32_t dayKey;
+  uint32_t stepsToday;
+  uint32_t hitsToday;
+  uint16_t stepsTowardRoll;
+};
+
+static constexpr uint32_t WARWALK_MAGIC = 0x5757414C; // 'WWAL'
+
+static void loadWarwalkPersist()
+{
+  if (!g_sdReady || !SD.exists(WARDRIVE_PATH))
+    return;
+
+  File f = SD.open(WARDRIVE_PATH, FILE_READ);
+  if (!f || f.size() != sizeof(WarwalkPersist))
+  {
+    if (f)
+      f.close();
+    return;
+  }
+
+  WarwalkPersist p{};
+  const int r = f.read((uint8_t *)&p, sizeof(p));
+  f.close();
+
+  if (r != (int)sizeof(p) || p.magic != WARWALK_MAGIC)
+    return;
+
+  s_dayKey = p.dayKey;
+  s_stepsToday = p.stepsToday;
+  s_hitsToday = p.hitsToday;
+  s_stepsTowardRoll = p.stepsTowardRoll;
+
+  Serial.printf("[WARWALK] loaded day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
+                (unsigned long)s_hitsToday);
+}
+
+static void saveWarwalkPersist(bool force)
+{
+  if (!g_sdReady)
+    return;
+
+  const uint32_t now = millis();
+
+  if (!force)
+  {
+    if ((uint32_t)(now - s_lastPersistMs) < 30000)
+      return;
+
+    if ((s_stepsToday - s_lastPersistSteps) < 10)
+      return;
+  }
+
+  WarwalkPersist p{};
+  p.magic = WARWALK_MAGIC;
+  p.dayKey = s_dayKey;
+  p.stepsToday = s_stepsToday;
+  p.hitsToday = s_hitsToday;
+  p.stepsTowardRoll = s_stepsTowardRoll;
+
+  File f = SD.open(WARDRIVE_PATH, FILE_WRITE);
+  if (!f)
+    return;
+
+  f.write((const uint8_t *)&p, sizeof(p));
+  f.flush();
+  f.close();
+
+  s_lastPersistMs = now;
+  s_lastPersistSteps = s_stepsToday;
+}
 
 static bool wardriveStepTrackingAllowed()
 {
@@ -94,7 +175,8 @@ static void resetIfNewDay()
     s_pendingInf = 0;
     s_pendingItem = ITEM_NONE;
     s_haveBaseline = false;
-
+    saveWarwalkPersist(true);
+    
     Serial.println("[WARDRIVE] daily counter reset");
   }
 }
@@ -186,6 +268,14 @@ void wardriveStepsTick(uint32_t nowMs)
 {
   resetIfNewDay();
 
+  static bool s_loadedPersist = false;
+  if (!s_loadedPersist)
+  {
+    s_loadedPersist = true;
+    loadWarwalkPersist();
+    resetIfNewDay();
+  }
+
   // War Walking is always active under the normal safety/state gates.
   // The Game Options "Step Counter" toggle only controls badge visibility.
   if (!motionAvailable)
@@ -253,8 +343,18 @@ void wardriveStepsTick(uint32_t nowMs)
   s_stepQuietSinceMs = 0;
   s_lastStepMs = nowMs;
 
-  if (s_stepsToday < UINT32_MAX)
-    s_stepsToday++;
+  static float s_stepAccumulator = 0.0f;
+  static constexpr float kStepScale = 1.7f;
+
+  s_stepAccumulator += kStepScale;
+
+  while (s_stepAccumulator >= 1.0f)
+  {
+    if (s_stepsToday < UINT32_MAX)
+      s_stepsToday++;
+
+    s_stepAccumulator -= 1.0f;
+  }
 
   if (s_stepsTowardRoll < UINT16_MAX)
     s_stepsTowardRoll++;
@@ -264,6 +364,7 @@ void wardriveStepsTick(uint32_t nowMs)
     s_stepsTowardRoll = 0;
     rollWardrive();
   }
+  saveWarwalkPersist(false);
 }
 
 void wardriveStepsResetRuntime()
@@ -276,6 +377,9 @@ void wardriveStepsResetRuntime()
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
   s_pendingHits = 0;
+  s_stepsToday = 0;
+  s_stepQuietSinceMs = 0;
+  saveWarwalkPersist(true);
 }
 
 uint32_t wardriveStepsToday()
