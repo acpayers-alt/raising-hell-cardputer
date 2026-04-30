@@ -33,6 +33,8 @@ uint32_t s_nextCheckMs = 0;
 uint32_t s_cooldownUntilMs = 0;
 uint32_t s_recentActivityUntilMs = 0;
 uint32_t s_earliestActivityAnomalyMs = 0;
+bool s_forcePending = false;
+uint32_t s_forcePendingUntilMs = 0;
 uint8_t s_frame = 0;
 
 // About 1 in 220 checks. At 45s/check, average is roughly once per 2.75 hours
@@ -200,6 +202,40 @@ void anomalyNotifyUserActivity(uint32_t nowMs)
 #endif
 }
 
+void anomalyRequestForceAfterReturn()
+{
+#if RH_ANOMALY_TEASER_ENABLED
+  const uint32_t now = millis();
+
+  s_forcePending = true;
+  s_forcePendingUntilMs = now + 10000UL;
+
+  // Delay before anomaly can fire (feels more natural)
+  s_earliestActivityAnomalyMs = now + 3000UL;
+
+  Serial.println("[ANOMALY] force pending (delayed)");
+#else
+  Serial.println("[ANOMALY] disabled");
+#endif
+}
+
+bool anomalyForceTrigger()
+{
+#if RH_ANOMALY_TEASER_ENABLED
+  if (!hardSafetyAllowsAnomaly())
+  {
+    Serial.println("[ANOMALY] force blocked by safety gate");
+    return false;
+  }
+
+  triggerAnomalyEvent(millis());
+  return true;
+#else
+  Serial.println("[ANOMALY] disabled");
+  return false;
+#endif
+}
+
 void anomalyTick(uint32_t nowMs)
 {
 #if RH_ANOMALY_TEASER_ENABLED
@@ -215,6 +251,25 @@ void anomalyTick(uint32_t nowMs)
     ++s_frame;
     requestUIRedraw();
     return;
+  }
+
+  if (s_forcePending)
+  {
+    // Wait a short delay after console return so it doesn't feel immediate
+    if ((int32_t)(nowMs - s_earliestActivityAnomalyMs) < 0)
+      return;
+  
+    if ((int32_t)(nowMs - s_forcePendingUntilMs) >= 0)
+    {
+      s_forcePending = false;
+      Serial.println("[ANOMALY] force expired");
+    }
+    else if (hardSafetyAllowsAnomaly())
+    {
+      s_forcePending = false;
+      triggerAnomalyEvent(nowMs);
+      return;
+    }
   }
 
   if ((int32_t)(nowMs - s_nextCheckMs) < 0)
