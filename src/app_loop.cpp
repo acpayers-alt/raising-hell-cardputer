@@ -766,6 +766,7 @@ void appMainLoopTick()
     {
       noteUserActivity();
       anomalyNotifyUserActivity(now);
+      wardriveStepsNotifyUserActivity();
     }
 
     // Non-pet settings-owned flows should eventually unwind back to PET.

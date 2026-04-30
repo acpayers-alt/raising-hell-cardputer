@@ -435,14 +435,17 @@ static void drawGameOptionsMenu()
   char passiveXpLine[32];
   snprintf(passiveXpLine, sizeof(passiveXpLine), "Passive XP: %s", passiveXpEnabled ? "ON" : "OFF");
 
+  char stepCounterLine[32];
+  snprintf(stepCounterLine, sizeof(stepCounterLine), "Step Counter: %s", isWardrivingEnabled() ? "ON" : "OFF");
+
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
 
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {decayLine, passiveXpLine, deathLine, ledLine};
-  const int totalItems = 4;
+  const char *labels[] = {decayLine, passiveXpLine, stepCounterLine, deathLine, ledLine};
+  const int totalItems = 5;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
 
@@ -753,16 +756,16 @@ static void drawStoredNetworksMenu()
   if (totalItems <= 0)
   {
     spr.setTextDatum(TC_DATUM);
-  
+
     spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     spr.drawString("No stored networks", SCREEN_W / 2, contentY + 36);
-  
+
     spr.drawString("ESC to return", SCREEN_W / 2, contentY + 62);
-  
+
     spr.setTextDatum(TL_DATUM);
     return;
   }
-  
+
   g_wifi.storedNetworkIndex = clampi(g_wifi.storedNetworkIndex, 0, totalItems - 1);
 
   constexpr int MAX_VISIBLE = 4;

@@ -1,6 +1,7 @@
 #include "wardrive_steps.h"
 
 #include <math.h>
+#include <time.h>
 
 #include "app_state.h"
 #include "currency.h"
@@ -12,27 +13,32 @@
 
 static constexpr uint32_t kSampleScreenOnMs = 50;
 static constexpr uint32_t kSamplePocketModeMs = 120;
-static constexpr uint32_t kStepCooldownMs = 340;
-
-static constexpr int kStepDeltaMg = 155;
-static constexpr int kStepsPerWardriveRoll = 18;
-static constexpr int kHitChancePct = 24;
-static constexpr int kRareItemChancePct = 5;
+static constexpr int kStepDeltaMg = 320;
+static constexpr uint32_t kStepCooldownMs = 680;
+static constexpr uint16_t kStepsPerWardriveRoll = 18;
+static constexpr uint8_t kHitChancePct = 22;
+static constexpr uint8_t kRareItemChancePct = 5;
+static bool s_stepArmed = true;
+static uint32_t s_stepQuietSinceMs = 0;
 
 static uint32_t s_lastSampleMs = 0;
 static uint32_t s_lastStepMs = 0;
 
-static uint32_t s_totalSteps = 0;
-static uint32_t s_sessionSteps = 0;
-static uint32_t s_stepsTowardRoll = 0;
-static uint32_t s_sessionHits = 0;
+static uint32_t s_stepsToday = 0;
+static uint32_t s_hitsToday = 0;
+static uint16_t s_stepsTowardRoll = 0;
+static constexpr int kStepHighMg = 520;
+static constexpr int kStepLowMg = 100;
+static constexpr uint32_t kStepRearmQuietMs = 120;
 
 static int s_baselineMg = 1000;
 static bool s_haveBaseline = false;
 
+static int s_dayKey = -1;
+
+static uint16_t s_pendingHits = 0;
 static int s_pendingInf = 0;
 static ItemType s_pendingItem = ITEM_NONE;
-static uint8_t s_pendingHits = 0;
 
 static bool wardriveStepTrackingAllowed()
 {
@@ -42,6 +48,7 @@ static bool wardriveStepTrackingAllowed()
   case UIState::PET_SLEEPING:
   case UIState::CLOCK_MODE:
   case UIState::TITLE_MENU:
+  case UIState::SETTINGS:
   case UIState::INVENTORY:
   case UIState::SHOP:
   case UIState::SLEEP_MENU:
@@ -49,6 +56,46 @@ static bool wardriveStepTrackingAllowed()
 
   default:
     return false;
+  }
+}
+
+static int currentLocalDayKey()
+{
+  const time_t now = time(nullptr);
+  if (now < 1700000000)
+    return -1;
+
+  struct tm lt;
+  if (!localtime_r(&now, &lt))
+    return -1;
+
+  return ((lt.tm_year + 1900) * 1000) + lt.tm_yday;
+}
+
+static void resetIfNewDay()
+{
+  const int dayKey = currentLocalDayKey();
+  if (dayKey < 0)
+    return;
+
+  if (s_dayKey < 0)
+  {
+    s_dayKey = dayKey;
+    return;
+  }
+
+  if (dayKey != s_dayKey)
+  {
+    s_dayKey = dayKey;
+    s_stepsToday = 0;
+    s_hitsToday = 0;
+    s_stepsTowardRoll = 0;
+    s_pendingHits = 0;
+    s_pendingInf = 0;
+    s_pendingItem = ITEM_NONE;
+    s_haveBaseline = false;
+
+    Serial.println("[WARDRIVE] daily counter reset");
   }
 }
 
@@ -69,41 +116,13 @@ static ItemType randomWardriveItem()
 
 static void queueWardriveNotice(int infReward, ItemType itemReward)
 {
-  if (s_pendingHits < 255)
+  if (s_pendingHits < 65535)
     s_pendingHits++;
 
   s_pendingInf += infReward;
 
   if (itemReward != ITEM_NONE)
     s_pendingItem = itemReward;
-}
-
-static void flushWardriveNoticeIfVisible()
-{
-  if (!isScreenOn())
-    return;
-
-  if (s_pendingHits == 0 && s_pendingInf == 0 && s_pendingItem == ITEM_NONE)
-    return;
-
-  char msg[96];
-
-  if (s_pendingItem != ITEM_NONE)
-  {
-    const char *itemName = g_app.inventory.getItemLabelForType(s_pendingItem);
-    snprintf(msg, sizeof(msg), "Wardrive hit!\nINF +%d\n%s +1", s_pendingInf,
-             (itemName && itemName[0]) ? itemName : "ITEM");
-  }
-  else
-  {
-    snprintf(msg, sizeof(msg), "Wardrive hit!\nINF +%d", s_pendingInf);
-  }
-
-  ui_showMessage(msg);
-
-  s_pendingHits = 0;
-  s_pendingInf = 0;
-  s_pendingItem = ITEM_NONE;
 }
 
 static void awardWardriveHit()
@@ -117,15 +136,16 @@ static void awardWardriveHit()
   {
     itemReward = randomWardriveItem();
     g_app.inventory.addItem(itemReward, 1);
+    saveManagerMarkDirty();
   }
 
-  if (s_sessionHits < UINT32_MAX)
-    s_sessionHits++;
+  if (s_hitsToday < UINT32_MAX)
+    s_hitsToday++;
 
   queueWardriveNotice(infReward, itemReward);
 
-  Serial.printf("[WARDRIVE] fictional hit steps=%lu sessionHits=%lu INF=+%d item=%d\n", (unsigned long)s_sessionSteps,
-                (unsigned long)s_sessionHits, infReward, (int)itemReward);
+  Serial.printf("[WARDRIVE] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n", (unsigned long)s_stepsToday,
+                (unsigned long)s_hitsToday, infReward, (int)itemReward);
 }
 
 static void rollWardrive()
@@ -134,16 +154,47 @@ static void rollWardrive()
     awardWardriveHit();
 }
 
+void wardriveStepsNotifyUserActivity()
+{
+  if (!isScreenOn())
+    return;
+
+  if (s_pendingHits == 0)
+    return;
+
+  char msg[96];
+
+  if (s_pendingItem != ITEM_NONE)
+  {
+    const char *itemName = g_app.inventory.getItemLabelForType(s_pendingItem);
+    snprintf(msg, sizeof(msg), "Wardriving hit!\n%u signals\nINF +%d\n%s +1", (unsigned)s_pendingHits, s_pendingInf,
+             (itemName && itemName[0]) ? itemName : "ITEM");
+  }
+  else
+  {
+    snprintf(msg, sizeof(msg), "Wardriving hit!\n%u signals\nINF +%d", (unsigned)s_pendingHits, s_pendingInf);
+  }
+
+  ui_showMessage(msg);
+
+  s_pendingHits = 0;
+  s_pendingInf = 0;
+  s_pendingItem = ITEM_NONE;
+}
+
 void wardriveStepsTick(uint32_t nowMs)
 {
-  flushWardriveNoticeIfVisible();
+  resetIfNewDay();
 
+  // War Walking is always active under the normal safety/state gates.
+  // The Game Options "Step Counter" toggle only controls badge visibility.
   if (!motionAvailable)
     return;
 
   if (!wardriveStepTrackingAllowed())
   {
     s_haveBaseline = false;
+    s_stepArmed = true;
     s_stepsTowardRoll = 0;
     return;
   }
@@ -171,43 +222,70 @@ void wardriveStepsTick(uint32_t nowMs)
   s_baselineMg = ((s_baselineMg * 15) + magMg) / 16;
 
   const int deltaMg = abs(magMg - s_baselineMg);
-  if (deltaMg < kStepDeltaMg)
+
+  // Re-arm only after motion settles. This prevents one bump/wobble
+  // from counting as several steps.
+  if (!s_stepArmed)
+  {
+    if (deltaMg <= kStepLowMg)
+    {
+      if (s_stepQuietSinceMs == 0)
+        s_stepQuietSinceMs = nowMs;
+
+      if ((uint32_t)(nowMs - s_stepQuietSinceMs) >= kStepRearmQuietMs)
+        s_stepArmed = true;
+    }
+    else
+    {
+      s_stepQuietSinceMs = 0;
+    }
+
+    return;
+  }
+
+  if (deltaMg < kStepHighMg)
     return;
 
   if ((uint32_t)(nowMs - s_lastStepMs) < kStepCooldownMs)
     return;
 
+  s_stepArmed = false;
+  s_stepQuietSinceMs = 0;
   s_lastStepMs = nowMs;
 
-  if (s_totalSteps < UINT32_MAX)
-    s_totalSteps++;
-  if (s_sessionSteps < UINT32_MAX)
-    s_sessionSteps++;
+  if (s_stepsToday < UINT32_MAX)
+    s_stepsToday++;
 
-  s_stepsTowardRoll++;
+  if (s_stepsTowardRoll < UINT16_MAX)
+    s_stepsTowardRoll++;
+
   if (s_stepsTowardRoll >= kStepsPerWardriveRoll)
   {
     s_stepsTowardRoll = 0;
     rollWardrive();
   }
-
-  // Do not force immediate SD writes per step. Rewards mark the save dirty;
-  // saveManagerTick() will handle normal persistence.
 }
 
 void wardriveStepsResetRuntime()
 {
   s_lastSampleMs = 0;
   s_lastStepMs = 0;
-  s_sessionSteps = 0;
   s_stepsTowardRoll = 0;
-  s_sessionHits = 0;
+  s_hitsToday = 0;
   s_haveBaseline = false;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
   s_pendingHits = 0;
 }
 
-uint32_t wardriveStepsTotal() { return s_totalSteps; }
-uint32_t wardriveStepsSession() { return s_sessionSteps; }
-uint32_t wardriveHitsSession() { return s_sessionHits; }
+uint32_t wardriveStepsToday()
+{
+  resetIfNewDay();
+  return s_stepsToday;
+}
+
+uint32_t wardriveHitsToday()
+{
+  resetIfNewDay();
+  return s_hitsToday;
+}

@@ -980,14 +980,14 @@ static void removeNamePendingFlag() { clearNamePendingFlag(); }
 // GAME OPTIONS (separate file so we don't break SettingsData)
 // ------------------------------------------------------------
 static const uint32_t GAMEOPT_MAGIC = 0x47504F54; // 'GPOT'
-static const uint16_t GAMEOPT_VERSION = 2;
+static const uint16_t GAMEOPT_VERSION = 3;
 
 struct GameOptionsData
 {
   uint32_t magic;
   uint16_t version;
-  uint8_t decayMode; // 0=Super Slow, 1=Slow, 2=Normal, 3=Fast, 4=Super Fast, 5=Insane
-  uint8_t _pad;      // alignment
+  uint8_t decayMode;
+  uint8_t wardrivingEnabled; // NEW
 };
 
 static GameOptionsData g_gameopt = {GAMEOPT_MAGIC, GAMEOPT_VERSION, 2, 0};
@@ -996,7 +996,8 @@ static void gameoptDefaults()
 {
   g_gameopt.magic = GAMEOPT_MAGIC;
   g_gameopt.version = GAMEOPT_VERSION;
-  g_gameopt.decayMode = 2; // Normal
+  g_gameopt.decayMode = 2;
+  g_gameopt.wardrivingEnabled = 0;
 }
 
 static bool loadGameOptionsFromSD_internal()
@@ -1035,10 +1036,10 @@ static bool loadGameOptionsFromSD_internal()
     return false;
 
   // Accept old version 1 (0=Normal,1=Slow,2=Off) and new version 2 (0..5)
-  if (tmp.version != 1 && tmp.version != GAMEOPT_VERSION)
+  if (tmp.version != 1 && tmp.version != 2 && tmp.version != GAMEOPT_VERSION)
     return false;
 
-  // Migration v1 -> v2
+  // Migration v1 -> v3
   if (tmp.version == 1)
   {
     if (tmp.decayMode == 0)
@@ -1047,6 +1048,22 @@ static bool loadGameOptionsFromSD_internal()
       tmp.decayMode = 1;
     else
       tmp.decayMode = 0;
+
+    tmp.wardrivingEnabled = 0;
+    tmp.version = GAMEOPT_VERSION;
+  }
+
+  // Migration v2 -> v3
+  if (tmp.version == 2)
+  {
+    tmp.wardrivingEnabled = 0;
+    tmp.version = GAMEOPT_VERSION;
+  }
+
+  // Migration v2 -> v3
+  if (tmp.version == 2)
+  {
+    tmp.wardrivingEnabled = 0; // default OFF
     tmp.version = GAMEOPT_VERSION;
   }
 
@@ -1089,6 +1106,14 @@ static bool saveGameOptionsToSD_internal()
   }
 
   return true;
+}
+
+bool isWardrivingEnabled() { return g_gameopt.wardrivingEnabled != 0; }
+
+void setWardrivingEnabled(bool en)
+{
+  g_gameopt.wardrivingEnabled = en ? 1 : 0;
+  saveGameOptionsToSD_internal();
 }
 
 // ============================================================
@@ -1380,6 +1405,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   const size_t OLD_SZ_11 = 11;
   const size_t OLD_SZ_13 = 13;
   const size_t OLD_SZ_14 = 14;
+  const size_t OLD_SZ_15 = 15;
 
   SettingsData tmp{};
   bool ok = false;

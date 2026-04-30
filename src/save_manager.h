@@ -47,6 +47,10 @@ void saveManagerFactoryReset();
 // ─────────────────────────────────────
 uint8_t saveManagerGetDecayMode(); // 0=Normal, 1=Slow, 2=Off
 void saveManagerSetDecayMode(uint8_t mode);
+bool isWardrivingEnabled();
+void setWardrivingEnabled(bool en);
+uint32_t wardriveStepsToday();
+uint32_t wardriveHitsToday();
 
 // ─────────────────────────────────────
 // Settings persistence (settings.bin)

@@ -626,6 +626,22 @@ static void actGame_TogglePassiveXp(InputState &)
   clearInputLatch();
 }
 
+static void actGame_ToggleWardriving(InputState &)
+{
+  setWardrivingEnabled(!isWardrivingEnabled());
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
+static void actGame_ToggleStepCounter(InputState &)
+{
+  setWardrivingEnabled(!isWardrivingEnabled());
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 static void actGame_ToggleDeath(InputState &)
 {
   petDeathEnabled = !petDeathEnabled;
@@ -836,6 +852,7 @@ static MenuItem kPetItems[] = {
 static MenuItem kGameItems[] = {
     {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
     {"Passive XP", actGame_TogglePassiveXp, nullptr, nullptr, nullptr},
+    {"Step Counter", actGame_ToggleStepCounter, nullptr, nullptr, nullptr},
     {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
     {"LED Alerts", actGame_ToggleLedAlerts, nullptr, nullptr, nullptr},
 };
@@ -896,7 +913,7 @@ static bool handleStoredNetworksPage(InputState &input, int move)
       clearInputLatch();
       return true;
     }
-    
+
     if (input.hotSettings)
     {
       g_settingsFlow.settingsPage = SettingsPage::TOP;
@@ -944,7 +961,7 @@ static bool handleStoredNetworksPage(InputState &input, int move)
       clearInputLatch();
       return true;
     }
-    
+
     if (input.hotSettings)
     {
       g_settingsFlow.settingsPage = SettingsPage::TOP;
