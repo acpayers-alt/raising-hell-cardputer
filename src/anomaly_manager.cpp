@@ -6,6 +6,8 @@
 #include "console.h"
 #include "display.h"
 #include "graphics.h"
+#include "graphics_render_utils.h"
+#include "graphics_sd_draw.h"
 #include "pet.h"
 #include "sound.h"
 #include "system_status_state.h"
@@ -24,6 +26,8 @@ enum class AnomalyType : uint8_t
   Tear = 1,
   AlienGlimpse = 2,
   LogOnly = 3,
+  Confront = 4,
+  Teleport = 5,
 };
 
 bool s_active = false;
@@ -35,7 +39,11 @@ uint32_t s_recentActivityUntilMs = 0;
 uint32_t s_earliestActivityAnomalyMs = 0;
 bool s_forcePending = false;
 uint32_t s_forcePendingUntilMs = 0;
+uint32_t s_teleportCooldownUntilMs = 0;
 uint8_t s_frame = 0;
+
+constexpr const char *kConfrontHeadPath = "/raising_hell/graphics/anomaly/alien_confront_head.png";
+constexpr const char *kTeleportSpritePath = "/raising_hell/graphics/anomaly/alien_teleport.png";
 
 // About 1 in 220 checks. At 45s/check, average is roughly once per 2.75 hours
 // while sitting in eligible states.
@@ -43,13 +51,25 @@ constexpr long kBaseChanceDenom = 220;
 constexpr uint32_t kCheckIntervalMs = 45000UL;
 constexpr uint32_t kCooldownMs = 45UL * 60UL * 1000UL;
 constexpr uint32_t kVisualMs = 90UL;
+constexpr uint32_t kConfrontVisualMs = 80UL;
+constexpr uint32_t kTeleportVisualMs = 90UL;
+
+constexpr uint32_t kTeleportCooldownMs = 2UL * 60UL * 60UL * 1000UL;
+
+// Confront only happens after the normal rare anomaly roll succeeds.
+// 1 in 35 anomaly events means it is much rarer than the generic glitches.
+constexpr long kConfrontChanceDenom = 35;
+
+// Teleport rolls only when returning from another tab to the Pet tab.
+// 1 in 80 pet-tab returns, plus a hard cooldown.
+constexpr long kTeleportChanceDenom = 80;
 
 bool uiAllowsAnomaly(UIState s)
 {
   switch (s)
   {
   // Core pet + tabbed experience
-  case UIState::PET_SCREEN:     // covers stats/feed/play in your current routing
+  case UIState::PET_SCREEN: // covers stats/feed/play in your current routing
   case UIState::PET_SLEEPING:
   case UIState::SLEEP_MENU:
   case UIState::INVENTORY:
@@ -98,14 +118,23 @@ void logAnomaly(AnomalyType t)
   case AnomalyType::LogOnly:
     Serial.println("[NET] unexpected packet signature");
     break;
+  case AnomalyType::Confront:
+    Serial.println("[EVENT] signal source resolved");
+    break;
+  case AnomalyType::Teleport:
+    Serial.println("[WARN] entity position mismatch");
+    break;
   }
 }
 
 AnomalyType pickType()
 {
+  if (random(kConfrontChanceDenom) == 0)
+    return AnomalyType::Confront;
+
   const long roll = random(100);
 
-  // ~80% generic glitches, ~20% alien hints.
+  // Most events stay generic. Alien hints remain uncommon.
   if (roll < 40)
     return AnomalyType::Scanline;
   if (roll < 80)
@@ -128,7 +157,19 @@ void triggerAnomalyEvent(uint32_t nowMs)
     return;
 
   s_active = true;
-  s_untilMs = nowMs + kVisualMs;
+
+  switch (s_type)
+  {
+  case AnomalyType::Confront:
+    s_untilMs = nowMs + kConfrontVisualMs;
+    break;
+  case AnomalyType::Teleport:
+    s_untilMs = nowMs + kTeleportVisualMs;
+    break;
+  default:
+    s_untilMs = nowMs + kVisualMs;
+    break;
+  }
 
   soundAnomalyBlip();
   requestUIRedraw();
@@ -178,6 +219,49 @@ void drawSignalIntrusionFrame()
 
   spr.drawFastHLine(cx - 20, cy + 10, 12, TFT_DARKGREY);
   spr.drawFastHLine(cx + 8, cy + 13, 17, TFT_DARKGREY);
+}
+
+void drawCenteredPngOrFallback(const char *path, int cx, int cy, int fallbackW, int fallbackH,
+                               const char *fallbackLabel)
+{
+  int w = 0;
+  int h = 0;
+  const bool gotWH = getPngWH(path, w, h);
+
+  const int drawW = gotWH ? w : fallbackW;
+  const int drawH = gotWH ? h : fallbackH;
+  const int x = cx - drawW / 2;
+  const int y = cy - drawH / 2;
+
+  if (gotWH && sprDrawPngFromSD(path, x, y))
+    return;
+
+  // Fallback placeholder until the PNG assets exist.
+  spr.drawRoundRect(x, y, drawW, drawH, 10, TFT_DARKGREY);
+  spr.drawLine(x + drawW / 2, y + 4, x + 8, y + drawH - 8, TFT_WHITE);
+  spr.drawLine(x + drawW / 2, y + 4, x + drawW - 8, y + drawH - 8, TFT_WHITE);
+  spr.fillRect(x + drawW / 2 - 13, y + drawH / 2 - 3, 8, 2, TFT_WHITE);
+  spr.fillRect(x + drawW / 2 + 5, y + drawH / 2 - 2, 10, 2, TFT_WHITE);
+
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString(fallbackLabel, cx, y + drawH - 8);
+  spr.setTextDatum(TL_DATUM);
+}
+
+void drawConfrontOverlay()
+{
+  // Not full-screen: direct, centered alien head intrusion.
+  drawCenteredPngOrFallback(kConfrontHeadPath, SCREEN_W / 2, TOP_BAR_H + (SCREEN_H - TOP_BAR_H) / 2, 74, 58, "SIGNAL");
+}
+
+void drawTeleportOverlay()
+{
+  // Static overlay near the pet area, intentionally not replacing the pet sprite.
+  drawCenteredPngOrFallback(kTeleportSpritePath, SCREEN_W / 2 + random(-10, 11), TOP_BAR_H + 62 + random(-3, 4), 46, 62,
+                            "ENTITY");
 }
 
 #endif
@@ -258,7 +342,7 @@ void anomalyTick(uint32_t nowMs)
     // Wait a short delay after console return so it doesn't feel immediate
     if ((int32_t)(nowMs - s_earliestActivityAnomalyMs) < 0)
       return;
-  
+
     if ((int32_t)(nowMs - s_forcePendingUntilMs) >= 0)
     {
       s_forcePending = false;
@@ -280,7 +364,7 @@ void anomalyTick(uint32_t nowMs)
   if ((int32_t)(nowMs - s_cooldownUntilMs) < 0)
     return;
 
-    if (!hardSafetyAllowsAnomaly())
+  if (!hardSafetyAllowsAnomaly())
     return;
 
   // Only roll shortly after real player activity, but never on the exact input moment.
@@ -294,6 +378,32 @@ void anomalyTick(uint32_t nowMs)
     return;
 
   triggerAnomalyEvent(nowMs);
+#else
+  (void)nowMs;
+#endif
+}
+
+void anomalyNotifyPetTabReturn(uint32_t nowMs)
+{
+#if RH_ANOMALY_TEASER_ENABLED
+  if ((int32_t)(nowMs - s_teleportCooldownUntilMs) < 0)
+    return;
+
+  if (!hardSafetyAllowsAnomaly())
+    return;
+
+  if (random(kTeleportChanceDenom) != 0)
+    return;
+
+  s_type = AnomalyType::Teleport;
+  s_frame = 0;
+  s_active = true;
+  s_untilMs = nowMs + kTeleportVisualMs;
+  s_teleportCooldownUntilMs = nowMs + kTeleportCooldownMs;
+
+  logAnomaly(s_type);
+  soundAnomalyBlip();
+  requestUIRedraw();
 #else
   (void)nowMs;
 #endif
@@ -322,6 +432,12 @@ void anomalyDrawOverlay()
     break;
   case AnomalyType::AlienGlimpse:
     drawSignalIntrusionFrame();
+    break;
+  case AnomalyType::Confront:
+    drawConfrontOverlay();
+    break;
+  case AnomalyType::Teleport:
+    drawTeleportOverlay();
     break;
   case AnomalyType::LogOnly:
     break;

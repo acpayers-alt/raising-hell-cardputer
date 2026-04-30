@@ -1,5 +1,6 @@
 #include <Arduino.h>
 
+#include "anomaly_manager.h"
 #include "app_state.h"
 #include "settings_flow_state.h"
 
@@ -93,11 +94,9 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
   if (!changed)
     return;
 
-  const bool leavingPetCacheZone = usesPetBackgroundCache(prevState, prevTab) &&
-                                   !usesPetBackgroundCache(state, tab);
+  const bool leavingPetCacheZone = usesPetBackgroundCache(prevState, prevTab) && !usesPetBackgroundCache(state, tab);
 
-  const bool enteringPetCacheZone = !usesPetBackgroundCache(prevState, prevTab) &&
-                                    usesPetBackgroundCache(state, tab);
+  const bool enteringPetCacheZone = !usesPetBackgroundCache(prevState, prevTab) && usesPetBackgroundCache(state, tab);
 
   if (leavingPetCacheZone)
     graphicsReleasePetBackgroundCache();
@@ -110,6 +109,9 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
 
   if (prevState != state)
     uiStateOnEnter(state);
+
+  if (prevTab != Tab::TAB_PET && tab == Tab::TAB_PET && state == UIState::PET_SCREEN)
+    anomalyNotifyPetTabReturn(millis());
 
   if (enteringPetCacheZone)
     graphicsPrewarmPetBackgroundCache();
