@@ -967,7 +967,13 @@ static void execLine(char *line)
     logLine("  auto mischief       trigger autonomous mischief action");
     logLine("  auto notify         force pending autonomy popup");
     logLine("  auto reset          clear autonomy pending counters");
-    logLine("  anomaly             close console and force one anomaly");
+    logLine("  anomaly             queue random anomaly");
+    logLine("  anomaly scanline    queue scanline anomaly");
+    logLine("  anomaly tear        queue frame tear anomaly");
+    logLine("  anomaly glimpse     queue signal intrusion");
+    logLine("  anomaly confront    queue confront overlay");
+    logLine("  anomaly teleport    queue teleport overlay");
+
 #endif
 
     return;
@@ -2131,7 +2137,34 @@ static void execLine(char *line)
   if (!strcmp(argv[0], "anomaly"))
   {
 #if RH_ANOMALY_TEASER_ENABLED
-    anomalyRequestForceAfterReturn();
+    if (argc >= 2)
+    {
+      if (!strcmp(argv[1], "scanline"))
+        anomalyRequestForceTypeAfterReturn(0);
+      else if (!strcmp(argv[1], "tear"))
+        anomalyRequestForceTypeAfterReturn(1);
+      else if (!strcmp(argv[1], "glimpse"))
+        anomalyRequestForceTypeAfterReturn(2);
+      else if (!strcmp(argv[1], "log"))
+        anomalyRequestForceTypeAfterReturn(3);
+      else if (!strcmp(argv[1], "confront"))
+        anomalyRequestForceTypeAfterReturn(4);
+      else if (!strcmp(argv[1], "teleport"))
+      {
+        // Jump away from pet so user can return and trigger teleport naturally
+        uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_STATS, true);
+      }
+      else
+      {
+        logLine("Usage: anomaly [scanline|tear|glimpse|log|confront|teleport]");
+        return;
+      }
+    }
+    else
+    {
+      anomalyRequestForceAfterReturn();
+    }
+
     consoleRequestCloseAfterCommand();
     logLine("[OK] anomaly queued");
 #else
@@ -2456,10 +2489,7 @@ void consoleClose()
 
 bool consoleIsOpen() { return g_consoleOpen; }
 
-void consoleRequestCloseAfterCommand()
-{
-  g_consoleCloseRequested = true;
-}
+void consoleRequestCloseAfterCommand() { g_consoleCloseRequested = true; }
 
 bool consoleConsumeCloseRequest()
 {

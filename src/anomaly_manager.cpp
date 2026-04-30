@@ -6,6 +6,7 @@
 #include "console.h"
 #include "display.h"
 #include "graphics.h"
+#include "graphics_pet_presentation.h"
 #include "graphics_render_utils.h"
 #include "graphics_sd_draw.h"
 #include "pet.h"
@@ -38,12 +39,14 @@ uint32_t s_cooldownUntilMs = 0;
 uint32_t s_recentActivityUntilMs = 0;
 uint32_t s_earliestActivityAnomalyMs = 0;
 bool s_forcePending = false;
+bool s_forceHasType = false;
+AnomalyType s_forceType = AnomalyType::Scanline;
 uint32_t s_forcePendingUntilMs = 0;
 uint32_t s_teleportCooldownUntilMs = 0;
 uint8_t s_frame = 0;
 
-constexpr const char *kConfrontHeadPath = "/raising_hell/graphics/anomaly/alien_confront_head.png";
-constexpr const char *kTeleportSpritePath = "/raising_hell/graphics/anomaly/alien_teleport.png";
+constexpr const char *kConfrontHeadPath = "/raising_hell/graphics/ui/error_items/render_fault_head.png";
+constexpr const char *kTeleportSpritePath = "/raising_hell/graphics/ui/error_items/render_position_mismatch.png";
 
 // About 1 in 220 checks. At 45s/check, average is roughly once per 2.75 hours
 // while sitting in eligible states.
@@ -51,7 +54,7 @@ constexpr long kBaseChanceDenom = 220;
 constexpr uint32_t kCheckIntervalMs = 45000UL;
 constexpr uint32_t kCooldownMs = 45UL * 60UL * 1000UL;
 constexpr uint32_t kVisualMs = 90UL;
-constexpr uint32_t kConfrontVisualMs = 80UL;
+constexpr uint32_t kConfrontVisualMs = 120UL;
 constexpr uint32_t kTeleportVisualMs = 90UL;
 
 constexpr uint32_t kTeleportCooldownMs = 2UL * 60UL * 60UL * 1000UL;
@@ -63,6 +66,7 @@ constexpr long kConfrontChanceDenom = 35;
 // Teleport rolls only when returning from another tab to the Pet tab.
 // 1 in 80 pet-tab returns, plus a hard cooldown.
 constexpr long kTeleportChanceDenom = 80;
+constexpr uint32_t kTeleportBootGraceMs = 5UL * 60UL * 1000UL;
 
 bool uiAllowsAnomaly(UIState s)
 {
@@ -171,7 +175,13 @@ void triggerAnomalyEvent(uint32_t nowMs)
     break;
   }
 
-  soundAnomalyBlip();
+  // Only play sound for glitch-style anomalies.
+  // Confront + Teleport must be silent.
+  if (s_type != AnomalyType::Confront && s_type != AnomalyType::Teleport)
+  {
+    soundAnomalyBlip();
+  }
+
   requestUIRedraw();
 }
 
@@ -251,17 +261,52 @@ void drawCenteredPngOrFallback(const char *path, int cx, int cy, int fallbackW, 
   spr.setTextDatum(TL_DATUM);
 }
 
+void drawBottomCenteredPngOrFallback(const char *path, int bottomCenterX, int bottomY, int fallbackW, int fallbackH,
+                                     const char *fallbackLabel)
+{
+  int w = 0;
+  int h = 0;
+  const bool gotWH = getPngWH(path, w, h);
+
+  const int drawW = gotWH ? w : fallbackW;
+  const int drawH = gotWH ? h : fallbackH;
+  const int x = bottomCenterX - drawW / 2;
+  const int y = bottomY - drawH;
+
+  if (gotWH && sprDrawPngFromSD(path, x, y))
+    return;
+
+  // Fallback placeholder until the PNG assets exist.
+  spr.drawRoundRect(x, y, drawW, drawH, 10, TFT_DARKGREY);
+  spr.drawLine(x + drawW / 2, y + 4, x + 8, y + drawH - 8, TFT_WHITE);
+  spr.drawLine(x + drawW / 2, y + 4, x + drawW - 8, y + drawH - 8, TFT_WHITE);
+  spr.fillRect(x + drawW / 2 - 13, y + drawH / 2 - 3, 8, 2, TFT_WHITE);
+  spr.fillRect(x + drawW / 2 + 5, y + drawH / 2 - 2, 10, 2, TFT_WHITE);
+
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString(fallbackLabel, bottomCenterX, y + drawH - 8);
+  spr.setTextDatum(TL_DATUM);
+}
+
 void drawConfrontOverlay()
 {
   // Not full-screen: direct, centered alien head intrusion.
-  drawCenteredPngOrFallback(kConfrontHeadPath, SCREEN_W / 2, TOP_BAR_H + (SCREEN_H - TOP_BAR_H) / 2, 74, 58, "SIGNAL");
+  drawCenteredPngOrFallback(kConfrontHeadPath, SCREEN_W / 2, TOP_BAR_H + (SCREEN_H - TOP_BAR_H) / 2 - 5, 82, 104,
+                            "SIGNAL");
 }
 
 void drawTeleportOverlay()
 {
-  // Static overlay near the pet area, intentionally not replacing the pet sprite.
-  drawCenteredPngOrFallback(kTeleportSpritePath, SCREEN_W / 2 + random(-10, 11), TOP_BAR_H + 62 + random(-3, 4), 46, 62,
-                            "ENTITY");
+  // Manual teleport overlay position.
+  // This is intentionally independent from pet sprite offsets so we can tune
+  // the alien asset visually without affecting normal pet positioning.
+  constexpr int kTeleportCenterX = SCREEN_W / 8;
+  constexpr int kTeleportBottomY = TOP_BAR_H + 95;
+
+  drawBottomCenteredPngOrFallback(kTeleportSpritePath, kTeleportCenterX, kTeleportBottomY, 46, 62, "ENTITY");
 }
 
 #endif
@@ -292,13 +337,35 @@ void anomalyRequestForceAfterReturn()
   const uint32_t now = millis();
 
   s_forcePending = true;
+  s_forceHasType = false;
   s_forcePendingUntilMs = now + 10000UL;
-
-  // Delay before anomaly can fire (feels more natural)
   s_earliestActivityAnomalyMs = now + 3000UL;
 
   Serial.println("[ANOMALY] force pending (delayed)");
 #else
+  Serial.println("[ANOMALY] disabled");
+#endif
+}
+
+void anomalyRequestForceTypeAfterReturn(int type)
+{
+#if RH_ANOMALY_TEASER_ENABLED
+  const uint32_t now = millis();
+
+  if (type < 0)
+    type = 0;
+  if (type > 5)
+    type = 5;
+
+  s_forcePending = true;
+  s_forceHasType = true;
+  s_forceType = (AnomalyType)type;
+  s_forcePendingUntilMs = now + 10000UL;
+  s_earliestActivityAnomalyMs = now + 3000UL;
+
+  Serial.printf("[ANOMALY] force type pending type=%d\n", type);
+#else
+  (void)type;
   Serial.println("[ANOMALY] disabled");
 #endif
 }
@@ -351,6 +418,46 @@ void anomalyTick(uint32_t nowMs)
     else if (hardSafetyAllowsAnomaly())
     {
       s_forcePending = false;
+
+      if (s_forceHasType)
+      {
+        s_forceHasType = false;
+
+        s_type = s_forceType;
+        s_frame = 0;
+        s_cooldownUntilMs = nowMs + kCooldownMs;
+
+        logAnomaly(s_type);
+
+        if (s_type == AnomalyType::LogOnly)
+          return;
+
+        s_active = true;
+
+        switch (s_type)
+        {
+        case AnomalyType::Confront:
+          s_untilMs = nowMs + kConfrontVisualMs;
+          break;
+        case AnomalyType::Teleport:
+          s_untilMs = nowMs + kTeleportVisualMs;
+          break;
+        default:
+          s_untilMs = nowMs + kVisualMs;
+          break;
+        }
+
+        // Only play sound for glitch-style anomalies.
+        // Confront + Teleport must be silent.
+        if (s_type != AnomalyType::Confront && s_type != AnomalyType::Teleport)
+        {
+          soundAnomalyBlip();
+        }
+
+        requestUIRedraw();
+        return;
+      }
+
       triggerAnomalyEvent(nowMs);
       return;
     }
@@ -386,6 +493,9 @@ void anomalyTick(uint32_t nowMs)
 void anomalyNotifyPetTabReturn(uint32_t nowMs)
 {
 #if RH_ANOMALY_TEASER_ENABLED
+  if (nowMs < kTeleportBootGraceMs)
+    return;
+
   if ((int32_t)(nowMs - s_teleportCooldownUntilMs) < 0)
     return;
 
@@ -402,7 +512,7 @@ void anomalyNotifyPetTabReturn(uint32_t nowMs)
   s_teleportCooldownUntilMs = nowMs + kTeleportCooldownMs;
 
   logAnomaly(s_type);
-  soundAnomalyBlip();
+  // Teleport is intentionally silent.
   requestUIRedraw();
 #else
   (void)nowMs;

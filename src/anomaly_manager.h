@@ -12,3 +12,4 @@ void anomalyRequestForceAfterReturn();
 
 // Pet-tab-return teaser: ultra-rare alien overlay after returning to the Pet tab.
 void anomalyNotifyPetTabReturn(uint32_t nowMs);
+void anomalyRequestForceTypeAfterReturn(int type);
