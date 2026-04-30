@@ -76,6 +76,7 @@
 #include "sdcard.h"
 #include "time_persist.h"
 #include "time_state.h"
+#include "wardrive_steps.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
 
@@ -278,6 +279,10 @@ void appMainLoopTick()
     saveManagerTick();
     maybePeriodicTimeSave();
 
+    // Pocket Mode: screen is blank, but safe idle states still track fictional
+    // wardriving steps. This does not scan Wi-Fi or touch real networks.
+    wardriveStepsTick(now);
+
     const bool sleepingNow_off = isPetSleepingNow();
 
     if (sleepingNow_off)
@@ -371,6 +376,9 @@ void appMainLoopTick()
   }
 
   InputState input = readInput();
+
+  // Wardriving is accelerometer/RNG only. No real Wi-Fi scanning occurs.
+  wardriveStepsTick(now);
 
 #if LED_STATUS_ENABLED
   if (ledInputLockActive())
