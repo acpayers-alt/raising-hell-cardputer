@@ -69,6 +69,13 @@ void uiConsoleHandle(InputState &input)
 
   // Let the console module handle keystrokes, cursor, etc.
   consoleUpdate(input);
+
+  if (consoleConsumeCloseRequest())
+  {
+    closeConsoleAndReturn(input);
+    return;
+  }
+
   requestUIRedraw();
 }
 

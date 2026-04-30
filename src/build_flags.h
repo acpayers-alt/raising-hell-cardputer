@@ -56,3 +56,7 @@
 #ifndef RH_DEV_MANIFEST_FALLBACK_URL
 #define RH_DEV_MANIFEST_FALLBACK_URL "https://backup-assets.raisinghellgame.com/manifest-dev-v2.json"
 #endif
+
+#ifndef RH_ANOMALY_TEASER_ENABLED
+#define RH_ANOMALY_TEASER_ENABLED 0
+#endif

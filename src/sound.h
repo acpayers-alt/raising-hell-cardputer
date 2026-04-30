@@ -74,6 +74,7 @@ void soundDeath();          // death sting (short, dramatic, buzzy)
 void soundEvoZap();
 void soundFlap();
 void soundWin();
+void soundAnomalyBlip();
 
 // -----------------------------------------------------------------------------
 // Backwards-compat wrappers (so old code compiles)

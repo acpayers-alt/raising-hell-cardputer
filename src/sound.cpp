@@ -629,6 +629,19 @@ void soundFuneralDirge()
   startSequence(k, (uint8_t)(sizeof(k) / sizeof(k[0])));
 }
 
+void soundAnomalyBlip()
+{
+  if (uiMutedNow())
+    return;
+
+  static const ToneStep seq[] = {
+      {1800, 18, 8},
+      {620, 22, 0},
+  };
+
+  startSequence(seq, 2);
+}
+
 void soundTickFlatlineFade()
 {
   if (!s_flatlineFadeActive)

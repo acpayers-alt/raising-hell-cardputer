@@ -9,6 +9,9 @@ bool consoleIsOpen();
 void consoleUpdate(InputState& in);
 void consoleClear();
 
+void consoleRequestCloseAfterCommand();
+bool consoleConsumeCloseRequest();
+
 int consoleGetLineCount();
 const char* consoleGetLine(int index);
 const char* consoleGetInputLine();

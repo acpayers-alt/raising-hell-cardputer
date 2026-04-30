@@ -23,9 +23,14 @@ static constexpr int kAutoSleepHealthThreshold = 20;
 static constexpr uint32_t kPizzaCooldownMs = 12UL * 60UL * 60UL * 1000UL;
 static constexpr uint32_t kMischiefCooldownMs = 6UL * 60UL * 60UL * 1000UL;
 
+// Prevent reboot farming / repeated boot penalties when the pet is already angry.
+// Mischief cooldown is RAM-only, so rebooting would otherwise make it immediately eligible again.
+static constexpr uint32_t kMischiefBootGraceMs = 10UL * 60UL * 1000UL;
+
 static uint32_t s_lastPizzaRollMs = 0;
 static uint32_t s_lastAutoSleepRollMs = 0;
 static uint32_t s_lastMischiefRollMs = 0;
+static bool s_mischiefBootGraceApplied = false;
 
 static uint8_t s_pizzaCount = 0;
 static int16_t s_pizzaInfSpent = 0;
@@ -73,6 +78,7 @@ void petAutonomyReset()
   s_lastPizzaRollMs = 0;
   s_lastAutoSleepRollMs = 0;
   s_lastMischiefRollMs = 0;
+  s_mischiefBootGraceApplied = false;
 
   s_pizzaCount = 0;
   s_pizzaInfSpent = 0;
@@ -90,7 +96,6 @@ static bool petAutonomyUiAllowsActions()
   {
   case UIState::PET_SCREEN:
   case UIState::CLOCK_MODE:
-  case UIState::TITLE_MENU:
   case UIState::INVENTORY:
   case UIState::SHOP:
   case UIState::SLEEP_MENU:
@@ -313,9 +318,23 @@ void petAutonomyTick(uint32_t nowMs)
     s_lastAutoSleepRollMs = 0;
   }
 
-  // --- Mischief: immediate eligibility + chance, but cooldown-gated ---
+  // --- Mischief: chance + cooldown-gated ---
+  // If the pet boots already angry, do not let rebooting repeatedly re-roll and re-apply INF loss.
   if (angry)
   {
+    if (!s_mischiefBootGraceApplied)
+    {
+      s_mischiefBootGraceApplied = true;
+
+      if (nowMs < kMischiefBootGraceMs)
+      {
+        s_lastMischiefRollMs = nowMs;
+        Serial.printf("[PET][AUTO] mischief boot grace armed name='%s' graceMs=%lu\n", pet.getName(),
+                      (unsigned long)kMischiefBootGraceMs);
+        return;
+      }
+    }
+
     const bool mischiefReady =
         s_lastMischiefRollMs == 0 || (uint32_t)(nowMs - s_lastMischiefRollMs) >= kMischiefCooldownMs;
 
@@ -379,7 +398,7 @@ void petAutonomyNotifyIfPending(uint32_t nowMs)
   {
     snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg), "%s%s caused mischief\n-%d INF", first ? "" : "\n", name,
              (int)s_mischiefInfLost);
-                 first = false;
+    first = false;
   }
 
   ui_showTimedMessage(msg, 3200);
