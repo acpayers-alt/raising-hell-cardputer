@@ -115,9 +115,7 @@ static void clearStaleCoreDumpIfNeeded()
   // Do not spam public logs unless support logging is enabled.
   if (supportLoggingEnabled())
   {
-    Serial.printf("[BOOT][COREDUMP] corrupt/invalid coredump detected err=%d; erasing\n", (int)chk);
-    esp_err_t er = esp_core_dump_image_erase();
-    Serial.printf("[BOOT][COREDUMP] erase result=%d\n", (int)er);
+    Serial.printf("[BOOT][COREDUMP] no valid coredump image err=%d\n", (int)chk);
   }
 }
 
