@@ -264,8 +264,8 @@ static void awardWardriveHit()
 
   queueWardriveNotice(infReward, itemReward);
 
-  Serial.printf("[WARDRIVE] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n", (unsigned long)s_stepsToday,
-                (unsigned long)s_hitsToday, infReward, (int)itemReward);
+  Serial.printf("[WARWALK] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n", (unsigned long)s_hitsToday,
+                infReward, (int)itemReward);
 }
 
 static void rollWardrive()
