@@ -109,6 +109,9 @@ struct SettingsData {
   // when set, next boot arms the first pet-screen intro fade
   uint8_t petScreenIntroFadeBootFlag;
   uint8_t whatsNewSeen;
+
+  // 0 = 12-hour clock, 1 = 24-hour clock
+  uint8_t timeFormat24h;
 };
 
 // ============================================================

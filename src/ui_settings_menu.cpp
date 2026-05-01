@@ -775,6 +775,15 @@ static void actSystem_TimeZoneSelect(InputState &)
   // settingsCycleTimeZone already redraws + beeps + clears latch
 }
 
+static void actSystem_Toggle24Hour(InputState &)
+{
+  settingsSetUse24HourTime(!settingsUse24HourTime());
+  saveSettingsToSD();
+  requestUIRedraw();
+  playBeep();
+  clearInputLatch();
+}
+
 static void actSystem_TimeZoneLeft(InputState &) { settingsCycleTimeZone(-1); }
 
 static void actSystem_TimeZoneRight(InputState &) { settingsCycleTimeZone(+1); }
@@ -790,10 +799,11 @@ static void actSystem_OpenWifi(InputState &input)
 }
 
 static MenuItem kSystemItems[] = {
-    {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
-    {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
-    {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
-    {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
+  {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
+  {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
+  {"24 Hour Time", actSystem_Toggle24Hour, nullptr, nullptr, nullptr},
+  {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
+  {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
 };
 
 // ------------------------------------------------------------

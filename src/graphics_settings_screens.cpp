@@ -270,17 +270,8 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-      "Care Guide",
-      nullptr,
-      "WiFi Settings >",
-      "Pet Options >",
-      "Game Options >",
-      "Screen Settings >",
-      "System Settings >",
-      "Console >",
-      "Credits",
-      "Store Pet",
-      "Main Menu",
+      "Care Guide",        nullptr,     "WiFi Settings >", "Pet Options >", "Game Options >", "Screen Settings >",
+      "System Settings >", "Console >", "Credits",         "Store Pet",     "Main Menu",
   };
 
   const int totalItems = 11;
@@ -437,7 +428,7 @@ static void drawGameOptionsMenu()
 
   char stepCounterLine[32];
   snprintf(stepCounterLine, sizeof(stepCounterLine), "Step Counter: %s", isStepCounterEnabled() ? "ON" : "OFF");
-  
+
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
 
@@ -871,8 +862,8 @@ static void drawSystemSettingsMenu()
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
 
-  const char *labels[] = {"Set Time", "Time Zone", "System Status >", "Factory Reset"};
-  const int totalItems = 4;
+  const char *labels[] = {"Set Time", "Time Zone", "24 Hour Time", "System Status >", "Factory Reset"};
+  const int totalItems = 5;
 
   g_app.systemSettingsIndex = clampi(g_app.systemSettingsIndex, 0, totalItems - 1);
 
@@ -918,9 +909,31 @@ static void drawSystemSettingsMenu()
       label = valueBuf;
     }
 
+    else if (strcmp(label, "24 Hour Time") == 0)
+    {
+      snprintf(valueBuf, sizeof(valueBuf), "24 Hour Time: %s", settingsUse24HourTime() ? "ON" : "OFF");
+      label = valueBuf;
+    }
+
     spr.setTextColor(textCol, fill);
     spr.drawString(label, boxX + 10, ty);
   }
+
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  spr.setTextDatum(TL_DATUM);
+
+  const int arrowX = boxX + boxW + 6;
+  const int arrowUpY = startY - 2;
+  const int arrowDownY = startY + totalH - 10;
+
+  if (start > 0)
+    spr.drawString("^", arrowX, arrowUpY);
+  if (start + visCount < totalItems)
+    spr.drawString("v", arrowX, arrowDownY);
+
+  spr.setTextDatum(TL_DATUM);
 
   if (g_factoryReset.confirmActive)
   {

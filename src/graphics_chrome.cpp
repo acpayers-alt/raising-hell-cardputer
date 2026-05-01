@@ -5,6 +5,7 @@
 #include "graphics_hud_icons.h"
 #include "graphics_shared_utils.h"
 #include "pet.h"
+#include "save_manager.h"
 #include "system_status_state.h"
 #include "time_persist.h"
 #include "time_state.h"
@@ -38,6 +39,18 @@ String formatTime()
   if (currentHour < 0 || currentMinute < 0 || currentHour > 23 || currentMinute > 59)
     return "! --:--";
 
+  const char *prefix = timeIsDirty() ? "* " : "";
+
+  char buf[16];
+
+  // --- 24-hour mode ---
+  if (settingsUse24HourTime())
+  {
+    snprintf(buf, sizeof(buf), "%s%02d:%02d", prefix, currentHour, currentMinute);
+    return String(buf);
+  }
+
+  // --- 12-hour mode ---
   int h = currentHour;
   bool pm = false;
 
@@ -56,8 +69,6 @@ String formatTime()
     pm = true;
   }
 
-  char buf[12];
-  const char *prefix = timeIsDirty() ? "* " : "";
   snprintf(buf, sizeof(buf), "%s%d:%02d %s", prefix, h, currentMinute, pm ? "PM" : "AM");
   return String(buf);
 }

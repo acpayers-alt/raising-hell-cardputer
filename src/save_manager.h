@@ -62,6 +62,10 @@ extern bool ledAlertsEnabled;
 bool settingsWifiEnabled();
 void settingsSetWifiEnabled(bool en);
 
+// Time Format Preference
+bool settingsUse24HourTime();
+void settingsSetUse24HourTime(bool en);
+
 // ─────────────────────────────────────
 // Sleep state persistence
 // ─────────────────────────────────────

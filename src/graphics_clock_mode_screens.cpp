@@ -38,20 +38,30 @@ void drawClockModeScreen(bool redrawBg)
     tm tmNow = {};
     localtime_r(&now, &tmNow);
 
-    char timeBuf[10];
+    char timeBuf[12];
 
     if (!timeIsValid())
     {
-      snprintf(timeBuf, sizeof(timeBuf), "--:--!");
+      snprintf(timeBuf, sizeof(timeBuf), "! --:--");
     }
     else
     {
-      int hour12 = tmNow.tm_hour % 12;
-      if (hour12 == 0)
-        hour12 = 12;
+      const char *prefix = timeIsDirty() ? "* " : "";
 
-      snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min, timeIsDirty() ? "*" : "");
+      if (settingsUse24HourTime())
+      {
+        snprintf(timeBuf, sizeof(timeBuf), "%s%02d:%02d", prefix, tmNow.tm_hour, tmNow.tm_min);
+      }
+      else
+      {
+        int hour12 = tmNow.tm_hour % 12;
+        if (hour12 == 0)
+          hour12 = 12;
+
+        snprintf(timeBuf, sizeof(timeBuf), "%s%d:%02d", prefix, hour12, tmNow.tm_min);
+      }
     }
+
     static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
@@ -126,19 +136,28 @@ void drawClockModeScreen(bool redrawBg)
   tm tmNow = {};
   localtime_r(&now, &tmNow);
 
-  char timeBuf[10];
+  char timeBuf[12];
 
   if (!timeIsValid())
   {
-    snprintf(timeBuf, sizeof(timeBuf), "--:--!");
+    snprintf(timeBuf, sizeof(timeBuf), "! --:--");
   }
   else
   {
-    int hour12 = tmNow.tm_hour % 12;
-    if (hour12 == 0)
-      hour12 = 12;
-
-    snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min, timeIsDirty() ? "*" : "");
+    const char *prefix = timeIsDirty() ? "* " : "";
+  
+    if (settingsUse24HourTime())
+    {
+      snprintf(timeBuf, sizeof(timeBuf), "%s%02d:%02d", prefix, tmNow.tm_hour, tmNow.tm_min);
+    }
+    else
+    {
+      int hour12 = tmNow.tm_hour % 12;
+      if (hour12 == 0)
+        hour12 = 12;
+  
+      snprintf(timeBuf, sizeof(timeBuf), "%s%d:%02d", prefix, hour12, tmNow.tm_min);
+    }
   }
 
   static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
@@ -152,7 +171,7 @@ void drawClockModeScreen(bool redrawBg)
     snprintf(dateBuf, sizeof(dateBuf), "Connect WiFi for time");
   else
     snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
-    
+
   spr.setTextColor(TFT_WHITE);
 
   spr.setTextDatum(TC_DATUM);

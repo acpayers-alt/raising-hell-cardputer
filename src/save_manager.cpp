@@ -111,7 +111,6 @@ static uint32_t lastSaveMs = 0;
 static const uint32_t DEBOUNCE_MS = 2000;
 static void newPetInternalNoSave(bool resetName = false);
 
-// One (and ONLY one) instance
 static SettingsData g_settings;
 
 bool settingsWifiEnabled() { return (g_settings.wifiEnabled != 0); }
@@ -122,6 +121,10 @@ void settingsSetWifiEnabled(bool en)
     Serial.printf("[WIFI PREF WRITE] en=%d @ %s:%d\n", en ? 1 : 0, __FILE__, __LINE__);
   g_settings.wifiEnabled = en ? 1 : 0;
 }
+
+bool settingsUse24HourTime() { return (g_settings.timeFormat24h != 0); }
+
+void settingsSetUse24HourTime(bool en) { g_settings.timeFormat24h = en ? 1 : 0; }
 
 // Settings persistence
 bool loadSettingsFromSD();
@@ -1438,6 +1441,52 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
       tmp.controlsHelpSeen = (tmp.controlsHelpSeen != 0);
       tmp.petScreenIntroFadeBootFlag = (tmp.petScreenIntroFadeBootFlag != 0);
       tmp.whatsNewSeen = (tmp.whatsNewSeen != 0);
+      tmp.timeFormat24h = (tmp.timeFormat24h != 0);
+    }
+  }
+  else if (sz == OLD_SZ_15)
+  {
+    uint8_t old[OLD_SZ_15];
+    const int r = f.read(old, OLD_SZ_15);
+    if (r == (int)OLD_SZ_15)
+    {
+      tmp.brightnessLevel = old[0];
+      tmp.autoScreenOffEnabled = (old[1] != 0);
+      tmp.soundEnabled = (old[2] != 0);
+      tmp.wifiEnabled = (old[3] != 0);
+      tmp.tzIndex = old[4];
+      tmp.autoScreenTimeoutSel = old[5];
+      tmp.autoClockTimeoutSel = old[6];
+      tmp.shakeSensitivitySel = old[7];
+      tmp.petDeathEnabled = (old[8] != 0);
+      tmp.passiveXpEnabled = (old[9] != 0);
+      tmp.ledAlertsEnabled = (old[10] != 0);
+      tmp.controlsHelpSeen = (old[11] != 0);
+      tmp.petPerfHudEnabled = (old[12] != 0);
+      tmp.petScreenIntroFadeBootFlag = (old[13] != 0);
+      tmp.whatsNewSeen = (old[14] != 0);
+
+      tmp.timeFormat24h = 0; // default existing users to 12-hour
+
+      if (tmp.brightnessLevel > 2)
+        tmp.brightnessLevel = 1;
+      if (!tzIndexIsValid(tmp.tzIndex))
+        tmp.tzIndex = tzDefaultIndex();
+      if (tmp.autoScreenTimeoutSel > 3)
+        tmp.autoScreenTimeoutSel = 3;
+      if (tmp.autoClockTimeoutSel > 3)
+        tmp.autoClockTimeoutSel = 3;
+
+      if (tmp.autoClockTimeoutSel != 3)
+        tmp.autoScreenTimeoutSel = 3;
+
+      if (tmp.shakeSensitivitySel > 3)
+        tmp.shakeSensitivitySel = 1;
+
+      tmp.autoScreenOffEnabled = (tmp.autoScreenTimeoutSel != 3);
+
+      ok = true;
+      loadedOld = true;
     }
   }
   else if (sz == OLD_SZ_14)
@@ -1751,7 +1800,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
   g_whatsNewSeen = (g_settings.whatsNewSeen != 0);
-
+  g_settings.timeFormat24h = (g_settings.timeFormat24h != 0);
+  
   // ------------------------------------------------------------
   // One-shot boot flag: pet intro fade
   // ------------------------------------------------------------
@@ -1842,6 +1892,7 @@ static bool saveSettingsToSD_internal()
   g_settings.controlsHelpSeen = (g_controlsHelpSeen != 0) ? 1 : 0;
   g_settings.whatsNewSeen = (g_whatsNewSeen != 0) ? 1 : 0;
   g_settings.petScreenIntroFadeBootFlag = (g_settings.petScreenIntroFadeBootFlag != 0) ? 1 : 0;
+  g_settings.timeFormat24h = settingsUse24HourTime() ? 1 : 0;
 
   tryRemove(SET_TMP_PATH);
 
@@ -2258,6 +2309,7 @@ void saveManagerBegin()
   g_settings.wifiEnabled = 1;
   g_settings.tzIndex = tzDefaultIndex();
   g_settings.whatsNewSeen = 0;
+  g_settings.timeFormat24h = 0;
   g_settings.shakeSensitivitySel = 1; // Low = current behavior
   motionSetShakeSensitivity(1);
   gameoptDefaults();
