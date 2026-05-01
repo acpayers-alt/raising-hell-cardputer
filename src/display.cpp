@@ -37,6 +37,7 @@
 
 // --- Debug --------------------------------------------------------------------
 #include "debug_state.h"
+#include "support_logging_state.h"
 
 // end of includes
 
@@ -58,24 +59,8 @@ static int voltageToPercent(int mv)
   // conservative at the top and more forgiving through the middle/lower band,
   // because the old curve reported ~3.7V as nearly empty.
   static const Point kCurve[] = {
-      {4200, 100},
-      {4160, 96},
-      {4120, 92},
-      {4080, 87},
-      {4040, 82},
-      {4000, 76},
-      {3960, 69},
-      {3920, 62},
-      {3880, 55},
-      {3840, 47},
-      {3800, 39},
-      {3760, 31},
-      {3720, 24},
-      {3680, 17},
-      {3640, 11},
-      {3600, 6},
-      {3560, 2},
-      {3520, 0},
+      {4200, 100}, {4160, 96}, {4120, 92}, {4080, 87}, {4040, 82}, {4000, 76}, {3960, 69}, {3920, 62}, {3880, 55},
+      {3840, 47},  {3800, 39}, {3760, 31}, {3720, 24}, {3680, 17}, {3640, 11}, {3600, 6},  {3560, 2},  {3520, 0},
   };
 
   if (mv >= kCurve[0].mv)
@@ -519,8 +504,11 @@ void updateBattery()
 
     if (Serial.availableForWrite() >= 160)
     {
-      Serial.printf("[BAT] init raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d\n", rawMv, mvMed, mvFilt,
-                    dv, pct, (int)usb, s_attachEvidence, s_detachEvidence);
+      if (supportLoggingEnabled())
+      {
+        Serial.printf("[BAT] init raw=%d med=%d filt=%d dv=%d pct=%d usb=%d attach=%d detach=%d\n", rawMv, mvMed,
+                      (int)s_mvEma, dv, pct, (int)usb, s_attachEvidence, s_detachEvidence);
+      }
     }
 
     s_batLogPrintedOnce = true;
@@ -610,7 +598,7 @@ void batteryProtectionTick(uint32_t now)
 
   const bool lowNow = (mv > 0 && mv <= 3600);
   const bool critNow = (mv > 0 && mv <= 3500);
-  
+
   if (lowNow)
   {
     if (!lowSinceMs)
@@ -651,9 +639,11 @@ void setBacklightTagged(uint8_t level, const char *file, int line)
 
   if (Serial && Serial.availableForWrite() >= 160)
   {
-    Serial.printf("[BL SRC] req=%u @ %s:%d t=%lu ui=%d tab=%d\n", (unsigned)level, file, line, (unsigned long)millis(),
-                  (int)g_app.uiState, (int)g_app.currentTab);
+    if (supportLoggingEnabled())
+    {
+      Serial.printf("[BL SRC] req=%u @ %s:%d t=%lu ui=%d tab=%d\n", (unsigned)level, file ? file : "?", line,
+                    (unsigned long)millis(), (int)g_app.uiState, (int)g_app.currentTab);
+    }
   }
-
   setBacklight(level);
 }

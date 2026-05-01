@@ -26,6 +26,7 @@
 // Core systems
 #include "debug.h"
 #include "savegame.h"
+#include "support_logging_state.h"
 
 // Game systems
 #include "game_options_state.h"
@@ -117,7 +118,8 @@ bool settingsWifiEnabled() { return (g_settings.wifiEnabled != 0); }
 
 void settingsSetWifiEnabled(bool en)
 {
-  Serial.printf("[WIFI PREF WRITE] en=%d @ %s:%d\n", en ? 1 : 0, __FILE__, __LINE__);
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI PREF WRITE] en=%d @ %s:%d\n", en ? 1 : 0, __FILE__, __LINE__);
   g_settings.wifiEnabled = en ? 1 : 0;
 }
 
@@ -837,7 +839,8 @@ static void applySleepStateFromBootFlag()
 
   // Do NOT change UI state here.
   // Boot flow will decide final landing, and then we can override it once.
-  Serial.println("[SAVE] restored sleeping pet from sleep_pending.flag");
+  if (supportLoggingEnabled())
+    Serial.println("[SAVE] restored sleeping pet from sleep_pending.flag");
 }
 
 static void rotateSaveBackups()
@@ -970,7 +973,8 @@ void saveManagerEnterSleepState()
   uiActionEnterState(UIState::PET_SLEEPING, Tab::TAB_PET, true);
   g_app.uiNeedsRedraw = true;
 
-  Serial.println("[SAVE] sleep entered + sleep_pending.flag set");
+  if (supportLoggingEnabled())
+    Serial.println("[SAVE] sleep entered + sleep_pending.flag set");
 }
 
 // Back-compat: older code called this name.
@@ -1780,8 +1784,9 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   applyTimezoneIndex((uint8_t)tzIndex);
 
-  Serial.printf("[SAVE] timezone load idx=%d label='%s' iana='%s' rule='%s'\n", tzIndex, tzName((uint8_t)tzIndex),
-                tzIanaName((uint8_t)tzIndex), tzPosixRule((uint8_t)tzIndex));
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] timezone load idx=%d label='%s' iana='%s' rule='%s'\n", tzIndex, tzName((uint8_t)tzIndex),
+                  tzIanaName((uint8_t)tzIndex), tzPosixRule((uint8_t)tzIndex));
 
   const bool wifiEn = (g_settings.wifiEnabled != 0);
 
@@ -1797,7 +1802,8 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
   if (wifiSettingNow != s_lastWifiLoadSetting || wifiRuntimeNow != s_lastWifiLoadRuntime)
   {
-    Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiSettingNow, wifiRuntimeNow);
+    if (supportLoggingEnabled())
+      Serial.printf("[WIFI LOAD] setting=%d runtime=%d (deferred apply)\n", wifiSettingNow, wifiRuntimeNow);
     s_lastWifiLoadSetting = wifiSettingNow;
     s_lastWifiLoadRuntime = wifiRuntimeNow;
   }
@@ -1818,10 +1824,9 @@ static bool saveSettingsToSD_internal()
   g_settings.soundEnabled = soundEnabled;
   g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
 
-#if !PUBLIC_BUILD
-  Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
-                wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
-#endif
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
+                  wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
 
   g_settings.tzIndex = tzIndex;
 
@@ -2109,45 +2114,53 @@ static bool loadSaveFileInternal(const char *path)
   g_lastLoadPath = path;
   g_lastLoadUsedBackup = (strcmp(path, SAVE_PATH) != 0);
 
-  Serial.printf("[SAVE] load OK path=%s size=%lu backup=%d\n", path, (unsigned long)g_lastLoadSize,
-                g_lastLoadUsedBackup ? 1 : 0);
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] load OK path=%s size=%lu backup=%d\n", path, (unsigned long)g_lastLoadSize,
+                  g_lastLoadUsedBackup ? 1 : 0);
 
   return true;
 }
 
 static bool loadSaveFromSD_internal()
 {
-  Serial.printf("[SAVE] trying primary path=%s\n", SAVE_PATH);
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] trying primary path=%s\n", SAVE_PATH);
   if (loadSaveFileInternal(SAVE_PATH))
   {
-    Serial.println("[SAVE] primary load OK");
+    if (supportLoggingEnabled())
+      Serial.println("[SAVE] primary load OK");
     return true;
   }
 
   Serial.printf("[SAVE] primary load failed err=%u size=%lu\n", (unsigned)g_lastLoadErr, (unsigned long)g_lastLoadSize);
 
-  Serial.printf("[SAVE] trying backup 1 path=%s\n", SAVE_BAK1_PATH);
-  if (loadSaveFileInternal(SAVE_BAK1_PATH))
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] trying backup 1 path=%s\n", SAVE_BAK1_PATH);
   {
-    Serial.println("[SAVE] backup 1 load OK");
+    if (supportLoggingEnabled())
+      Serial.println("[SAVE] backup 1 load OK");
     return true;
   }
 
   Serial.printf("[SAVE] backup 1 failed err=%u size=%lu\n", (unsigned)g_lastLoadErr, (unsigned long)g_lastLoadSize);
 
-  Serial.printf("[SAVE] trying backup 2 path=%s\n", SAVE_BAK2_PATH);
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] trying backup 2 path=%s\n", SAVE_BAK2_PATH);
   if (loadSaveFileInternal(SAVE_BAK2_PATH))
   {
-    Serial.println("[SAVE] backup 2 load OK");
+    if (supportLoggingEnabled())
+      Serial.println("[SAVE] backup 2 load OK");
     return true;
   }
 
   Serial.printf("[SAVE] backup 2 failed err=%u size=%lu\n", (unsigned)g_lastLoadErr, (unsigned long)g_lastLoadSize);
 
-  Serial.printf("[SAVE] trying backup 3 path=%s\n", SAVE_BAK3_PATH);
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] trying backup 3 path=%s\n", SAVE_BAK3_PATH);
   if (loadSaveFileInternal(SAVE_BAK3_PATH))
   {
-    Serial.println("[SAVE] backup 3 load OK");
+    if (supportLoggingEnabled())
+      Serial.println("[SAVE] backup 3 load OK");
     return true;
   }
 
@@ -2220,10 +2233,9 @@ static bool saveSaveToSD_internal()
     return false;
   }
 
-#if !PUBLIC_BUILD
-  Serial.printf("[SAVE] WRITE OK path=%s level=%u xp=%lu name='%s' pending=%d\n", SAVE_PATH, (unsigned)pet.level,
-                (unsigned long)pet.xp, pet.name, namePendingFlagExists() ? 1 : 0);
-#endif
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] WRITE OK path=%s level=%u xp=%lu name='%s' pending=%d\n", SAVE_PATH, (unsigned)pet.level,
+                  (unsigned long)pet.xp, pet.name, namePendingFlagExists() ? 1 : 0);
 
   return true;
 }
@@ -2271,8 +2283,9 @@ static bool autoHealLoadedSaveIfNeeded()
   const bool hadBlankPetName = isBlankName(pet.name);
   bool changed = false;
 
-  Serial.printf("[SAVE][AUTOHEAL] begin namePending=%d blankPetName=%d name='%s'\n", hadNamePending ? 1 : 0,
-                hadBlankPetName ? 1 : 0, pet.name);
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE][AUTOHEAL] begin namePending=%d blankPetName=%d name='%s'\n", hadNamePending ? 1 : 0,
+                  hadBlankPetName ? 1 : 0, pet.name);
 
   // --------------------------------------------------------------------------
   // Name / pending-flag recovery
@@ -2491,8 +2504,9 @@ bool saveManagerLoad()
     saveSettingsToSD_internal();
   }
 
-  Serial.printf("[SAVE] load result=%d err=%u size=%lu\n", saveOk ? 1 : 0, (unsigned)g_lastLoadErr,
-                (unsigned long)g_lastLoadSize);
+  if (supportLoggingEnabled())
+    Serial.printf("[SAVE] load result=%d err=%u size=%lu\n", saveOk ? 1 : 0, (unsigned)g_lastLoadErr,
+                  (unsigned long)g_lastLoadSize);
 
   if (saveOk)
   {
@@ -2522,16 +2536,18 @@ bool saveManagerLoad()
       dirty = false;
     }
 
-    Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
-                  blankPetName ? 1 : 0, pet.name);
+    if (supportLoggingEnabled())
+      Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
+                    blankPetName ? 1 : 0, pet.name);
 
     // --- PET NAME (once per boot) ---
     static bool s_loggedPetNameThisBoot = false;
 
     if (!s_loggedPetNameThisBoot && pet.name[0] != '\0')
     {
-      Serial.printf("[PET] current '%s' lvl=%u xp=%lu type=%d\n", pet.name, (unsigned)pet.level, (unsigned long)pet.xp,
-                    (int)pet.type);
+      if (supportLoggingEnabled())
+        Serial.printf("[PET] current '%s' lvl=%u xp=%lu type=%d\n", pet.name, (unsigned)pet.level,
+                      (unsigned long)pet.xp, (int)pet.type);
     }
     // Boot policy:
     // If a loaded save is still in an unfinished fresh-pet state

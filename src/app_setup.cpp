@@ -26,6 +26,7 @@
 #include "boot_pipeline.h"
 #include "runtime_log.h"
 #include "system_status_state.h"
+#include "support_logging_state.h"
 #include "version.h"
 
 // --- Display / input / UX -----------------------------------------------------
@@ -142,15 +143,19 @@ void appSetup()
   Serial.begin(115200);
   runtimeLogInit();
   bootTime = millis();
+  supportLoggingBegin();
 
   // Give USB stack a moment, then do a bounded handshake.
   delay(50);
   serialBootHandshake(2500);
 
+if (supportLoggingEnabled())
+{
   Serial.printf("[PSRAM] size=%u free=%u\n", (unsigned)ESP.getPsramSize(), (unsigned)ESP.getFreePsram());
 
   Serial.printf("[HEAP] free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
 
 // DO NOT use 0 here; on some ESP32 CDC builds this can cause "no output ever".
 // Keep it small so we still don't block hard when host isn't ready.

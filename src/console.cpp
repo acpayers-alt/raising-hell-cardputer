@@ -49,6 +49,7 @@
 #include "debug.h"
 #include "input.h"
 #include "runtime_log.h"
+#include "support_logging_state.h"
 
 // -----------------------------------------------------------------------------
 // Project: Build / Version
@@ -321,11 +322,21 @@ static void consoleLogSupportModeStatus()
     logLine("Support mode: ON");
   else
     logLine("Support mode: OFF");
+  {
+    char buf[48];
+    snprintf(buf, sizeof(buf), "Support logging: %s", supportLoggingEnabled() ? "ON" : "OFF");
+    logLine(buf);
+  }
 
   if (!g_consoleSupportMode)
     logLine("Use 'support on' to enable support commands.");
 #else
   logLine("Support mode: always available in dev build");
+  {
+    char buf[48];
+    snprintf(buf, sizeof(buf), "Support logging: %s", supportLoggingEnabled() ? "ON" : "OFF");
+    logLine(buf);
+  }
 #endif
 }
 
@@ -903,6 +914,8 @@ static void execLine(char *line)
     logLine("  support             show support mode status");
     logLine("  support status      show support mode status");
     logLine("  support report      system diagnostic dump");
+    logLine("  supportlog          show support logging status");
+    logLine("  supportlog on|off   enable/disable verbose support logs");
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
     logLine("  support on|off      enable/disable support commands");
 #endif
@@ -1025,6 +1038,39 @@ static void execLine(char *line)
     uiPopReturnTarget();
 
     whatsNewBegin(ret.state, ret.tab);
+    return;
+  }
+
+  // SUPPORT LOGGING
+  if (!strcmp(argv[0], "supportlog"))
+  {
+    if (argc == 1 || !strcmp(argv[1], "status"))
+    {
+      logf("Support logging: %s", supportLoggingEnabled() ? "ON" : "OFF");
+#if defined(PUBLIC_BUILD) && PUBLIC_BUILD
+      logLine("Use 'supportlog on' to enable verbose boot/save/wifi logs.");
+#else
+      logLine("Support logging is always ON in dev builds.");
+#endif
+      return;
+    }
+
+    if (!strcmp(argv[1], "on"))
+    {
+      setSupportLoggingEnabled(true);
+      logLine("[OK] Support logging enabled");
+      logLine("Verbose boot/save/wifi logs will persist across reboot.");
+      return;
+    }
+
+    if (!strcmp(argv[1], "off"))
+    {
+      setSupportLoggingEnabled(false);
+      logLine("[OK] Support logging disabled");
+      return;
+    }
+
+    logLine("Usage: supportlog [status|on|off]");
     return;
   }
 

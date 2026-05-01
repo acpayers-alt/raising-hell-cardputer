@@ -1,5 +1,6 @@
 #include "wifi_store.h"
 
+#include "support_logging_state.h"
 #include <Preferences.h>
 
 static const char *NS = "rh_wifi";
@@ -74,11 +75,9 @@ bool wifiStoreLoadProfile(int index, String &ssid, String &pass)
 
   p.end();
 
-  Serial.printf("[WIFI STORE] load profile=%d ok=%d ssid='%s' passLen=%u\n",
-                index,
-                ok ? 1 : 0,
-                ok ? ssid.c_str() : "",
-                ok ? (unsigned)pass.length() : 0);
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI STORE] load profile=%d ok=%d ssid='%s' passLen=%u\n", index, ok ? 1 : 0,
+                  ok ? ssid.c_str() : "", ok ? (unsigned)pass.length() : 0);
 
   return ok;
 }
@@ -102,10 +101,9 @@ bool wifiStoreLoad(String &ssid, String &pass)
 
   p.end();
 
-  Serial.printf("[WIFI STORE] load ok=%d ssid='%s' passLen=%u\n",
-                ok ? 1 : 0,
-                ok ? ssid.c_str() : "",
-                ok ? (unsigned)pass.length() : 0);
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI STORE] load ok=%d ssid='%s' passLen=%u\n", ok ? 1 : 0, ok ? ssid.c_str() : "",
+                  ok ? (unsigned)pass.length() : 0);
 
   return ok;
 }
@@ -138,10 +136,7 @@ int wifiStoreCount()
   return count;
 }
 
-bool wifiStoreHasCreds()
-{
-  return wifiStoreCount() > 0;
-}
+bool wifiStoreHasCreds() { return wifiStoreCount() > 0; }
 
 void wifiStoreSave(const String &ssid, const String &pass)
 {
@@ -197,9 +192,8 @@ void wifiStoreSave(const String &ssid, const String &pass)
 
   p.end();
 
-  Serial.printf("[WIFI STORE] saved profile ssid='%s' profiles=%d\n",
-                ssid.c_str(),
-                wifiStoreCount());
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI STORE] saved profile ssid='%s' profiles=%d\n", ssid.c_str(), wifiStoreCount());
 }
 
 bool wifiStoreDeleteProfile(int index)
@@ -266,7 +260,8 @@ bool wifiStoreDeleteProfile(int index)
 
   p.end();
 
-  Serial.printf("[WIFI STORE] deleted profile index=%d remaining=%d\n", index, wifiStoreCount());
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI STORE] deleted profile index=%d remaining=%d\n", index, wifiStoreCount());
   return true;
 }
 
@@ -284,5 +279,6 @@ void wifiStoreClear()
 
   p.end();
 
-  Serial.println("[WIFI STORE] cleared all wifi profiles");
+  if (supportLoggingEnabled())
+    Serial.println("[WIFI STORE] cleared all wifi profiles");
 }
