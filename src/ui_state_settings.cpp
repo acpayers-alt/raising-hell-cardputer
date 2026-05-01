@@ -105,7 +105,7 @@ void uiSettingsHandle(InputState &input)
     if (input.menuOnce || input.escOnce)
     {
       g_settingsFlow.settingsPage = SettingsPage::SYSTEM;
-      g_app.systemSettingsIndex = 2; // System Status row
+      g_app.systemSettingsIndex = 3;
       requestUIRedraw();
       playBeep();
       clearInputLatch();

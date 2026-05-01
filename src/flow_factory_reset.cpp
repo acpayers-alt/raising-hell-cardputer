@@ -128,9 +128,10 @@ bool factoryResetSystemSettingsHook(InputState &input, int systemSettingsIndex)
   // System rows are:
   //   0 Set Time
   //   1 Time Zone
-  //   2 System Status
-  //   3 Factory Reset
-  if ((input.selectOnce || input.encoderPressOnce) && systemSettingsIndex == 3)
+  //   2 24 Hour Time
+  //   3 System Status
+  //   4 Factory Reset
+  if ((input.selectOnce || input.encoderPressOnce) && systemSettingsIndex == 4)
   {
     g_factoryReset.confirmActive = true;
     g_factoryReset.confirmIndex = 0;

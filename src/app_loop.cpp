@@ -660,6 +660,48 @@ void appMainLoopTick()
   }
 
   // ---------------------------------------------------------------------------
+  // PERSISTENT TOAST / RESULT POPUP
+  //   durationMs == 0 means "stay until dismissed".
+  //   These are used by autonomous events and War Walking results.
+  // ---------------------------------------------------------------------------
+  if (uiToastIsPersistent())
+  {
+    if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
+    {
+      uiDismissToast();
+      clearInputLatch();
+      requestUIRedraw();
+    }
+    else
+    {
+      requestUIRedraw();
+    }
+
+    if (consumeUIRedrawRequest())
+      renderUI();
+
+    wifiTimeTick();
+
+    if (shouldTickAssetOtaNow())
+      assetOtaTick();
+    if (g_timeAnchorAttempted || timeIsSynced())
+      updateTime();
+    updateBattery();
+    batteryProtectionTick(now);
+    saveManagerTick();
+    maybePeriodicTimeSave();
+
+#if LED_STATUS_ENABLED
+    ledSetScreenOff(false);
+    ledUpdatePetStatus(computeLedMode());
+#endif
+
+    soundTick();
+    delay(10);
+    return;
+  }
+
+  // ---------------------------------------------------------------------------
   // LEVEL UP MODAL (blocks input until dismissed with ENTER or G)
   // ---------------------------------------------------------------------------
   {

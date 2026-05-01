@@ -14,6 +14,9 @@ void uiDrawLevelUpPopup();
 
 void ui_showMessage(const char *msg);
 void ui_showTimedMessage(const char *msg, uint32_t durationMs);
+bool uiToastIsActive();
+bool uiToastIsPersistent();
+void uiDismissToast();
 void ui_showSuccessMessage(const char *msg);
 
 void uiBeginAlertScreenFlash(uint8_t r, uint8_t g, uint8_t b);

@@ -18,7 +18,7 @@ static uint16_t g_levelUpPopupLevel = 0;
 
 static bool g_toastActive = false;
 static uint32_t g_toastUntilMs = 0;
-static char g_toastMsg[64] = {0};
+static char g_toastMsg[128] = {0};
 
 static bool g_alertScreenFlashActive = false;
 static uint32_t g_alertScreenFlashUntilMs = 0;
@@ -199,6 +199,27 @@ void ui_showMessage(const char *msg)
 void ui_showTimedMessage(const char *msg, uint32_t durationMs)
 {
   uiShowToastInternal(msg, durationMs);
+}
+
+bool uiToastIsActive()
+{
+  return g_toastActive;
+}
+
+bool uiToastIsPersistent()
+{
+  return g_toastActive && g_toastUntilMs == 0;
+}
+
+void uiDismissToast()
+{
+  if (!g_toastActive)
+    return;
+
+  g_toastActive = false;
+  g_toastUntilMs = 0;
+  g_toastMsg[0] = '\0';
+  requestFullUIRedraw();
 }
 
 void ui_showSuccessMessage(const char *msg)
