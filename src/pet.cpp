@@ -284,10 +284,19 @@ void Pet::petSleepTick()
   }
 
   static bool s_sleepFlagLatched = false;
+  static uint32_t lastSleepUpdate = 0;
+  static uint32_t sleepAccMs = 0;
+  static uint8_t sleepSubTick = 0;  // gate small sleep effects
+  static uint8_t sleepHealTick = 0; // gate HP regen during sleep
 
   if (!g_app.isSleeping)
   {
     s_sleepFlagLatched = false;
+    lastSleepUpdate = 0;
+    sleepAccMs = 0;
+    sleepSubTick = 0;
+    sleepHealTick = 0;
+    s_sleepRecoveryMessageShown = false;
     return;
   }
 
@@ -307,11 +316,6 @@ void Pet::petSleepTick()
     Serial.println("[SLEEP] entered → flag set");
     s_sleepFlagLatched = true;
   }
-
-  static uint32_t lastSleepUpdate = 0;
-  static uint32_t sleepAccMs = 0;
-  static uint8_t sleepSubTick = 0;  // gate small sleep effects
-  static uint8_t sleepHealTick = 0; // gate HP regen during sleep
 
   bool changed = false;
 
