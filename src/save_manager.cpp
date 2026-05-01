@@ -2136,6 +2136,8 @@ static bool loadSaveFromSD_internal()
 
   if (supportLoggingEnabled())
     Serial.printf("[SAVE] trying backup 1 path=%s\n", SAVE_BAK1_PATH);
+
+  if (loadSaveFileInternal(SAVE_BAK1_PATH))
   {
     if (supportLoggingEnabled())
       Serial.println("[SAVE] backup 1 load OK");

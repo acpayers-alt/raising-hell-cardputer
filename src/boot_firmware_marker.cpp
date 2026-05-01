@@ -1,5 +1,6 @@
 #include "boot_firmware_marker.h"
 
+#include "support_logging_state.h"
 #include <Arduino.h>
 #include <Preferences.h>
 
@@ -10,12 +11,9 @@ namespace
 {
 static constexpr const char *kBootPrefsNs = "rh_boot";
 static constexpr const char *kLastSeenBuildKey = "fw_id";
-}
+} // namespace
 
-const char *bootCurrentBuildId()
-{
-  return RH_BUILD_ID_STRING;
-}
+const char *bootCurrentBuildId() { return RH_BUILD_ID_STRING; }
 
 bool bootFirmwareMarkerRead(String &outBuildId)
 {
@@ -57,7 +55,8 @@ bool bootMarkFirmwareSeenAndRequestProvisionIfChanged()
   String lastSeenBuildId;
   if (!bootFirmwareMarkerRead(lastSeenBuildId))
   {
-    Serial.println("[BOOT][FW] prefs read failed; skipping firmware-change check");
+    if (supportLoggingEnabled())
+      Serial.println("[BOOT][FW] prefs read failed; skipping firmware-change check");
     return false;
   }
 
@@ -67,8 +66,7 @@ bool bootMarkFirmwareSeenAndRequestProvisionIfChanged()
   if (changed)
   {
     Serial.printf("[BOOT][FW] build changed old='%s' new='%s'\n",
-                  lastSeenBuildId.length() ? lastSeenBuildId.c_str() : "(none)",
-                  currentBuildId.c_str());
+                  lastSeenBuildId.length() ? lastSeenBuildId.c_str() : "(none)", currentBuildId.c_str());
 
     requestAssetProvisionOnNextBoot();
 
@@ -77,6 +75,7 @@ bool bootMarkFirmwareSeenAndRequestProvisionIfChanged()
   }
   else
   {
+    if (supportLoggingEnabled())
     Serial.printf("[BOOT][FW] build unchanged id='%s'\n", currentBuildId.c_str());
   }
 

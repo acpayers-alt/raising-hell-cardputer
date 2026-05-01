@@ -18,6 +18,7 @@
 #include "pet_state.h"
 #include "save_manager.h"
 #include "sleep_state.h"
+#include "support_logging_state.h"
 #include "ui_actions.h"
 #include "user_toggles_state.h"
 
@@ -313,10 +314,9 @@ void Pet::petSleepTick()
   {
     saveManagerSetSleepPendingFlag();
     saveManagerMarkDirty();
-    
-#if !PUBLIC_BUILD
-    Serial.println("[SLEEP] entered → flag set");
-#endif
+
+    if (supportLoggingEnabled())
+      Serial.println("[SLEEP] entered → flag set");
 
     s_sleepFlagLatched = true;
   }

@@ -86,6 +86,7 @@
 #include "debug.h"
 #include "esp_heap_caps.h"
 #include "runtime_log.h"
+#include "support_logging_state.h"
 #include "ui_state_pet_sleeping.h"
 #include "version.h"
 // End of includes
@@ -193,9 +194,10 @@ static bool bootAssetPackTooOld()
   const bool tooOld =
       (!haveInstalled || !installedPack.length() || compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0);
 
-  runtimeLogf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d", RH_MIN_REQUIRED_ASSET_PACK,
-              (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)", haveInstalled ? 1 : 0,
-              tooOld ? 1 : 0);
+  if (supportLoggingEnabled())
+    runtimeLogf("[BOOT][ASSET_VER] minRequired=%s installed=%s haveInstalled=%d tooOld=%d", RH_MIN_REQUIRED_ASSET_PACK,
+                (haveInstalled && installedPack.length()) ? installedPack.c_str() : "(none)", haveInstalled ? 1 : 0,
+                tooOld ? 1 : 0);
 
   return tooOld;
 }
@@ -723,7 +725,7 @@ static bool bootAssetProvisionWifiReady()
 
       return true;
     }
-    
+
     applyWifiPower(shouldEnableWifi);
 
     if (g_bootAssetProvisionMustComplete && shouldEnableWifi)
@@ -783,8 +785,9 @@ static void finalizeBootLanding()
   g_bootAssetProvisionMustComplete = false;
   g_bootProvisionWifiOnboardingStarted = false;
 
-  Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n", (int)s_bootFinalLandingState,
-                g_controlsHelpSeen ? 1 : 0, g_postProvisionControlsHelpPending ? 1 : 0);
+  if (supportLoggingEnabled())
+    Serial.printf("[BOOT][LAND] finalLanding=%d controlsHelpSeen=%d postProvisionHelp=%d\n",
+                  (int)s_bootFinalLandingState, g_controlsHelpSeen ? 1 : 0, g_postProvisionControlsHelpPending ? 1 : 0);
 
   // Ensure Wi-Fi is actually applied before any early-return landing detours
   // like controls help.
@@ -792,14 +795,16 @@ static void finalizeBootLanding()
   {
     const bool pref = settingsWifiEnabled();
 
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n", pref ? 1 : 0,
-                  (WiFi.getMode() == WIFI_OFF ? 0 : 1));
+    if (supportLoggingEnabled())
+      Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_before=%d\n", pref ? 1 : 0,
+                    (WiFi.getMode() == WIFI_OFF ? 0 : 1));
 
     wifiSetEnabled(pref);
     applyWifiPower(pref);
 
-    Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n", pref ? 1 : 0,
-                  (WiFi.getMode() == WIFI_OFF ? 0 : 1));
+    if (supportLoggingEnabled())
+      Serial.printf("[BOOT WIFI APPLY - FINALIZE] pref=%d runtime_after=%d\n", pref ? 1 : 0,
+                    (WiFi.getMode() == WIFI_OFF ? 0 : 1));
 
     g_wifiApplied = true;
   }
@@ -874,7 +879,7 @@ static void finalizeBootLanding()
 
     const bool fullRedraw = (s_bootFinalLandingState == UIState::TITLE_MENU);
     enterState(s_bootFinalLandingState, Tab::TAB_PET, fullRedraw);
-    
+
     if (s_bootFinalLandingState == UIState::PET_SLEEPING)
     {
       uiPetSleepingBootEnter();
@@ -1076,7 +1081,9 @@ void postBootInitTick()
       loadedFromSD = saveManagerLoad();
 
     const bool saveFileExistsNow = bootSaveFileExists();
-    runtimeLogf("[BOOT][SAVECHK] loadedFromSD=%d saveFileExists=%d", loadedFromSD ? 1 : 0, saveFileExistsNow ? 1 : 0);
+
+    if (supportLoggingEnabled())
+      runtimeLogf("[BOOT][SAVECHK] loadedFromSD=%d saveFileExists=%d", loadedFromSD ? 1 : 0, saveFileExistsNow ? 1 : 0);
 
     DBG_ON("[LOAD] saveManagerLoad -> %d\n", (int)loadedFromSD);
 
@@ -1112,22 +1119,26 @@ void postBootInitTick()
 
     const bool deferForAssetProvision = provisionRequested || provisionMandatory || provisionTooOld;
 
-    runtimeLogf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d",
-                settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
-                (int)afterOk);
+    if (supportLoggingEnabled())
+      runtimeLogf("[BOOTPIPE] settingsLoaded=%d saveLoaded=%d timeValid=%d firstBootWizard=%d afterOk=%d",
+                  settingsLoaded ? 1 : 0, loadedFromSD ? 1 : 0, timeIsValid() ? 1 : 0, firstBootWizard ? 1 : 0,
+                  (int)afterOk);
 
-    if (deferForAssetProvision)
-      runtimeLogLine("[BOOT] path=ASSET_PROVISION_PENDING");
-    else if (firstBootWizard)
-      runtimeLogLine("[BOOT] path=FIRST_BOOT_WIZARD");
-    else if (!timeIsValid())
-      runtimeLogLine("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
-    else if (loadedSaveExists && saveManagerSleepPendingFlagExists())
-      runtimeLogLine("[BOOT] path=PET_SLEEPING_RESTORE");
-    else if (!loadedSaveExists)
-      runtimeLogLine("[BOOT] path=TITLE_MENU_NO_SAVE");
-    else
-      runtimeLogLine("[BOOT] path=TITLE_MENU_NORMAL");
+    if (supportLoggingEnabled())
+    {
+      if (deferForAssetProvision)
+        runtimeLogLine("[BOOT] path=ASSET_PROVISION_PENDING");
+      else if (firstBootWizard)
+        runtimeLogLine("[BOOT] path=FIRST_BOOT_WIZARD");
+      else if (!timeIsValid())
+        runtimeLogLine("[BOOT] path=TIME_INVALID_WIFI_RECOVERY");
+      else if (loadedSaveExists && saveManagerSleepPendingFlagExists())
+        runtimeLogLine("[BOOT] path=PET_SLEEPING_RESTORE");
+      else if (!loadedSaveExists)
+        runtimeLogLine("[BOOT] path=TITLE_MENU_NO_SAVE");
+      else
+        runtimeLogLine("[BOOT] path=TITLE_MENU_NORMAL");
+    }
 
     if (!loadedFromSD)
     {
@@ -1164,7 +1175,7 @@ void postBootInitTick()
 
         return;
       }
-      
+
       drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
       g_bootAssetProvisionActive = true;
       requestUIRedraw();
@@ -1254,8 +1265,9 @@ void postBootInitTick()
       // Boot is complete — finalize landing NOW (this runs Wi-Fi apply)
       if (!g_bootLandingDone)
       {
-        Serial.printf("[BOOT] finalize direct landing=%d postBootInitDone=1 wifiApplied=%d\n",
-                      (int)s_bootFinalLandingState, g_wifiApplied ? 1 : 0);
+        if (supportLoggingEnabled())
+          Serial.printf("[BOOT] finalize direct landing=%d postBootInitDone=1 wifiApplied=%d\n",
+                        (int)s_bootFinalLandingState, g_wifiApplied ? 1 : 0);
 
         finalizeBootLanding();
         return;

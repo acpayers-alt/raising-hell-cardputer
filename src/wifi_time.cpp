@@ -2,6 +2,7 @@
 #include "app_state.h"
 #include "debug.h"
 #include "input_activity_state.h"
+#include "support_logging_state.h"
 #include "time_persist.h"
 #include "time_state.h"
 #include "timezone.h"
@@ -123,6 +124,7 @@ void wifiConsoleBeginConnect(const char *ssid, const char *pass)
   WiFi.scanDelete();
   delay(50);
 
+  if (supportLoggingEnabled())
   Serial.printf("[WIFI] begin connect ssid='%s' mode=%d status=%d\n",
                 ssid, (int)WiFi.getMode(), (int)WiFi.status());
 

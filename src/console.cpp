@@ -1046,7 +1046,12 @@ static void execLine(char *line)
   {
     if (argc == 1 || !strcmp(argv[1], "status"))
     {
-      logf("Support logging: %s", supportLoggingEnabled() ? "ON" : "OFF");
+      {
+        char buf[48];
+        snprintf(buf, sizeof(buf), "Support logging: %s", supportLoggingEnabled() ? "ON" : "OFF");
+        logLine(buf);
+      }
+
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
       logLine("Use 'supportlog on' to enable verbose boot/save/wifi logs.");
 #else

@@ -11,6 +11,7 @@
 #include "motion.h"
 #include "save_manager.h"
 #include "sdcard.h"
+#include "support_logging_state.h"
 #include <SD.h>
 
 static const char *WARDRIVE_PATH = "/raising_hell/save/warwalk.bin";
@@ -97,8 +98,9 @@ static bool loadWarwalkPersist()
   s_stepsTowardRoll = p.stepsTowardRoll;
   s_lastPersistSteps = s_stepsToday;
 
-  Serial.printf("[WARWALK] loaded day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
-                (unsigned long)s_hitsToday);
+  if (supportLoggingEnabled())
+    Serial.printf("[WARWALK] loaded day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
+                  (unsigned long)s_hitsToday);
 
   return true;
 }
@@ -155,8 +157,9 @@ static void saveWarwalkPersist(bool force)
   s_lastPersistMs = now;
   s_lastPersistSteps = s_stepsToday;
 
-  Serial.printf("[WARWALK] saved day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
-                (unsigned long)s_hitsToday);
+  if (supportLoggingEnabled())
+    Serial.printf("[WARWALK] saved day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
+                  (unsigned long)s_hitsToday);
 }
 
 static bool wardriveStepTrackingAllowed()
@@ -215,7 +218,8 @@ static void resetIfNewDay()
     s_haveBaseline = false;
     saveWarwalkPersist(true);
 
-    Serial.println("[WARWALK] daily counter reset");
+    if (supportLoggingEnabled())
+      Serial.println("[WARWALK] daily counter reset");
   }
 }
 
@@ -296,7 +300,7 @@ void wardriveStepsNotifyUserActivity()
   }
 
   ui_showTimedMessage(msg, 0);
-  
+
   s_pendingHits = 0;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;

@@ -1,5 +1,6 @@
 #include "wifi_power.h"
 
+#include "support_logging_state.h"
 #include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
@@ -8,12 +9,14 @@
 
 void applyWifiPower(bool enable)
 {
-  Serial.printf("[WIFI POWER] enable=%d mode=%d status=%d\n", enable ? 1 : 0, (WiFi.getMode() == WIFI_OFF ? 0 : 1),
-                (int)WiFi.status());
+  if (supportLoggingEnabled())
+    Serial.printf("[WIFI POWER] enable=%d mode=%d status=%d\n", enable ? 1 : 0, (WiFi.getMode() == WIFI_OFF ? 0 : 1),
+                  (int)WiFi.status());
 
   if (!enable)
   {
-    Serial.println("[WIFI POWER] disabling radio");
+    if (supportLoggingEnabled())
+      Serial.println("[WIFI POWER] disabling radio");
     WiFi.setAutoReconnect(false);
     WiFi.disconnect(true, true);
     WiFi.mode(WIFI_OFF);
@@ -28,12 +31,14 @@ void applyWifiPower(bool enable)
   String ssid, pass;
   if (wifiStoreLoad(ssid, pass) && ssid.length() > 0)
   {
-    Serial.printf("[WIFI POWER] begin managed connect ssid='%s'\n", ssid.c_str());
+    if (supportLoggingEnabled())
+      Serial.printf("[WIFI POWER] begin managed connect ssid='%s'\n", ssid.c_str());
     wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
   }
   else
   {
-    Serial.println("[WIFI POWER] no stored creds; Wi-Fi remains enabled but idle");
+    if (supportLoggingEnabled())
+      Serial.println("[WIFI POWER] no stored creds; Wi-Fi remains enabled but idle");
     // Do NOT disconnect or turn Wi-Fi back off here.
     // Leave STA mode up so manual enable actually stays enabled.
   }

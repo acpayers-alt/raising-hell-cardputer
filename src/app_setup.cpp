@@ -25,8 +25,8 @@
 #include "app_state.h"
 #include "boot_pipeline.h"
 #include "runtime_log.h"
-#include "system_status_state.h"
 #include "support_logging_state.h"
+#include "system_status_state.h"
 #include "version.h"
 
 // --- Display / input / UX -----------------------------------------------------
@@ -109,13 +109,16 @@ static void clearStaleCoreDumpIfNeeded()
   }
 
   if (chk == ESP_ERR_NOT_FOUND)
-  {
     return;
-  }
 
-  Serial.printf("[BOOT][COREDUMP] corrupt/invalid coredump detected err=%d; erasing\n", (int)chk);
-  esp_err_t er = esp_core_dump_image_erase();
-  Serial.printf("[BOOT][COREDUMP] erase result=%d\n", (int)er);
+  // Some builds/partition layouts report an invalid coredump area every boot.
+  // Do not spam public logs unless support logging is enabled.
+  if (supportLoggingEnabled())
+  {
+    Serial.printf("[BOOT][COREDUMP] corrupt/invalid coredump detected err=%d; erasing\n", (int)chk);
+    esp_err_t er = esp_core_dump_image_erase();
+    Serial.printf("[BOOT][COREDUMP] erase result=%d\n", (int)er);
+  }
 }
 
 static void serialBootHandshake(uint32_t waitMs)
@@ -149,13 +152,13 @@ void appSetup()
   delay(50);
   serialBootHandshake(2500);
 
-if (supportLoggingEnabled())
-{
-  Serial.printf("[PSRAM] size=%u free=%u\n", (unsigned)ESP.getPsramSize(), (unsigned)ESP.getFreePsram());
+  if (supportLoggingEnabled())
+  {
+    Serial.printf("[PSRAM] size=%u free=%u\n", (unsigned)ESP.getPsramSize(), (unsigned)ESP.getFreePsram());
 
-  Serial.printf("[HEAP] free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-}
+    Serial.printf("[HEAP] free=%u largest=%u\n", (unsigned)ESP.getFreeHeap(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  }
 
 // DO NOT use 0 here; on some ESP32 CDC builds this can cause "no output ever".
 // Keep it small so we still don't block hard when host isn't ready.
@@ -217,7 +220,8 @@ if (supportLoggingEnabled())
 
   {
     const esp_reset_reason_t rr = esp_reset_reason();
-    bootPrintf("[BOOT] reset=%s (%d)\n", resetReasonStr(rr), (int)rr);
+    if (supportLoggingEnabled())
+      bootPrintf("[BOOT] reset=%s (%d)\n", resetReasonStr(rr), (int)rr);
   }
 
   auto cfg = M5.config();
@@ -419,5 +423,6 @@ if (supportLoggingEnabled())
                   (ch == AssetOtaChannel::DEV) ? "DEV" : "PUBLIC", manifestUrl ? manifestUrl : "(null)");
   }
 
-  bootPrintln("[BOOT] setup complete");
+  if (supportLoggingEnabled())
+    bootPrintln("[BOOT] setup complete");
 }
