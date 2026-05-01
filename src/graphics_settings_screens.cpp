@@ -436,8 +436,8 @@ static void drawGameOptionsMenu()
   snprintf(passiveXpLine, sizeof(passiveXpLine), "Passive XP: %s", passiveXpEnabled ? "ON" : "OFF");
 
   char stepCounterLine[32];
-  snprintf(stepCounterLine, sizeof(stepCounterLine), "Step Counter: %s", isWardrivingEnabled() ? "ON" : "OFF");
-
+  snprintf(stepCounterLine, sizeof(stepCounterLine), "Step Counter: %s", isStepCounterEnabled() ? "ON" : "OFF");
+  
   char deathLine[32];
   snprintf(deathLine, sizeof(deathLine), "Pet Death: %s", petDeathEnabled ? "ON" : "OFF");
 

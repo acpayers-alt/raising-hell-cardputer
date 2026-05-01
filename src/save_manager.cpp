@@ -987,7 +987,7 @@ struct GameOptionsData
   uint32_t magic;
   uint16_t version;
   uint8_t decayMode;
-  uint8_t wardrivingEnabled; // NEW
+  uint8_t stepCounterEnabled;
 };
 
 static GameOptionsData g_gameopt = {GAMEOPT_MAGIC, GAMEOPT_VERSION, 2, 0};
@@ -997,7 +997,7 @@ static void gameoptDefaults()
   g_gameopt.magic = GAMEOPT_MAGIC;
   g_gameopt.version = GAMEOPT_VERSION;
   g_gameopt.decayMode = 2;
-  g_gameopt.wardrivingEnabled = 0;
+  g_gameopt.stepCounterEnabled = 0;
 }
 
 static bool loadGameOptionsFromSD_internal()
@@ -1049,21 +1049,14 @@ static bool loadGameOptionsFromSD_internal()
     else
       tmp.decayMode = 0;
 
-    tmp.wardrivingEnabled = 0;
+      tmp.stepCounterEnabled = 0;
     tmp.version = GAMEOPT_VERSION;
   }
 
   // Migration v2 -> v3
   if (tmp.version == 2)
   {
-    tmp.wardrivingEnabled = 0;
-    tmp.version = GAMEOPT_VERSION;
-  }
-
-  // Migration v2 -> v3
-  if (tmp.version == 2)
-  {
-    tmp.wardrivingEnabled = 0; // default OFF
+    tmp.stepCounterEnabled = 0;
     tmp.version = GAMEOPT_VERSION;
   }
 
@@ -1108,11 +1101,11 @@ static bool saveGameOptionsToSD_internal()
   return true;
 }
 
-bool isWardrivingEnabled() { return g_gameopt.wardrivingEnabled != 0; }
+bool isStepCounterEnabled() { return g_gameopt.stepCounterEnabled != 0; }
 
-void setWardrivingEnabled(bool en)
+void setStepCounterEnabled(bool en)
 {
-  g_gameopt.wardrivingEnabled = en ? 1 : 0;
+  g_gameopt.stepCounterEnabled = en ? 1 : 0;
   saveGameOptionsToSD_internal();
 }
 

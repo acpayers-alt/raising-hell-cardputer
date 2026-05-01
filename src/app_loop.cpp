@@ -280,7 +280,7 @@ void appMainLoopTick()
     maybePeriodicTimeSave();
 
     // Pocket Mode: screen is blank, but safe idle states still track fictional
-    // wardriving steps. This does not scan Wi-Fi or touch real networks.
+    // War Walking steps. This does not scan Wi-Fi or touch real networks.
     wardriveStepsTick(now);
 
     const bool sleepingNow_off = isPetSleepingNow();
@@ -377,7 +377,7 @@ void appMainLoopTick()
 
   InputState input = readInput();
 
-  // Wardriving is accelerometer/RNG only. No real Wi-Fi scanning occurs.
+  // War Walking is accelerometer/RNG only. No real Wi-Fi scanning occurs.
   wardriveStepsTick(now);
 
 #if LED_STATUS_ENABLED

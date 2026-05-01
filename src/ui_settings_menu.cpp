@@ -626,17 +626,9 @@ static void actGame_TogglePassiveXp(InputState &)
   clearInputLatch();
 }
 
-static void actGame_ToggleWardriving(InputState &)
-{
-  setWardrivingEnabled(!isWardrivingEnabled());
-  requestUIRedraw();
-  playBeep();
-  clearInputLatch();
-}
-
 static void actGame_ToggleStepCounter(InputState &)
 {
-  setWardrivingEnabled(!isWardrivingEnabled());
+  setStepCounterEnabled(!isStepCounterEnabled());
   requestUIRedraw();
   playBeep();
   clearInputLatch();

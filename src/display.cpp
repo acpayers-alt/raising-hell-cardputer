@@ -53,13 +53,34 @@ static int voltageToPercent(int mv)
     int mv;
     int pct;
   };
+
+  // Cardputer battery reporting is voltage-based. This curve is intentionally
+  // conservative at the top and more forgiving through the middle/lower band,
+  // because the old curve reported ~3.7V as nearly empty.
   static const Point kCurve[] = {
-      {4200, 100}, {4160, 95}, {4110, 88}, {4060, 80}, {4010, 72}, {3960, 64}, {3910, 56}, {3870, 48}, {3830, 40},
-      {3790, 32},  {3750, 24}, {3710, 17}, {3670, 11}, {3630, 6},  {3590, 3},  {3550, 1},  {3500, 0},
+      {4200, 100},
+      {4160, 96},
+      {4120, 92},
+      {4080, 87},
+      {4040, 82},
+      {4000, 76},
+      {3960, 69},
+      {3920, 62},
+      {3880, 55},
+      {3840, 47},
+      {3800, 39},
+      {3760, 31},
+      {3720, 24},
+      {3680, 17},
+      {3640, 11},
+      {3600, 6},
+      {3560, 2},
+      {3520, 0},
   };
 
   if (mv >= kCurve[0].mv)
     return 100;
+
   const int last = (int)(sizeof(kCurve) / sizeof(kCurve[0])) - 1;
   if (mv <= kCurve[last].mv)
     return 0;
@@ -68,11 +89,14 @@ static int voltageToPercent(int mv)
   {
     if (mv <= kCurve[i].mv && mv >= kCurve[i + 1].mv)
     {
-      const int x0 = kCurve[i].mv, y0 = kCurve[i].pct;
-      const int x1 = kCurve[i + 1].mv, y1 = kCurve[i + 1].pct;
+      const int x0 = kCurve[i].mv;
+      const int y0 = kCurve[i].pct;
+      const int x1 = kCurve[i + 1].mv;
+      const int y1 = kCurve[i + 1].pct;
       return y0 + (mv - x0) * (y1 - y0) / (x1 - x0);
     }
   }
+
   return 0;
 }
 
@@ -584,9 +608,9 @@ void batteryProtectionTick(uint32_t now)
     return;
   }
 
-  const bool lowNow = (mv > 0 && mv <= 3550);
-  const bool critNow = (mv > 0 && mv <= 3475);
-
+  const bool lowNow = (mv > 0 && mv <= 3600);
+  const bool critNow = (mv > 0 && mv <= 3500);
+  
   if (lowNow)
   {
     if (!lowSinceMs)

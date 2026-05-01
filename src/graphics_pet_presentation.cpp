@@ -229,7 +229,7 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   {
     ok = buildPetLayerCacheViaSpr(bgPath);
   }
-  
+
   if (!ok)
   {
     s_petBgHardFail = true;
@@ -947,9 +947,9 @@ bool drawIntroWalkingPetOverride()
   return ok;
 }
 
-static void drawWardriveStepBadge()
+static void drawStepCounterBadge()
 {
-  if (!isWardrivingEnabled())
+  if (!isStepCounterEnabled())
     return;
 
   const uint32_t steps = wardriveStepsToday();
@@ -1052,7 +1052,7 @@ static void drawPetScreenImpl(bool redrawBg)
   }
 
   drawMiniStatPreview();
-  drawWardriveStepBadge();
+  drawStepCounterBadge();
   drawTabBar();
   drawPetPerfHud();
 }

@@ -19,7 +19,6 @@ static uint32_t s_lastPersistSteps = 0;
 
 static constexpr uint32_t kSampleScreenOnMs = 50;
 static constexpr uint32_t kSamplePocketModeMs = 120;
-static constexpr int kStepDeltaMg = 320;
 static constexpr uint32_t kStepCooldownMs = 680;
 static constexpr uint16_t kStepsPerWardriveRoll = 18;
 static constexpr uint8_t kHitChancePct = 22;
@@ -57,17 +56,29 @@ struct WarwalkPersist
 
 static constexpr uint32_t WARWALK_MAGIC = 0x5757414C; // 'WWAL'
 
-static void loadWarwalkPersist()
+static bool loadWarwalkPersist()
 {
-  if (!g_sdReady || !SD.exists(WARDRIVE_PATH))
-    return;
+  if (!g_sdReady)
+    return false;
+
+  if (!SD.exists(WARDRIVE_PATH))
+  {
+    Serial.println("[WARWALK] no persist file");
+    return true;
+  }
 
   File f = SD.open(WARDRIVE_PATH, FILE_READ);
-  if (!f || f.size() != sizeof(WarwalkPersist))
+  if (!f)
   {
-    if (f)
-      f.close();
-    return;
+    Serial.println("[WARWALK] load failed: open");
+    return true;
+  }
+
+  if (f.size() != sizeof(WarwalkPersist))
+  {
+    Serial.printf("[WARWALK] load rejected: size=%u want=%u\n", (unsigned)f.size(), (unsigned)sizeof(WarwalkPersist));
+    f.close();
+    return true;
   }
 
   WarwalkPersist p{};
@@ -75,15 +86,21 @@ static void loadWarwalkPersist()
   f.close();
 
   if (r != (int)sizeof(p) || p.magic != WARWALK_MAGIC)
-    return;
+  {
+    Serial.println("[WARWALK] load rejected: bad read/magic");
+    return true;
+  }
 
   s_dayKey = p.dayKey;
   s_stepsToday = p.stepsToday;
   s_hitsToday = p.hitsToday;
   s_stepsTowardRoll = p.stepsTowardRoll;
+  s_lastPersistSteps = s_stepsToday;
 
   Serial.printf("[WARWALK] loaded day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
                 (unsigned long)s_hitsToday);
+
+  return true;
 }
 
 static void saveWarwalkPersist(bool force)
@@ -102,6 +119,12 @@ static void saveWarwalkPersist(bool force)
       return;
   }
 
+  if (!SD.exists("/raising_hell"))
+    SD.mkdir("/raising_hell");
+
+  if (!SD.exists("/raising_hell/save"))
+    SD.mkdir("/raising_hell/save");
+
   WarwalkPersist p{};
   p.magic = WARWALK_MAGIC;
   p.dayKey = s_dayKey;
@@ -109,16 +132,31 @@ static void saveWarwalkPersist(bool force)
   p.hitsToday = s_hitsToday;
   p.stepsTowardRoll = s_stepsTowardRoll;
 
+  if (SD.exists(WARDRIVE_PATH))
+    SD.remove(WARDRIVE_PATH);
+
   File f = SD.open(WARDRIVE_PATH, FILE_WRITE);
   if (!f)
+  {
+    Serial.println("[WARWALK] save failed: open");
     return;
+  }
 
-  f.write((const uint8_t *)&p, sizeof(p));
+  const size_t w = f.write((const uint8_t *)&p, sizeof(p));
   f.flush();
   f.close();
 
+  if (w != sizeof(p))
+  {
+    Serial.printf("[WARWALK] save short write got=%u want=%u\n", (unsigned)w, (unsigned)sizeof(p));
+    return;
+  }
+
   s_lastPersistMs = now;
   s_lastPersistSteps = s_stepsToday;
+
+  Serial.printf("[WARWALK] saved day=%d steps=%lu hits=%lu\n", s_dayKey, (unsigned long)s_stepsToday,
+                (unsigned long)s_hitsToday);
 }
 
 static bool wardriveStepTrackingAllowed()
@@ -176,8 +214,8 @@ static void resetIfNewDay()
     s_pendingItem = ITEM_NONE;
     s_haveBaseline = false;
     saveWarwalkPersist(true);
-    
-    Serial.println("[WARDRIVE] daily counter reset");
+
+    Serial.println("[WARWALK] daily counter reset");
   }
 }
 
@@ -249,12 +287,12 @@ void wardriveStepsNotifyUserActivity()
   if (s_pendingItem != ITEM_NONE)
   {
     const char *itemName = g_app.inventory.getItemLabelForType(s_pendingItem);
-    snprintf(msg, sizeof(msg), "Wardriving hit!\n%u signals\nINF +%d\n%s +1", (unsigned)s_pendingHits, s_pendingInf,
+    snprintf(msg, sizeof(msg), "War Walking hit!\n%u signals\nINF +%d\n%s +1", (unsigned)s_pendingHits, s_pendingInf,
              (itemName && itemName[0]) ? itemName : "ITEM");
   }
   else
   {
-    snprintf(msg, sizeof(msg), "Wardriving hit!\n%u signals\nINF +%d", (unsigned)s_pendingHits, s_pendingInf);
+    snprintf(msg, sizeof(msg), "War Walking hit!\n%u signals\nINF +%d", (unsigned)s_pendingHits, s_pendingInf);
   }
 
   ui_showMessage(msg);
@@ -262,6 +300,7 @@ void wardriveStepsNotifyUserActivity()
   s_pendingHits = 0;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
+  saveWarwalkPersist(true);
 }
 
 void wardriveStepsTick(uint32_t nowMs)
@@ -271,8 +310,10 @@ void wardriveStepsTick(uint32_t nowMs)
   static bool s_loadedPersist = false;
   if (!s_loadedPersist)
   {
+    if (!loadWarwalkPersist())
+      return;
+
     s_loadedPersist = true;
-    loadWarwalkPersist();
     resetIfNewDay();
   }
 
