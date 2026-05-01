@@ -401,8 +401,8 @@ void petAutonomyNotifyIfPending(uint32_t nowMs)
     first = false;
   }
 
-  ui_showTimedMessage(msg, 3200);
-
+  ui_showTimedMessage(msg, 0);
+  
   Serial.printf("[PET][AUTO] summary pizzaCount=%u pizzaInf=%d mischiefCount=%u mischiefInf=%d autoSleep=%u\n",
                 (unsigned)s_pizzaCount, (int)s_pizzaInfSpent, (unsigned)s_mischiefCount, (int)s_mischiefInfLost,
                 (unsigned)s_autoSleepCount);

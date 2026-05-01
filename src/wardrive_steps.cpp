@@ -295,8 +295,8 @@ void wardriveStepsNotifyUserActivity()
     snprintf(msg, sizeof(msg), "War Walking hit!\n%u signals\nINF +%d", (unsigned)s_pendingHits, s_pendingInf);
   }
 
-  ui_showMessage(msg);
-
+  ui_showTimedMessage(msg, 0);
+  
   s_pendingHits = 0;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
