@@ -125,8 +125,7 @@ void wifiConsoleBeginConnect(const char *ssid, const char *pass)
   delay(50);
 
   if (supportLoggingEnabled())
-  Serial.printf("[WIFI] begin connect ssid='%s' mode=%d status=%d\n",
-                ssid, (int)WiFi.getMode(), (int)WiFi.status());
+    Serial.printf("[WIFI] begin connect ssid='%s' mode=%d status=%d\n", ssid, (int)WiFi.getMode(), (int)WiFi.status());
 
   WiFi.begin(ssid, pass);
   s_lastWifiAttemptMs = millis();
@@ -505,6 +504,7 @@ void wifiTimeTick()
     {
       s_timeSynced = true;
       applyTimezoneIndex(tzIndex);
+      timeMarkClean();
       Serial.println("[TIME] SYNCED");
     }
   }
@@ -519,7 +519,4 @@ bool timeIsSynced()
   return s_timeSynced || (t > 1704067200);
 }
 
-bool timeIsNtpSyncedStrict()
-{
-  return s_timeSynced;
-}
+bool timeIsNtpSyncedStrict() { return s_timeSynced; }

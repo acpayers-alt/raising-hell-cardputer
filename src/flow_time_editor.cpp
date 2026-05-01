@@ -160,7 +160,10 @@ static void commitSetTime()
     settimeofday(&tv, nullptr);
   }
 
-  // Persist anchor used by your time system.
+  // Manual time set is user-confirmed, so treat it as clean.
+  timeMarkClean();
+
+  // Persist anchor used by time system.
   saveTimeAnchor();
 }
 

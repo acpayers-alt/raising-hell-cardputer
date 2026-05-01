@@ -6,6 +6,7 @@
 #include "graphics_shared_utils.h"
 #include "pet.h"
 #include "system_status_state.h"
+#include "time_persist.h"
 #include "time_state.h"
 #include "ui_icons.h"
 #include "wifi_time.h"
@@ -31,10 +32,11 @@ PetUIColorScheme uiSchemeForPet(PetType t)
 
 String formatTime()
 {
+  if (!timeIsValid())
+    return "! --:--";
+
   if (currentHour < 0 || currentMinute < 0 || currentHour > 23 || currentMinute > 59)
-  {
-    return "--:--";
-  }
+    return "! --:--";
 
   int h = currentHour;
   bool pm = false;
@@ -54,8 +56,9 @@ String formatTime()
     pm = true;
   }
 
-  char buf[9];
-  snprintf(buf, sizeof(buf), "%d:%02d %s", h, currentMinute, pm ? "PM" : "AM");
+  char buf[12];
+  const char *prefix = timeIsDirty() ? "* " : "";
+  snprintf(buf, sizeof(buf), "%s%d:%02d %s", prefix, h, currentMinute, pm ? "PM" : "AM");
   return String(buf);
 }
 

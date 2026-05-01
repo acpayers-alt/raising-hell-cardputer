@@ -6,6 +6,7 @@
 #include "graphics_pet_presentation.h"
 #include "pet.h"
 #include "save_manager.h"
+#include "time_persist.h"
 
 extern Pet pet;
 extern bool g_sdReady;
@@ -37,13 +38,20 @@ void drawClockModeScreen(bool redrawBg)
     tm tmNow = {};
     localtime_r(&now, &tmNow);
 
-    int hour12 = tmNow.tm_hour % 12;
-    if (hour12 == 0)
-      hour12 = 12;
+    char timeBuf[10];
 
-    char timeBuf[8];
-    snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
+    if (!timeIsValid())
+    {
+      snprintf(timeBuf, sizeof(timeBuf), "--:--!");
+    }
+    else
+    {
+      int hour12 = tmNow.tm_hour % 12;
+      if (hour12 == 0)
+        hour12 = 12;
 
+      snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min, timeIsDirty() ? "*" : "");
+    }
     static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
@@ -51,7 +59,10 @@ void drawClockModeScreen(bool redrawBg)
     const char *month = (tmNow.tm_mon >= 0 && tmNow.tm_mon < 12) ? kMonths[tmNow.tm_mon] : "---";
 
     char dateBuf[24];
-    snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
+    if (!timeIsValid())
+      snprintf(dateBuf, sizeof(dateBuf), "Connect WiFi for time");
+    else
+      snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
 
     spr.setTextColor(TFT_WHITE);
 
@@ -115,12 +126,20 @@ void drawClockModeScreen(bool redrawBg)
   tm tmNow = {};
   localtime_r(&now, &tmNow);
 
-  int hour12 = tmNow.tm_hour % 12;
-  if (hour12 == 0)
-    hour12 = 12;
+  char timeBuf[10];
 
-  char timeBuf[8];
-  snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", hour12, tmNow.tm_min);
+  if (!timeIsValid())
+  {
+    snprintf(timeBuf, sizeof(timeBuf), "--:--!");
+  }
+  else
+  {
+    int hour12 = tmNow.tm_hour % 12;
+    if (hour12 == 0)
+      hour12 = 12;
+
+    snprintf(timeBuf, sizeof(timeBuf), "%d:%02d%s", hour12, tmNow.tm_min, timeIsDirty() ? "*" : "");
+  }
 
   static const char *kWeekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
   static const char *kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -129,8 +148,11 @@ void drawClockModeScreen(bool redrawBg)
   const char *month = (tmNow.tm_mon >= 0 && tmNow.tm_mon < 12) ? kMonths[tmNow.tm_mon] : "---";
 
   char dateBuf[24];
-  snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
-
+  if (!timeIsValid())
+    snprintf(dateBuf, sizeof(dateBuf), "Connect WiFi for time");
+  else
+    snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", weekday, month, tmNow.tm_mday);
+    
   spr.setTextColor(TFT_WHITE);
 
   spr.setTextDatum(TC_DATUM);
