@@ -1106,7 +1106,18 @@ void postBootInitTick()
 
     s_bootFinalLandingState = afterOk;
 
-    bootMarkFirmwareSeenAndRequestProvisionIfChanged();
+    const bool firmwareChanged = bootMarkFirmwareSeenAndRequestProvisionIfChanged();
+
+    if (firmwareChanged)
+    {
+      // Upgrade install: re-arm the full post-boot info sequence.
+      // This makes Care Guide -> What's New run on the first normal landing
+      // after the upgraded firmware boots.
+      g_controlsHelpSeen = 0;
+      g_whatsNewSeen = 0;
+      saveSettingsToSD();
+    }
+
     const bool provisionRequested = bootAssetProvisionRequested();
     const bool provisionMandatory = bootAssetProvisionMandatory();
     const bool provisionTooOld = bootAssetPackTooOld();

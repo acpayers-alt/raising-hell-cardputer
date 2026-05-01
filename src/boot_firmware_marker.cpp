@@ -20,8 +20,11 @@ bool bootFirmwareMarkerRead(String &outBuildId)
   outBuildId = "";
 
   Preferences prefs;
+
+  // On a fresh install/upgrade path, the namespace may not exist yet.
+  // Treat that as "no firmware seen" instead of skipping the upgrade check.
   if (!prefs.begin(kBootPrefsNs, true))
-    return false;
+    return true;
 
   outBuildId = prefs.getString(kLastSeenBuildKey, "");
   prefs.end();
