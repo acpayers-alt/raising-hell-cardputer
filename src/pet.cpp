@@ -313,7 +313,10 @@ void Pet::petSleepTick()
   {
     saveManagerSetSleepPendingFlag();
     saveManagerMarkDirty();
+#if !PUBLIC_BUILD
     Serial.println("[SLEEP] entered → flag set");
+#endif
+
     s_sleepFlagLatched = true;
   }
 

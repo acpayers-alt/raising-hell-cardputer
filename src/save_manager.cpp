@@ -1049,7 +1049,7 @@ static bool loadGameOptionsFromSD_internal()
     else
       tmp.decayMode = 0;
 
-      tmp.stepCounterEnabled = 0;
+    tmp.stepCounterEnabled = 0;
     tmp.version = GAMEOPT_VERSION;
   }
 
@@ -1818,8 +1818,11 @@ static bool saveSettingsToSD_internal()
   g_settings.soundEnabled = soundEnabled;
   g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
 
+#if !PUBLIC_BUILD
   Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
                 wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
+#endif
+
   g_settings.tzIndex = tzIndex;
 
   if (autoClockTimeoutSel != 3)
@@ -2217,8 +2220,10 @@ static bool saveSaveToSD_internal()
     return false;
   }
 
+#if !PUBLIC_BUILD
   Serial.printf("[SAVE] WRITE OK path=%s level=%u xp=%lu name='%s' pending=%d\n", SAVE_PATH, (unsigned)pet.level,
                 (unsigned long)pet.xp, pet.name, namePendingFlagExists() ? 1 : 0);
+#endif
 
   return true;
 }
