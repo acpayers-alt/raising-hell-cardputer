@@ -661,27 +661,52 @@ void appMainLoopTick()
 
   // ---------------------------------------------------------------------------
   // PERSISTENT TOAST / RESULT POPUP
-  //   durationMs == 0 means "stay until dismissed".
-  //   These are used by autonomous events and War Walking results.
   // ---------------------------------------------------------------------------
   if (uiToastIsPersistent())
   {
     if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
     {
       uiDismissToast();
+  
+      // HARD CONSUME: this input must not leak into the rest of the frame
+      inputForceClear();
+      input = InputState{};
       clearInputLatch();
+  
       requestUIRedraw();
+  
+      if (consumeUIRedrawRequest())
+        renderUI();
+  
+      // Keep background systems ticking, but DO NOT process gameplay/input
+      wifiTimeTick();
+      if (shouldTickAssetOtaNow())
+        assetOtaTick();
+      if (g_timeAnchorAttempted || timeIsSynced())
+        updateTime();
+      updateBattery();
+      batteryProtectionTick(now);
+      saveManagerTick();
+      maybePeriodicTimeSave();
+  
+  #if LED_STATUS_ENABLED
+      ledSetScreenOff(false);
+      ledUpdatePetStatus(computeLedMode());
+  #endif
+  
+      soundTick();
+      delay(10);
+      return;
     }
-    else
-    {
-      requestUIRedraw();
-    }
-
+  
+    // No dismiss yet — just keep it visible
+    requestUIRedraw();
+  
     if (consumeUIRedrawRequest())
       renderUI();
-
+  
     wifiTimeTick();
-
+  
     if (shouldTickAssetOtaNow())
       assetOtaTick();
     if (g_timeAnchorAttempted || timeIsSynced())
@@ -690,17 +715,17 @@ void appMainLoopTick()
     batteryProtectionTick(now);
     saveManagerTick();
     maybePeriodicTimeSave();
-
-#if LED_STATUS_ENABLED
+  
+  #if LED_STATUS_ENABLED
     ledSetScreenOff(false);
     ledUpdatePetStatus(computeLedMode());
-#endif
-
+  #endif
+  
     soundTick();
     delay(10);
     return;
   }
-
+  
   // ---------------------------------------------------------------------------
   // LEVEL UP MODAL (blocks input until dismissed with ENTER or G)
   // ---------------------------------------------------------------------------

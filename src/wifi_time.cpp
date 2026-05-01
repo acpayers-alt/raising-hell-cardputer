@@ -38,7 +38,7 @@ static uint32_t s_lastWifiAttemptMs = 0;
 static uint32_t s_lastRssiMs = 0;
 static uint32_t s_lastTimeCheckMs = 0;
 
-static constexpr uint32_t WIFI_RETRY_MS = 5000;
+static constexpr uint32_t WIFI_RETRY_MS = 2500;
 static constexpr uint32_t RSSI_POLL_MS = 1000;
 
 // ---- Event -> Tick handoff ----
@@ -291,12 +291,21 @@ static void onWiFiEvent(WiFiEvent_t event)
 
 static void tryWiFiConnect()
 {
+  static int s_retryProfileIndex = 0;
+
   String ssid;
   String pass;
 
-  if (wifiStoreLoad(ssid, pass) && ssid.length() > 0)
+  bool found = false;
+
+  for (int tries = 0; tries < WIFI_PROFILE_MAX; ++tries)
   {
-    Serial.printf("[WIFI] retry stored ssid='%s'\n", ssid.c_str());
+    const int idx = (s_retryProfileIndex + tries) % WIFI_PROFILE_MAX;
+
+    if (!wifiStoreLoadProfile(idx, ssid, pass) || ssid.length() == 0)
+      continue;
+
+    Serial.printf("[WIFI] retry stored profile=%d ssid='%s'\n", idx, ssid.c_str());
 
     if (!s_wifiEventHooked)
     {
@@ -312,19 +321,25 @@ static void tryWiFiConnect()
 
     strncpy(s_consoleSsidBuf, ssid.c_str(), sizeof(s_consoleSsidBuf) - 1);
     s_consoleSsidBuf[sizeof(s_consoleSsidBuf) - 1] = '\0';
-    return;
+
+    // Advance for next retry cycle
+    s_retryProfileIndex = (idx + 1) % WIFI_PROFILE_MAX;
+
+    found = true;
+    break;
+  }
+
+  if (!found)
+  {
+    s_retryProfileIndex = 0;
   }
 
 #if defined(WIFI_SSID) && defined(WIFI_PASS)
-  if (strlen(WIFI_SSID) == 0)
+  if (!found && strlen(WIFI_SSID) > 0)
   {
-    DBGLN_ON("[WIFI] SSID empty, not connecting");
-    return;
+    DBG_ON("[WIFI] begin fallback ssid='%s'\n", WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
   }
-
-  DBG_ON("[WIFI] begin ssid='%s' len=%d\n", WIFI_SSID, (int)strlen(WIFI_SSID));
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  DBGLN_ON("[WIFI] WiFi.begin() called");
 #endif
 }
 

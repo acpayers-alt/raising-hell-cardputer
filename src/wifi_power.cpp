@@ -1,7 +1,6 @@
 #include "wifi_power.h"
 
 #include "support_logging_state.h"
-#include "wifi_power.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
 #include <Preferences.h>
@@ -29,13 +28,22 @@ void applyWifiPower(bool enable)
   WiFi.setAutoReconnect(true);
 
   String ssid, pass;
-  if (wifiStoreLoad(ssid, pass) && ssid.length() > 0)
+  bool found = false;
+
+  for (int i = 0; i < WIFI_PROFILE_MAX; ++i)
   {
+    if (!wifiStoreLoadProfile(i, ssid, pass) || ssid.length() == 0)
+      continue;
+
     if (supportLoggingEnabled())
-      Serial.printf("[WIFI POWER] begin managed connect ssid='%s'\n", ssid.c_str());
+      Serial.printf("[WIFI POWER] begin managed connect profile=%d ssid='%s'\n", i, ssid.c_str());
+
     wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
+    found = true;
+    break;
   }
-  else
+
+  if (!found)
   {
     if (supportLoggingEnabled())
       Serial.println("[WIFI POWER] no stored creds; Wi-Fi remains enabled but idle");
