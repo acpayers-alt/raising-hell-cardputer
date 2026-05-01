@@ -800,7 +800,7 @@ static MenuItem kSystemItems[] = {
 // Menu definitions
 // ------------------------------------------------------------
 static MenuItem kTopItems[] = {
-    {"Manual", actTop_Controls, nullptr, nullptr, nullptr},
+    {"Care Guide", actTop_Controls, nullptr, nullptr, nullptr},
     {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
     {"WiFi Settings", actTop_OpenWifi, nullptr, nullptr, nullptr},
     {"Pet Options", actTop_OpenPet, nullptr, nullptr, nullptr},

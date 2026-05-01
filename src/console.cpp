@@ -2648,6 +2648,46 @@ static bool consoleScrollDownOne()
 // -----------------------------------------------------------------------------
 // Input handling
 // -----------------------------------------------------------------------------
+static int consoleHeldScrollRepeat(const InputState &in)
+{
+  static uint32_t s_holdStartMs = 0;
+  static uint32_t s_lastRepeatMs = 0;
+  static int s_lastDir = 0;
+
+  int dir = 0;
+  if (in.uiUpHeld)
+    dir = -1;
+  else if (in.uiDownHeld)
+    dir = 1;
+
+  if (dir == 0)
+  {
+    s_holdStartMs = 0;
+    s_lastRepeatMs = 0;
+    s_lastDir = 0;
+    return 0;
+  }
+
+  const uint32_t now = millis();
+
+  if (dir != s_lastDir)
+  {
+    s_holdStartMs = now;
+    s_lastRepeatMs = now;
+    s_lastDir = dir;
+    return 0;
+  }
+
+  if ((uint32_t)(now - s_holdStartMs) < 360)
+    return 0;
+
+  if ((uint32_t)(now - s_lastRepeatMs) < 95)
+    return 0;
+
+  s_lastRepeatMs = now;
+  return dir;
+}
+
 void consoleUpdate(InputState &in)
 {
   if (!g_consoleOpen)
@@ -2665,6 +2705,21 @@ void consoleUpdate(InputState &in)
   }
 
   bool touched = false;
+
+  if (g_len == 0)
+  {
+    const int heldScroll = consoleHeldScrollRepeat(in);
+    if (heldScroll < 0)
+    {
+      if (consoleScrollUpOne())
+        touched = true;
+    }
+    else if (heldScroll > 0)
+    {
+      if (consoleScrollDownOne())
+        touched = true;
+    }
+  }
 
   while (in.kbHasEvent())
   {

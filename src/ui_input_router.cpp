@@ -16,6 +16,8 @@
 #include "whats_new_state.h"
 #include "wifi_setup_state.h"
 
+bool g_suppressMenuTick = false;
+
 // ----------------------------------------------------------------------------
 // Text capture policy
 // ----------------------------------------------------------------------------
@@ -106,6 +108,8 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
 
 bool uiHandleInput(InputState &in)
 {
+  g_suppressMenuTick = false;
+
   static bool s_lastTextCapture = false;
   const bool desiredTextCapture = uiWantsTextCaptureNow();
   if (desiredTextCapture != s_lastTextCapture)

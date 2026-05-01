@@ -12,3 +12,5 @@ bool uiWantsTextCaptureForState(UIState s);
 // Central UI input entry point.
 // Applies global interceptors then dispatches to the current UIState handler table.
 bool uiHandleInput(InputState& in);
+
+extern bool g_suppressMenuTick;

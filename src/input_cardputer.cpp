@@ -605,12 +605,24 @@ static void readKeyboard(InputState &out)
   out.mgSelectHeld = mgSelectHeld;
   out.mgSpaceHeld = heldSpace;
 
-  // UI held flags only when not in text capture and not in mini-game
-  if (!g_textCaptureMode && !inMiniGameUi)
+  // UI held flags.
+  // Normal UI gets keyboard nav clusters.
+  // Console/text capture only gets punctuation arrows so E/S/etc still type normally.
+  if (!inMiniGameUi)
   {
-    out.selectHeld = st.enter;
+    if (!g_textCaptureMode)
+    {
+      out.selectHeld = st.enter;
+      out.uiUpHeld = (heldUp || heldE || heldO);
+      out.uiDownHeld = (heldDown || heldS || heldK);
+    }
+    else if (g_app.uiState == UIState::CONSOLE)
+    {
+      out.uiUpHeld = heldUp;
+      out.uiDownHeld = heldDown;
+    }
   }
-
+  
   // If nothing changed AND no keys are held, we can skip work.
   // IMPORTANT: include escAnyHeld so ESC never gets skipped by this early return.
   const bool heldSpecial = heldUp || heldDown || heldLeft || heldRight || escAnyHeld || heldEnter || heldG ||

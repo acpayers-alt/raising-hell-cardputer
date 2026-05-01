@@ -270,7 +270,7 @@ static void drawSettingsTopMenu()
   snprintf(volumeLine, sizeof(volumeLine), "Volume: %s", soundVolumeToText(soundGetVolumeLevel()));
 
   static const char *labelsStatic[] = {
-      "Manual",
+      "Care Guide",
       nullptr,
       "WiFi Settings >",
       "Pet Options >",

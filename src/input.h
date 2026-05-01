@@ -25,7 +25,8 @@ static constexpr uint8_t RH_KEY_ENTER = 0x81;
 static constexpr uint8_t RH_KEY_FN = 0x82;
 static constexpr uint8_t RH_KEY_SHIFT = 0x83;
 
-struct KeyEvent {
+struct KeyEvent
+{
   uint8_t code; // ASCII for normal keys, RH_KEY_* for specials
 };
 
@@ -38,7 +39,7 @@ struct InputState
   uint8_t tabJump = 255;
 
   bool menuOnce = false;
-  bool homeOnce = false; 
+  bool homeOnce = false;
   bool selectOnce = false;
   bool upOnce = false;
   bool downOnce = false;
@@ -67,6 +68,11 @@ struct InputState
   bool rightHeld = false;
   bool encoderHeld = false;
 
+  // UI navigation held state, including keyboard nav clusters.
+  // Used by scrollable UI like Care Guide and Console.
+  bool uiUpHeld = false;
+  bool uiDownHeld = false;
+
   // --------------------------------------------------------------------------
   // MINI-GAME MAPPED CONTROLS (active only while uiState == UIState::MINI_GAME)
   // While a mini-game is running, we LOCK OUT all other hotkeys (tabs, console,
@@ -85,7 +91,7 @@ struct InputState
   bool mgDownHeld = false;
   bool mgLeftHeld = false;
   bool mgRightHeld = false;
-  bool mgQuitHeld = false;   // ESC/back held in mini-game (pause/exit handling)
+  bool mgQuitHeld = false; // ESC/back held in mini-game (pause/exit handling)
 
   bool mgSpaceOnce = false; // SPACE (duck / drop / brake depending on game)
   bool mgSpaceHeld = false;
@@ -134,9 +140,10 @@ struct InputState
     mgUpHeld = mgDownHeld = mgLeftHeld = mgRightHeld = false;
     mgSpaceOnce = false;
     mgSpaceHeld = false;
-mgUpHeld = mgDownHeld = mgLeftHeld = mgRightHeld = false;
-mgQuitHeld = false;
-
+    mgUpHeld = mgDownHeld = mgLeftHeld = mgRightHeld = false;
+    mgQuitHeld = false;
+    uiUpHeld = false;
+    uiDownHeld = false;
     goShortRelease = false;
     goLongHold = false;
 
