@@ -291,16 +291,16 @@ void wardriveStepsNotifyUserActivity()
   if (s_pendingItem != ITEM_NONE)
   {
     const char *itemName = g_app.inventory.getItemLabelForType(s_pendingItem);
-    snprintf(msg, sizeof(msg), "War Walking hit!\n%u signals\nINF +%d\n%s +1", (unsigned)s_pendingHits, s_pendingInf,
+    snprintf(msg, sizeof(msg), "Signal hit!\n%u signals  +%d INF\n%s +1", (unsigned)s_pendingHits, s_pendingInf,
              (itemName && itemName[0]) ? itemName : "ITEM");
   }
   else
   {
-    snprintf(msg, sizeof(msg), "War Walking hit!\n%u signals\nINF +%d", (unsigned)s_pendingHits, s_pendingInf);
+    snprintf(msg, sizeof(msg), "Signal hit!\n%u signals  +%d INF", (unsigned)s_pendingHits, s_pendingInf);
   }
 
-  ui_showTimedMessage(msg, 0);
-
+  ui_showMessage(msg);
+  
   s_pendingHits = 0;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
