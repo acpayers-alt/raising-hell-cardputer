@@ -685,28 +685,30 @@ static bool bootAssetProvisionWifiReady()
     //   1) try stored creds if present
     //   2) try launcher-imported creds
     //   3) fall back to manual Wi-Fi setup
-    if (shouldEnableWifi && !wifiConnected && !haveStoredCreds)
+    if (shouldEnableWifi && !wifiConnected)
     {
       g_bootProvisionWifiOnboardingStarted = true;
       g_bootAssetProvisionActive = false;
-
+    
       ui_setBootSplashActive(false);
-
+    
       if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
       {
-
-        Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
-
+        if (haveStoredCreds)
+          Serial.println("[BOOT][PROVISION] stored creds present; entering BOOT_ASSET_WIFI_REQUIRED for profile failover");
+        else
+          Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
+    
         uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();
         renderUI();
         clearInputLatch();
       }
-
+    
       return false;
     }
-
+    
     wifiSetEnabled(shouldEnableWifi);
 
     if (wifiConnected)

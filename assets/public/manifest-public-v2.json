@@ -1,9 +1,9 @@
 {
-  "packVersion": "1.1.9",
-  "pack_version": "1.1.9",
+  "packVersion": "1.1.10",
+  "pack_version": "1.1.10",
   "channel": "public",
-  "generatedAt": "2026-04-09T21:09:39.973422+00:00",
-  "fileCount": 432,
+  "generatedAt": "2026-05-01T21:59:20.835168+00:00",
+  "fileCount": 436,
   "files": [
     {
       "path": "raising_hell/graphics/background/dev/dev_ad_bg.jpg",
@@ -2106,9 +2106,29 @@
       "sha256": "a5ef5ea058ade359c2a7758ba2fad2b80665abb16f1701d5d227893ee2ab99e9"
     },
     {
+      "path": "raising_hell/graphics/ui/error_items/render_fault_head.png",
+      "size": 14716,
+      "sha256": "e0cc6b0d4ae34daf0f6708d7d4d8a49f800eea60883abce0ca41039990a452a1"
+    },
+    {
+      "path": "raising_hell/graphics/ui/error_items/render_position_mismatch.png",
+      "size": 7318,
+      "sha256": "a64a65a54da79b590f1704d5e5eee9dce30dfb4c62e3f471aa798cc8533b0933"
+    },
+    {
       "path": "raising_hell/graphics/ui/icons/inf_coin.png",
       "size": 1186,
       "sha256": "1434c69ea68a0c9a2ac644104daaa7a719b5dc5c10fbaa7ab89717e00e59bf11"
+    },
+    {
+      "path": "raising_hell/graphics/ui/icons/inf_icon.png",
+      "size": 430,
+      "sha256": "30103a392ac4a62d035685a9e4d13f6d8f3ba6ff34402ff353e19120f466a727"
+    },
+    {
+      "path": "raising_hell/graphics/ui/icons/inf_icon_lrg.png",
+      "size": 507,
+      "sha256": "b412b929780057e9a935b75f687c91d584679a10d4f99e65bbbe9d0e30ea5301"
     },
     {
       "path": "raising_hell/graphics/ui/icons/life_icon.png",
