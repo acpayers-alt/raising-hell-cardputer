@@ -14,6 +14,8 @@
 #include "graphics_ui_common.h"
 #include "pet.h"
 #include "pet_autonomy.h"
+#include "save_manager.h"
+#include "wardrive_steps.h"
 
 // -----------------------------------------------------------------------------
 // External state (owned elsewhere)
@@ -50,6 +52,47 @@ static bool g_sleepAnimActive = false;
 // -----------------------------------------------------------------------------
 // Forward declarations (private to this module)
 // -----------------------------------------------------------------------------
+static void drawSleepStepCounterBadge()
+{
+  if (!isStepCounterEnabled())
+    return;
+
+  const uint32_t steps = wardriveStepsToday();
+
+  char buf[16];
+  if (steps >= 100000)
+    snprintf(buf, sizeof(buf), "99k+");
+  else if (steps >= 1000)
+    snprintf(buf, sizeof(buf), "%luk", (unsigned long)(steps / 1000));
+  else
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)steps);
+
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+
+  const int textW = spr.textWidth(buf);
+  const int boxW = 18 + textW + 6;
+  const int boxH = 13;
+
+  // Right anchored. As the text grows, the badge expands left.
+  const int x = SCREEN_W - boxW - 4;
+  const int y = TOP_BAR_H + 2;
+
+  spr.fillRoundRect(x, y, boxW, boxH, 5, TFT_BLACK);
+  spr.drawRoundRect(x, y, boxW, boxH, 5, TFT_DARKGREY);
+
+  const int iconX = x + 4;
+  const int iconY = y + 3;
+
+  spr.drawCircle(iconX + 4, iconY + 4, 2, TFT_GREEN);
+  spr.drawCircle(iconX + 4, iconY + 4, 5, TFT_DARKGREEN);
+  spr.fillCircle(iconX + 4, iconY + 4, 1, TFT_GREEN);
+
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString(buf, x + 15, y + 3);
+}
+
 static void drawSleepScreenImpl(bool redrawBg);
 
 void sleepBgNotifyScreenWake()
@@ -242,6 +285,7 @@ static void drawSleepScreenImpl(bool redrawBg)
 
   drawTopBar();
   drawMiniStatPreviewSleepLeft();
+  drawSleepStepCounterBadge();
   drawPassOutNotice();
   drawSleepMeterBar();
 }
