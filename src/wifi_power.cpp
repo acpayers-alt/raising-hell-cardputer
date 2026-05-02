@@ -26,6 +26,13 @@ void applyWifiPower(bool enable)
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
 
+  if (WiFi.status() == WL_CONNECTED)
+{
+  if (supportLoggingEnabled())
+    Serial.println("[WIFI POWER] already connected; leaving current association alone");
+  return;
+}
+
   String ssid, pass;
   bool found = false;
 

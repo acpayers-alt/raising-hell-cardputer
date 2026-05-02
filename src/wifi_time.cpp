@@ -38,7 +38,12 @@ static uint32_t s_lastWifiAttemptMs = 0;
 static uint32_t s_lastRssiMs = 0;
 static uint32_t s_lastTimeCheckMs = 0;
 
-static constexpr uint32_t WIFI_RETRY_MS = 2500;
+static bool s_wifiAttemptActive = false;
+static uint32_t s_wifiAttemptStartMs = 0;
+static uint32_t s_nextWifiRetryMs = 0;
+
+static constexpr uint32_t WIFI_RETRY_MS = 10000;
+static constexpr uint32_t WIFI_CONNECT_ATTEMPT_MS = 15000;
 static constexpr uint32_t RSSI_POLL_MS = 1000;
 
 // ---- Event -> Tick handoff ----
@@ -129,6 +134,10 @@ void wifiConsoleBeginConnect(const char *ssid, const char *pass)
 
   WiFi.begin(ssid, pass);
   s_lastWifiAttemptMs = millis();
+
+  s_wifiAttemptActive = true;
+  s_wifiAttemptStartMs = s_lastWifiAttemptMs;
+  s_nextWifiRetryMs = s_lastWifiAttemptMs + WIFI_CONNECT_ATTEMPT_MS;
 }
 
 void wifiConsoleDisconnect(bool eraseCreds)
@@ -149,6 +158,9 @@ void wifiConsoleDisconnect(bool eraseCreds)
 
   s_waitSntpBeforeSync = true;
   s_consoleConnectStartMs = 0;
+  s_wifiAttemptActive = false;
+  s_wifiAttemptStartMs = 0;
+  s_nextWifiRetryMs = millis() + WIFI_RETRY_MS;
 
   if (eraseCreds)
   {
@@ -229,6 +241,9 @@ void wifiSetEnabled(bool en)
     s_evtDisc = false;
 
     s_waitSntpBeforeSync = true;
+    s_wifiAttemptActive = false;
+    s_wifiAttemptStartMs = 0;
+    s_nextWifiRetryMs = 0;
   }
   else
   {
@@ -309,6 +324,9 @@ static void tryWiFiConnect()
 
     wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
 
+    s_wifiAttemptActive = true;
+    s_wifiAttemptStartMs = millis();
+
     // Advance for next retry cycle
     s_retryProfileIndex = (idx + 1) % WIFI_PROFILE_MAX;
 
@@ -360,6 +378,9 @@ void wifiTimeInit()
   s_sntpStartedAtMs = 0;
 
   s_waitSntpBeforeSync = true;
+  s_wifiAttemptActive = false;
+  s_wifiAttemptStartMs = 0;
+  s_nextWifiRetryMs = 0;
 
   s_wifiConnected = (WiFi.status() == WL_CONNECTED);
 
@@ -480,13 +501,38 @@ void wifiTimeTick()
 
   if (!reallyConnected)
   {
-    if (!interactive && (now - s_lastWifiAttemptMs >= WIFI_RETRY_MS))
+    const int st = WiFi.status();
+
+    const bool hardFailed = (st == WL_CONNECT_FAILED) || (st == WL_NO_SSID_AVAIL) || (st == WL_CONNECTION_LOST);
+
+    const bool attemptTimedOut =
+        s_wifiAttemptActive && ((uint32_t)(now - s_wifiAttemptStartMs) >= WIFI_CONNECT_ATTEMPT_MS);
+
+    if (s_wifiAttemptActive && (hardFailed || attemptTimedOut))
+    {
+      if (supportLoggingEnabled())
+        Serial.printf("[WIFI] reconnect attempt ended status=%d timedOut=%d\n", st, attemptTimedOut ? 1 : 0);
+
+      s_wifiAttemptActive = false;
+      s_wifiAttemptStartMs = 0;
+      s_nextWifiRetryMs = now + WIFI_RETRY_MS;
+    }
+
+    if (!interactive && !s_wifiAttemptActive && (s_nextWifiRetryMs == 0 || (int32_t)(now - s_nextWifiRetryMs) >= 0))
     {
       s_lastWifiAttemptMs = now;
       tryWiFiConnect();
+
+      s_nextWifiRetryMs = now + WIFI_CONNECT_ATTEMPT_MS;
     }
+
     return;
   }
+
+  // reset retry state on successful connection
+  s_wifiAttemptActive = false;
+  s_wifiAttemptStartMs = 0;
+  s_nextWifiRetryMs = 0;
 
   if (!interactive && !s_sntpStartedThisConnect && s_sntpStartAtMs != 0 && (int32_t)(now - s_sntpStartAtMs) >= 0)
   {
