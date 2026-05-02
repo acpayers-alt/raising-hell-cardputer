@@ -319,7 +319,10 @@ bool sdAssetsPresent()
     return false;
 
   // Fast path: after first successful check, only verify canaries
-  if (s_assetDeepCheckDone && s_assetDeepCheckOk)
+  // Fast path only valid for a short window after deep check.
+  // After that, force revalidation occasionally.
+  const uint32_t now = millis();
+  if (s_assetDeepCheckDone && s_assetDeepCheckOk && (now - s_lastAssetDeepCheckMs) < 30000)
   {
     static const char *kCanaryFiles[] = {
         "/raising_hell/graphics/background/dev/hell_bg.jpg",
@@ -343,8 +346,13 @@ bool sdAssetsPresent()
   // -------- SLOW PATH (run ONCE) --------
 
   if (!SD.exists(kSdAssetsLocalManifestPath))
+  {
+    // Invalidate cache if manifest disappears
+    s_assetDeepCheckDone = false;
+    s_assetDeepCheckOk = false;
     return false;
-
+  }
+  
   const AssetOtaStatus st = assetOtaStatus();
   if (st != AssetOtaStatus::IDLE && st != AssetOtaStatus::SUCCESS)
     return false;
@@ -388,6 +396,7 @@ bool sdAssetsPresent()
 
   s_assetDeepCheckDone = true;
   s_assetDeepCheckOk = ok;
+  s_lastAssetDeepCheckMs = millis();
 
   return ok;
 }
