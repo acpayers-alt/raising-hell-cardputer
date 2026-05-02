@@ -122,13 +122,13 @@ After the first launch:
 
 Advanced users can manually flash the firmware using PlatformIO or esptool.
 
-### Step 1 — Download firmware
+### Step 1 - Download firmware
 
 Download the latest firmware binary from the GitHub Releases page:
 
 https://github.com/acpayers-alt/raising-hell-cardputer/releases
 
-### Step 2 — Flash firmware
+### Step 2 - Flash firmware
 
 Flash the firmware to the device.
 
@@ -140,7 +140,7 @@ Example using esptool:
 
 esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash 0x10000 firmware.bin
 
-### Step 3 — Launch the game
+### Step 3 - Launch the game
 
 After booting the firmware:
 
@@ -175,24 +175,17 @@ Do not place the graphics folder inside `/raising_hell/assets/`.
 
 A correct manual install should look like this:
 
+```text
 /raising_hell/
-
   assets/
-
     manifest_local.json
 
-
   graphics/
-
     background/
-
     mini_games/
-
     pet/
-
     ui/
-    
-
+```  
 
 The important paths are:
 
@@ -226,6 +219,7 @@ https://github.com/acpayers-alt/raising-hell-cardputer/releases
 3. Copy the asset pack contents to the SD card so the final layout is:
 
 /raising_hell/assets/manifest_local.json
+
 /raising_hell/graphics/
 
 4. If the manifest is not already named `manifest_local.json`, rename it to:
