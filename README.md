@@ -176,14 +176,23 @@ Do not place the graphics folder inside `/raising_hell/assets/`.
 A correct manual install should look like this:
 
 /raising_hell/
+
   assets/
+
     manifest_local.json
 
+
   graphics/
+
     background/
+
     mini_games/
+
     pet/
+
     ui/
+    
+
 
 The important paths are:
 
