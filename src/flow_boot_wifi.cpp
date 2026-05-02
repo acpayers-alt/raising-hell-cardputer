@@ -261,6 +261,19 @@ void uiBootWifiImportedHandle(InputState &in)
 // -----------------------------------------------------------------------------
 void uiBootAssetWifiRequiredHandle(InputState &in)
 {
+  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
+  {
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+
+    Serial.println("[BOOTWIFI] Wi-Fi skipped from prompt -> manual time setup");
+
+    beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+    requestUIRedraw();
+    return;
+  }
+  
   if (!in.selectOnce)
   {
     uiActionSwallowAll(in);

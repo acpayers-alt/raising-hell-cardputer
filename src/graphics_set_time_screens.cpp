@@ -49,11 +49,17 @@ static void drawSetDateTimePanel(int x, int y, int w, int h, int selectedField)
   {
     spr.drawString(s, cx, baseY);
     const int tw = spr.textWidth(s);
+
     if (selectedField == fid)
-      spr.drawFastHLine(cx, baseY + 14, tw, TFT_YELLOW);
+    {
+      const int uy = baseY + 15;
+      spr.drawFastHLine(cx, uy, tw, TFT_YELLOW);
+      spr.drawFastHLine(cx, uy + 1, tw, TFT_YELLOW);
+    }
+
     cx += tw + 4;
   };
-
+  
   // Date
   drawField(yy, 0);
   spr.drawString("-", cx, baseY);

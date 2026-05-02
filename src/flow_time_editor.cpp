@@ -239,7 +239,15 @@ void uiSetTimeHandle(InputState &in)
     if (g_setTimeField == kFieldOk)
     {
       commitSetTime();
-      returnFromSetTime();
+
+      Serial.println("[BOOT] manual time complete, re-entering boot pipeline");
+
+      // Force full boot re-evaluation (assets, provisioning, etc)
+      uiPopReturnTarget(); // discard previous return
+      uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
+      requestUIRedraw();
+      inputForceClear();
+
       return;
     }
     else
@@ -292,7 +300,7 @@ void uiSetTimeHandle(InputState &in)
     in.clearEdges();
     return;
   }
-  
+
   if (anyUiChange)
     requestUIRedraw();
 
