@@ -185,6 +185,15 @@ static bool uiStateAllowsConsoleHotkey(UIState s)
   }
 }
 
+// ---------------------------------------------------------------------------
+// Blocking UI pattern:
+// - modal owns the frame
+// - run auto screen-off
+// - render if needed
+// - tick background services
+// - return (no further input/gameplay)
+// ---------------------------------------------------------------------------
+
 static void tickBlockingUiBackgroundServices(uint32_t nowMs, bool tickSoundAgain)
 {
   wifiTimeTick();
@@ -221,6 +230,12 @@ static bool blockingUiAutoScreenOffCheck(uint32_t nowMs)
   }
 
   return false;
+}
+
+static void finishBlockingUiFrame(uint32_t nowMs, bool tickSoundAgain)
+{
+  tickBlockingUiBackgroundServices(nowMs, tickSoundAgain);
+  delay(10);
 }
 
 static void consumeConfirmInput(InputState &input)
@@ -723,8 +738,7 @@ void appMainLoopTick()
         renderUI();
 
       // Keep background systems ticking, but DO NOT process gameplay/input
-      tickBlockingUiBackgroundServices(now, true);
-      delay(10);
+      finishBlockingUiFrame(now, true);
       return;
     }
 
@@ -734,19 +748,7 @@ void appMainLoopTick()
     if (consumeUIRedrawRequest())
       renderUI();
 
-    wifiTimeTick();
-
-    if (shouldTickAssetOtaNow())
-      assetOtaTick();
-    if (g_timeAnchorAttempted || timeIsSynced())
-      updateTime();
-    updateBattery();
-    batteryProtectionTick(now);
-    saveManagerTick();
-    maybePeriodicTimeSave();
-
-    soundTick();
-    delay(10);
+    finishBlockingUiFrame(now, true);
     return;
   }
 
@@ -773,8 +775,7 @@ void appMainLoopTick()
       renderUI();
     }
 
-    tickBlockingUiBackgroundServices(now, false);
-
+    finishBlockingUiFrame(now, false);
     return;
   }
 
@@ -1211,12 +1212,7 @@ void appMainLoopTick()
       renderUI();
     }
 
-    tickBlockingUiBackgroundServices(now, false);
-
-#if LED_STATUS_ENABLED
-    ledSetScreenOff(false);
-    ledUpdatePetStatus(computeLedMode());
-#endif
+    finishBlockingUiFrame(now, false);
     return;
   }
 
@@ -1234,12 +1230,7 @@ void appMainLoopTick()
       renderUI();
     }
 
-    tickBlockingUiBackgroundServices(now, false);
-
-#if LED_STATUS_ENABLED
-    ledSetScreenOff(false);
-    ledUpdatePetStatus(computeLedMode());
-#endif
+    finishBlockingUiFrame(now, false);
 
     return;
   }
