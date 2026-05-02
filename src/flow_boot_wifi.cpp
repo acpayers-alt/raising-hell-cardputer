@@ -50,10 +50,7 @@ static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
 
-static bool bootWifiCanSkipToManualTime()
-{
-  return !g_bootAssetProvisionMustComplete || sdAssetsPresent();
-}
+static bool bootWifiCanSkipToManualTime() { return !g_bootAssetProvisionMustComplete || sdAssetsPresent(); }
 
 static void bootWifiSkipToManualTime(InputState &in, const char *source)
 {
@@ -283,7 +280,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     bootWifiSkipToManualTime(in, "BOOT_ASSET_WIFI_REQUIRED");
     return;
   }
-  
+
   if ((in.escOnce || in.menuOnce) && !bootWifiCanSkipToManualTime())
   {
     uiActionSwallowAll(in);
@@ -291,7 +288,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     clearInputLatch();
     return;
   }
-  
+
   if (!in.selectOnce)
   {
     uiActionSwallowAll(in);
@@ -683,7 +680,7 @@ void uiBootNtpWaitHandle(InputState &in)
     const uint32_t elapsed = millis() - s_bootNtpWaitStartMs;
     if (elapsed >= kBootNtpWaitTimeoutMs)
     {
-      Serial.printf("[BOOT][NTP] timeout after %lu ms -> fallback to manual time\n", (unsigned long)elapsed);
+      Serial.printf("[BOOT][NTP] timeout after %lu ms\n", (unsigned long)elapsed);
 
       s_bootNtpWaitStarted = false;
       s_bootNtpWaitStartMs = 0;
@@ -691,6 +688,16 @@ void uiBootNtpWaitHandle(InputState &in)
       uiActionSwallowAll(in);
       uiDrainKb(in);
       clearInputLatch();
+
+      if (g_bootAssetProvisionMustComplete)
+      {
+        Serial.println("[BOOT][NTP] mandatory asset provisioning active; skipping manual time detour");
+        uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        return;
+      }
+
       beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
       requestUIRedraw();
       return;

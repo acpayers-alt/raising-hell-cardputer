@@ -308,7 +308,7 @@ static void tryWiFiConnect()
     Serial.printf("[WIFI] retry stored profile=%d ssid='%s'\n", idx, ssid.c_str());
 
     wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
-    
+
     // Advance for next retry cycle
     s_retryProfileIndex = (idx + 1) % WIFI_PROFILE_MAX;
 
@@ -375,7 +375,11 @@ void wifiTimeInit()
     s_rssi = -127;
   }
 
-  tryWiFiConnect();
+  if (!s_wifiConnected)
+  {
+    tryWiFiConnect();
+  }
+
   s_lastWifiAttemptMs = millis();
 }
 

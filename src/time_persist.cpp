@@ -11,6 +11,7 @@ static constexpr uint32_t SAVE_INTERVAL_MS = 5UL * 60UL * 1000UL; // every 5 min
 // ------------- module state -------------
 static bool g_timeRestored = false;
 static bool g_timeDirty = false;
+static bool g_timeTrusted = false;
 
 // Jan 1, 2021 (UTC). Anything below this is treated as invalid.
 static constexpr uint64_t MIN_VALID_EPOCH = 1609459200ULL;
@@ -37,6 +38,7 @@ void invalidateTimeNow()
   applyEpoch((time_t)0);
   g_timeRestored = false;
   g_timeDirty = false;
+  g_timeTrusted = false;
   lastSaveMs = millis();
 }
 
@@ -48,6 +50,7 @@ void clearTimeAnchor()
   prefs.end();
   g_timeRestored = false;
   g_timeDirty = false;
+  g_timeTrusted = false;
 }
 
 // NEW: lets UI/boot code know if we’ve restored time this session
@@ -59,6 +62,7 @@ void timeMarkClean()
 {
   g_timeDirty = false;
   g_timeRestored = false;
+  g_timeTrusted = false;
 }
 
 // NEW: check if an anchor exists (without modifying time)
@@ -83,13 +87,14 @@ bool loadTimeAnchor()
     g_timeDirty = false;
     return false;
   }
-  
-applyEpoch((time_t)savedEpoch);
 
-g_timeRestored = true;
-g_timeDirty = true;
-lastSaveMs = millis();   // prevent immediate resave
-return true;
+  applyEpoch((time_t)savedEpoch);
+
+  g_timeRestored = true;
+  g_timeDirty = true;
+  g_timeTrusted = false;
+  lastSaveMs = millis();
+  return true;
 }
 
 // Backward-compatible alias (matches your .ino call)
@@ -102,6 +107,11 @@ void saveTimeAnchor()
     return;
   }
 
+  if (g_timeRestored && !g_timeTrusted)
+  {
+    return;
+  }
+  
   time_t now = time(nullptr);
 
   time_t nowEpoch = time(nullptr);

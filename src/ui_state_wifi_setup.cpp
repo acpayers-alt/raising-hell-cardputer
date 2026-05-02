@@ -74,7 +74,7 @@ static void wifiSetupRunBlockingScan()
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
-  WiFi.disconnect(false, true);
+  WiFi.disconnect(false, false);
   WiFi.scanDelete();
   delay(150);
 

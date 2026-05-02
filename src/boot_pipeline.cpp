@@ -360,8 +360,8 @@ bool sdAssetsPresent()
 
   if (compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0)
   {
-    Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n",
-                  installedPack.c_str(), RH_MIN_REQUIRED_ASSET_PACK);
+    Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n", installedPack.c_str(),
+                  RH_MIN_REQUIRED_ASSET_PACK);
     s_assetDeepCheckDone = true;
     s_assetDeepCheckOk = false;
     return false;
@@ -399,6 +399,8 @@ uint32_t g_sdFirstTryMs = 0;
 bool g_sdGaveUp = false;
 uint8_t g_sdTryCount = 0;
 static uint32_t g_bootProvisionWifiStartMs = 0;
+static uint32_t g_bootAssetProvisionRetryAfterMs = 0;
+static constexpr uint32_t kBootAssetProvisionRetryDelayMs = 15000UL;
 bool g_bootAssetProvisionActive = false;
 extern bool g_bootAssetProvisionMustComplete;
 bool g_bootAssetProvisionMustComplete = false;
@@ -525,19 +527,9 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
     if (line2 && line2[0])
       d.drawString(line2, 12, 40);
 
-    char dbg1[64];
-    snprintf(dbg1, sizeof(dbg1), "st=%d  cur=%u  total=%u", (int)st, (unsigned)cur, (unsigned)total);
-    d.drawString(dbg1, 12, 56);
+    d.fillRect(12, 72, SCREEN_W - 24, 14, TFT_DARKGREY);
+    d.drawRect(12, 72, SCREEN_W - 24, 14, TFT_WHITE);
 
-    char dbg2[48];
-    snprintf(dbg2, sizeof(dbg2), "status=%s", statusText ? statusText : "");
-    d.drawString(dbg2, 12, 68);
-
-    // Force a visible test box exactly where the bar should live
-    d.fillRect(12, 84, SCREEN_W - 24, 14, TFT_DARKGREY);
-    d.drawRect(12, 84, SCREEN_W - 24, 14, TFT_WHITE);
-
-    // Draw progress fill even if total is 0, so we can see the area
     if (total > 0)
     {
       int fillW = (int)(((uint32_t)(SCREEN_W - 26) * cur) / total);
@@ -547,17 +539,29 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
         fillW = SCREEN_W - 26;
 
       if (fillW > 0)
-        d.fillRect(13, 85, fillW, 12, TFT_GREEN);
+        d.fillRect(13, 73, fillW, 12, TFT_GREEN);
 
       char prog[40];
       snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
       d.setTextColor(TFT_WHITE, TFT_BLACK);
-      d.drawString(prog, 12, 104);
+      d.drawString(prog, 12, 94);
     }
     else
     {
-      d.setTextColor(TFT_YELLOW, TFT_BLACK);
-      d.drawString("total == 0", 12, 104);
+      d.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+      d.drawString("Preparing download...", 12, 94);
+    }
+
+    if (supportLoggingEnabled())
+    {
+      char dbg1[64];
+      snprintf(dbg1, sizeof(dbg1), "st=%d cur=%u total=%u", (int)st, (unsigned)cur, (unsigned)total);
+      d.setTextColor(TFT_DARKGREY, TFT_BLACK);
+      d.drawString(dbg1, 12, 112);
+
+      char dbg2[64];
+      snprintf(dbg2, sizeof(dbg2), "status=%s", statusText ? statusText : "");
+      d.drawString(dbg2, 12, 124);
     }
   };
 
@@ -616,11 +620,22 @@ static bool runBootAssetProvision()
   if (!bootAssetProvisionRequired())
   {
     s_bootAssetProvisionHandled = false;
+    g_bootAssetProvisionRetryAfterMs = 0;
     return false;
   }
 
   if (s_bootAssetProvisionHandled)
     return true;
+
+  const uint32_t now = millis();
+  if (g_bootAssetProvisionMustComplete && g_bootAssetProvisionRetryAfterMs != 0 &&
+      (int32_t)(now - g_bootAssetProvisionRetryAfterMs) < 0)
+  {
+    drawBootAssetProvisionScreen("Asset download failed.", "Retrying shortly...");
+    return true;
+  }
+
+  g_bootAssetProvisionRetryAfterMs = 0;
 
   ui_setBootSplashActive(false);
   clearInputLatch();
@@ -633,28 +648,23 @@ static bool runBootAssetProvision()
   String msg;
   const bool ok = assetOtaRunInWorkerTask(&msg);
 
-  // Re-check asset presence after OTA work completes.
   g_assetsChecked = true;
   g_assetsMissing = !sdAssetsPresent();
 
   drawBootAssetProvisionScreen("Asset check result", msg.c_str());
   delay(1500);
 
-  // Success only counts if assets are actually present afterward.
   if (ok && !g_assetsMissing)
   {
     s_bootAssetProvisionHandled = true;
+    g_bootAssetProvisionRetryAfterMs = 0;
 
     if (g_bootAssetProvisionMustComplete)
     {
-      // Only route through post-provision controls help when this is effectively
-      // a no-save / onboarding situation. Existing pets should resume normally.
       const bool saveExistsNow = bootSaveFileExists();
       if (!saveExistsNow)
       {
         writePostProvisionControlsHelpFlag();
-
-        // Ensure full onboarding sequence runs (controls + what's new)
         g_controlsHelpSeen = 0;
         g_whatsNewSeen = 0;
       }
@@ -670,18 +680,15 @@ static bool runBootAssetProvision()
 
   runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());
 
-  // Allow retry after failure (for example, after the user fixes Wi-Fi creds).
   s_bootAssetProvisionHandled = false;
 
-  // If assets are still missing, this is a mandatory provisioning failure.
-  // Stay blocked on the provisioning/error screen, but do not permanently latch failure.
   if (g_assetsMissing)
   {
+    g_bootAssetProvisionRetryAfterMs = millis() + kBootAssetProvisionRetryDelayMs;
+    drawBootAssetProvisionScreen("Asset download failed.", "Will retry shortly...");
     return true;
   }
 
-  // Optional OTA request failed or had no effect, but assets already exist.
-  // Allow normal boot to continue.
   g_bootAssetProvisionActive = false;
   g_bootUiBlockedForAssetProvision = false;
 
@@ -748,37 +755,31 @@ static bool bootAssetProvisionWifiReady()
     //   1) try stored creds if present
     //   2) try launcher-imported creds
     //   3) fall back to manual Wi-Fi setup
-    if (shouldEnableWifi && !wifiConnected)
+    if (shouldEnableWifi && !wifiConnected && !haveStoredCreds)
     {
       g_bootProvisionWifiOnboardingStarted = true;
       g_bootAssetProvisionActive = false;
-    
+
       ui_setBootSplashActive(false);
-    
+
       if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
       {
-        if (haveStoredCreds)
-          Serial.println("[BOOT][PROVISION] stored creds present; entering BOOT_ASSET_WIFI_REQUIRED for profile failover");
-        else
-          Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
-    
+        Serial.println("[BOOT][PROVISION] no stored creds; entering BOOT_ASSET_WIFI_REQUIRED");
+
         uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
         requestFullUIRedraw();
         requestUIRedraw();
         renderUI();
         clearInputLatch();
       }
-    
+
       return false;
     }
-    
+
     wifiSetEnabled(shouldEnableWifi);
 
     if (wifiConnected)
     {
-      // Boot Wi-Fi/onboarding already brought the interface up. Do not restart
-      // Wi-Fi or call wifiTimeInit() here; either can briefly drop the station
-      // and cause asset OTA to report a false "Connect WiFi first" failure.
       if (g_bootAssetProvisionMustComplete && shouldEnableWifi)
       {
         settingsSetWifiEnabled(true);
@@ -791,6 +792,32 @@ static bool bootAssetProvisionWifiReady()
       return true;
     }
 
+    // actively start stored profile failover
+    if (shouldEnableWifi && haveStoredCreds)
+    {
+      Serial.println("[BOOT][PROVISION] starting stored profile failover");
+
+      bootWifiBeginStoredProfileFailover();
+
+      if (bootWifiBeginStoredProfileConnect(0))
+      {
+        g_bootProvisionWifiStarted = true;
+        g_bootProvisionWifiStartMs = millis();
+
+        requestFullUIRedraw();
+        requestUIRedraw();
+        renderUI();
+        clearInputLatch();
+
+        return false;
+      }
+
+      bootWifiClearStoredProfileFailover();
+
+      Serial.println("[BOOT][PROVISION] stored profile connect failed immediately");
+    }
+
+    // fallback → raw WiFi init
     applyWifiPower(shouldEnableWifi);
 
     if (g_bootAssetProvisionMustComplete && shouldEnableWifi)
@@ -824,10 +851,30 @@ static bool bootAssetProvisionWifiReady()
   if (g_bootAssetProvisionMustComplete)
   {
     if (elapsed >= 30000)
-      drawBootAssetProvisionScreen("WiFi not connected.", "Press ENTER to set up.");
-    else
-      drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
+    {
+      g_bootProvisionWifiOnboardingStarted = true;
+      g_bootAssetProvisionActive = false;
+      g_bootProvisionWifiStarted = false;
+      g_bootProvisionWifiStartMs = 0;
+      bootWifiClearStoredProfileFailover();
 
+      ui_setBootSplashActive(false);
+
+      if (g_app.uiState != UIState::BOOT_ASSET_WIFI_REQUIRED && g_app.uiState != UIState::CONSOLE)
+      {
+        Serial.println("[BOOT][PROVISION] WiFi connect timeout; entering setup/retry screen");
+
+        uiActionEnterState(UIState::BOOT_ASSET_WIFI_REQUIRED, Tab::TAB_PET, true);
+        requestFullUIRedraw();
+        requestUIRedraw();
+        renderUI();
+        clearInputLatch();
+      }
+
+      return false;
+    }
+
+    drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
     return false;
   }
 
