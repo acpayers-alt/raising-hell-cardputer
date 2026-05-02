@@ -652,6 +652,7 @@ static bool runBootAssetProvision()
 
   drawBootAssetProvisionScreen("Checking asset package.", "Please wait...");
 
+  const bool wasBootProvisionRequest = bootAssetProvisionRequested();
   clearAssetProvisionBootRequest();
 
   String msg;
@@ -686,6 +687,11 @@ static bool runBootAssetProvision()
     if (assetOtaDidInstallFiles())
     {
       Serial.println("[OTA] files installed; rebooting");
+      ESP.restart();
+    }
+    else if (wasBootProvisionRequest || g_bootAssetProvisionMustComplete)
+    {
+      Serial.println("[OTA] no file installs during boot provisioning; rebooting to restore graphics heap");
       ESP.restart();
     }
     else

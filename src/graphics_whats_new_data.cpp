@@ -3,7 +3,7 @@
 const HelpLine kWhatsNew[] = {
 
     {HelpLineType::SECTION, "What's New"},
-    {HelpLineType::BODY, "Version 2.1.2"},
+    {HelpLineType::BODY, "Version 2.2"},
     {HelpLineType::BODY, "- Pet Behavior + QOL"},
     {HelpLineType::GAP, nullptr},
 

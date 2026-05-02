@@ -21,6 +21,7 @@
 #include "sdcard.h"
 #include "ui_invalidate.h"
 #include "ui_runtime.h"
+#include "version.h"
 #include "wifi_time.h"
 
 static constexpr bool kLogVerifySuccess = false;
@@ -30,6 +31,49 @@ static bool s_otaDidInstallFiles = false;
 // -----------------------------------------------------------------------------
 // Worklist helpers
 // -----------------------------------------------------------------------------
+static bool parseSemver3Local(const String &v, int &maj, int &min, int &pat)
+{
+  const int p1 = v.indexOf('.');
+  const int p2 = (p1 >= 0) ? v.indexOf('.', p1 + 1) : -1;
+
+  if (p1 <= 0 || p2 <= p1)
+    return false;
+
+  String a = v.substring(0, p1);
+  String b = v.substring(p1 + 1, p2);
+  String c = v.substring(p2 + 1);
+  a.trim();
+  b.trim();
+  c.trim();
+
+  if (!a.length() || !b.length() || !c.length())
+    return false;
+
+  maj = a.toInt();
+  min = b.toInt();
+  pat = c.toInt();
+  return true;
+}
+
+static int compareSemver3Local(const String &lhs, const String &rhs)
+{
+  int lMaj, lMin, lPat;
+  int rMaj, rMin, rPat;
+
+  if (!parseSemver3Local(lhs, lMaj, lMin, lPat))
+    return -1;
+  if (!parseSemver3Local(rhs, rMaj, rMin, rPat))
+    return 1;
+
+  if (lMaj != rMaj)
+    return (lMaj < rMaj) ? -1 : 1;
+  if (lMin != rMin)
+    return (lMin < rMin) ? -1 : 1;
+  if (lPat != rPat)
+    return (lPat < rPat) ? -1 : 1;
+  return 0;
+}
+
 const char *assetOtaWorklistPath() { return "/raising_hell/ota/worklist.txt"; }
 
 bool assetOtaWorklistClear()
@@ -147,10 +191,32 @@ static bool s_loadedFromSd = false;
 static bool s_graphicsReleasedForOta = false;
 static bool s_assetOtaConfirmActive = false;
 
+
+static bool assetOtaRemotePackAcceptable(const String &remotePackVersion)
+{
+  if (!remotePackVersion.length())
+    return false;
+
+  if (compareSemver3Local(remotePackVersion, RH_MIN_REQUIRED_ASSET_PACK) < 0)
+  {
+    Serial.printf("[OTA] reject remote pack below minimum: remote=%s required=%s\n", remotePackVersion.c_str(),
+                  RH_MIN_REQUIRED_ASSET_PACK);
+    return false;
+  }
+
+  if (s_installedVersion.length() && compareSemver3Local(remotePackVersion, s_installedVersion) < 0)
+  {
+    Serial.printf("[OTA] reject remote pack older than installed: remote=%s installed=%s\n", remotePackVersion.c_str(),
+                  s_installedVersion.c_str());
+    return false;
+  }
+
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // URL resolution
 // -----------------------------------------------------------------------------
-
 static String assetFileResolvedUrl(const String &packVersion, const AssetManifestFile &f, bool fallback)
 {
   String url = fallback ? RH_FALLBACK_ASSET_BASE_URL : RH_PRIMARY_ASSET_BASE_URL;
@@ -406,7 +472,7 @@ static void restoreMainUiSprite()
   // the main UI sprite even if provisioning is still marked active.
   if (g_bootAssetProvisionActive && s_status != AssetOtaStatus::SUCCESS)
     return;
-    
+
   if (!s_graphicsReleasedForOta)
   {
     invalidateBackgroundCache();
@@ -811,6 +877,15 @@ bool assetOtaCheckNow(String *outMessage)
     setFailure(AssetOtaError::JSON_FAIL);
     if (outMessage)
       *outMessage = "Manifest download/parse failed";
+    restoreMainUiSprite();
+    return false;
+  }
+
+  if (!assetOtaRemotePackAcceptable(remotePackVersion))
+  {
+    setFailure(AssetOtaError::JSON_FAIL);
+    if (outMessage)
+      *outMessage = "Remote asset pack is older than required/current";
     restoreMainUiSprite();
     return false;
   }
@@ -1281,7 +1356,4 @@ bool assetOtaCheckNow(String *outMessage)
   return true;
 }
 
-bool assetOtaDidInstallFiles()
-{
-  return s_otaDidInstallFiles;
-}
+bool assetOtaDidInstallFiles() { return s_otaDidInstallFiles; }
