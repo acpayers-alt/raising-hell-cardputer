@@ -515,10 +515,11 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
 {
   displayInit();
 
-  const uint16_t cur = assetOtaCurrentFileIndex();
-  const uint16_t total = assetOtaTotalFileCount();
-  const AssetOtaStatus st = assetOtaStatus();
-  const char *statusText = assetOtaStatusString();
+  const AssetOtaProgress &p = assetOtaGetProgress();
+
+  const uint16_t cur = p.current;
+  const uint16_t total = p.total;
+  const char *stage = p.stage ? p.stage : "-";
 
   auto drawUi = [&](auto &d)
   {
@@ -534,7 +535,42 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
     if (line1 && line1[0])
       d.drawString(line1, 12, 28);
     if (line2 && line2[0])
-      d.drawString(line2, 12, 40);
+    {
+      char path1[64] = {0};
+      char path2[64] = {0};
+
+      const int maxLineLen = 28;
+      size_t len = strlen(line2);
+
+      if (len <= maxLineLen)
+      {
+        strncpy(path1, line2, sizeof(path1) - 1);
+      }
+      else
+      {
+        int split = maxLineLen;
+
+        // Prefer splitting at a slash for readability
+        for (int i = maxLineLen; i > 10; --i)
+        {
+          if (line2[i] == '/')
+          {
+            split = i + 1;
+            break;
+          }
+        }
+
+        strncpy(path1, line2, split);
+        path1[split] = '\0';
+
+        strncpy(path2, line2 + split, sizeof(path2) - 1);
+      }
+
+      d.drawString(path1, 12, 40);
+
+      if (path2[0])
+        d.drawString(path2, 12, 52);
+    }
 
     d.fillRect(12, 72, SCREEN_W - 24, 14, TFT_DARKGREY);
     d.drawRect(12, 72, SCREEN_W - 24, 14, TFT_WHITE);
@@ -561,17 +597,18 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
       d.drawString("Preparing download...", 12, 94);
     }
 
-    if (supportLoggingEnabled())
-    {
-      char dbg1[64];
-      snprintf(dbg1, sizeof(dbg1), "st=%d cur=%u total=%u", (int)st, (unsigned)cur, (unsigned)total);
-      d.setTextColor(TFT_DARKGREY, TFT_BLACK);
-      d.drawString(dbg1, 12, 112);
+    char progDetail[48];
 
-      char dbg2[64];
-      snprintf(dbg2, sizeof(dbg2), "status=%s", statusText ? statusText : "");
-      d.drawString(dbg2, 12, 124);
-    }
+    d.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+
+    snprintf(progDetail, sizeof(progDetail), "st: %s", stage);
+    d.drawString(progDetail, 12, 112);
+
+    snprintf(progDetail, sizeof(progDetail), "cur: %u", (unsigned)cur);
+    d.drawString(progDetail, 12, 124);
+
+    snprintf(progDetail, sizeof(progDetail), "total: %u", (unsigned)total);
+    d.drawString(progDetail, 12, 136);
   };
 
   if (assetOtaDidReleaseGraphics())
