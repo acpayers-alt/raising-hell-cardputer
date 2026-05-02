@@ -223,6 +223,12 @@ static bool blockingUiAutoScreenOffCheck(uint32_t nowMs)
   return false;
 }
 
+static void consumeConfirmInput(InputState &input)
+{
+  input.selectOnce = false;
+  input.encoderPressOnce = false;
+}
+
 void appMainLoopTick()
 {
   // ---------------------------------------------------------------------------
@@ -710,9 +716,7 @@ void appMainLoopTick()
       uiDismissToast();
 
       // HARD CONSUME: this input must not leak into the rest of the frame
-      input.selectOnce = false;
-      input.encoderPressOnce = false;
-      // DO NOT clear latch here — allow next UI to consume same frame input
+      consumeConfirmInput(input);
       requestUIRedraw();
 
       if (consumeUIRedrawRequest())
@@ -757,9 +761,7 @@ void appMainLoopTick()
     if (input.selectOnce || input.encoderPressOnce)
     {
       uiDismissLevelUpPopup();
-      // consume only the confirm, do not nuke latch
-      input.selectOnce = false;
-      input.encoderPressOnce = false;
+      consumeConfirmInput(input);
       requestUIRedraw();
     }
     else
