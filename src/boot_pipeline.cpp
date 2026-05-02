@@ -104,6 +104,9 @@ Tab g_bootWizardAfterOkTab = Tab::TAB_PET;
 // SD Asset Check (all builds)
 // -----------------------------------------------------------------------------
 static const char *kSdAssetsLocalManifestPath = "/raising_hell/assets/manifest_local.json";
+static bool s_assetDeepCheckDone = false;
+static bool s_assetDeepCheckOk = false;
+static uint32_t s_lastAssetDeepCheckMs = 0;
 
 bool g_assetsChecked = false;
 bool g_assetsMissing = false;
@@ -315,18 +318,78 @@ bool sdAssetsPresent()
   if (!g_sdReady)
     return false;
 
-  const char *localManifestPath = "/raising_hell/assets/manifest_local.json";
+  // Fast path: after first successful check, only verify canaries
+  if (s_assetDeepCheckDone && s_assetDeepCheckOk)
+  {
+    static const char *kCanaryFiles[] = {
+        "/raising_hell/graphics/background/dev/hell_bg.jpg",
+        "/raising_hell/graphics/background/eld/eld_bg.jpg",
+        "/raising_hell/graphics/background/flow/rh_splash.jpg",
+        "/raising_hell/graphics/ui/icons/inf_icon.png",
+    };
 
-  if (!SD.exists(localManifestPath))
+    for (const char *path : kCanaryFiles)
+    {
+      if (!SD.exists(path))
+      {
+        Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // -------- SLOW PATH (run ONCE) --------
+
+  if (!SD.exists(kSdAssetsLocalManifestPath))
     return false;
 
   const AssetOtaStatus st = assetOtaStatus();
-
-  // Do not trust local manifest while OTA is actively checking/downloading/installing/failing.
   if (st != AssetOtaStatus::IDLE && st != AssetOtaStatus::SUCCESS)
     return false;
 
-  return true;
+  String installedPack;
+  if (!assetManifestLoadLocalPackVersion(&installedPack) || !installedPack.length())
+  {
+    Serial.println("[ASSETCHK] manifest present but packVersion missing");
+    s_assetDeepCheckDone = true;
+    s_assetDeepCheckOk = false;
+    return false;
+  }
+
+  if (compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0)
+  {
+    Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n",
+                  installedPack.c_str(), RH_MIN_REQUIRED_ASSET_PACK);
+    s_assetDeepCheckDone = true;
+    s_assetDeepCheckOk = false;
+    return false;
+  }
+
+  // Canary check (same as fast path)
+  static const char *kCanaryFiles[] = {
+      "/raising_hell/graphics/background/dev/hell_bg.jpg",
+      "/raising_hell/graphics/background/eld/eld_bg.jpg",
+      "/raising_hell/graphics/background/flow/rh_splash.jpg",
+      "/raising_hell/graphics/ui/icons/inf_icon.png",
+  };
+
+  bool ok = true;
+  for (const char *path : kCanaryFiles)
+  {
+    if (!SD.exists(path))
+    {
+      Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+      ok = false;
+      break;
+    }
+  }
+
+  s_assetDeepCheckDone = true;
+  s_assetDeepCheckOk = ok;
+
+  return ok;
 }
 
 // -----------------------------------------------------------------------------

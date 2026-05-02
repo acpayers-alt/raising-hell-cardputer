@@ -50,6 +50,23 @@ static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
 
+static bool bootWifiCanSkipToManualTime()
+{
+  return !g_bootAssetProvisionMustComplete || sdAssetsPresent();
+}
+
+static void bootWifiSkipToManualTime(InputState &in, const char *source)
+{
+  uiActionSwallowAll(in);
+  uiDrainKb(in);
+  clearInputLatch();
+
+  Serial.printf("[BOOTWIFI] Wi-Fi skipped from %s -> manual time setup\n", source ? source : "boot wifi");
+
+  beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+  requestUIRedraw();
+}
+
 void bootWifiBeginNtpWait()
 {
   s_bootNtpWaitStartMs = millis();
@@ -261,16 +278,17 @@ void uiBootWifiImportedHandle(InputState &in)
 // -----------------------------------------------------------------------------
 void uiBootAssetWifiRequiredHandle(InputState &in)
 {
-  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
+  if ((in.escOnce || in.menuOnce) && bootWifiCanSkipToManualTime())
+  {
+    bootWifiSkipToManualTime(in, "BOOT_ASSET_WIFI_REQUIRED");
+    return;
+  }
+  
+  if ((in.escOnce || in.menuOnce) && !bootWifiCanSkipToManualTime())
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
-
-    Serial.println("[BOOTWIFI] Wi-Fi skipped from prompt -> manual time setup");
-
-    beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
-    requestUIRedraw();
     return;
   }
   

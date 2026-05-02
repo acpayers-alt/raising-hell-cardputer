@@ -3,6 +3,7 @@
 A Tamagotchi-style virtual pet game for the M5Stack Cardputer ADV (ESP32).
 
 Raise your infernal companion through multiple life stages, feed it, play mini-games, manage sleep cycles, survive decay, and maybe… resurrect what should not be resurrected.
+
 [![Discord](https://img.shields.io/discord/1495288087104721038?label=Join%20Discord&logo=discord&color=5865F2)](https://discord.gg/RH7dwZqaxV)
 ![Latest Release](https://img.shields.io/github/v/release/acpayers-alt/raising-hell-cardputer)
 ![Platform](https://img.shields.io/badge/platform-Cardputer%20ADV-orange)
@@ -13,6 +14,7 @@ Raise your infernal companion through multiple life stages, feed it, play mini-g
 ## Community
 
 Follow live development, report issues, and help shape Raising Hell:
+
 https://discord.gg/RH7dwZqaxV
 
 ------------------------------------------------------------
@@ -20,76 +22,73 @@ Hardware Target
 ------------------------------------------------------------
 
 - M5Stack Cardputer ADV
-- ESP32 (240 MHz)
-- SD card (required for assets)
-
+- ESP32 240 MHz
+- SD card required for assets
 
 ------------------------------------------------------------
 Controls
 ------------------------------------------------------------
 
-Arrow Keys  - Navigate
+Arrow Keys - Navigate
 
-Enter/G       - Confirm
+Enter/G - Confirm
 
-Esc         - Menu
+Esc - Menu
 
-Del/Q
+Del/Q - Back/Home
 
-GO          - Screen Off/On
+GO - Screen Off/On
 
-Shake Your cardputer to wake the screen
+Shake your Cardputer to wake the screen
 
-Hold GO     - Power Menu
+Hold GO - Power Menu
 
-/           - Console
+/ - Console
 
-Keyz Z-M are hotkeys for all the tabs
+Keys Z-M are hotkeys for all tabs
 
-(Some mini-games may use alternate input behavior.)
+Alternate Navigation - E,A,S,D and O,J,K,L allow one-handed navigation
 
-Alternate Navigation - E,A,S,D and O,J,K,L - allows for one handed navigation
-
+Some mini-games may use alternate input behavior.
 
 ------------------------------------------------------------
 Project Structure
 ------------------------------------------------------------
 
-src/        (all .cpp and .h files)
+src/ - Game source files
 
-assets/     Image Files
+assets/ - Image files and asset source material
 
-docs/       Licensing, Changelog, Contrib
+docs/ - Licensing, changelog, contribution notes
 
-tools/      Asset Manifest Generator and other Dev Tools
-
+tools/ - Asset manifest generator and development tools
 
 ------------------------------------------------------------
 Installation
 ------------------------------------------------------------
 
-Raising Hell runs on the **M5Stack Cardputer ADV**.
+Raising Hell runs on the M5Stack Cardputer ADV.
 
-There are three ways to install the game depending on your setup.
+There are three main ways to install the game depending on your setup.
 
 ---
 
-# 1. Install via M5Launcher (Recommended)
+# 1. Install via M5Launcher Recommended
 
 This is the easiest way to install Raising Hell directly from the Cardputer.
 
 ### Steps
 
-1. Install **M5Launcher** on your Cardputer if it is not already installed.
-2. Connect the device to **Wi-Fi**.
-3. Open **M5Launcher**.
-4. Browse the application list and locate **Raising Hell**.
-5. Select the game and choose **Install**.
+1. Install M5Launcher on your Cardputer if it is not already installed.
+2. Connect the device to Wi-Fi.
+3. Open M5Launcher.
+4. Browse the application list and locate Raising Hell.
+5. Select the game and choose Install.
 
 After installation:
 
 - Launch the game from the launcher.
-- On first boot the game will **automatically provision required assets via OTA**.
+- On first boot the game will automatically provision required assets via OTA.
 
 No manual asset downloads are required.
 
@@ -97,7 +96,7 @@ No manual asset downloads are required.
 
 # 2. Install using M5Burner
 
-You can install the firmware from a computer using **M5Burner**.
+You can install the firmware from a computer using M5Burner.
 
 ### Requirements
 
@@ -107,19 +106,19 @@ You can install the firmware from a computer using **M5Burner**.
 ### Steps
 
 1. Connect the Cardputer ADV to your computer via USB.
-2. Open **M5Burner**.
-3. Search for **Raising Hell**.
+2. Open M5Burner.
+3. Search for Raising Hell.
 4. Select the application.
-5. Click **Burn**.
+5. Click Burn.
 6. Wait for flashing to complete.
 
 After the first launch:
 
-- The game will **download required assets automatically via OTA**.
+- The game will download required assets automatically via OTA.
 
 ---
 
-# 3. Manual Firmware Install (Advanced)
+# 3. Manual Firmware Install Advanced
 
 Advanced users can manually flash the firmware using PlatformIO or esptool.
 
@@ -134,94 +133,142 @@ https://github.com/acpayers-alt/raising-hell-cardputer/releases
 Flash the firmware to the device.
 
 Example using PlatformIO:
+
 pio run -t upload
 
-Or using esptool:
+Example using esptool:
+
 esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash 0x10000 firmware.bin
 
 ### Step 3 — Launch the game
 
 After booting the firmware:
 
-- The game will automatically provision its asset pack via OTA.
+- The game will automatically provision its asset pack via OTA if assets are missing.
 
 ---
 
-### Optional: Manual Asset Installation
+# Optional Manual Asset Installation Offline Mode
 
-If you do not want to use OTA, you can install assets manually.
+Manual asset installation allows the game to run without Wi-Fi or OTA provisioning.
 
-IMPORTANT: Manual installs require the v2 asset manifest.
+This is useful for:
 
----
-
-### Required SD Card Structure
-
-Your SD card must contain the following base directory:
-
-/raising_hell/assets/
-
-All asset files and folders must live inside this directory.
+- Offline devices
+- Faster setup
+- Users who prefer to prepare the SD card manually
 
 ---
 
-### Steps
+## Important
 
-1. Download the asset pack from the repository  
-   Make sure it includes a v2 manifest (for example: manifest-dev-v2.json or manifest-public-v2.json)
+Raising Hell uses a hybrid asset layout:
 
-2. Create the required directory on your SD card:
+- The local asset manifest lives in `/raising_hell/assets/`
+- The actual graphics and asset folders live directly under `/raising_hell/`
 
-/raising_hell/assets/
+Do not place the graphics folder inside `/raising_hell/assets/`.
 
-3. Copy the entire contents of the asset pack into that directory
+---
 
-Your structure should look like:
+## Required SD Card Structure
 
-/raising_hell/assets/
-  manifest_local.json
+A correct manual install should look like this:
+
+/raising_hell/
+  assets/
+    manifest_local.json
+
   graphics/
-  audio/
-  fonts/
-  ...
+    background/
+    mini_games/
+    pet/
+    ui/
 
-(Exact folders may vary depending on asset version)
+The important paths are:
 
-4. Rename the manifest file:
+/raising_hell/assets/manifest_local.json
+/raising_hell/graphics/
 
-manifest-dev-v2.json → manifest_local.json  
-or  
-manifest-public-v2.json → manifest_local.json
+---
 
-5. Ensure the final manifest path is:
+## Incorrect Structures
+
+These will not work correctly:
+
+/raising_hell/assets/graphics/
+
+/raising_hell/assets/assets/raising_hell/graphics/
+
+/raising_hell/assets/raising_hell/graphics/
+
+If the manifest is detected but the graphics are in the wrong place, the game may boot without visible graphics.
+
+---
+
+## Manual Asset Install Steps
+
+1. Download the latest asset pack zip from GitHub Releases:
+
+https://github.com/acpayers-alt/raising-hell-cardputer/releases
+
+2. Extract the zip on your computer.
+
+3. Copy the asset pack contents to the SD card so the final layout is:
+
+/raising_hell/assets/manifest_local.json
+/raising_hell/graphics/
+
+4. If the manifest is not already named `manifest_local.json`, rename it to:
+
+manifest_local.json
+
+5. Confirm the final manifest path is:
 
 /raising_hell/assets/manifest_local.json
 
-6. Safely eject the SD card and insert it into the device
+6. Safely eject the SD card.
 
-7. Power on the device
+7. Insert the SD card into the Cardputer ADV.
 
----
-
-### Behavior
-
-- The game will detect the local manifest and load assets from SD
-- If assets are missing or outdated, OTA may still trigger depending on build
-- No internet connection is required if the asset pack is complete
+8. Boot Raising Hell.
 
 ---
 
-### Common Mistakes
+## First Boot With Manual Assets
 
-- Manifest not renamed to manifest_local.json
-- Using a non-v2 manifest
-- Placing files outside /raising_hell/assets/
-- Missing folders from the asset pack
-- Incorrect SD card format (must be FAT32)
+If the manual asset install is valid:
+
+- The game will detect the local asset manifest.
+- The game will verify required graphics canary files.
+- Wi-Fi can be skipped.
+- You will be prompted to set the date, time, and timezone manually.
+- The game will continue without downloading assets.
+
+A successful boot log should include something like:
+
+[BOOT][ASSET] assetsPresent=1 tooOld=0
 
 ---
 
-If the game cannot detect assets, it will attempt OTA or report missing assets.
+## Manual Install Troubleshooting
+
+If the game asks for Wi-Fi or tries OTA anyway:
+
+- Confirm the SD card is FAT32.
+- Confirm the manifest is exactly here:
+
+/raising_hell/assets/manifest_local.json
+
+- Confirm graphics are directly here:
+
+/raising_hell/graphics/
+
+- Confirm graphics are not nested under `/raising_hell/assets/`.
+- Confirm you are using the correct asset pack version for the firmware.
+- Confirm the asset pack is complete.
+
+If the game boots but graphics are missing, the most likely cause is an incorrect folder layout.
 
 ---
 
@@ -229,11 +276,13 @@ If the game cannot detect assets, it will attempt OTA or report missing assets.
 
 On first launch Raising Hell will:
 
-- Check for required game assets  
-- Download missing assets automatically  
-- Store assets on the SD card  
+- Check for required game assets
+- Use local SD assets if present and valid
+- Download missing or outdated assets automatically if Wi-Fi is available
+- Store assets on the SD card
+- Guide first-time users through setup
 
-This process only occurs once.
+This process normally only occurs once.
 
 ---
 
@@ -251,9 +300,11 @@ The original first-generation Cardputer has not been tested and may not work cor
 
 If the game fails to start:
 
-- Ensure an **SD card is installed**
-- Ensure the device has **Wi-Fi connectivity** for asset provisioning
-- Restart the device after flashing
+- Ensure an SD card is installed.
+- Ensure the SD card is FAT32.
+- Ensure assets are installed or Wi-Fi is available for OTA provisioning.
+- Restart the device after flashing.
+- If manually installing assets, verify the folder structure carefully.
 
 ------------------------------------------------------------
 Development Direction
@@ -267,7 +318,6 @@ This project is under active architectural cleanup and refactor toward:
 - Separation of platform and gameplay logic
 - Open-source readiness
 
-
 ------------------------------------------------------------
 Arduino IDE Settings
 ------------------------------------------------------------
@@ -275,24 +325,29 @@ Arduino IDE Settings
 Recommended configuration:
 
 Board: M5Cardputer
-Flash Mode: QIO 80MHz
-Flash Size: 4MB (32Mb)
-Partition Scheme: Huge APP (3MB No OTA / 1MB SPIFFS)
-CPU Frequency: 240MHz (WiFi)
-Upload Speed: 921600
 
+Flash Mode: QIO 80MHz
+
+Flash Size: 4MB 32Mb
+
+Partition Scheme: Huge APP 3MB No OTA / 1MB SPIFFS
+
+CPU Frequency: 240MHz WiFi
+
+Upload Speed: 921600
 
 ------------------------------------------------------------
 Building From Source
 ------------------------------------------------------------
 
 1. Clone the repository.
-2. Copy the assets folder contents to an SD card.
+2. Copy the required assets to an SD card.
 3. Open raising_hell_cpADV.ino in the Arduino IDE.
 4. Select the board settings listed above.
 5. Compile and upload.
 
-   
+For PlatformIO builds, use the provided PlatformIO configuration.
+
 ------------------------------------------------------------
 Known Limitations
 ------------------------------------------------------------
@@ -300,7 +355,6 @@ Known Limitations
 - Requires SD card
 - Designed specifically for Cardputer ADV hardware
 - Not optimized for alternate ESP32 boards
-
 
 ------------------------------------------------------------
 License
@@ -311,7 +365,6 @@ See the LICENSE file for details.
 
 Assets licensing is described in ASSETS_LICENSE.md.
 
-
 ------------------------------------------------------------
 Author
 ------------------------------------------------------------
@@ -320,14 +373,14 @@ Aaron Ayers
 
 If you build this, fork it, improve it, or port it — I’d love to see it.
 
-
 ------------------------------------------------------------
 Screenshots
 ------------------------------------------------------------
+
 ![Raising Hell](media/Raising_Hell_Credits.JPG)
 ![Choose Your Pet](media/Raising_Hell_Choose.JPG)
 ![Hatch Your Pet](media/Raising_Hell_Hatch.JPG)
-![NameYour Pet](media/Raising_Hell_Name.JPG)
+![Name Your Pet](media/Raising_Hell_Name.JPG)
 ![Meet Your Pet](media/Raising_Hell_Meet.JPG)
 ![Care for Your Pet](media/Raising_Hell_Care.JPG)
 ![Raise Your Pet](media/Raising_Hell_Raise.JPG)

@@ -28,6 +28,11 @@ void UiBootWizardMenu::ResetWifiPromptChoice() { s_wifiPromptChoice = 0; }
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+static bool bootWizardCanSkipToManualTime()
+{
+  return !g_bootAssetProvisionMustComplete || sdAssetsPresent();
+}
+
 static void bootWizardSkipToManualTime()
 {
   beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
@@ -114,8 +119,7 @@ static void tzCommit()
 // -----------------------------------------------------------------------------
 bool UiBootWizardMenu::HandleWifiPrompt(InputState &in)
 {
-  // For mandatory asset provisioning, do not allow skipping WiFi.
-  if (!g_bootAssetProvisionMustComplete && in.escOnce)
+  if ((in.escOnce || in.menuOnce) && bootWizardCanSkipToManualTime())
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
@@ -123,16 +127,15 @@ bool UiBootWizardMenu::HandleWifiPrompt(InputState &in)
     bootWizardSkipToManualTime();
     return true;
   }
-
-  // MENU inactive here
-  if (in.menuOnce)
+  
+  if ((in.escOnce || in.menuOnce) && !bootWizardCanSkipToManualTime())
   {
     uiActionSwallowAll(in);
     uiDrainKb(in);
     clearInputLatch();
     return true;
   }
-
+  
   // For mandatory asset provisioning, force the WiFi path.
   if (!g_bootAssetProvisionMustComplete && (in.upOnce || in.downOnce))
   {

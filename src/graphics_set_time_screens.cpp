@@ -8,22 +8,13 @@
 #include "app_state.h"
 
 #include "pet.h"
+#include "time_editor_state.h"
+#include "timezone.h"
 
 extern Pet pet;
 
-// externs (already defined elsewhere)
-extern int g_setTimeField;
-extern bool g_setTimeMode;
-
-extern tm g_setTimeTm;
-
 static void drawSetDateTimePanel(int x, int y, int w, int h, int selectedField)
 {
-  const uint16_t outline = uiPillOutline(pet.type);
-
-  spr.drawRoundRect(x, y, w, h, 8, outline);
-  spr.fillRoundRect(x + 1, y + 1, w - 2, h - 2, 8, TFT_BLACK);
-
   const int year = g_setTimeTm.tm_year + 1900;
   const int mon = g_setTimeTm.tm_mon + 1;
   const int day = g_setTimeTm.tm_mday;
@@ -42,41 +33,84 @@ static void drawSetDateTimePanel(int x, int y, int w, int h, int selectedField)
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  const int baseY = y + 18;
-  int cx = x + 8;
+  const int baseY = y + 2;
+
+  int totalW = 0;
+  totalW += spr.textWidth(yy) + 4;
+  totalW += spr.textWidth("-") + 4;
+  totalW += spr.textWidth(mo) + 4;
+  totalW += spr.textWidth("-") + 4;
+  totalW += spr.textWidth(dd) + 10;
+  totalW += spr.textWidth(th) + 4;
+  totalW += spr.textWidth(":") + 4;
+  totalW += spr.textWidth(tmBuf);
+
+  int cx = x + (w - totalW) / 2;
 
   auto drawField = [&](const char *s, int fid)
   {
-    spr.drawString(s, cx, baseY);
     const int tw = spr.textWidth(s);
+    const bool selected = (selectedField == fid);
 
-    if (selectedField == fid)
+    if (selected)
+      spr.setTextColor(TFT_YELLOW, TFT_BLACK);
+
+    spr.drawString(s, cx, baseY);
+
+    if (selected)
     {
-      const int uy = baseY + 15;
+      const int uy = baseY + 16;
       spr.drawFastHLine(cx, uy, tw, TFT_YELLOW);
       spr.drawFastHLine(cx, uy + 1, tw, TFT_YELLOW);
     }
 
+    if (selected)
+      spr.setTextColor(TFT_WHITE, TFT_BLACK);
+
     cx += tw + 4;
   };
-  
-  // Date
+
   drawField(yy, 0);
   spr.drawString("-", cx, baseY);
   cx += spr.textWidth("-") + 4;
+
   drawField(mo, 1);
   spr.drawString("-", cx, baseY);
   cx += spr.textWidth("-") + 4;
+
   drawField(dd, 2);
 
-  // Spacer
   cx += 10;
 
-  // Time
   drawField(th, 3);
   spr.drawString(":", cx, baseY);
   cx += spr.textWidth(":") + 4;
+
   drawField(tmBuf, 4);
+
+  const int tzY = baseY + 23;
+  const bool tzSel = (selectedField == 5);
+
+  const char *tzLabel = tzName((uint8_t)tzIndex);
+  if (!tzLabel || !tzLabel[0])
+    tzLabel = "Timezone";
+
+  spr.setTextDatum(TC_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextColor(tzSel ? TFT_YELLOW : TFT_LIGHTGREY, TFT_BLACK);
+  spr.drawString(tzLabel, x + w / 2, tzY);
+
+  if (tzSel)
+  {
+    const int tw = spr.textWidth(tzLabel);
+    const int ux = x + (w - tw) / 2;
+    spr.drawFastHLine(ux, tzY + 16, tw, TFT_YELLOW);
+    spr.drawFastHLine(ux, tzY + 17, tw, TFT_YELLOW);
+  }
+
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
 }
 
 void drawSetTimeScreen()
@@ -93,14 +127,15 @@ void drawSetTimeScreen()
 
   spr.fillRect(0, contentY, cw, ch, TFT_BLACK);
 
-  spr.setTextDatum(TL_DATUM);
+  spr.setTextDatum(TC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.setTextFont(2);
   spr.setTextSize(1);
-  spr.drawString("Set Date & Time", cx + 8, contentY + 6);
+  spr.drawString("Set Date & Time", cx + cw / 2, contentY + 4);
+  spr.setTextDatum(TL_DATUM);
 
   const int panelX = cx + 10;
-  const int panelY = contentY + 28;
+  const int panelY = contentY + 22;
   const int panelW = cw - 20;
   const int panelH = 42;
 
@@ -109,15 +144,15 @@ void drawSetTimeScreen()
   const int okW = 84;
   const int okH = 22;
   const int okX = cx + (cw - okW) / 2;
-  const int okY = panelY + panelH + 12;
 
-  const bool okSel = (g_setTimeField == 5);
+  const int okY = panelY + panelH + 2;
+  const bool okSel = (g_setTimeField == 6);
   drawButton(okX, okY, okW, okH, "OK", okSel);
 
   spr.setTextDatum(BC_DATUM);
   spr.setTextFont(1);
   spr.setTextSize(1);
   spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  spr.drawString("Enter: next | Arrows: +/-", cx + cw / 2, contentY + ch - 2);
+  spr.drawString("L/R select | U/D adjust", cx + cw / 2, contentY + ch - 2);
   spr.setTextDatum(TL_DATUM);
 }

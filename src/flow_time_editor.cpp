@@ -1,5 +1,6 @@
 #include "flow_time_editor.h"
 
+#include "timezone.h"
 #include <Arduino.h>
 #include <sys/time.h>
 #include <time.h>
@@ -15,22 +16,6 @@
 
 // -----------------------------------------------------------------------------
 // Set-Time flow
-//
-// This module owns the SET_TIME UI behavior.
-//
-// Expected UX (matches graphics.cpp drawSetDateTimePanel()):
-//   - g_setTimeField selects: 0=year,1=month,2=day,3=hour,4=min,5=OK pill
-//   - Left/Right: move selection (wrap)
-//   - Up/Down: adjust selected field (only when field 0-4)
-//   - Enter/Select:
-//        - If on OK: commit and return
-//        - Otherwise: jump selection to OK (no commit)
-//   - ESC:
-//        - If cancel allowed: return without commit
-//        - If cancel blocked (boot gate): ignored
-//   - Menu/Backspace:
-//        - If not on OK: jump to OK
-//        - If on OK: behaves like cancel (if allowed)
 // -----------------------------------------------------------------------------
 
 static constexpr uint8_t kFieldYear = 0;
@@ -38,17 +23,16 @@ static constexpr uint8_t kFieldMonth = 1;
 static constexpr uint8_t kFieldDay = 2;
 static constexpr uint8_t kFieldHour = 3;
 static constexpr uint8_t kFieldMinute = 4;
-static constexpr uint8_t kFieldOk = 5;
+static constexpr uint8_t kFieldTimezone = 5;
+static constexpr uint8_t kFieldOk = 6;
 
 static inline bool fieldIsAdjustable(uint8_t f) { return (f <= kFieldMinute); }
 
 static void normalizeAndClampTm(struct tm &t)
 {
-  // Normalize with mktime() (handles overflow like month 13, day 0, etc.)
   time_t epoch = mktime(&t);
   if (epoch < 0)
   {
-    // Fallback to a sane default if normalization fails.
     memset(&t, 0, sizeof(t));
     t.tm_year = 2026 - 1900;
     t.tm_mon = 0;
@@ -60,7 +44,6 @@ static void normalizeAndClampTm(struct tm &t)
     return;
   }
 
-  // Clamp year range (helps avoid weird UI states if the user holds keys).
   const int year = t.tm_year + 1900;
   if (year < 2000)
   {
@@ -76,7 +59,22 @@ static void normalizeAndClampTm(struct tm &t)
 
 static void initEditorFromNow()
 {
-  // Seed editor from current system time.
+  // If we're in forced boot setup, ALWAYS start at 2026 baseline
+  if (g_setTimeForceNoCancel)
+  {
+    memset(&g_setTimeTm, 0, sizeof(g_setTimeTm));
+    g_setTimeTm.tm_year = 2026 - 1900;
+    g_setTimeTm.tm_mon = 0;
+    g_setTimeTm.tm_mday = 1;
+    g_setTimeTm.tm_hour = 12;
+    g_setTimeTm.tm_min = 0;
+    g_setTimeTm.tm_sec = 0;
+    g_setTimeTm.tm_isdst = -1;
+    normalizeAndClampTm(g_setTimeTm);
+    return;
+  }
+
+  // Otherwise (settings flow), use current time
   time_t now = time(nullptr);
   if (now <= 0)
   {
@@ -87,26 +85,17 @@ static void initEditorFromNow()
     g_setTimeTm.tm_hour = 12;
     g_setTimeTm.tm_min = 0;
     g_setTimeTm.tm_sec = 0;
+    g_setTimeTm.tm_isdst = -1;
     normalizeAndClampTm(g_setTimeTm);
     return;
   }
 
   struct tm *lt = localtime(&now);
   if (!lt)
-  {
-    memset(&g_setTimeTm, 0, sizeof(g_setTimeTm));
-    g_setTimeTm.tm_year = 2026 - 1900;
-    g_setTimeTm.tm_mon = 0;
-    g_setTimeTm.tm_mday = 1;
-    g_setTimeTm.tm_hour = 12;
-    g_setTimeTm.tm_min = 0;
-    g_setTimeTm.tm_sec = 0;
-    normalizeAndClampTm(g_setTimeTm);
     return;
-  }
 
   g_setTimeTm = *lt;
-  g_setTimeTm.tm_isdst = -1; // let mktime decide
+  g_setTimeTm.tm_isdst = -1;
   normalizeAndClampTm(g_setTimeTm);
 }
 
@@ -136,6 +125,24 @@ static void adjustEditorField(uint8_t field, int delta)
   normalizeAndClampTm(g_setTimeTm);
 }
 
+static void adjustTimezoneField(int delta)
+{
+  const int count = (int)tzCount();
+  if (count <= 0)
+    return;
+
+  int next = (int)tzIndex + delta;
+
+  if (next < 0)
+    next = count - 1;
+  else if (next >= count)
+    next = 0;
+
+  tzIndex = next;
+  applyTimezoneIndex((uint8_t)tzIndex);
+  saveTzIndexToNVS((uint8_t)tzIndex);
+}
+
 static void returnFromSetTime()
 {
   g_setTimeActive = false;
@@ -148,9 +155,12 @@ static void returnFromSetTime()
 
 static void commitSetTime()
 {
-  // Commit edited tm -> system time.
+  applyTimezoneIndex(tzIndex);
+  saveTzIndexToNVS(tzIndex);
+
   struct tm tmp = g_setTimeTm;
   tmp.tm_isdst = -1;
+
   time_t epoch = mktime(&tmp);
   if (epoch > 0)
   {
@@ -160,11 +170,27 @@ static void commitSetTime()
     settimeofday(&tv, nullptr);
   }
 
-  // Manual time set is user-confirmed, so treat it as clean.
   timeMarkClean();
-
-  // Persist anchor used by time system.
   saveTimeAnchor();
+}
+
+static void finishForcedBootTime()
+{
+  Serial.println("[BOOT] manual time complete, finishing boot gate");
+
+  g_setTimeActive = false;
+  g_setTimeForceNoCancel = false;
+
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
+
+  bootSetupClearPendingFlag();
+  Serial.printf("[BOOT] manual time complete -> entering return state=%d tab=%d\n", (int)ret.state, (int)ret.tab);
+
+  uiActionEnterState(ret.state, ret.tab, true);
+
+  requestUIRedraw();
+  inputForceClear();
 }
 
 // -----------------------------------------------------------------------------
@@ -202,6 +228,7 @@ void beginSetTimeEditorFromSettings(SettingsPage /*page*/, UIState returnState, 
 // -----------------------------------------------------------------------------
 // UI handler
 // -----------------------------------------------------------------------------
+
 void uiSetTimeHandle(InputState &in)
 {
   if (!g_setTimeActive)
@@ -209,56 +236,64 @@ void uiSetTimeHandle(InputState &in)
 
   bool anyUiChange = false;
 
-  // Left/Right change selection (wrap)
   if (in.leftOnce)
   {
     g_setTimeField = (g_setTimeField == 0) ? kFieldOk : (uint8_t)(g_setTimeField - 1);
     anyUiChange = true;
   }
+
   if (in.rightOnce)
   {
     g_setTimeField = (g_setTimeField >= kFieldOk) ? 0 : (uint8_t)(g_setTimeField + 1);
     anyUiChange = true;
   }
 
-  // Up/Down adjust current field
   if (in.upOnce && fieldIsAdjustable(g_setTimeField))
   {
     adjustEditorField(g_setTimeField, +1);
     anyUiChange = true;
   }
+
   if (in.downOnce && fieldIsAdjustable(g_setTimeField))
   {
     adjustEditorField(g_setTimeField, -1);
     anyUiChange = true;
   }
 
-  // Enter/Select behavior: commit only when OK selected.
+  if (in.upOnce && g_setTimeField == kFieldTimezone)
+  {
+    adjustTimezoneField(+1);
+    anyUiChange = true;
+  }
+
+  if (in.downOnce && g_setTimeField == kFieldTimezone)
+  {
+    adjustTimezoneField(-1);
+    anyUiChange = true;
+  }
+
   if (in.selectOnce)
   {
     if (g_setTimeField == kFieldOk)
     {
       commitSetTime();
 
-      Serial.println("[BOOT] manual time complete, re-entering boot pipeline");
+      if (g_setTimeForceNoCancel)
+      {
+        finishForcedBootTime();
+        in.clearEdges();
+        return;
+      }
 
-      // Force full boot re-evaluation (assets, provisioning, etc)
-      uiPopReturnTarget(); // discard previous return
-      uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
-      requestUIRedraw();
-      inputForceClear();
-
+      returnFromSetTime();
+      in.clearEdges();
       return;
     }
-    else
-    {
-      // Enter shouldn't do anything except move focus to OK.
-      g_setTimeField = kFieldOk;
-      anyUiChange = true;
-    }
+
+    g_setTimeField = kFieldOk;
+    anyUiChange = true;
   }
 
-  // Menu/backspace acts as "go to OK" first; cancel only when already on OK.
   if (in.menuOnce)
   {
     if (g_setTimeField != kFieldOk)
@@ -269,16 +304,17 @@ void uiSetTimeHandle(InputState &in)
     else if (!g_setTimeForceNoCancel)
     {
       returnFromSetTime();
+      in.clearEdges();
       return;
     }
   }
 
-  // ESC cancels normally; during forced boot time entry, return to Wi-Fi setup.
   if (in.escOnce)
   {
     if (!g_setTimeForceNoCancel)
     {
       returnFromSetTime();
+      in.clearEdges();
       return;
     }
 
@@ -304,6 +340,5 @@ void uiSetTimeHandle(InputState &in)
   if (anyUiChange)
     requestUIRedraw();
 
-  // Do not allow other systems to interpret these edges.
   in.clearEdges();
 }
