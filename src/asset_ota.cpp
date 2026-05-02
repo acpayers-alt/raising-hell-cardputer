@@ -1064,7 +1064,9 @@ bool assetOtaCheckNow(String *outMessage)
       const AssetManifestFile &f = worklistBatch[batchIdx];
       const uint16_t idx = processedCount;
       s_progress.current = idx + 1;
-
+      s_progress.bytesCurrent = 0;
+      s_progress.bytesTotal = f.size;
+      
       s_status = AssetOtaStatus::DOWNLOADING;
       s_progress.stage = "downloading";
 

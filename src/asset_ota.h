@@ -11,9 +11,12 @@
 
 struct AssetOtaProgress
 {
+  const char *stage;
   uint16_t current;
   uint16_t total;
-  const char *stage;
+
+  uint32_t bytesCurrent;   // current file downloaded bytes
+  uint32_t bytesTotal;     // current file total size
 };
 
 const AssetOtaProgress &assetOtaGetProgress();

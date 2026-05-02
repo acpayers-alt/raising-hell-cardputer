@@ -604,7 +604,11 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
     snprintf(progDetail, sizeof(progDetail), "st: %s", stage);
     d.drawString(progDetail, 12, 112);
 
-    snprintf(progDetail, sizeof(progDetail), "cur: %u", (unsigned)cur);
+    if (p.bytesTotal > 0)
+      snprintf(progDetail, sizeof(progDetail), "cur: %.1f KB", (double)p.bytesTotal / 1024.0);
+    else
+      snprintf(progDetail, sizeof(progDetail), "cur: %u", (unsigned)cur);
+
     d.drawString(progDetail, 12, 124);
 
     snprintf(progDetail, sizeof(progDetail), "total: %u", (unsigned)total);
