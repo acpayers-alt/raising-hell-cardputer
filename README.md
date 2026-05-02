@@ -189,8 +189,10 @@ A correct manual install should look like this:
 
 The important paths are:
 
+```
 /raising_hell/assets/manifest_local.json
 /raising_hell/graphics/
+```
 
 ---
 
