@@ -98,8 +98,11 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
 
   const bool enteringPetCacheZone = !usesPetBackgroundCache(prevState, prevTab) && usesPetBackgroundCache(state, tab);
 
-  if (leavingPetCacheZone)
-    graphicsReleasePetBackgroundCache();
+  // Do not release the pet background cache on ordinary tab/menu transitions.
+  // Rebuilding this cache from SD on every return to the pet tab causes visible
+  // flicker if the decode takes more than one frame or transiently fails.
+  // Heavy memory-pressure flows such as OTA/mini-games still release it explicitly.
+  (void)leavingPetCacheZone;
 
   if (prevState != state)
     uiStateOnExit(prevState);

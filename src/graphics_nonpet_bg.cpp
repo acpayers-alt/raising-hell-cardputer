@@ -10,6 +10,7 @@
 
 static const char *PATH_BG_NONPET_TILE_DEV = "/raising_hell/graphics/background/flow/dev_tab_bg.png";
 static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/flow/eld_tab_bg.png";
+static char s_lastNonPetTileFailPath[160] = {0};
 
 static M5Canvas s_nonPetTile(&M5.Display);
 static bool s_nonPetTileReady = false;
@@ -45,6 +46,7 @@ static bool ensureNonPetTileReady()
       return false;
 
     s_nonPetTileHardFail = false;
+    s_lastNonPetTileFailPath[0] = '\0';
   }
 
   const PetType desiredType = pet.type;
@@ -85,8 +87,6 @@ static bool ensureNonPetTileReady()
   {
     s_nonPetTileHardFail = true;
     s_lastNonPetTileFailMs = millis();
-
-    static char s_lastNonPetTileFailPath[160] = {0};
 
     const char *failPath = path ? path : "(null)";
     if (strcmp(s_lastNonPetTileFailPath, failPath) != 0)
@@ -146,4 +146,5 @@ void graphicsReleaseNonPetTileCache()
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
   s_nonPetTileCachedType = (PetType)255;
+  s_lastNonPetTileFailPath[0] = '\0';
 }
