@@ -132,9 +132,7 @@ void uiWifiConnectWaitHandle(InputState &in)
     }
     else
     {
-      Serial.printf("[WIFI] skip save: ssid='%s' passLen=%u\n",
-                    g_wifi.ssid,
-                    (unsigned)strlen(g_wifi.pass));
+      Serial.printf("[WIFI] skip save: ssid='%s' passLen=%u\n", g_wifi.ssid, (unsigned)strlen(g_wifi.pass));
     }
 
     wifiResetConnectUiState();
@@ -148,7 +146,9 @@ void uiWifiConnectWaitHandle(InputState &in)
     return;
   }
 
-  if (failedStatus || timedOut)
+  const bool attemptHasHadTime = effectiveAgeMs >= 2500;
+
+  if ((attemptHasHadTime && failedStatus) || timedOut)
   {
     // One automatic retry before bouncing the user back to password entry.
     if (!s_autoRetryIssued && g_wifi.ssid[0] && g_wifi.pass[0])

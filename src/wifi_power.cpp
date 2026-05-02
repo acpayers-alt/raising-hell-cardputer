@@ -3,7 +3,6 @@
 #include "support_logging_state.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include <Preferences.h>
 #include <WiFi.h>
 
 void applyWifiPower(bool enable)
@@ -54,12 +53,8 @@ void applyWifiPower(bool enable)
 
 void wifiResetSettings()
 {
-  // Clear stored creds (matches your console code namespace/keys)
-  Preferences prefs;
-  prefs.begin("rh_wifi", false);
-  prefs.putString("ssid", "");
-  prefs.putString("pass", "");
-  prefs.end();
+  // Clear all stored Wi-Fi profiles, including legacy creds.
+  wifiStoreClear();
 
   // Disconnect from current network
   WiFi.disconnect(true, true);

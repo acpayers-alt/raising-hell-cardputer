@@ -71,7 +71,12 @@ bool wifiStoreLoadProfile(int index, String &ssid, String &pass)
     return false;
   }
 
-  const bool ok = readProfile(p, index, ssid, pass);
+  bool ok = readProfile(p, index, ssid, pass);
+
+  // Backward compatibility: older builds only stored legacy ssid/pass.
+  // Treat legacy creds as profile 0 if slot 0 has not been migrated yet.
+  if (!ok && index == 0)
+    ok = loadLegacy(p, ssid, pass);
 
   p.end();
 

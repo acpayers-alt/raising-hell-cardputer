@@ -307,21 +307,8 @@ static void tryWiFiConnect()
 
     Serial.printf("[WIFI] retry stored profile=%d ssid='%s'\n", idx, ssid.c_str());
 
-    if (!s_wifiEventHooked)
-    {
-      WiFi.onEvent(onWiFiEvent);
-      s_wifiEventHooked = true;
-    }
-
-    WiFi.persistent(false);
-    WiFi.setAutoReconnect(true);
-    WiFi.setSleep(false);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid.c_str(), pass.c_str());
-
-    strncpy(s_consoleSsidBuf, ssid.c_str(), sizeof(s_consoleSsidBuf) - 1);
-    s_consoleSsidBuf[sizeof(s_consoleSsidBuf) - 1] = '\0';
-
+    wifiConsoleBeginConnect(ssid.c_str(), pass.c_str());
+    
     // Advance for next retry cycle
     s_retryProfileIndex = (idx + 1) % WIFI_PROFILE_MAX;
 
