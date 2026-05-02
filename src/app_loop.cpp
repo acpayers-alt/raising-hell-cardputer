@@ -544,14 +544,16 @@ void appMainLoopTick()
       {
         if (!SD.exists("/"))
         {
-          Serial.printf("[SDRUNTIME] probe: SD root missing -> forcing sdReady=0 ui=%d\n", (int)g_app.uiState);
+          Serial.printf("[SDRUNTIME] probe: SD root missing; treating as transient ui=%d\n", (int)g_app.uiState);
 
-          g_sdReady = false;
+          // Do not immediately mark SD dead from a single root probe miss.
+          // Some cards/controllers transiently fail this check while still mounted.
           assetsPresentNow = false;
         }
         else
         {
           assetsPresentNow = sdAssetsPresent();
+
           if (!assetsPresentNow)
           {
             Serial.printf("[SDRUNTIME] probe: sdReady=1 but assetsPresent=0 -> forcing assetsMissing ui=%d\n",
@@ -690,9 +692,21 @@ void appMainLoopTick()
           // but cold boot does.
           if (!g_sdReady)
           {
-            Serial.println("[SDRUNTIME] retry failed with sdReady=0 -> rebooting for cold SD init");
-            delay(100);
-            ESP.restart();
+            Serial.println("[SDRUNTIME] retry failed with sdReady=0; staying in SD missing modal");
+
+            // HARD STOP: kill provisioning state
+            g_bootAssetProvisionMustComplete = false;
+            g_bootUiBlockedForAssetProvision = false;
+            g_bootAssetProvisionActive = false;
+            g_bootProvisionWifiOnboardingStarted = false;
+
+            assetOtaResetState();
+
+            // Force modal redraw
+            s_assetsMissingModalDrawn = false;
+            s_assetsMissingModalLogged = false;
+
+            clearInputLatch();
           }
         }
         else

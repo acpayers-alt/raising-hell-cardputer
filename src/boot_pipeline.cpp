@@ -1412,7 +1412,7 @@ void postBootInitTick()
     return;
   }
 
-  if (bootAssetProvisionRequired())
+  if (g_bootLandingDeferredForAssetProvision && bootAssetProvisionRequired())
   {
     // If user opened console during the asset intro/provision phase,
     // freeze boot pipeline UI activity so we do not fight the overlay.

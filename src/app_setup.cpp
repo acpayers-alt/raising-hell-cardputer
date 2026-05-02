@@ -223,7 +223,22 @@ void appSetup()
   }
 
   auto cfg = M5.config();
+
+  // This firmware targets Cardputer ADV only.
+  // M5Unified/M5GFX auto-detection can intermittently misidentify ADV as the
+  // original Cardputer, which breaks downstream hardware assumptions.
+  cfg.fallback_board = m5::board_t::board_M5CardputerADV;
+
   M5Cardputer.begin(cfg, true);
+
+  Serial.printf("[BOOT][BOARD] M5 board=%d expected_adv=%d\n", (int)M5.getBoard(),
+                (int)m5::board_t::board_M5CardputerADV);
+
+  if (M5.getBoard() != m5::board_t::board_M5CardputerADV)
+  {
+    Serial.printf("[BOOT][BOARD][WARN] detected non-ADV board=%d; forcing ADV-targeted runtime assumptions\n",
+                  (int)M5.getBoard());
+  }
 
   // Let tasks settle before anything else touches SPI / WiFi / SD.
   delay(50);
