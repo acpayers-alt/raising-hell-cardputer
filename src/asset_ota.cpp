@@ -25,6 +25,7 @@
 
 static constexpr bool kLogVerifySuccess = false;
 static constexpr bool kLogInstallVerbose = false;
+static bool s_otaDidInstallFiles = false;
 
 // -----------------------------------------------------------------------------
 // Worklist helpers
@@ -698,6 +699,8 @@ static bool assetOtaLoadWorklistBatch(uint32_t startOffset, size_t maxEntries, s
 
 bool assetOtaCheckNow(String *outMessage)
 {
+  s_otaDidInstallFiles = false;
+
   if (outMessage)
     *outMessage = "";
 
@@ -1093,6 +1096,7 @@ bool assetOtaCheckNow(String *outMessage)
       }
 
       ++installOkCount;
+      s_otaDidInstallFiles = true;
       ++processedCount;
       Serial.printf("[OTA] INSTALL COUNT ok=%u skipped=%u current=%s\n", (unsigned)installOkCount, (unsigned)skipCount,
                     rel.c_str());
@@ -1271,4 +1275,9 @@ bool assetOtaCheckNow(String *outMessage)
   assetOtaWorklistClear();
   restoreMainUiSprite();
   return true;
+}
+
+bool assetOtaDidInstallFiles()
+{
+  return s_otaDidInstallFiles;
 }

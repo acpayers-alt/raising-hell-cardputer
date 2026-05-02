@@ -44,6 +44,7 @@ uint16_t assetOtaCurrentFileIndex();
 uint16_t assetOtaTotalFileCount();
 
 bool assetOtaDidReleaseGraphics();
+bool assetOtaDidInstallFiles();
 
 // -----------------------------------------------------------------------------
 // Confirmation / UI flow

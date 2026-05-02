@@ -6,8 +6,13 @@
 
 #include "debug.h"    // DBG_ON / DBGLN_ON macros (or your real debug macro header)
 #include "graphics.h" // invalidateBackgroundCache (if that's where it is)
+#include "graphics_nonpet_bg.h"
+#include "graphics_pet_presentation.h"
+
 #include <SD.h>
 #include <SPI.h>
+
+void requestUIRedraw();
 
 bool g_sdReady = false;
 bool sdReady() { return g_sdReady; }
@@ -162,8 +167,11 @@ bool initSD()
     }
 
     // SD is ready. If UI rendered before SD came up, background caches may be
-    // placeholder-filled. Force the next render to rebuild backgrounds.
+    // placeholder-filled or failure-latched. Force all background caches to rebuild.
+    graphicsReleaseNonPetTileCache();
+    graphicsReleasePetBackgroundCache();
     invalidateBackgroundCache();
+    requestUIRedraw();
 
     return true;
   }

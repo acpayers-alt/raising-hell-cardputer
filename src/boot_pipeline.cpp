@@ -352,7 +352,7 @@ bool sdAssetsPresent()
     s_assetDeepCheckOk = false;
     return false;
   }
-  
+
   const AssetOtaStatus st = assetOtaStatus();
   if (st != AssetOtaStatus::IDLE && st != AssetOtaStatus::SUCCESS)
     return false;
@@ -677,14 +677,24 @@ static bool runBootAssetProvision()
         g_controlsHelpSeen = 0;
         g_whatsNewSeen = 0;
       }
-
       settingsSetWifiEnabled(true);
       saveSettingsToSD();
     }
 
     g_bootAssetProvisionActive = false;
     g_bootUiBlockedForAssetProvision = false;
-    ESP.restart();
+    if (assetOtaDidInstallFiles())
+    {
+      Serial.println("[OTA] files installed; rebooting");
+      ESP.restart();
+    }
+    else
+    {
+      Serial.println("[OTA] no file installs; continuing boot");
+
+      g_bootLandingDeferredForAssetProvision = false;
+      return false;
+    }
   }
 
   runtimeLogf("[BOOT][ASSET_PROVISION] failed: %s", msg.c_str());

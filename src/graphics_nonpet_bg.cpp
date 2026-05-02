@@ -14,6 +14,7 @@ static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/
 static M5Canvas s_nonPetTile(&M5.Display);
 static bool s_nonPetTileReady = false;
 static bool s_nonPetTileHardFail = false;
+static uint32_t s_lastNonPetTileFailMs = 0;
 static int s_nonPetTileW = 0;
 static int s_nonPetTileH = 0;
 static PetType s_nonPetTileCachedType = (PetType)255;
@@ -35,7 +36,16 @@ static inline const char *nonPetTilePathForPet(PetType t)
 static bool ensureNonPetTileReady()
 {
   if (s_nonPetTileHardFail)
-    return false;
+  {
+    const uint32_t now = millis();
+
+    // Do not permanently black-hole the UI background after one transient
+    // SD/decode failure during boot or post-OTA recovery.
+    if ((uint32_t)(now - s_lastNonPetTileFailMs) < 3000UL)
+      return false;
+
+    s_nonPetTileHardFail = false;
+  }
 
   const PetType desiredType = pet.type;
   const char *path = nonPetTilePathForPet(desiredType);
@@ -74,6 +84,7 @@ static bool ensureNonPetTileReady()
   if (!ok)
   {
     s_nonPetTileHardFail = true;
+    s_lastNonPetTileFailMs = millis();
 
     static char s_lastNonPetTileFailPath[160] = {0};
 
@@ -131,6 +142,7 @@ void graphicsReleaseNonPetTileCache()
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;
   s_nonPetTileHardFail = false;
+  s_lastNonPetTileFailMs = 0;
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
   s_nonPetTileCachedType = (PetType)255;
