@@ -24,9 +24,13 @@
 #include "version.h"
 #include "wifi_time.h"
 
+static AssetOtaProgress s_progress;
+
 static constexpr bool kLogVerifySuccess = false;
 static constexpr bool kLogInstallVerbose = false;
 static bool s_otaDidInstallFiles = false;
+
+const AssetOtaProgress &assetOtaGetProgress() { return s_progress; }
 
 // -----------------------------------------------------------------------------
 // Worklist helpers
@@ -190,7 +194,6 @@ static bool s_inited = false;
 static bool s_loadedFromSd = false;
 static bool s_graphicsReleasedForOta = false;
 static bool s_assetOtaConfirmActive = false;
-
 
 static bool assetOtaRemotePackAcceptable(const String &remotePackVersion)
 {
@@ -893,6 +896,10 @@ bool assetOtaCheckNow(String *outMessage)
   Serial.printf("[OTA] plan result: pack=%s changed=%u worklist=%s\n", remotePackVersion.c_str(),
                 (unsigned)changedCount, assetOtaWorklistPath());
 
+  s_progress.total = (changedCount > 0) ? changedCount : 1;
+  s_progress.current = 0;
+  s_progress.stage = (changedCount > 0) ? "planning" : "up-to-date";
+
   strncpy(s_state.targetPackVersion, remotePackVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
   s_state.totalFileCount = changedCount;
@@ -1056,8 +1063,11 @@ bool assetOtaCheckNow(String *outMessage)
     {
       const AssetManifestFile &f = worklistBatch[batchIdx];
       const uint16_t idx = processedCount;
+      s_progress.current = idx + 1;
 
       s_status = AssetOtaStatus::DOWNLOADING;
+      s_progress.stage = "downloading";
+
       s_state.status = (uint8_t)s_status;
       s_state.currentFileIndex = (uint16_t)(idx + 1);
       assetOtaStateSave(s_state);
@@ -1157,6 +1167,7 @@ bool assetOtaCheckNow(String *outMessage)
       }
 
       s_status = AssetOtaStatus::INSTALLING;
+      s_progress.stage = "installing";
       s_state.status = (uint8_t)s_status;
       assetOtaStateSave(s_state);
 
@@ -1193,6 +1204,8 @@ bool assetOtaCheckNow(String *outMessage)
     std::vector<AssetManifestFile> verifyBatch;
 
     Serial.printf("[OTA] verify pass starting...\n");
+    s_progress.stage = "verifying";
+    s_progress.current = 0;
 
     while (verifiedCount < changedCount)
     {
@@ -1227,6 +1240,7 @@ bool assetOtaCheckNow(String *outMessage)
         {
           Serial.printf("[OTA VERIFY] skip bad path: %s\n", vf.path);
           ++verifiedCount;
+          s_progress.current = verifiedCount;
           continue;
         }
 
@@ -1242,6 +1256,7 @@ bool assetOtaCheckNow(String *outMessage)
         }
 
         ++verifiedCount;
+        s_progress.current = verifiedCount;
       }
     }
 
@@ -1329,6 +1344,8 @@ bool assetOtaCheckNow(String *outMessage)
   }
 
   s_installedVersion = remotePackVersion;
+  s_progress.stage = "finalizing";
+  s_progress.current = s_progress.total;
   s_status = AssetOtaStatus::SUCCESS;
 
   assetOtaStateDefaults(s_state);

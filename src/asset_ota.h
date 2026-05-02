@@ -9,6 +9,15 @@
 
 #include "asset_ota_types.h"
 
+struct AssetOtaProgress
+{
+  uint16_t current;
+  uint16_t total;
+  const char *stage;
+};
+
+const AssetOtaProgress &assetOtaGetProgress();
+
 // -----------------------------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------------------------
