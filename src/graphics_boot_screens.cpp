@@ -294,8 +294,11 @@ void drawBootWifiImportedScreen()
   const char *statusText = assetOtaStatusString();
   const char *errText = assetOtaLastErrorString();
 
-  const uint16_t cur = assetOtaCurrentFileIndex();
-  const uint16_t total = assetOtaTotalFileCount();
+  const AssetOtaProgress &p = assetOtaGetProgress();
+
+  const uint16_t cur = p.current;
+  const uint16_t total = p.total;
+  const char *stage = p.stage ? p.stage : "-";
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
 
@@ -331,10 +334,19 @@ void drawBootWifiImportedScreen()
 
     char prog[32];
     snprintf(prog, sizeof(prog), "%u / %u", (unsigned)cur, (unsigned)total);
-    spr.drawCentreString(prog, screenW / 2, 94, 2);
+    spr.drawCentreString(prog, screenW / 2, 92, 2);
+
+    char detail[48];
+    if (p.bytesTotal > 0)
+      snprintf(detail, sizeof(detail), "%s  %.1f KB", stage, (double)p.bytesTotal / 1024.0);
+    else
+      snprintf(detail, sizeof(detail), "%s", stage);
+
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(detail, screenW / 2, 108, 1);
 
     const int barX = 20;
-    const int barY = 106;
+    const int barY = 118;
     const int barW = screenW - 40;
     const int barH = 10;
 
