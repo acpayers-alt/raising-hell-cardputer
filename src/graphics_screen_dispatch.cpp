@@ -101,6 +101,7 @@ bool uiIsBootWifiOnboardingState(UIState s)
   case UIState::BOOT_NTP_WAIT:
   case UIState::BOOT_ASSET_WIFI_REQUIRED:
   case UIState::WIFI_SETUP:
+  case UIState::SET_TIME:
     return true;
   default:
     return false;

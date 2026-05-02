@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "app_state.h"
+#include "asset_provision_request.h"
 #include "boot_pipeline.h"
 #include "input.h"
 #include "time_editor_state.h"
@@ -183,6 +184,17 @@ static void finishForcedBootTime()
 
   const UIReturnTarget ret = uiGetReturnTarget();
   uiPopReturnTarget();
+
+  if (!g_bootAssetProvisionMustComplete && sdAssetsPresent() && assetProvisionBootRequested())
+  {
+    Serial.println("[BOOT] manual time complete; clearing optional asset provision request");
+
+    clearAssetProvisionBootRequest();
+
+    g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
+    g_bootProvisionWifiOnboardingStarted = false;
+  }
 
   bootSetupClearPendingFlag();
   Serial.printf("[BOOT] manual time complete -> entering return state=%d tab=%d\n", (int)ret.state, (int)ret.tab);

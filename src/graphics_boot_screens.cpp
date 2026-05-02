@@ -17,9 +17,9 @@
 #include <WiFi.h>
 
 #include "graphics_controls_manual_data.h"
-#include "graphics_whats_new_data.h"
 #include "graphics_nonpet_bg.h"
 #include "graphics_shared_utils.h"
+#include "graphics_whats_new_data.h"
 
 static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_splash.jpg";
 
@@ -63,10 +63,7 @@ static int helpLinesMaxScroll(const HelpLine *lines, int count)
   return 0;
 }
 
-int controlsHelpMaxScroll()
-{
-  return helpLinesMaxScroll(kControlsManual, kControlsManualCount);
-}
+int controlsHelpMaxScroll() { return helpLinesMaxScroll(kControlsManual, kControlsManualCount); }
 
 void controlsHelpResetScroll() { g_controlsHelpScroll = 0; }
 
@@ -189,14 +186,11 @@ static void drawHelpLinesScreen(const HelpLine *lines, int count, int &scroll)
 
   if (scroll < maxScroll)
     spr.drawString("v", panelX + panelW - 12, panelY + panelH - 12, 1);
-  }
+}
 
-  void drawControlsHelpScreen()
-  {
-    drawHelpLinesScreen(kControlsManual, kControlsManualCount, g_controlsHelpScroll);
-  }
+void drawControlsHelpScreen() { drawHelpLinesScreen(kControlsManual, kControlsManualCount, g_controlsHelpScroll); }
 
-  void whatsNewResetScroll() { g_whatsNewScroll = 0; }
+void whatsNewResetScroll() { g_whatsNewScroll = 0; }
 
 bool whatsNewScrollUp()
 {
@@ -221,10 +215,7 @@ bool whatsNewScrollDown()
   return true;
 }
 
-void drawWhatsNewScreen()
-{
-  drawHelpLinesScreen(kWhatsNew, kWhatsNewCount, g_whatsNewScroll);
-}
+void drawWhatsNewScreen() { drawHelpLinesScreen(kWhatsNew, kWhatsNewCount, g_whatsNewScroll); }
 
 void drawBootWifiPromptScreen()
 {
@@ -262,8 +253,19 @@ void drawBootAssetWifiRequiredScreen()
   spr.setTextColor(TFT_GREEN, TFT_BLACK);
   spr.drawString("ENTER: Set up Wi-Fi", 10, 102);
 
-  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  spr.drawString("\\: Console", 10, 118);
+  if (!g_bootAssetProvisionMustComplete || sdAssetsPresent())
+  {
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawString("ESC: Set time manually", 10, 118);
+
+    spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    spr.drawString("\\: Console", 10, 134);
+  }
+  else
+  {
+    spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    spr.drawString("\\: Console", 10, 118);
+  }
 
   spr.pushSprite(0, 0);
 }

@@ -65,9 +65,16 @@ bool wifiStoreLoadProfile(int index, String &ssid, String &pass)
   pass = "";
 
   Preferences p;
+
+  static bool s_warnedWifiStoreMissing = false;
+
   if (!p.begin(NS, true))
   {
-    Serial.println("[WIFI STORE] load profile: namespace missing or prefs open failed");
+    if (!s_warnedWifiStoreMissing)
+    {
+      Serial.println("[WIFI STORE] load profile: namespace missing or prefs open failed");
+      s_warnedWifiStoreMissing = true;
+    }
     return false;
   }
 

@@ -609,6 +609,7 @@ static bool bootAssetProvisionWifiOnboardingActive()
   case UIState::BOOT_TZ_PICK:
   case UIState::BOOT_NTP_WAIT:
   case UIState::WIFI_SETUP:
+  case UIState::SET_TIME:
     return true;
 
   case UIState::BOOT_ASSET_WIFI_REQUIRED:
@@ -1428,6 +1429,15 @@ void postBootInitTick()
   // ---------------------------------------------------------------------------
   // Stage 3.5: Deferred boot asset provisioning
   // ---------------------------------------------------------------------------
+  // Manual time entry is an explicit user escape path during boot/provisioning.
+  // Do not keep polling/provisioning behind it; it makes the editor sluggish and
+  // can fight redraw/input. The time editor will hand control back when finished.
+  if (g_bootLandingDeferredForAssetProvision && g_app.uiState == UIState::SET_TIME)
+  {
+    g_bootAssetProvisionActive = false;
+    g_bootUiBlockedForAssetProvision = false;
+    return;
+  }
   // HARD GUARD: if assets disappeared during runtime, NEVER re-enter boot provisioning
   if (g_assetsMissing && g_app.uiState == UIState::PET_SCREEN)
   {
@@ -1475,8 +1485,9 @@ void postBootInitTick()
     }
 
     if (bootAssetProvisionRequired() && g_bootLandingDeferredForAssetProvision && !g_bootAssetProvisionActive &&
-        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED && g_app.uiState != UIState::BOOT &&
-        g_app.uiState != UIState::CONSOLE)
+        !g_bootProvisionWifiOnboardingStarted && WiFi.status() == WL_CONNECTED &&
+
+        g_app.uiState != UIState::BOOT && g_app.uiState != UIState::CONSOLE && g_app.uiState != UIState::SET_TIME)
     {
       Serial.printf("[BOOT][ASSET_STAGE35] forcing return to BOOT from ui=%d\n", (int)g_app.uiState);
       uiActionEnterState(UIState::BOOT, Tab::TAB_PET, true);
