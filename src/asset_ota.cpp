@@ -400,9 +400,13 @@ static const char *errorString(AssetOtaError err)
 
 static void restoreMainUiSprite()
 {
-  if (g_bootAssetProvisionActive)
+  // During active provisioning, avoid fighting the provisioning screen while
+  // downloads are in progress. But once OTA has reached SUCCESS, the boot
+  // pipeline may continue (especially for no-op updates), so we must restore
+  // the main UI sprite even if provisioning is still marked active.
+  if (g_bootAssetProvisionActive && s_status != AssetOtaStatus::SUCCESS)
     return;
-
+    
   if (!s_graphicsReleasedForOta)
   {
     invalidateBackgroundCache();
