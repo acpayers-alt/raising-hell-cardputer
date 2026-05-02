@@ -194,9 +194,18 @@ void cachePetAreaBackgroundIfNeeded(bool force)
 
   if (s_petBgHardFail && !force)
   {
-    // SD/cache previously failed — avoid retry storm
-    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
-    return;
+    static uint32_t s_lastPetBgHardFailRetryMs = 0;
+    const uint32_t now = millis();
+  
+    // Avoid retry storm, but do not make the failure permanent.
+    if ((uint32_t)(now - s_lastPetBgHardFailRetryMs) < 3000UL)
+    {
+      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+      return;
+    }
+  
+    s_lastPetBgHardFailRetryMs = now;
+    force = true;
   }
 
   const char *bgPath = bgPathForPetWithStage(pet.type, pet.evoStage);
@@ -230,28 +239,26 @@ void cachePetAreaBackgroundIfNeeded(bool force)
     ok = buildPetLayerCacheViaSpr(bgPath);
   }
 
-  if (!ok)
-  {
-    s_petBgHardFail = true;
+if (!ok)
+{
+  petLayerReady = false;
+  s_petBgCachedPath = nullptr;
+  s_petBgCachedType = (PetType)255;
+  s_petBgCachedStage = 255;
 
-    petLayerReady = false;
-    s_petBgCachedPath = nullptr;
-    s_petBgCachedType = (PetType)255;
-    s_petBgCachedStage = 255;
+  bool directOk = false;
+  if (bgPath)
+    directOk = sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
 
-    // Fallback: draw the pet background directly this frame so the user
-    // does not see a black flash while the cache rebuild retries.
-    bool directOk = false;
-    if (bgPath)
-      directOk = sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+  s_petBgHardFail = !directOk;
 
-    if (!directOk)
-      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+  if (!directOk)
+    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
 
-    invalidateBackgroundCache();
-    requestUIRedraw();
-    return;
-  }
+  invalidateBackgroundCache();
+  requestUIRedraw();
+  return;
+}
 
   s_petBgCachedPath = bgPath;
   s_petBgCachedType = pet.type;

@@ -338,16 +338,22 @@ void petAutonomyTick(uint32_t nowMs)
     const bool mischiefReady =
         s_lastMischiefRollMs == 0 || (uint32_t)(nowMs - s_lastMischiefRollMs) >= kMischiefCooldownMs;
 
-    if (mischiefReady && rollPercent(kMischiefChancePct))
+    if (mischiefReady)
     {
-      doMischief();
+      if (rollPercent(kMischiefChancePct))
+      {
+        doMischief();
+      }
+
+      // Advance cooldown regardless of success
       s_lastMischiefRollMs = nowMs;
       return;
     }
   }
   else
   {
-    s_lastMischiefRollMs = 0;
+    // Do NOT reset cooldown when mood improves.
+    // This prevents rapid re-triggering when mood fluctuates.
   }
 }
 
@@ -402,7 +408,7 @@ void petAutonomyNotifyIfPending(uint32_t nowMs)
   }
 
   ui_showTimedMessage(msg, 0);
-  
+
   Serial.printf("[PET][AUTO] summary pizzaCount=%u pizzaInf=%d mischiefCount=%u mischiefInf=%d autoSleep=%u\n",
                 (unsigned)s_pizzaCount, (int)s_pizzaInfSpent, (unsigned)s_mischiefCount, (int)s_mischiefInfLost,
                 (unsigned)s_autoSleepCount);
