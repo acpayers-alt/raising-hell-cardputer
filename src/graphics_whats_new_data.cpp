@@ -13,7 +13,6 @@ const HelpLine kWhatsNew[] = {
     {HelpLineType::BODY, "- War Walking/Step counter"},
     {HelpLineType::BODY, "- Sleep Quality score"},
     {HelpLineType::BODY, "- 24 hour time option"},
-    {HelpLineType::BODY, "- Step counter + wardriving"},
     {HelpLineType::BODY, "- Dirty time indicators"},
     {HelpLineType::BODY, "- Multiple Wi-Fi profiles"},
     {HelpLineType::GAP, nullptr},
@@ -23,7 +22,9 @@ const HelpLine kWhatsNew[] = {
     {HelpLineType::BODY, "- Scroll indicators in submenus"},
     {HelpLineType::BODY, "- Care Guide (manual renamed)"},
     {HelpLineType::BODY, "- Cleaner system settings"},
+    {HelpLineType::BODY, "- More reliable saves (auto heal)"},
     {HelpLineType::BODY, "- Improved console + scrollback"},
+    {HelpLineType::BODY, "- Provisioning reliability"},
     {HelpLineType::GAP, nullptr},
 
     {HelpLineType::SECTION, "Gameplay"},
