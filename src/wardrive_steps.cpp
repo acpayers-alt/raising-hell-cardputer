@@ -19,8 +19,8 @@ static uint32_t s_lastPersistMs = 0;
 static uint32_t s_lastPersistSteps = 0;
 
 static constexpr uint32_t kSampleScreenOnMs = 50;
-static constexpr uint32_t kSamplePocketModeMs = 120;
-static constexpr uint32_t kStepCooldownMs = 680;
+static constexpr uint32_t kSamplePocketModeMs = 80;
+static constexpr uint32_t kStepCooldownMs = 320;
 static constexpr uint16_t kStepsPerWardriveRoll = 18;
 static constexpr uint8_t kHitChancePct = 22;
 static constexpr uint8_t kRareItemChancePct = 5;
@@ -33,9 +33,11 @@ static uint32_t s_lastStepMs = 0;
 static uint32_t s_stepsToday = 0;
 static uint32_t s_hitsToday = 0;
 static uint16_t s_stepsTowardRoll = 0;
-static constexpr int kStepHighMg = 520;
-static constexpr int kStepLowMg = 100;
-static constexpr uint32_t kStepRearmQuietMs = 120;
+static float s_stepAccumulator = 0.0f;
+static constexpr float kStepScale = 1.7f;
+static constexpr int kStepHighMg = 260;
+static constexpr int kStepLowMg = 220;
+static constexpr uint32_t kStepRearmQuietMs = 40;
 
 static int s_baselineMg = 1000;
 static bool s_haveBaseline = false;
@@ -208,6 +210,7 @@ static void resetIfNewDay()
 
   if (dayKey != s_dayKey)
   {
+    s_stepAccumulator = 0.0f;
     s_dayKey = dayKey;
     s_stepsToday = 0;
     s_hitsToday = 0;
@@ -268,14 +271,36 @@ static void awardWardriveHit()
 
   queueWardriveNotice(infReward, itemReward);
 
-  Serial.printf("[WARWALK] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n", (unsigned long)s_hitsToday,
-                infReward, (int)itemReward);
-}
+  Serial.printf("[WARWALK] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n",
+    (unsigned long)s_stepsToday, (unsigned long)s_hitsToday, infReward, (int)itemReward);
+  }
 
 static void rollWardrive()
 {
   if (random(0, 100) < kHitChancePct)
     awardWardriveHit();
+}
+
+static void creditWardriveDetectedStep()
+{
+  s_stepAccumulator += kStepScale;
+
+  while (s_stepAccumulator >= 1.0f)
+  {
+    if (s_stepsToday < UINT32_MAX)
+      s_stepsToday++;
+
+    if (s_stepsTowardRoll < UINT16_MAX)
+      s_stepsTowardRoll++;
+
+    if (s_stepsTowardRoll >= kStepsPerWardriveRoll)
+    {
+      s_stepsTowardRoll = 0;
+      rollWardrive();
+    }
+
+    s_stepAccumulator -= 1.0f;
+  }
 }
 
 void wardriveStepsNotifyUserActivity()
@@ -300,7 +325,7 @@ void wardriveStepsNotifyUserActivity()
   }
 
   ui_showMessage(msg);
-  
+
   s_pendingHits = 0;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
@@ -330,7 +355,6 @@ void wardriveStepsTick(uint32_t nowMs)
   {
     s_haveBaseline = false;
     s_stepArmed = true;
-    s_stepsTowardRoll = 0;
     return;
   }
 
@@ -388,32 +412,13 @@ void wardriveStepsTick(uint32_t nowMs)
   s_stepQuietSinceMs = 0;
   s_lastStepMs = nowMs;
 
-  static float s_stepAccumulator = 0.0f;
-  static constexpr float kStepScale = 1.7f;
-
-  s_stepAccumulator += kStepScale;
-
-  while (s_stepAccumulator >= 1.0f)
-  {
-    if (s_stepsToday < UINT32_MAX)
-      s_stepsToday++;
-
-    s_stepAccumulator -= 1.0f;
-  }
-
-  if (s_stepsTowardRoll < UINT16_MAX)
-    s_stepsTowardRoll++;
-
-  if (s_stepsTowardRoll >= kStepsPerWardriveRoll)
-  {
-    s_stepsTowardRoll = 0;
-    rollWardrive();
-  }
+  creditWardriveDetectedStep();
   saveWarwalkPersist(false);
 }
 
 void wardriveStepsResetRuntime()
 {
+  s_stepAccumulator = 0.0f;
   s_lastSampleMs = 0;
   s_lastStepMs = 0;
   s_stepsTowardRoll = 0;
