@@ -2582,14 +2582,11 @@ bool saveManagerLoad()
 
     if (healed)
     {
-      Serial.println("[SAVE] auto-heal changed loaded payload");
-
-      // TEMP DEBUG GUARD:
-      // Do not allow immediate persistence of a legacy V3 migration result while
-      // we are still validating raw XP decode offsets.
-      dirty = false;
+      Serial.println("[SAVE] auto-heal changed loaded payload -> persisting healed save");
+      saveManagerMarkDirty();
+      saveManagerForce();
     }
-
+    
     if (supportLoggingEnabled())
       Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
                     blankPetName ? 1 : 0, pet.name);
