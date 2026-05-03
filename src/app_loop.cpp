@@ -740,9 +740,12 @@ void appMainLoopTick()
     if (blockingUiAutoScreenOffCheck(now))
       return;
 
-    if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
-    {
-      uiDismissToast();
+      if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
+      {
+        if (wardriveStepsNoticeActive())
+          wardriveStepsDismissNotice();
+      
+        uiDismissToast();
 
       // HARD CONSUME: this input must not leak into the rest of the frame
       consumeConfirmInput(input);

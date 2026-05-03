@@ -289,20 +289,57 @@ void uiDrawToastOverlay()
 
   const int pad = 10;
   const int boxW = screenW - (pad * 2);
-  const int boxH = 42;
+
+  int lineCount = 1;
+  for (const char *p = g_toastMsg; *p; ++p)
+  {
+    if (*p == '\n')
+      lineCount++;
+  }
+
+  if (lineCount < 1)
+    lineCount = 1;
+  if (lineCount > 4)
+    lineCount = 4;
+
+  const int lineH = 16;
+  const int boxH = 18 + (lineCount * lineH);
   const int x = pad;
   const int y = (screenH - boxH) / 2;
 
   spr.fillRoundRect(x, y, boxW, boxH, 8, TFT_BLACK);
   spr.drawRoundRect(x, y, boxW, boxH, 8, modalOutline);
 
-  spr.setTextDatum(MC_DATUM);
+  spr.setTextDatum(TC_DATUM);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.setTextFont(2);
   spr.setTextSize(1);
-  spr.drawString(g_toastMsg, screenW / 2, y + (boxH / 2));
-  spr.setTextDatum(TL_DATUM);
 
+  char line[96];
+  const char *start = g_toastMsg;
+  int drawLine = 0;
+  int textY = y + 8;
+
+  while (*start && drawLine < lineCount)
+  {
+    const char *end = strchr(start, '\n');
+    const size_t len = end ? (size_t)(end - start) : strlen(start);
+    const size_t copyLen = (len < sizeof(line) - 1) ? len : sizeof(line) - 1;
+
+    memcpy(line, start, copyLen);
+    line[copyLen] = '\0';
+
+    spr.drawString(line, screenW / 2, textY + (drawLine * lineH));
+
+    if (!end)
+      break;
+
+    start = end + 1;
+    drawLine++;
+  }
+
+  spr.setTextDatum(TL_DATUM);
+  
   requestUIRedraw();
 }
 

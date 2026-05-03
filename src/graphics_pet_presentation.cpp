@@ -962,13 +962,8 @@ static void drawStepCounterBadge()
   const uint32_t steps = wardriveStepsToday();
 
   char buf[16];
-  if (steps >= 100000)
-    snprintf(buf, sizeof(buf), "99k+");
-  else if (steps >= 1000)
-    snprintf(buf, sizeof(buf), "%luk", (unsigned long)(steps / 1000));
-  else
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)steps);
-
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)steps);
+  
   spr.setTextDatum(TL_DATUM);
   spr.setTextFont(1);
   spr.setTextSize(1);

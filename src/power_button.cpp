@@ -2,14 +2,14 @@
 
 #include "display.h" // isScreenOn(), toggleScreenPower(), requestUIRedraw()
 #include "flow_power_menu.h"
+#include "graphics.h"
 #include "input.h"                // inputForceClear(), clearInputLatch()
 #include "input_activity_state.h" // setLastInputActivityMs(now)
 #include "menu_actions.h"         // openPowerMenuFromHere(now)
 #include "motion.h"
 #include "ui_invalidate.h"
-#include <Arduino.h>
-#include "graphics.h"
 #include "ui_runtime.h"
+#include <Arduino.h>
 
 static constexpr int GO_BTN_PIN = 0;
 static constexpr bool GO_ACTIVE_LOW = true;
@@ -112,9 +112,19 @@ void powerButtonTick(uint32_t now)
   {
     s_lastRaw = false;
     s_lastEdgeMs = releaseMs;
+
+    // If press+release both happened between loop ticks, raw may already be false
+    // before the held-state block below gets a chance to arm the short press.
+    // Use the ISR timestamps so quick valid GO taps still toggle the screen.
+    if (s_pressLatched && !s_longFired)
+    {
+      const uint32_t heldMs = releaseMs - s_pressStartMs;
+      if (heldMs >= kMinPressMs)
+        s_shortArmed = true;
+    }
   }
 
-if (raw != s_lastRaw)
+  if (raw != s_lastRaw)
   {
     s_lastRaw = raw;
     s_lastEdgeMs = now;

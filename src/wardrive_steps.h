@@ -4,6 +4,9 @@
 #include <stdint.h>
 
 void wardriveStepsTick(uint32_t nowMs);
+bool wardriveStepsNoticeActive();
+void wardriveStepsDismissNotice();
+
 void wardriveStepsNotifyUserActivity();
 void wardriveStepsResetRuntime();
 

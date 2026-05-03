@@ -47,6 +47,7 @@ static int s_dayKey = -1;
 static uint16_t s_pendingHits = 0;
 static int s_pendingInf = 0;
 static ItemType s_pendingItem = ITEM_NONE;
+static bool s_noticeActive = false;
 
 struct WarwalkPersist
 {
@@ -241,6 +242,28 @@ static ItemType randomWardriveItem()
   }
 }
 
+static void showOrUpdateWardriveNotice()
+{
+  if (s_pendingHits == 0)
+    return;
+
+  char line1[64];
+  char line2[64];
+  char line3[64];
+
+  snprintf(line1, sizeof(line1), "Gateways Detected!!");
+  const char *signalWord = (s_pendingHits == 1) ? "signal" : "signals";
+
+  snprintf(line2, sizeof(line2), "%u dark %s found", (unsigned)s_pendingHits, signalWord);
+  snprintf(line3, sizeof(line3), "Deciphered for %d INF", s_pendingInf);
+
+  // Build a visually spaced message (no reliance on \n wrapping)
+  char msg[192];
+  snprintf(msg, sizeof(msg), "%s\n%s\n%s", line1, line2, line3);
+
+  ui_showTimedMessage(msg, 0);
+}
+
 static void queueWardriveNotice(int infReward, ItemType itemReward)
 {
   if (s_pendingHits < 65535)
@@ -250,6 +273,9 @@ static void queueWardriveNotice(int infReward, ItemType itemReward)
 
   if (itemReward != ITEM_NONE)
     s_pendingItem = itemReward;
+
+  s_noticeActive = true;
+  showOrUpdateWardriveNotice();
 }
 
 static void awardWardriveHit()
@@ -271,9 +297,9 @@ static void awardWardriveHit()
 
   queueWardriveNotice(infReward, itemReward);
 
-  Serial.printf("[WARWALK] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n",
-    (unsigned long)s_stepsToday, (unsigned long)s_hitsToday, infReward, (int)itemReward);
-  }
+  Serial.printf("[WARWALK] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n", (unsigned long)s_stepsToday,
+                (unsigned long)s_hitsToday, infReward, (int)itemReward);
+}
 
 static void rollWardrive()
 {
@@ -311,24 +337,23 @@ void wardriveStepsNotifyUserActivity()
   if (s_pendingHits == 0)
     return;
 
-  char msg[96];
+  s_noticeActive = true;
+  showOrUpdateWardriveNotice();
+  saveWarwalkPersist(true);
+}
 
-  if (s_pendingItem != ITEM_NONE)
-  {
-    const char *itemName = g_app.inventory.getItemLabelForType(s_pendingItem);
-    snprintf(msg, sizeof(msg), "Signal hit!\n%u signals  +%d INF\n%s +1", (unsigned)s_pendingHits, s_pendingInf,
-             (itemName && itemName[0]) ? itemName : "ITEM");
-  }
-  else
-  {
-    snprintf(msg, sizeof(msg), "Signal hit!\n%u signals  +%d INF", (unsigned)s_pendingHits, s_pendingInf);
-  }
+bool wardriveStepsNoticeActive() { return s_noticeActive; }
 
-  ui_showMessage(msg);
+void wardriveStepsDismissNotice()
+{
+  if (!s_noticeActive)
+    return;
 
+  s_noticeActive = false;
   s_pendingHits = 0;
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
+
   saveWarwalkPersist(true);
 }
 
@@ -427,6 +452,7 @@ void wardriveStepsResetRuntime()
   s_pendingInf = 0;
   s_pendingItem = ITEM_NONE;
   s_pendingHits = 0;
+  s_noticeActive = false;
   s_stepsToday = 0;
   s_stepQuietSinceMs = 0;
   saveWarwalkPersist(true);
