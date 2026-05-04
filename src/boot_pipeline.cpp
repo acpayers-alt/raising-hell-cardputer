@@ -511,6 +511,36 @@ bool bootAssetProvisionRequired()
   return requested || mandatory || tooOld;
 }
 
+static void cancelOptionalBootAssetProvision(const char *reason)
+{
+  if (g_bootAssetProvisionMustComplete)
+    return;
+
+  clearAssetProvisionBootRequest();
+
+  // If this was only an optional “too old / requested” asset check,
+  // do not keep re-arming Stage 3.5 while WiFi is unavailable.
+  g_bootAssetPackTooOldCached = false;
+
+  g_bootAssetProvisionActive = false;
+  g_bootUiBlockedForAssetProvision = false;
+  g_bootProvisionWifiStarted = false;
+  g_bootProvisionWifiStartMs = 0;
+  g_bootAssetProvisionRetryAfterMs = 0;
+
+  bootWifiClearStoredProfileFailover();
+
+  if (g_sdReady)
+  {
+    const bool assetsPresentNow = sdAssetsPresent();
+    g_assetsChecked = true;
+    g_assetsMissing = !assetsPresentNow;
+  }
+
+  Serial.printf("[BOOT][ASSET_PROVISION] optional skipped: %s assetsMissing=%d\n", reason ? reason : "unknown",
+                g_assetsMissing ? 1 : 0);
+}
+
 void drawBootAssetProvisionScreen(const char *line1, const char *line2)
 {
   displayInit();
@@ -776,9 +806,14 @@ static bool bootAssetProvisionWifiReady()
   if (bootAssetProvisionWifiOnboardingActive())
     return false;
 
-  // Optional OTA request: if WiFi is disabled in settings, let OTA report it and continue boot.
+  // Optional asset checks must not run OTA when WiFi is disabled.
+  // If assets are already present, skip the optional check and allow boot landing
+  // to continue normally on the next pipeline tick.
   if (!g_bootAssetProvisionMustComplete && !settingsWifiEnabled())
-    return true;
+  {
+    cancelOptionalBootAssetProvision("WiFi disabled");
+    return false;
+  }
 
   if (!g_bootProvisionWifiStarted)
   {
@@ -945,9 +980,13 @@ static bool bootAssetProvisionWifiReady()
     return false;
   }
 
-  // Optional asset checks should not block boot forever.
+  // Optional asset checks should not block boot forever, and they should not
+  // fall through into asset OTA when WiFi never came up.
   if (elapsed >= 8000)
-    return true;
+  {
+    cancelOptionalBootAssetProvision("WiFi unavailable");
+    return false;
+  }
 
   drawBootAssetProvisionScreen("Connecting to WiFi.", "Please wait...");
   return false;

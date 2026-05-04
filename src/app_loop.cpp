@@ -527,43 +527,56 @@ void appMainLoopTick()
     // Detect mid-session SD removal or asset disappearance.
     // ---------------------------------------------------------------------------
     static uint32_t s_nextSdProbeMs = 0;
+    static uint8_t s_assetProbeFailCount = 0;
+
     if ((int32_t)(now - s_nextSdProbeMs) >= 0)
     {
-      s_nextSdProbeMs = now + 300;
+      s_nextSdProbeMs = now + 1000;
 
       const bool sdReadyBeforeProbe = g_sdReady;
       const bool assetsMissingBeforeProbe = g_assetsMissing;
 
       bool assetsPresentNow = false;
 
-      // Always verify SD state — don't trust stale g_sdReady.
-      // IMPORTANT: do NOT auto-remount here, because that blocks the UI and
-      // makes the pet screen appear frozen. The modal retry path will handle
-      // remount explicitly when the user presses Enter.
       if (g_sdReady)
       {
-        if (!SD.exists("/"))
-        {
-          Serial.printf("[SDRUNTIME] probe: SD root missing; treating as transient ui=%d\n", (int)g_app.uiState);
+        assetsPresentNow = sdAssetsPresent();
 
-          // Do not immediately mark SD dead from a single root probe miss.
-          // Some cards/controllers transiently fail this check while still mounted.
-          assetsPresentNow = false;
-        }
-        else
+        if (!assetsPresentNow)
         {
-          assetsPresentNow = sdAssetsPresent();
-
-          if (!assetsPresentNow)
-          {
-            Serial.printf("[SDRUNTIME] probe: sdReady=1 but assetsPresent=0 -> forcing assetsMissing ui=%d\n",
-                          (int)g_app.uiState);
-          }
+          Serial.printf("[SDRUNTIME] probe: sdReady=1 but assetsPresent=0 ui=%d\n", (int)g_app.uiState);
         }
       }
 
-      g_assetsMissing = !(g_sdReady && assetsPresentNow);
+      const bool assetsOkNow = (g_sdReady && assetsPresentNow);
+
+      if (assetsOkNow)
+      {
+        s_assetProbeFailCount = 0;
+        g_assetsMissing = false;
+      }
+      else
+      {
+        if (s_assetProbeFailCount < 5)
+          s_assetProbeFailCount++;
+
+        if (s_assetProbeFailCount >= 3)
+        {
+          g_assetsMissing = true;
+
+          Serial.printf("[SDRUNTIME] assets missing after %u consecutive failures\n", s_assetProbeFailCount);
+        }
+      }
+
       g_assetsChecked = true;
+
+      if (assetsMissingBeforeProbe && !g_assetsMissing)
+      {
+        Serial.println("[SDRUNTIME] assets recovered");
+
+        invalidateBackgroundCache();
+        requestUIRedraw();
+      }
 
       // -------------------------------------------------------------------------
       // HARD STOP: kill any active provisioning session if assets disappear
@@ -594,7 +607,7 @@ void appMainLoopTick()
     }
   }
 
-  //   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // MODAL: SD assets missing / SD card missing
   // ---------------------------------------------------------------------------
   {
@@ -740,12 +753,12 @@ void appMainLoopTick()
     if (blockingUiAutoScreenOffCheck(now))
       return;
 
-      if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
-      {
-        if (wardriveStepsNoticeActive())
-          wardriveStepsDismissNotice();
-      
-        uiDismissToast();
+    if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
+    {
+      if (wardriveStepsNoticeActive())
+        wardriveStepsDismissNotice();
+
+      uiDismissToast();
 
       // HARD CONSUME: this input must not leak into the rest of the frame
       consumeConfirmInput(input);
@@ -1347,6 +1360,22 @@ void appMainLoopTick()
   wifiTimeTick();
   if (g_timeAnchorAttempted || timeIsSynced())
     updateTime();
+
+  static bool s_birthHealAfterTimeSyncDone = false;
+
+  if (!s_birthHealAfterTimeSyncDone && timeIsNtpSyncedStrict())
+  {
+    s_birthHealAfterTimeSyncDone = true;
+
+    if (saveManagerAutoHeal())
+    {
+      Serial.println("[TIME] post-sync birth autoheal applied");
+
+      saveManagerMarkDirty();
+      requestUIRedraw();
+    }
+  }
+
   updateBattery();
   batteryProtectionTick(now);
   saveManagerTick();

@@ -45,6 +45,7 @@
 #include "time_persist.h"
 #include "time_state.h"
 #include "timezone.h"
+#include "wifi_time.h"
 
 // WiFi
 #include "wifi_store.h"
@@ -1121,6 +1122,10 @@ void setStepCounterEnabled(bool en)
 // ============================================================
 static uint32_t getNowEpochOrZero()
 {
+  // Only trust time if we have strict NTP sync
+  if (!timeIsNtpSyncedStrict())
+    return 0;
+
   time_t now = time(nullptr);
   return (now > 1700000000) ? (uint32_t)now : 0;
 }
@@ -1175,7 +1180,8 @@ SavePayload makeDefaultSavePayload()
   p.inv.slots[3].type = (uint8_t)ITEM_ELDRITCH_EYE;
   p.inv.slots[3].qty = 0;
 
-  p.birth_epoch = getNowEpochOrZero();
+  uint32_t now = getNowEpochOrZero();
+  p.birth_epoch = (now != 0) ? now : 1;
   return p;
 }
 
@@ -1801,7 +1807,7 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
   g_controlsHelpSeen = (g_settings.controlsHelpSeen != 0);
   g_whatsNewSeen = (g_settings.whatsNewSeen != 0);
   g_settings.timeFormat24h = (g_settings.timeFormat24h != 0);
-  
+
   // ------------------------------------------------------------
   // One-shot boot flag: pet intro fade
   // ------------------------------------------------------------
@@ -2586,7 +2592,7 @@ bool saveManagerLoad()
       saveManagerMarkDirty();
       saveManagerForce();
     }
-    
+
     if (supportLoggingEnabled())
       Serial.printf("[SAVE] loaded OK after heal namePending=%d blankPetName=%d name='%s'\n", namePending ? 1 : 0,
                     blankPetName ? 1 : 0, pet.name);
