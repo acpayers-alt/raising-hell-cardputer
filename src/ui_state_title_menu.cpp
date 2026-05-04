@@ -13,6 +13,7 @@
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_input_common.h"
+#include "ui_invalidate.h"
 #include "ui_runtime.h"
 #include "ui_state_choose_pet.h"
 #include "ui_state_import_pet_list.h"
@@ -182,6 +183,9 @@ void uiTitleMenuOnEnter(InputState &in)
 
   swallowTitleInput(in);
   refreshTitleMenuAvailability();
+
+  invalidateBackgroundCache();
+  requestFullUIRedraw();
 
   // If no save exists, always focus "New Pet" (row 0)
   if (!s_titleHasSave)
