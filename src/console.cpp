@@ -1002,9 +1002,10 @@ static void execLine(char *line)
 
   if (!strcmp(argv[0], "newpet!"))
   {
-    logLine("[OK] Creating new pet...");
-    saveManagerNewPet();
-    logLine("[OK] New pet created (save overwritten).");
+    logLine("[OK] Clearing current pet; use title menu to start a new pet.");
+    saveManagerDeletePetOnly();
+    resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+    logLine("[OK] Pet cleared.");
     return;
   }
 #endif

@@ -924,7 +924,6 @@ void saveManagerAssignFreshPetId()
 static void printState(const char *tag);
 static void pack(SavePayload &p);
 static void unpack(const SavePayload &p);
-static void newPetInternal();
 static bool ensureSaveDir();
 static void tryRemove(const char *path);
 static void clearNamePendingFlag();
@@ -1237,8 +1236,8 @@ SavePayload makeDefaultSavePayload()
   p.pet.xp = 0;
   p.pet.evoStage = 0;
 
-  strcpy(p.pet.name, "Bub");
-  p.pet.petId = generatePetId();
+  p.pet.name[0] = '\0';
+  p.pet.petId = 0;
 
   memset(&p.inv, 0, sizeof(p.inv));
   p.inv.selectedIndex = 0;
@@ -1438,15 +1437,6 @@ static void unpack(const SavePayload &p)
   s_livedAgeLastTickMs = millis();
 
   pet.birth_epoch = g_birthEpoch;
-}
-
-static void newPetInternal()
-{
-  SavePayload p = makeDefaultSavePayload();
-  unpack(p);
-
-  dirty = true;
-  (void)saveManagerSave();
 }
 
 static bool ensureSaveDir()
@@ -2014,21 +2004,19 @@ static bool saveSettingsToSD_internal()
 
 static void newPetInternalNoSave(bool resetName)
 {
+  (void)resetName;
+
   SavePayload p = makeDefaultSavePayload();
   unpack(p);
 
+  pet.name[0] = '\0';
   pet.petId = generatePetId();
+
   Serial.printf("[PETID] new pet assigned %016llX\n", (unsigned long long)pet.petId);
 
   // New pets always start on Normal decay mode.
   g_gameopt.decayMode = 2;
   saveGameOptionsToSD_internal();
-
-  if (resetName)
-  {
-    // Ensure the runtime pet name is blank for a fresh flow.
-    pet.name[0] = '\0';
-  }
 
   writeNamePendingFlag();
 }
@@ -2919,10 +2907,8 @@ bool saveManagerSaveFileExists()
 
 void saveManagerNewPet()
 {
-  if (!g_sdReady)
-    return;
-  (void)ensureSaveDir();
-  newPetInternal();
+  Serial.println("[SAVE][BUG] saveManagerNewPet() blocked; use CHOOSE_PET flow / saveManagerNewPetNoSave()");
+  saveManagerNewPetNoSave();
 }
 
 void saveManagerNewPetNoSave()
