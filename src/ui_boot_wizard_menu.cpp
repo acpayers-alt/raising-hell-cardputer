@@ -49,21 +49,6 @@ static void bootWizardSkipToManualTime()
   requestUIRedraw();
 }
 
-static bool bootWifiCanSkipToManualTime()
-{
-  // Manual time setup is always allowed. If mandatory assets are still pending,
-  // the editor will return to BOOT so the asset gate can resume.
-  return true;
-}
-
-static UIState bootWifiManualTimeReturnState()
-{
-  if (g_bootAssetProvisionMustComplete)
-    return UIState::BOOT;
-
-  return g_bootWizardAfterOkState;
-}
-
 static void bootWizardEnterWifiSetup()
 {
   // Critical: tell WIFI_SETUP state we're in boot-wizard flow so it returns to
