@@ -2783,6 +2783,15 @@ void saveManagerStampBirthNow()
 
 bool saveManagerAutoHeal()
 {
+  // ------------------------------------------------------------
+  // CRITICAL: Never autoheal if no valid save was loaded
+  // ------------------------------------------------------------
+  if (g_lastLoadErr != SLE_OK || g_lastLoadPath == nullptr)
+  {
+    Serial.println("[SAVE][AUTOHEAL] skipped (no valid save loaded)");
+    return false;
+  }
+
   if (!g_sdReady)
   {
     Serial.println("[SAVE][AUTOHEAL] skipped: SD not ready");
