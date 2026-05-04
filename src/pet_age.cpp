@@ -5,11 +5,11 @@
 #include <stdio.h>   // snprintf
 #include <string.h>  // strlen, memcpy
 
-AgeParts calcAgeParts(int64_t birthEpoch, int64_t nowEpoch) {
+AgeParts calcAgePartsFromSeconds(int64_t totalSeconds) {
   AgeParts a{0, 0, 0, 0, 0};
-  if (birthEpoch <= 0 || nowEpoch <= birthEpoch) return a;
+  if (totalSeconds <= 0) return a;
 
-  int64_t secs = nowEpoch - birthEpoch;
+  int64_t secs = totalSeconds;
 
   a.minutes = (int)(secs / 60);
   secs %= 60;
@@ -27,6 +27,13 @@ AgeParts calcAgeParts(int64_t birthEpoch, int64_t nowEpoch) {
   a.months %= 12;
 
   return a;
+}
+
+AgeParts calcAgeParts(int64_t birthEpoch, int64_t nowEpoch) {
+  if (birthEpoch <= 0 || nowEpoch <= birthEpoch)
+    return AgeParts{0, 0, 0, 0, 0};
+
+  return calcAgePartsFromSeconds(nowEpoch - birthEpoch);
 }
 
 void formatAgeString(char* out, size_t outSize, const AgeParts& a, bool includeDays) {

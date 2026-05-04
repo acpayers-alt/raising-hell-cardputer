@@ -400,6 +400,11 @@ void appMainLoopTick()
       ledUpdatePetStatus(computeLedMode());
 #endif
 
+      // If a screen-off LED/status rail pulse was active, the panel may still
+      // contain the solid alert color. Draw the real UI immediately so shake
+      // wake does not visibly flash the status color before the next frame.
+      renderUI();
+
       return;
     }
 
@@ -616,7 +621,8 @@ void appMainLoopTick()
     static bool s_prevAssetsMissingModalActive = false;
     static bool s_prevAssetsMissingModalSdReady = true;
 
-    const bool assetsMissingModalActive = (g_assetsMissing && !g_bootAssetProvisionMustComplete);
+    const bool assetsMissingModalActive =
+        (g_assetsMissing && !g_bootAssetProvisionMustComplete && g_app.uiState != UIState::CONSOLE);
 
     // If the modal just became inactive, fully reset its one-shot state.
     if (!assetsMissingModalActive && s_prevAssetsMissingModalActive)
@@ -644,6 +650,23 @@ void appMainLoopTick()
       if (input.selectOnce)
         retryRequested = true;
 
+      if (input.consoleOnce)
+      {
+        Serial.printf("[SDRUNTIME] console requested from assets-missing modal sdReady=%d ui=%d\n", g_sdReady ? 1 : 0,
+                      (int)g_app.uiState);
+
+        openConsoleWithReturn(g_app.uiState, g_app.currentTab,
+                              /*retToSettings=*/false, g_settingsFlow.settingsPage);
+
+        invalidateBackgroundCache();
+        requestUIRedraw();
+        renderUI();
+        
+        input = InputState{};
+        clearInputLatch();
+        return;
+      }
+
       while (input.kbHasEvent())
       {
         KeyEvent ev = input.kbPop();
@@ -666,6 +689,22 @@ void appMainLoopTick()
       {
         drawAssetsMissingScreen();
         s_assetsMissingModalDrawn = true;
+      }
+
+      if (input.consoleOnce)
+      {
+        Serial.printf("[SDRUNTIME] console requested from assets-missing modal sdReady=%d ui=%d\n", g_sdReady ? 1 : 0,
+                      (int)g_app.uiState);
+
+        openConsoleWithReturn(g_app.uiState, g_app.currentTab,
+                              /*retToSettings=*/false, g_settingsFlow.settingsPage);
+
+        invalidateBackgroundCache();
+        requestUIRedraw();
+
+        input = InputState{};
+        clearInputLatch();
+        return;
       }
 
       if (retryRequested)

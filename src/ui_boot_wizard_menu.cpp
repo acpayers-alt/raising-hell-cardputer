@@ -17,6 +17,8 @@
 // These are defined in flow_boot_wizard.cpp
 extern UIState g_bootWizardAfterOkState;
 extern Tab g_bootWizardAfterOkTab;
+static bool bootWizardCanSkipToManualTime();
+static void bootWizardSkipToManualTime();
 
 // -----------------------------------------------------------------------------
 // Local wizard choice state
@@ -30,13 +32,36 @@ void UiBootWizardMenu::ResetWifiPromptChoice() { s_wifiPromptChoice = 0; }
 // -----------------------------------------------------------------------------
 static bool bootWizardCanSkipToManualTime()
 {
-  return !g_bootAssetProvisionMustComplete || sdAssetsPresent();
+  return true;
+}
+
+static UIState bootWizardManualTimeReturnState()
+{
+  if (g_bootAssetProvisionMustComplete)
+    return UIState::BOOT;
+
+  return g_bootWizardAfterOkState;
 }
 
 static void bootWizardSkipToManualTime()
 {
-  beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+  beginForcedSetTimeBootGate(bootWizardManualTimeReturnState(), g_bootWizardAfterOkTab);
   requestUIRedraw();
+}
+
+static bool bootWifiCanSkipToManualTime()
+{
+  // Manual time setup is always allowed. If mandatory assets are still pending,
+  // the editor will return to BOOT so the asset gate can resume.
+  return true;
+}
+
+static UIState bootWifiManualTimeReturnState()
+{
+  if (g_bootAssetProvisionMustComplete)
+    return UIState::BOOT;
+
+  return g_bootWizardAfterOkState;
 }
 
 static void bootWizardEnterWifiSetup()
@@ -56,7 +81,7 @@ static void bootWizardEnterWifiSetup()
   g_wifi.scanCount = 0;
   g_wifi.scanIndex = 0;
 
-  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnState = bootWizardManualTimeReturnState();
   g_wifi.returnTab = g_bootWizardAfterOkTab;
   g_wifi.aborted = false;
 

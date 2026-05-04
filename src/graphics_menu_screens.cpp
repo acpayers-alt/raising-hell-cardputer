@@ -301,8 +301,8 @@ void drawTitleMenuScreen(bool redrawBg)
   const bool hasImport = uiTitleMenuHasImport();
   const bool hasBirth = (saveManagerGetBirthEpoch() != 0);
   const bool hasName = (pet.getName()[0] != '\0');
-  const bool hasRuntimePet = (hasBirth && hasName);
-
+  const bool hasRuntimePet = hasName;
+  
   char row0Buf[80];
   if (hasRuntimePet)
   {

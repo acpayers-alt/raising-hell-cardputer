@@ -46,7 +46,7 @@ static bool s_enterLatched = false;
 static bool s_mgSelectLatched = false; // mini-game Enter/G edge latch (separate from UI Enter)
 static bool s_delLatched = false;
 static bool s_qLatched = false; // Q -> menu edge
-static bool s_cLatched = false; // '\' -> console edge
+static bool s_cLatched = false; // '/' or '\' -> console edge
 static bool s_gLatched = false; // G -> selectOnce edge
 
 // Nav cluster latches — prevent press+release double edges
@@ -622,7 +622,7 @@ static void readKeyboard(InputState &out)
       out.uiDownHeld = heldDown;
     }
   }
-  
+
   // If nothing changed AND no keys are held, we can skip work.
   // IMPORTANT: include escAnyHeld so ESC never gets skipped by this early return.
   const bool heldSpecial = heldUp || heldDown || heldLeft || heldRight || escAnyHeld || heldEnter || heldG ||
@@ -761,7 +761,7 @@ static void readKeyboard(InputState &out)
       return false;
     }
   };
-  
+
   const bool escBlockedNow = escBlockedInState(g_app.uiState);
 
   // Cooldown: prevents menu flicker if some code clears the latch while ESC is still held.
@@ -861,7 +861,7 @@ static void readKeyboard(InputState &out)
     out.selectOnce = false;
 
     s_qLatched = kbHeldChar('q') || kbHeldChar('Q');
-    s_cLatched = kbHeldChar('\\');
+    s_cLatched = kbHeldChar('\\') || kbHeldChar('/');
     s_gLatched = heldG;
 
     out.kbQHead = out.kbQTail = 0;
@@ -876,23 +876,23 @@ static void readKeyboard(InputState &out)
       if (!c)
         continue;
 
-        const uint8_t ucEsc = (uint8_t)c;
+      const uint8_t ucEsc = (uint8_t)c;
 
-        // ESC should behave like the global cancel/settings key, not disappear.
-        if (ucEsc == 0x1B)
-        {
-          out.hotSettings = true;
-          continue;
-        }
-  
-        // Cardputer ESC comes through the tilde/backquote family.
-        // In normal UI flow this should behave like the existing global
-        // cancel/settings key, not disappear.
-        if (ucEsc == 0x1B || ucEsc == 0x29 || c == '`' || c == '~' || ucEsc == 0xB0)
-        {
-          out.hotSettings = true;
-          continue;
-        }
+      // ESC should behave like the global cancel/settings key, not disappear.
+      if (ucEsc == 0x1B)
+      {
+        out.hotSettings = true;
+        continue;
+      }
+
+      // Cardputer ESC comes through the tilde/backquote family.
+      // In normal UI flow this should behave like the existing global
+      // cancel/settings key, not disappear.
+      if (ucEsc == 0x1B || ucEsc == 0x29 || c == '`' || c == '~' || ucEsc == 0xB0)
+      {
+        out.hotSettings = true;
+        continue;
+      }
 
       // Backspace/Delete/ASCII DEL -> console delete OR UI menu/back
       const uint8_t uc = (uint8_t)c;
@@ -918,8 +918,8 @@ static void readKeyboard(InputState &out)
         continue;
       }
 
-      // Backslash -> console toggle
-      if (c == '\\')
+      // Slash/backslash -> console toggle
+      if (c == '/' || c == '\\')
       {
         if (!s_cLatched && acceptNav(s_navConMs))
         {

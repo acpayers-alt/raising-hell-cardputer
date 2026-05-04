@@ -28,6 +28,7 @@ void saveManagerNewPetNoSave();
 void saveManagerFullWipe();
 
 uint32_t saveManagerGetBirthEpoch();
+uint32_t saveManagerGetLivedAgeSeconds();
 void saveManagerStampBirthNow();
 
 // ─────────────────────────────────────

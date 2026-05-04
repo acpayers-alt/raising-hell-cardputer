@@ -10,7 +10,7 @@
 
 // 'SHHR' (your constant; keep as-is if you already wrote files with it)
 #define SAVE_MAGIC   0x52484853
-#define SAVE_VERSION 4
+#define SAVE_VERSION 5
 
 // Back-compat names used by older code (sdcard.cpp)
 #define RH_SAVE_MAGIC   SAVE_MAGIC
@@ -72,14 +72,27 @@ struct InvPersist {
 // FULL SAVE PAYLOAD (CRC covers exactly these bytes)
 // ============================================================
 
-struct SavePayload {
-  // Keeping these is OK; just be consistent on read/write.
-  uint32_t magic;    // SAVE_MAGIC
-  uint16_t version;  // SAVE_VERSION
+struct SavePayloadV4 {
+  uint32_t magic;
+  uint16_t version;
 
   PetPersist pet;
   InvPersist inv;
   uint32_t birth_epoch;
+};
+
+struct SavePayload {
+  uint32_t magic;
+  uint16_t version;
+
+  PetPersist pet;
+  InvPersist inv;
+
+  // Calendar metadata only. 0 means unknown/untrusted.
+  uint32_t birth_epoch;
+
+  // Authoritative pet age/progression clock.
+  uint32_t lived_age_seconds;
 };
 
 // ============================================================

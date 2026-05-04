@@ -50,7 +50,23 @@ static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
 
-static bool bootWifiCanSkipToManualTime() { return !g_bootAssetProvisionMustComplete || sdAssetsPresent(); }
+static bool bootWifiCanSkipToManualTime() { return true; }
+
+static UIState bootWifiManualTimeReturnState()
+{
+  if (g_bootAssetProvisionMustComplete)
+    return UIState::BOOT;
+
+  return g_bootWizardAfterOkState;
+}
+
+static UIState bootWifiPromptReturnState()
+{
+  if (g_bootAssetProvisionMustComplete)
+    return UIState::BOOT;
+
+  return UIState::BOOT_WIFI_PROMPT;
+}
 
 static void bootWifiSkipToManualTime(InputState &in, const char *source)
 {
@@ -60,7 +76,7 @@ static void bootWifiSkipToManualTime(InputState &in, const char *source)
 
   Serial.printf("[BOOTWIFI] Wi-Fi skipped from %s -> manual time setup\n", source ? source : "boot wifi");
 
-  beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+  beginForcedSetTimeBootGate(bootWifiManualTimeReturnState(), g_bootWizardAfterOkTab);
   requestUIRedraw();
 }
 
@@ -100,7 +116,7 @@ bool bootWifiBeginStoredProfileConnect(int profileIndex)
 
   g_wifi.connectFailCount = 0;
   g_wifi.aborted = false;
-  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnState = bootWifiPromptReturnState();
   g_wifi.returnTab = g_bootWizardAfterOkTab;
 
   strlcpy(wifiSetupSsid, ssid.c_str(), sizeof(wifiSetupSsid));
@@ -246,7 +262,7 @@ void uiBootWifiImportedHandle(InputState &in)
     clearInputLatch();
 
     wifiResetConnectUiState();
-    uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+    uiActionEnterState(bootWifiPromptReturnState(), g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
   }
@@ -328,7 +344,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
 
     g_wifi.connectFailCount = 0;
     g_wifi.aborted = false;
-    g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+    g_wifi.returnState = bootWifiPromptReturnState();
     g_wifi.returnTab = g_bootWizardAfterOkTab;
 
     strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
@@ -362,7 +378,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   settingsSetWifiEnabled(true);
   saveSettingsToSD();
 
-  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnState = bootWifiPromptReturnState();
   g_wifi.returnTab = g_bootWizardAfterOkTab;
   g_wifi.aborted = false;
 
@@ -408,7 +424,7 @@ static void bootWifiFallBackToManualEntry(InputState &in)
   g_wifi.scanCount = 0;
   g_wifi.scanIndex = 0;
 
-  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnState = bootWifiPromptReturnState();
   g_wifi.returnTab = g_bootWizardAfterOkTab;
   g_wifi.aborted = false;
 
@@ -454,7 +470,7 @@ static void bootWifiRetryOrReturnToScan(InputState &in)
     g_wifi.scanIndex = 0;
   }
 
-  g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+  g_wifi.returnState = bootWifiPromptReturnState();
   g_wifi.returnTab = g_bootWizardAfterOkTab;
   g_wifi.aborted = false;
 
@@ -480,26 +496,14 @@ void uiBootWifiWaitHandle(InputState &in)
     uiDrainKb(in);
     clearInputLatch();
     wifiResetConnectUiState();
-    uiActionEnterState(UIState::BOOT_WIFI_PROMPT, g_bootWizardAfterOkTab, true);
+    uiActionEnterState(bootWifiPromptReturnState(), g_bootWizardAfterOkTab, true);
     requestUIRedraw();
     return;
   }
 
-  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
+  if (in.escOnce || in.menuOnce)
   {
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
-    beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
-    requestUIRedraw();
-    return;
-  }
-
-  if (g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
-  {
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
+    bootWifiSkipToManualTime(in, "BOOT_WIFI_WAIT");
     return;
   }
 
@@ -544,7 +548,7 @@ void uiBootWifiWaitHandle(InputState &in)
 
         g_wifi.connectFailCount = 0;
         g_wifi.aborted = false;
-        g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
+        g_wifi.returnState = bootWifiPromptReturnState();
         g_wifi.returnTab = g_bootWizardAfterOkTab;
 
         strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
@@ -654,24 +658,11 @@ void uiBootTzPickHandle(InputState &in) { (void)UiBootWizardMenu::HandleTimezone
 // -----------------------------------------------------------------------------
 void uiBootNtpWaitHandle(InputState &in)
 {
-  if (!g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
+  if (in.escOnce || in.menuOnce)
   {
     s_bootNtpWaitStarted = false;
     s_bootNtpWaitStartMs = 0;
-
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
-    beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
-    requestUIRedraw();
-    return;
-  }
-
-  if (g_bootAssetProvisionMustComplete && (in.escOnce || in.menuOnce))
-  {
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
+    bootWifiSkipToManualTime(in, "BOOT_NTP_WAIT");
     return;
   }
 
@@ -689,16 +680,7 @@ void uiBootNtpWaitHandle(InputState &in)
       uiDrainKb(in);
       clearInputLatch();
 
-      if (g_bootAssetProvisionMustComplete)
-      {
-        Serial.println("[BOOT][NTP] mandatory asset provisioning active; skipping manual time detour");
-        uiActionEnterState(UIState::BOOT, g_bootWizardAfterOkTab, true);
-        requestFullUIRedraw();
-        requestUIRedraw();
-        return;
-      }
-
-      beginForcedSetTimeBootGate(g_bootWizardAfterOkState, g_bootWizardAfterOkTab);
+      beginForcedSetTimeBootGate(bootWifiManualTimeReturnState(), g_bootWizardAfterOkTab);
       requestUIRedraw();
       return;
     }
@@ -733,7 +715,7 @@ void uiBootNtpWaitHandle(InputState &in)
 
     Serial.printf("[BOOTWIFI] NTP synced -> returning to final state afterOk=%d\n", (int)g_bootWizardAfterOkState);
 
-    uiActionEnterState(g_bootWizardAfterOkState, g_bootWizardAfterOkTab, true);
+    uiActionEnterState(bootWifiManualTimeReturnState(), g_bootWizardAfterOkTab, true);
     requestFullUIRedraw();
     requestUIRedraw();
     return;

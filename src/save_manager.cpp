@@ -45,10 +45,10 @@
 #include "time_persist.h"
 #include "time_state.h"
 #include "timezone.h"
-#include "wifi_time.h"
 
 // WiFi
 #include "wifi_store.h"
+#include "wifi_time.h"
 
 // UI / rendering
 #include "display.h"
@@ -84,6 +84,7 @@ static void clearNamePendingFlag();
 void resetRuntimeToCleanNoSaveState(bool resetName);
 static bool isFinalBubFilename(const char *nm);
 static uint32_t s_lastExportListHash = 0;
+static bool isBlankName(const char *name);
 
 static uint32_t hashExportEntry(const PetExportEntry &e)
 {
@@ -133,6 +134,8 @@ void saveSettingsToSD(); // exported wrapper
 
 // Pet Stuff
 static uint32_t g_birthEpoch = 0;
+static uint32_t g_livedAgeSeconds = 0;
+static uint32_t s_livedAgeLastTickMs = 0;
 
 static uint8_t g_lastLoadErr = SLE_OK;
 static uint32_t g_lastLoadSize = 0;
@@ -1122,12 +1125,78 @@ void setStepCounterEnabled(bool en)
 // ============================================================
 static uint32_t getNowEpochOrZero()
 {
-  // Only trust time if we have strict NTP sync
-  if (!timeIsNtpSyncedStrict())
+  // Accept only intentional time:
+  // - strict NTP sync
+  // - manual time setup / synced state
+  //
+  // Do NOT accept restored anchor time before one of those states,
+  // because stale anchors caused fake-old newborn pets.
+  if (!timeIsNtpSyncedStrict() && !timeIsSynced())
     return 0;
 
   time_t now = time(nullptr);
   return (now > 1700000000) ? (uint32_t)now : 0;
+}
+
+static uint32_t getBirthEpochForNewPet()
+{
+  // Calendar metadata only.
+  // If there is no intentional NTP/manual time, keep it unknown.
+  return getNowEpochOrZero();
+}
+
+static uint32_t livedAgeFromBirthEpoch(uint32_t birthEpoch)
+{
+  // Treat old sentinel/invalid calendar births as unknown.
+  if (birthEpoch < 946684800UL) // before 2000-01-01
+    return 0;
+
+  const uint32_t now = getNowEpochOrZero();
+
+  if (now == 0 || now <= birthEpoch)
+    return 0;
+
+  return now - birthEpoch;
+}
+
+static bool isBlankName(const char *name) { return !name || name[0] == '\0'; }
+
+static bool hasFinalizedPetForLivedAge() { return !namePendingFlagExists() && !isBlankName(pet.name); }
+
+static void tickLivedAge()
+{
+  const uint32_t nowMs = millis();
+
+  if (!hasFinalizedPetForLivedAge())
+  {
+    s_livedAgeLastTickMs = nowMs;
+    return;
+  }
+
+  if (s_livedAgeLastTickMs == 0)
+  {
+    s_livedAgeLastTickMs = nowMs;
+    return;
+  }
+
+  const uint32_t deltaMs = nowMs - s_livedAgeLastTickMs;
+  if (deltaMs < 1000)
+    return;
+
+  const uint32_t addSeconds = deltaMs / 1000;
+  s_livedAgeLastTickMs += addSeconds * 1000;
+
+  if (UINT32_MAX - g_livedAgeSeconds < addSeconds)
+    g_livedAgeSeconds = UINT32_MAX;
+  else
+    g_livedAgeSeconds += addSeconds;
+
+  static uint32_t s_lastLivedAgeDirtySeconds = 0;
+  if ((uint32_t)(g_livedAgeSeconds - s_lastLivedAgeDirtySeconds) >= 60)
+  {
+    s_lastLivedAgeDirtySeconds = g_livedAgeSeconds;
+    saveManagerMarkDirty();
+  }
 }
 
 static uint64_t generatePetId()
@@ -1137,7 +1206,13 @@ static uint64_t generatePetId()
   uint64_t id = (hi << 32) | lo;
 
   if (id == 0)
-    id = ((uint64_t)getNowEpochOrZero() << 32) | 0xA5A5A5A5ULL;
+  {
+    uint32_t seed = getBirthEpochForNewPet();
+    if (seed == 0)
+      seed = millis();
+
+    id = ((uint64_t)seed << 32) | (uint64_t)esp_random();
+  }
 
   return id;
 }
@@ -1180,8 +1255,8 @@ SavePayload makeDefaultSavePayload()
   p.inv.slots[3].type = (uint8_t)ITEM_ELDRITCH_EYE;
   p.inv.slots[3].qty = 0;
 
-  uint32_t now = getNowEpochOrZero();
-  p.birth_epoch = (now != 0) ? now : 1;
+  p.birth_epoch = getBirthEpochForNewPet();
+  p.lived_age_seconds = 0;
   return p;
 }
 
@@ -1226,6 +1301,9 @@ static void migrateV2ToRuntime(const SavePayloadV2 &p2)
   g_app.inventory.fromPersist(p2.inv);
 
   g_birthEpoch = (p2.birth_epoch != 0) ? p2.birth_epoch : p2.pet.birth_epoch;
+
+  g_livedAgeSeconds = livedAgeFromBirthEpoch(g_birthEpoch);
+  s_livedAgeLastTickMs = millis();
 
   saveManagerMarkDirty();
   g_app.uiNeedsRedraw = true;
@@ -1300,6 +1378,8 @@ static void migrateV3ToRuntime(const SavePayloadV3 &p3)
   g_app.inventory.syncEepromNoDirty();
 
   g_birthEpoch = (p3.birth_epoch != 0) ? p3.birth_epoch : p3.pet.birth_epoch;
+  g_livedAgeSeconds = livedAgeFromBirthEpoch(g_birthEpoch);
+  s_livedAgeLastTickMs = millis();
 
   saveManagerMarkDirty();
   g_app.uiNeedsRedraw = true;
@@ -1312,16 +1392,18 @@ static void pack(SavePayload &p)
   p.version = SAVE_VERSION;
 
   uint32_t be = g_birthEpoch;
-  if (be == 0)
-    be = getNowEpochOrZero();
+  if (be == 1)
+    be = 0;
+
   g_birthEpoch = be;
 
-  p.birth_epoch = be;
+  p.birth_epoch = g_birthEpoch;
+  p.lived_age_seconds = g_livedAgeSeconds;
 
-  pet.birth_epoch = be;
+  pet.birth_epoch = g_birthEpoch;
 
   pet.toPersist(p.pet);
-  p.pet.birth_epoch = be;
+  p.pet.birth_epoch = g_birthEpoch;
 
   g_app.inventory.toPersist(p.inv);
 }
@@ -1348,11 +1430,14 @@ static void unpack(const SavePayload &p)
   applySleepStateFromBootFlag();
 
   uint32_t be = p.birth_epoch;
-  if (be == 0)
-    be = getNowEpochOrZero();
-  g_birthEpoch = be;
+  if (be == 1)
+    be = 0;
 
-  pet.birth_epoch = be;
+  g_birthEpoch = be;
+  g_livedAgeSeconds = p.lived_age_seconds;
+  s_livedAgeLastTickMs = millis();
+
+  pet.birth_epoch = g_birthEpoch;
 }
 
 static void newPetInternal()
@@ -1971,6 +2056,8 @@ void resetRuntimeToCleanNoSaveState(bool resetName)
 
   // No birth time
   g_birthEpoch = 0;
+  g_livedAgeSeconds = 0;
+  s_livedAgeLastTickMs = 0;
 
   // Clean inventory
   g_app.inventory.init();
@@ -2087,6 +2174,45 @@ static bool loadSaveFileInternal(const char *path)
     }
 
     unpack(p);
+  }
+  else if (sz == sizeof(SavePayloadV4))
+  {
+    SavePayloadV4 p4{};
+    memset(&p4, 0, sizeof(p4));
+
+    const size_t want = sizeof(p4);
+    const int r = f.read((uint8_t *)&p4, want);
+    f.close();
+
+    if (r != (int)want)
+    {
+      g_lastLoadErr = SLE_READ_FAIL;
+      Serial.printf("[SAVE] FAIL path=%s reason=read_fail_v4 got=%d want=%u size=%lu\n", path, r, (unsigned)want,
+                    (unsigned long)sz);
+      return false;
+    }
+
+    if (p4.magic != SAVE_MAGIC)
+    {
+      g_lastLoadErr = SLE_MAGIC_BAD;
+      Serial.printf("[SAVE] FAIL path=%s reason=magic_bad_v4 got=0x%08lx want=0x%08lx size=%lu\n", path,
+                    (unsigned long)p4.magic, (unsigned long)SAVE_MAGIC, (unsigned long)sz);
+      return false;
+    }
+
+    SavePayload upgraded{};
+    upgraded.magic = SAVE_MAGIC;
+    upgraded.version = SAVE_VERSION;
+
+    upgraded.pet = p4.pet;
+    upgraded.inv = p4.inv;
+
+    upgraded.birth_epoch = (p4.birth_epoch != 0) ? p4.birth_epoch : p4.pet.birth_epoch;
+
+    upgraded.lived_age_seconds = livedAgeFromBirthEpoch(upgraded.birth_epoch);
+
+    unpack(upgraded);
+    saveManagerMarkDirty();
   }
   else if (sz == sizeof(SavePayloadV3))
   {
@@ -2239,12 +2365,10 @@ static bool saveSaveToSD_internal()
 
   // Never persist if there is no active finalized pet yet.
   //
-  // Policy:
-  // - g_birthEpoch == 0 means "no active pet lifecycle exists yet"
-  // - name_pending.flag means fresh pet creation is still incomplete
-  //
-  // A finalized new pet must set a non-zero birth epoch before the first forced save.
-  if (g_birthEpoch == 0)
+  // birth_epoch is calendar metadata only and may be 0 for fully offline pets.
+  // A non-blank name is the active-pet gate; name_pending.flag still blocks
+  // incomplete fresh-pet creation.
+  if (isBlankName(pet.name))
   {
     Serial.println("[SAVE] SKIP (no active pet)");
     return true;
@@ -2323,18 +2447,6 @@ void saveManagerBegin()
   DBG_ON("[SAVE] begin sizeof(SavePayload)=%u sizeof(PetPersist)=%u sizeof(InvPersist)=%u sizeof(SettingsData)=%u\n",
          (unsigned)sizeof(SavePayload), (unsigned)sizeof(PetPersist), (unsigned)sizeof(InvPersist),
          (unsigned)sizeof(SettingsData));
-}
-
-static bool isBlankName(const char *s)
-{
-  if (!s)
-    return true;
-  for (const char *p = s; *p; ++p)
-  {
-    if (*p != ' ' && *p != '\t' && *p != '\r' && *p != '\n')
-      return false;
-  }
-  return true;
 }
 
 static bool autoHealLoadedSaveIfNeeded()
@@ -2668,17 +2780,17 @@ void saveManagerSetPetIntroFadeBootFlag()
 
 void saveManagerStampBirthNow()
 {
-  uint32_t now = getNowEpochOrZero();
+  g_birthEpoch = getBirthEpochForNewPet();
+  pet.birth_epoch = g_birthEpoch;
 
-  // A brand-new finalized pet must be saveable even before NTP/time is valid.
-  // If wall clock is unavailable, use a non-zero sentinel epoch for the first save.
-  // Auto-heal/load code can normalize this later once real time is available.
-  if (now == 0)
-    now = 1;
+  g_livedAgeSeconds = 0;
+  s_livedAgeLastTickMs = millis();
 
-  g_birthEpoch = now;
-  pet.birth_epoch = now;
   saveManagerMarkDirty();
+
+  Serial.printf("[SAVE] first-finalize birthEpoch=%lu livedAge=%lu strictNtp=%d synced=%d\n",
+                (unsigned long)g_birthEpoch, (unsigned long)g_livedAgeSeconds, timeIsNtpSyncedStrict() ? 1 : 0,
+                timeIsSynced() ? 1 : 0);
 }
 
 bool saveManagerAutoHeal()
@@ -2729,6 +2841,8 @@ void saveManagerMarkDirty()
 
 void saveManagerTick()
 {
+  tickLivedAge();
+
   if (!dirty)
     return;
 
@@ -2824,6 +2938,8 @@ void saveManagerNewPetNoSave()
 }
 
 uint32_t saveManagerGetBirthEpoch() { return g_birthEpoch; }
+
+uint32_t saveManagerGetLivedAgeSeconds() { return g_livedAgeSeconds; }
 
 uint8_t saveManagerGetDecayMode()
 {
@@ -2964,6 +3080,7 @@ static bool writeCurrentBubJsonToDir(const char *dirPath, char *outPath, size_t 
   profile["xp"] = pet.xp;
   profile["evoStage"] = pet.evoStage;
   profile["birthEpoch"] = g_birthEpoch;
+  profile["livedAgeSeconds"] = g_livedAgeSeconds;
 
   char petIdBuf[24];
   snprintf(petIdBuf, sizeof(petIdBuf), "%016llX", (unsigned long long)pet.petId);
@@ -3163,6 +3280,8 @@ bool saveManagerImportBubAtPath(const char *path, char *outPath, size_t outPathS
 
   g_birthEpoch = (uint32_t)(profile["birthEpoch"] | 0);
   pet.birth_epoch = g_birthEpoch;
+  g_livedAgeSeconds = (uint32_t)(profile["livedAgeSeconds"] | livedAgeFromBirthEpoch(g_birthEpoch));
+  s_livedAgeLastTickMs = millis();
 
   const char *petIdStr = profile["petId"] | "";
   unsigned long long parsedPetId = 0ULL;
@@ -3286,6 +3405,9 @@ void saveManagerDeletePetOnly()
   g_app.inventory.wipePersistedEeprom();
 
   // Prevent the old live pet from being re-saved by the debounce save path.
+  g_birthEpoch = 0;
+  g_livedAgeSeconds = 0;
+  s_livedAgeLastTickMs = 0;
   dirty = false;
   lastSaveMs = millis();
 }

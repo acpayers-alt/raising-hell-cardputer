@@ -111,9 +111,7 @@ void drawStatsTab(bool redrawBg)
   char buf[40];
 
   {
-    uint32_t birth = saveManagerGetBirthEpoch();
-    int64_t now = (int64_t)time(nullptr);
-    AgeParts a = calcAgeParts((int64_t)birth, now);
+    AgeParts a = calcAgePartsFromSeconds((int64_t)saveManagerGetLivedAgeSeconds());
     formatAgeString(buf, sizeof(buf), a, false);
   }
   drawKV(textX, textY + 0 * rowH, "Age", buf);
@@ -213,7 +211,7 @@ void drawStatsTab(bool redrawBg)
       cond = "Bored";
       condColor = TFT_GREEN;
     }
-    
+
     spr.setTextDatum(TL_DATUM);
     spr.setTextFont(1);
     spr.setTextSize(1);
@@ -239,10 +237,10 @@ void drawPlayTab(bool redrawBg)
   drawNonPetTabBackground();
 
   // draw card + content
-  
+
   drawTopBar();
   drawTabBar();
-  
+
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
   const int contentBottom = contentY + contentH;

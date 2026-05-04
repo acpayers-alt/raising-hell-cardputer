@@ -33,7 +33,7 @@ static bool s_titleActivationArmed = false;
 
 static bool titleHasLivePet()
 {
-  return saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
+  return saveManagerSaveFileExists() || pet.getName()[0] != '\0';
 }
 
 static bool titleHasPendingDeath() { return petDeathEnabled && pet.hunger <= 0 && pet.health <= 0; }
@@ -44,7 +44,7 @@ static void refreshTitleMenuAvailability()
   const bool hasBirth = (saveManagerGetBirthEpoch() != 0);
   const bool hasName = (pet.getName()[0] != '\0');
 
-  s_titleHasSave = saveExists || (hasBirth && hasName);
+  s_titleHasSave = saveExists || hasName;
   s_titleHasImport = saveManagerHasImportableBubJson();
 
   static uint32_t s_lastBlankNameLogMs = 0;

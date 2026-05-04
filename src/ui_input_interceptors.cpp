@@ -47,6 +47,21 @@ static inline bool escBlockedInState(UIState s)
   }
 }
 
+static inline bool bootSetupOwnsMenuEsc(UIState s)
+{
+  switch (s)
+  {
+  case UIState::BOOT_WIFI_PROMPT:
+  case UIState::BOOT_TZ_PICK:
+  case UIState::BOOT_NTP_WAIT:
+  case UIState::BOOT_ASSET_WIFI_REQUIRED:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 static inline bool consoleBlockedInState(UIState s)
 {
   switch (s)
@@ -102,13 +117,18 @@ bool uiHandleGlobalInterceptors(InputState &in)
   // (Suppression is used for modal flows where ESC/menu must not work.)
   if (menuSuppressedNow())
   {
+    // Boot setup screens own ESC/MENU locally.
+    // Do not let global suppression swallow the manual-time escape path.
+    if (bootSetupOwnsMenuEsc(g_app.uiState))
+      return false;
+  
     if (in.escOnce || in.menuOnce || in.homeOnce || in.consoleOnce)
     {
       uiActionSwallowEdges(in);
       return true;
     }
   }
-
+  
   if (in.consoleOnce && consoleBlockedInState(g_app.uiState))
   {
     uiActionSwallowEdges(in);

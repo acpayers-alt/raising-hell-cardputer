@@ -223,13 +223,22 @@ void drawBootWifiPromptScreen()
   spr.setTextDatum(TL_DATUM);
   spr.setTextFont(2);
   spr.setTextSize(1);
+
+  spr.setTextColor(TFT_RED, TFT_BLACK);
+  spr.drawString("Setup required", 10, 10);
+
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("Set up WiFi for automatic", 10, 32);
+  spr.drawString("time and updates.", 10, 48);
 
-  spr.drawString("First boot setup", 10, 10);
-  spr.drawString("Setup WiFi to auto-set time?", 10, 40);
+  spr.setTextColor(TFT_GREEN, TFT_BLACK);
+  spr.drawString("ENTER: Set up WiFi", 10, 78);
 
-  spr.drawString("ENTER: Setup WiFi", 10, 80);
-  spr.drawString("ESC: Enter Time Manually", 10, 100);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("ESC: Manual Setup", 10, 94);
+
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString("\\: Console", 10, 116);
 
   spr.pushSprite(0, 0);
 }
@@ -245,27 +254,17 @@ void drawBootAssetWifiRequiredScreen()
   spr.drawString("Initial asset download", 10, 10);
 
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("Raising Hell requires", 10, 32);
-  spr.drawString("an internet connection", 10, 48);
-  spr.drawString("for initial asset", 10, 64);
-  spr.drawString("download.", 10, 80);
-
+  spr.drawString("Raising Hell requires an internet ", 10, 32);
+  spr.drawString("connection for initial assets", 10, 48);
+  
   spr.setTextColor(TFT_GREEN, TFT_BLACK);
-  spr.drawString("ENTER: Set up Wi-Fi", 10, 102);
-
-  if (!g_bootAssetProvisionMustComplete || sdAssetsPresent())
-  {
-    spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawString("ESC: Set time manually", 10, 118);
-
-    spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    spr.drawString("\\: Console", 10, 134);
-  }
-  else
-  {
-    spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    spr.drawString("\\: Console", 10, 118);
-  }
+  spr.drawString("ENTER: Set up WiFi", 10, 72);
+  
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawString("ESC: Manual Setup", 10, 88);
+  
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawString("\\: Console", 10, 110);
 
   spr.pushSprite(0, 0);
 }

@@ -28,8 +28,8 @@ void drawClockModeScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
-  const bool hasLivePet = saveManagerSaveFileExists() || (saveManagerGetBirthEpoch() != 0 && pet.getName()[0] != '\0');
-
+    const bool hasLivePet = saveManagerSaveFileExists() || pet.getName()[0] != '\0';
+    
   if (!hasLivePet)
   {
     spr.fillScreen(TFT_BLACK);

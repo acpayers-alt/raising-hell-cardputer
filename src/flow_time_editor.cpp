@@ -8,10 +8,12 @@
 #include "app_state.h"
 #include "asset_provision_request.h"
 #include "boot_pipeline.h"
+#include "flow_boot_wizard.h"
 #include "input.h"
 #include "time_editor_state.h"
 #include "time_persist.h"
 #include "ui_actions.h"
+#include "ui_input_common.h"
 #include "ui_invalidate.h"
 #include "wifi_setup_state.h"
 
@@ -38,7 +40,7 @@ static void normalizeAndClampTm(struct tm &t)
     t.tm_year = 2026 - 1900;
     t.tm_mon = 0;
     t.tm_mday = 1;
-    t.tm_hour = 12;
+    t.tm_hour = 0;
     t.tm_min = 0;
     t.tm_sec = 0;
     (void)mktime(&t);
@@ -67,7 +69,7 @@ static void initEditorFromNow()
     g_setTimeTm.tm_year = 2026 - 1900;
     g_setTimeTm.tm_mon = 0;
     g_setTimeTm.tm_mday = 1;
-    g_setTimeTm.tm_hour = 12;
+    g_setTimeTm.tm_hour = 0;
     g_setTimeTm.tm_min = 0;
     g_setTimeTm.tm_sec = 0;
     g_setTimeTm.tm_isdst = -1;
@@ -83,7 +85,7 @@ static void initEditorFromNow()
     g_setTimeTm.tm_year = 2026 - 1900;
     g_setTimeTm.tm_mon = 0;
     g_setTimeTm.tm_mday = 1;
-    g_setTimeTm.tm_hour = 12;
+    g_setTimeTm.tm_hour = 0;
     g_setTimeTm.tm_min = 0;
     g_setTimeTm.tm_sec = 0;
     g_setTimeTm.tm_isdst = -1;
@@ -172,7 +174,10 @@ static void commitSetTime()
   }
 
   timeMarkClean();
-  saveTimeAnchor();
+
+  // Manual/offline time is a display convenience, not a real RTC.
+  // Do not persist it as a boot anchor; otherwise every reboot restores
+  // the exact manually-entered clock value and looks like broken timekeeping.
 }
 
 static void finishForcedBootTime()
@@ -197,6 +202,55 @@ static void finishForcedBootTime()
   }
 
   bootSetupClearPendingFlag();
+
+  if (ret.state == UIState::BOOT && g_bootAssetProvisionMustComplete)
+  {
+    const bool assetsPresentNow = sdAssetsPresent();
+  
+    if (assetsPresentNow)
+    {
+      Serial.println("[BOOT] manual time complete; local assets present -> continuing boot");
+  
+      clearAssetProvisionBootRequest();
+  
+      g_bootAssetProvisionMustComplete = false;
+      g_bootAssetProvisionActive = false;
+      g_bootUiBlockedForAssetProvision = false;
+      g_bootProvisionWifiOnboardingStarted = false;
+  
+      uiActionEnterState(ret.state, ret.tab, true);
+      requestUIRedraw();
+      inputForceClear();
+      return;
+    }
+  
+    Serial.println("[BOOT] manual time complete -> WiFi setup");
+  
+    g_bootProvisionWifiOnboardingStarted = true;
+  
+    g_wifiSetupFromBootWizard = true;
+    wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+    wifiSetupSsid[0] = 0;
+    wifiSetupPass[0] = 0;
+    wifiSetupBuf[0] = 0;
+  
+    g_wifi.scanStarted = false;
+    g_wifi.scanInProgress = false;
+    g_wifi.scanCount = 0;
+    g_wifi.scanIndex = 0;
+    g_wifi.connectFailCount = 0;
+  
+    g_wifi.returnState = UIState::BOOT;
+    g_wifi.returnTab = ret.tab;
+    g_wifi.aborted = false;
+  
+    uiActionEnterState(UIState::WIFI_SETUP, ret.tab, true);
+  
+    requestUIRedraw();
+    inputForceClear();
+    return;
+  }
+
   Serial.printf("[BOOT] manual time complete -> entering return state=%d tab=%d\n", (int)ret.state, (int)ret.tab);
 
   uiActionEnterState(ret.state, ret.tab, true);
@@ -323,29 +377,24 @@ void uiSetTimeHandle(InputState &in)
 
   if (in.escOnce)
   {
-    if (!g_setTimeForceNoCancel)
+    uiActionSwallowAll(in);
+    uiDrainKb(in);
+    clearInputLatch();
+
+    if (g_setTimeForceNoCancel)
     {
-      returnFromSetTime();
-      in.clearEdges();
+      // Back to boot flow (asset screen), not WiFi setup
+      g_setTimeActive = false;
+      g_setTimeForceNoCancel = false;
+
+      uiActionEnterState(UIState::BOOT, g_app.currentTab, true);
+
+      requestUIRedraw();
       return;
     }
 
-    g_setTimeActive = false;
-    g_setTimeForceNoCancel = false;
-
-    g_wifiSetupFromBootWizard = true;
-    g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
-    g_wifi.scanIndex = 0;
-    g_wifi.buf[0] = '\0';
-
-    g_wifi.returnState = UIState::BOOT_WIFI_PROMPT;
-    g_wifi.returnTab = Tab::TAB_PET;
-    g_wifi.aborted = false;
-
-    uiActionEnterState(UIState::WIFI_SETUP, g_app.currentTab, true);
-    requestUIRedraw();
-    inputForceClear();
-    in.clearEdges();
+    // Normal settings flow
+    returnFromSetTime();
     return;
   }
 

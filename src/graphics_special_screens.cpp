@@ -153,7 +153,8 @@ void drawBurialScreen()
   y += lineH;
 
   char ageBuf[32] = {0};
-  getPetAgeString(ageBuf, sizeof(ageBuf), be);
+  AgeParts lived = calcAgePartsFromSeconds((int64_t)saveManagerGetLivedAgeSeconds());
+  formatAgeString(ageBuf, sizeof(ageBuf), lived, false);
   spr.drawString(String("Age: ") + ageBuf, cx, y);
 
   spr.pushSprite(0, 0);

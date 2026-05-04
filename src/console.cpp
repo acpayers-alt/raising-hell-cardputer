@@ -1788,11 +1788,13 @@ static void execLine(char *line)
     time_t now = time(nullptr);
 
     uint32_t birth = saveManagerGetBirthEpoch();
+    uint32_t lived = saveManagerGetLivedAgeSeconds();
 
     logf("now:   %lu", (unsigned long)now);
     logf("birth: %lu", (unsigned long)birth);
+    logf("lived: %lu seconds", (unsigned long)lived);
 
-    AgeParts a = calcAgeParts((time_t)birth, now);
+    AgeParts a = calcAgePartsFromSeconds((int64_t)lived);
     char s[32];
     formatAgeString(s, sizeof(s), a, false);
     logf("age:   %s", s);
