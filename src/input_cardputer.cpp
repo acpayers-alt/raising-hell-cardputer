@@ -861,7 +861,7 @@ static void readKeyboard(InputState &out)
     out.selectOnce = false;
 
     s_qLatched = kbHeldChar('q') || kbHeldChar('Q');
-    s_cLatched = kbHeldChar('\\') || kbHeldChar('/');
+    s_cLatched = kbHeldChar('\\');
     s_gLatched = heldG;
 
     out.kbQHead = out.kbQTail = 0;
@@ -918,8 +918,8 @@ static void readKeyboard(InputState &out)
         continue;
       }
 
-      // Slash/backslash -> console toggle
-      if (c == '/' || c == '\\')
+      // Backslash -> console toggle
+      if (c == '\\')
       {
         if (!s_cLatched && acceptNav(s_navConMs))
         {
@@ -928,7 +928,7 @@ static void readKeyboard(InputState &out)
         }
         continue;
       }
-
+      
       const char lc = (char)tolower((unsigned char)c);
 
       if (!g_textCaptureMode)
