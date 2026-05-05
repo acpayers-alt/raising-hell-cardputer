@@ -221,7 +221,6 @@ static bool blockingUiAutoScreenOffCheck(uint32_t nowMs)
 
   if (!isScreenOn())
   {
-    const bool hasLivePet = saveManagerSaveFileExists();
 #if LED_STATUS_ENABLED
     ledSetScreenOff(true);
     ledUpdatePetStatus(computeLedMode());
@@ -1362,19 +1361,28 @@ void appMainLoopTick()
     s_prevDbgUiState = (int)g_app.uiState;
   }
 
-  const bool sleepingNow2 = isPetSleepingNow();
+  const bool hasLivePetPostMenu = saveManagerSaveFileExists();
+  const bool sleepingNow2 = hasLivePetPostMenu && isPetSleepingNow();
 
-  if (!s_prevSleeping && sleepingNow2)
-    soundSleep();
-  if (s_prevSleeping && !sleepingNow2)
-    soundWake();
+  if (hasLivePetPostMenu)
+  {
+    if (!s_prevSleeping && sleepingNow2)
+      soundSleep();
+    if (s_prevSleeping && !sleepingNow2)
+      soundWake();
+  }
+  else
+  {
+    s_prevSleeping = false;
+  }
+
   s_prevSleeping = sleepingNow2;
 
   const bool inDeathTransition = (g_app.uiState == UIState::DEATH_TRANSITION);
 
   if (!inDeathTransition)
   {
-    if (petWarningAudioAllowedForUi(g_app.uiState))
+    if (hasLivePetPostMenu && petWarningAudioAllowedForUi(g_app.uiState))
     {
       soundLowHealthTick((uint8_t)pet.health, sleepingNow2,
                          /*screenOn=*/isScreenOn(),

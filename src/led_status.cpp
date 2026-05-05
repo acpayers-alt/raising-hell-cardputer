@@ -1,6 +1,7 @@
 #include "led_status.h"
 #include "app_state.h"
 #include "pet.h"
+#include "save_manager.h"
 #include "sleep_state.h"
 
 #include <Adafruit_NeoPixel.h>
@@ -420,6 +421,9 @@ bool isPetSleepingNow()
 
 LedPetMode computeLedMode()
 {
+  if (!saveManagerSaveFileExists())
+    return LED_PET_OFF;
+
   if (isPetSleepingNow())
     return LED_PET_SLEEPING;
 

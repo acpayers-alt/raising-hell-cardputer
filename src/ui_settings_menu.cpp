@@ -1173,7 +1173,7 @@ bool Handle(InputState &input, int move)
     {
       const bool storeFirst = (UiSettingsPages::GameNewPetConfirmIndex() == 0);
 
-      if (storeFirst)
+      if (storeFirst && saveManagerSaveFileExists())
       {
         char parkedPath[128];
         if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
