@@ -221,6 +221,7 @@ static bool blockingUiAutoScreenOffCheck(uint32_t nowMs)
 
   if (!isScreenOn())
   {
+    const bool hasLivePet = saveManagerSaveFileExists();
 #if LED_STATUS_ENABLED
     ledSetScreenOff(true);
     ledUpdatePetStatus(computeLedMode());
@@ -342,49 +343,56 @@ void appMainLoopTick()
     // War Walking steps. This does not scan Wi-Fi or touch real networks.
     wardriveStepsTick(now);
 
-    const bool sleepingNow_off = isPetSleepingNow();
+    const bool hasLivePet_off = saveManagerSaveFileExists();
+    bool sleepingNow_off = false;
 
-    if (sleepingNow_off)
+    if (hasLivePet_off)
     {
-      pet.petSleepTick();
-      petResetUpdateTimers(); // prevent decay "catch-up" on wake
-    }
-    else
-    {
-      petAutonomyTick(now);
+      sleepingNow_off = isPetSleepingNow();
 
-      if (isPetSleepingNow())
+      if (sleepingNow_off)
       {
         pet.petSleepTick();
-        petResetUpdateTimers();
+        petResetUpdateTimers(); // prevent decay "catch-up" on wake
       }
       else
       {
-        pet.update();
-        passiveXpTick(now);
+        petAutonomyTick(now);
+
+        if (isPetSleepingNow())
+        {
+          sleepingNow_off = true;
+          pet.petSleepTick();
+          petResetUpdateTimers();
+        }
+        else
+        {
+          pet.update();
+          passiveXpTick(now);
+        }
       }
-    }
 
-    if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
-    {
-      uiEndAlertScreenFlash();
+      if (pet.health <= 0 && petDeathEnabled && petDeathShouldAutoEnterForUi(g_app.uiState))
+      {
+        uiEndAlertScreenFlash();
 #if LED_STATUS_ENABLED
-      ledSetScreenOff(true);
-      ledUpdatePetStatus(LED_PET_OFF);
+        ledSetScreenOff(true);
+        ledUpdatePetStatus(LED_PET_OFF);
 #endif
-      petEnterDeathState();
-      clearInputLatch();
-      return;
-    }
+        petEnterDeathState();
+        clearInputLatch();
+        return;
+      }
 
-    // Near-death beep MUST work even with screen off, but only while a pet-owned
-    // screen owns the experience. Title/settings/boot should not beep without
-    // on-screen pet context.
-    if (petWarningAudioAllowedForUi(g_app.uiState))
-    {
-      soundLowHealthTick((uint8_t)pet.health, sleepingNow_off,
-                         /*screenOn=*/isScreenOn(),
-                         /*inDeathScreen=*/inDeathFlow);
+      // Near-death beep MUST work even with screen off, but only while a pet-owned
+      // screen owns the experience. Title/settings/boot should not beep without
+      // on-screen pet context.
+      if (petWarningAudioAllowedForUi(g_app.uiState))
+      {
+        soundLowHealthTick((uint8_t)pet.health, sleepingNow_off,
+                           /*screenOn=*/isScreenOn(),
+                           /*inDeathScreen=*/inDeathFlow);
+      }
     }
 
     if (motionAvailable && motionShakeDetected())
@@ -400,11 +408,7 @@ void appMainLoopTick()
       ledUpdatePetStatus(computeLedMode());
 #endif
 
-      // If a screen-off LED/status rail pulse was active, the panel may still
-      // contain the solid alert color. Draw the real UI immediately so shake
-      // wake does not visibly flash the status color before the next frame.
       renderUI();
-
       return;
     }
 
@@ -661,7 +665,7 @@ void appMainLoopTick()
         invalidateBackgroundCache();
         requestUIRedraw();
         renderUI();
-        
+
         input = InputState{};
         clearInputLatch();
         return;
@@ -1305,9 +1309,11 @@ void appMainLoopTick()
   }
 
   // ---------------------------------------------------------------------------
-  // Pet tick (ALWAYS run even if Console is open)
+  // Pet tick (ALWAYS run even if Console is open, but only with a saved pet)
   // ---------------------------------------------------------------------------
-  if (!inDeathFlow)
+  const bool hasLivePet = saveManagerSaveFileExists();
+
+  if (!inDeathFlow && hasLivePet)
   {
     if (isPetSleepingNow())
     {

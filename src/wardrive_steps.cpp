@@ -280,6 +280,11 @@ static void queueWardriveNotice(int infReward, ItemType itemReward)
 
 static void awardWardriveHit()
 {
+  if (!saveManagerSaveFileExists())
+{
+  Serial.println("[WARWALK] hit blocked (no saved pet)");
+  return;
+}
   const int infReward = random(4, 13);
 
   addInf(infReward);
@@ -303,6 +308,9 @@ static void awardWardriveHit()
 
 static void rollWardrive()
 {
+  if (!saveManagerSaveFileExists())
+    return;
+
   if (random(0, 100) < kHitChancePct)
     awardWardriveHit();
 }
