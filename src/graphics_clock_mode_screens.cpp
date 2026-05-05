@@ -28,8 +28,8 @@ void drawClockModeScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
-    const bool hasLivePet = saveManagerSaveFileExists() || pet.getName()[0] != '\0';
-    
+  const bool hasLivePet = saveManagerSaveFileExists();
+
   if (!hasLivePet)
   {
     spr.fillScreen(TFT_BLACK);
@@ -145,7 +145,7 @@ void drawClockModeScreen(bool redrawBg)
   else
   {
     const char *prefix = timeIsDirty() ? "* " : "";
-  
+
     if (settingsUse24HourTime())
     {
       snprintf(timeBuf, sizeof(timeBuf), "%s%02d:%02d", prefix, tmNow.tm_hour, tmNow.tm_min);
@@ -155,7 +155,7 @@ void drawClockModeScreen(bool redrawBg)
       int hour12 = tmNow.tm_hour % 12;
       if (hour12 == 0)
         hour12 = 12;
-  
+
       snprintf(timeBuf, sizeof(timeBuf), "%s%d:%02d", prefix, hour12, tmNow.tm_min);
     }
   }

@@ -32,8 +32,6 @@ static bool s_titleHasImport = false;
 static uint32_t s_titleEnteredMs = 0;
 static bool s_titleActivationArmed = false;
 
-static bool titleHasLivePet() { return saveManagerSaveFileExists() || pet.getName()[0] != '\0'; }
-
 static bool titleHasPendingDeath() { return petDeathEnabled && pet.hunger <= 0 && pet.health <= 0; }
 
 static void refreshTitleMenuAvailability()

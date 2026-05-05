@@ -170,7 +170,6 @@ static const char *LEGACY_SAVE_PATH = "/raising_hell/save/raising_hell.sav";
 static const char *SAVE_BAK1_PATH = "/raising_hell/save/save.bak1";
 static const char *SAVE_BAK2_PATH = "/raising_hell/save/save.bak2";
 static const char *SAVE_BAK3_PATH = "/raising_hell/save/save.bak3";
-static const char *AUTO_HEAL_FALLBACK_PET_NAME = "Bub";
 
 bool saveManagerAutoHeal();
 static const char *NAME_PENDING_FLAG_PATH = "/raising_hell/save/name_pending.flag";
@@ -2034,7 +2033,7 @@ void resetRuntimeToCleanNoSaveState(bool resetName)
   pet = Pet();
   pet.name[0] = '\0';
   pet.petId = 0;
-  
+
   // Clear all sleep/runtime flags
   g_app.isSleeping = false;
   g_app.sleepingByTimer = false;
@@ -2454,17 +2453,7 @@ static bool autoHealLoadedSaveIfNeeded()
   // --------------------------------------------------------------------------
   if (hadBlankPetName)
   {
-    pet.setName(AUTO_HEAL_FALLBACK_PET_NAME);
-
-    if (!isBlankName(pet.name))
-    {
-      Serial.printf("[SAVE][AUTOHEAL] repaired blank pet name -> '%s'\n", pet.name);
-      changed = true;
-    }
-    else
-    {
-      Serial.println("[SAVE][AUTOHEAL] failed to apply fallback pet name");
-    }
+    Serial.println("[SAVE][AUTOHEAL] blank pet name detected; not applying fallback name");
   }
 
   if (namePendingFlagExists() && !isBlankName(pet.name))
