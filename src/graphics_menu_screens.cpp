@@ -292,9 +292,29 @@ void drawTitleMenuScreen(bool redrawBg)
   if (g_sdReady)
     ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
 
-  if (!ok)
+  // Returning TITLE <- PET/onboarding/settings can sometimes leave enough UI
+  // cache pressure that the splash JPG decode fails. Title owns the full frame,
+  // so release large UI caches and retry once before falling back to black.
+  if (!ok && g_sdReady)
+  {
+    Serial.println("[TITLE BG] splash draw failed; releasing UI caches and retrying");
+
+    graphicsReleaseUiCachesForMiniGame();
+
+    spr.clearClipRect();
     spr.fillSprite(TFT_BLACK);
 
+    ok = sprDrawJpgFromSD(PATH_BG_SPLASH, 0, 0);
+
+    Serial.printf("[TITLE BG] retry ok=%d\n", ok ? 1 : 0);
+  }
+
+  if (!ok)
+  {
+    Serial.println("[TITLE BG] splash unavailable; using black fallback");
+    spr.fillSprite(TFT_BLACK);
+  }
+  
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
   const bool hasName = (pet.getName()[0] != '\0');

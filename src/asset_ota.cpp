@@ -496,6 +496,10 @@ static void restoreMainUiSprite()
 
   s_graphicsReleasedForOta = false;
 
+  // The main sprite was destroyed/recreated for OTA. Any cached UI draw state
+  // that was built against the old frame/sprite lifetime must be discarded.
+  graphicsReleaseUiCachesForMiniGame();
+
   invalidateBackgroundCache();
   requestUIRedraw();
   renderUI();

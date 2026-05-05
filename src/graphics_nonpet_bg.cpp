@@ -88,7 +88,10 @@ static bool ensureNonPetTileReady()
 
   if (!ok)
   {
-    s_nonPetTileHardFail = true;
+    // Do not hard-fail forever on a transient SD/decode miss.
+    // Back off retries and fall back to a cheap generated background.
+    s_nonPetTileHardFail = false;
+    s_nonPetTileRetryAfterMs = now + 30000;
 
     static char s_lastNonPetTileFailPath[160] = {0};
 
@@ -111,8 +114,8 @@ static bool ensureNonPetTileReady()
   if (s_nonPetTileReady)
     s_nonPetTileCachedType = desiredType;
 
-    s_nonPetTileHardFail = false;
-    s_nonPetTileRetryAfterMs = 0;
+  s_nonPetTileHardFail = false;
+  s_nonPetTileRetryAfterMs = 0;
 
   if (s_nonPetTileW != NONPET_TILE_W || s_nonPetTileH != NONPET_TILE_H)
   {
@@ -132,7 +135,7 @@ void drawNonPetTabBackground()
     spr.fillScreen(TFT_BLACK);
     return;
   }
-
+    
   for (int y = 0; y < SCREEN_H; y += s_nonPetTileH)
   {
     for (int x = 0; x < SCREEN_W; x += s_nonPetTileW)

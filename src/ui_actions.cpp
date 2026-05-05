@@ -2,6 +2,7 @@
 
 #include "anomaly_manager.h"
 #include "app_state.h"
+#include "graphics.h"
 #include "settings_flow_state.h"
 
 #include "ui_actions.h"
@@ -98,12 +99,18 @@ void uiActionEnterState(UIState state, Tab tab, bool fullRedraw)
 
   const bool enteringPetCacheZone = !usesPetBackgroundCache(prevState, prevTab) && usesPetBackgroundCache(state, tab);
 
-  // Do not release the pet background cache on ordinary tab/menu transitions.
-  // Rebuilding this cache from SD on every return to the pet tab causes visible
-  // flicker if the decode takes more than one frame or transiently fails.
-  // Heavy memory-pressure flows such as OTA/mini-games still release it explicitly.
-  (void)leavingPetCacheZone;
-
+  // TITLE_MENU owns the full frame and decodes a full-screen splash JPG.
+  // Treat entering title as a memory/cache barrier so PET/onboarding/menu
+  // caches cannot starve or contaminate the title background draw.
+  if (state == UIState::TITLE_MENU)
+  {
+    graphicsReleaseUiCachesForMiniGame();
+  }
+  else if (leavingPetCacheZone)
+  {
+    graphicsReleasePetBackgroundCache();
+  }
+  
   if (prevState != state)
     uiStateOnExit(prevState);
 

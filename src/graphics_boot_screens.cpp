@@ -26,6 +26,14 @@ static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_s
 int g_controlsHelpScroll = 0;
 int g_whatsNewScroll = 0;
 
+static void drawHelpFallbackBackground()
+{
+  // Plain safe background for onboarding/help screens.
+  // Do not use drawNonPetTabBackground() here: on first-boot/onboarding flows,
+  // the non-pet tile cache can fail loading and affect the next screen.
+  spr.fillScreen(TFT_BLACK);
+}
+
 int controlsHelpLineHeight(const HelpLine &line)
 {
   switch (line.type)
@@ -99,7 +107,7 @@ static void drawHelpLinesScreen(const HelpLine *lines, int count, int &scroll)
   if (scroll > maxScroll)
     scroll = maxScroll;
 
-  drawNonPetTabBackground();
+  drawHelpFallbackBackground();
 
   const int screenW = SCREEN_W;
   const int screenH = SCREEN_H;
@@ -256,13 +264,13 @@ void drawBootAssetWifiRequiredScreen()
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString("Raising Hell requires an internet ", 10, 32);
   spr.drawString("connection for initial assets", 10, 48);
-  
+
   spr.setTextColor(TFT_GREEN, TFT_BLACK);
   spr.drawString("ENTER: Set up WiFi", 10, 72);
-  
+
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.drawString("ESC: Manual Setup", 10, 88);
-  
+
   spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
   spr.drawString("\\: Console", 10, 110);
 
