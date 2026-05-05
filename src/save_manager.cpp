@@ -2032,7 +2032,9 @@ void resetRuntimeToCleanNoSaveState(bool resetName)
 
   // Completely clear pet runtime
   pet = Pet();
-
+  pet.name[0] = '\0';
+  pet.petId = 0;
+  
   // Clear all sleep/runtime flags
   g_app.isSleeping = false;
   g_app.sleepingByTimer = false;

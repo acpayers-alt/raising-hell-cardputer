@@ -314,9 +314,12 @@ static void drawSettingsTopMenu()
     const int y = startY + row * (itemH + gap);
     const bool sel = (i == g_app.settingsIndex);
 
-    const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
+    const bool hasLivePet = saveManagerSaveFileExists();
+    const bool disabled = ((i == 3 || i == 9) && !hasLivePet);
+
+    const uint16_t outline = disabled ? TFT_DARKGREY : (sel ? uiPillOutline(pet.type) : TFT_DARKGREY);
     const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
-    const uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
+    const uint16_t textCol = disabled ? TFT_DARKGREY : (sel ? TFT_WHITE : TFT_LIGHTGREY);
 
     spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);
     spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);
@@ -383,9 +386,12 @@ static void drawPetSettingsMenu()
     const int y = startY + row * (itemH + gap);
     const bool sel = (i == g_app.petSettingsIndex);
 
-    const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
+    const bool hasLivePet = saveManagerSaveFileExists();
+    const bool disabled = (!hasLivePet && i != 3); // New Pet remains available.
+
+    const uint16_t outline = disabled ? TFT_DARKGREY : (sel ? uiPillOutline(pet.type) : TFT_DARKGREY);
     const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
-    const uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
+    const uint16_t textCol = disabled ? TFT_DARKGREY : (sel ? TFT_WHITE : TFT_LIGHTGREY);
 
     spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);
     spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);

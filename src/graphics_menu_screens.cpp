@@ -283,12 +283,10 @@ void drawTitleMenuScreen(bool redrawBg)
   if (!isScreenOn())
     return;
 
-  // Title splash must draw full-screen no matter what happened previously.
-  // Clear any lingering clip state before drawing the JPG.
+  // Title owns the full frame. Always clear first so returning
+  // PET -> TITLE cannot reuse stale pet/menu pixels.
   spr.clearClipRect();
-
-  if (redrawBg)
-    spr.fillSprite(TFT_BLACK);
+  spr.fillSprite(TFT_BLACK);
 
   bool ok = false;
   if (g_sdReady)
@@ -299,10 +297,9 @@ void drawTitleMenuScreen(bool redrawBg)
 
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
-  const bool hasBirth = (saveManagerGetBirthEpoch() != 0);
   const bool hasName = (pet.getName()[0] != '\0');
-  const bool hasRuntimePet = hasName;
-  
+  const bool hasRuntimePet = hasSave && hasName;
+
   char row0Buf[80];
   if (hasRuntimePet)
   {
@@ -320,7 +317,7 @@ void drawTitleMenuScreen(bool redrawBg)
 
     snprintf(row0Buf, sizeof(row0Buf), "%s - lvl %u %s", pet.getName(), (unsigned)pet.level, typePretty);
   }
-  else if (hasSave && hasBirth)
+  else if (hasSave)
   {
     // Runtime state is partially present but the name is missing.
     // Show a more specific fallback so row 0 never goes "mysteriously blank."
@@ -338,11 +335,7 @@ void drawTitleMenuScreen(bool redrawBg)
 
     snprintf(row0Buf, sizeof(row0Buf), "(unnamed) - lvl %u %s", (unsigned)pet.level, typePretty);
   }
-  else if (hasSave)
-  {
-    snprintf(row0Buf, sizeof(row0Buf), "Continue");
-  }
-  else
+    else
   {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }

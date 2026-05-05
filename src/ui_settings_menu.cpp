@@ -213,6 +213,8 @@ static void actGame_TogglePetPerfHud(InputState &)
 
 static bool enConsole() { return true; }
 
+static bool enHasLivePet() { return saveManagerSaveFileExists(); }
+
 static void actTop_Console(InputState &input)
 {
   openConsoleWithReturn(UIState::SETTINGS, g_app.currentTab, true, g_settingsFlow.settingsPage);
@@ -659,6 +661,14 @@ static void actGame_ToggleLedAlerts(InputState &)
 
 static void actPet_RenamePet(InputState &input)
 {
+  if (!saveManagerSaveFileExists())
+  {
+    ui_showMessage("No pet loaded");
+    soundError();
+    requestUIRedraw();
+    clearInputLatch();
+    return;
+  }
   strncpy(g_pendingPetName, pet.getName(), PET_NAME_MAX);
   g_pendingPetName[PET_NAME_MAX] = '\0';
 
@@ -799,11 +809,11 @@ static void actSystem_OpenWifi(InputState &input)
 }
 
 static MenuItem kSystemItems[] = {
-  {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
-  {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
-  {"24 Hour Time", actSystem_Toggle24Hour, nullptr, nullptr, nullptr},
-  {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
-  {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
+    {"Set Time", actSystem_SetTime, nullptr, nullptr, nullptr},
+    {"Time Zone", actSystem_TimeZoneSelect, actSystem_TimeZoneLeft, actSystem_TimeZoneRight, nullptr},
+    {"24 Hour Time", actSystem_Toggle24Hour, nullptr, nullptr, nullptr},
+    {"System Status", actTop_OpenStatus, nullptr, nullptr, nullptr},
+    {"Factory Reset", nullptr, nullptr, nullptr, nullptr}, // handled by hookSystem()
 };
 
 // ------------------------------------------------------------
@@ -813,13 +823,13 @@ static MenuItem kTopItems[] = {
     {"Care Guide", actTop_Controls, nullptr, nullptr, nullptr},
     {"Volume", actTop_VolumeSelect, actTop_VolumeLeft, actTop_VolumeRight, nullptr},
     {"WiFi Settings", actTop_OpenWifi, nullptr, nullptr, nullptr},
-    {"Pet Options", actTop_OpenPet, nullptr, nullptr, nullptr},
+    {"Pet Options", actTop_OpenPet, nullptr, nullptr, enHasLivePet},
     {"Game Options", actTop_OpenGame, nullptr, nullptr, nullptr},
     {"Screen Settings", actTop_OpenScreen, nullptr, nullptr, nullptr},
     {"System Settings", actTop_OpenSystem, nullptr, nullptr, nullptr},
     {"Console", actTop_Console, nullptr, nullptr, enConsole},
     {"Credits", actTop_Credits, nullptr, nullptr, nullptr},
-    {"Store Pet", actPet_StorePet, nullptr, nullptr, nullptr},
+    {"Store Pet", actPet_StorePet, nullptr, nullptr, enHasLivePet},
     {"Main Menu", actTop_MainMenu, nullptr, nullptr, nullptr},
 };
 
@@ -845,9 +855,9 @@ static MenuItem kWifiItems[] = {
 };
 
 static MenuItem kPetItems[] = {
-    {"Rename Pet", actPet_RenamePet, nullptr, nullptr, nullptr},
-    {"Backup Current Pet", actPet_BackupCurrentPet, nullptr, nullptr, nullptr},
-    {"Restore From Backup", actPet_RestoreFromBackup, nullptr, nullptr, nullptr},
+    {"Rename Pet", actPet_RenamePet, nullptr, nullptr, enHasLivePet},
+    {"Backup Current Pet", actPet_BackupCurrentPet, nullptr, nullptr, enHasLivePet},
+    {"Restore From Backup", actPet_RestoreFromBackup, nullptr, nullptr, enHasLivePet},
     {"New Pet", actPet_NewPet, nullptr, nullptr, nullptr},
 };
 
