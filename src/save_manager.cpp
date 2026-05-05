@@ -85,6 +85,10 @@ void resetRuntimeToCleanNoSaveState(bool resetName);
 static bool isFinalBubFilename(const char *nm);
 static uint32_t s_lastExportListHash = 0;
 static bool isBlankName(const char *name);
+static uint32_t s_lastSettingsSaveMs = 0;
+static const uint32_t SETTINGS_DEBOUNCE_MS = 5000;
+static uint32_t s_lastGameOptSaveMs = 0;
+static const uint32_t GAMEOPT_DEBOUNCE_MS = 5000;
 
 static uint32_t hashExportEntry(const PetExportEntry &e)
 {
@@ -1078,6 +1082,12 @@ static bool loadGameOptionsFromSD_internal()
 
 static bool saveGameOptionsToSD_internal()
 {
+  const uint32_t now = millis();
+if (now - s_lastGameOptSaveMs < GAMEOPT_DEBOUNCE_MS)
+  return true;
+
+s_lastGameOptSaveMs = now;
+
   if (!g_sdReady)
     return false;
   if (!ensureSaveDir())
@@ -1943,6 +1953,17 @@ static bool loadSettingsFromSD_internal(bool *outLoadedOld)
 
 static bool saveSettingsToSD_internal()
 {
+  const uint32_t now = millis();
+
+  if (now - s_lastSettingsSaveMs < SETTINGS_DEBOUNCE_MS)
+  {
+    if (supportLoggingEnabled())
+      Serial.println("[WIFI SAVE] skipped (debounce)");
+    return true;
+  }
+
+  s_lastSettingsSaveMs = now;
+
   if (!g_sdReady)
     return false;
   if (!ensureSaveDir())
@@ -2839,6 +2860,11 @@ void saveManagerTick()
     DBG_ON("[SAVE] TICK dirty but SD not ready\n");
     return;
   }
+
+  // Do not let SD writes hitch active mini-game frames or reward screens.
+  // Dirty state remains dirty and will save after the game exits.
+  if (g_app.uiState == UIState::MINI_GAME || g_app.uiState == UIState::MG_PAUSE || g_app.inMiniGame)
+    return;
 
   const uint32_t now = millis();
   if (now - lastSaveMs < DEBOUNCE_MS)

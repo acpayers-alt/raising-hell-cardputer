@@ -59,6 +59,7 @@ static bool s_flappyBgReady = false;
 static bool s_flappyBgLoadFailed = false;
 static char s_flappyBgPath[160] = {0};
 static const char *flappyBgPathForPet();
+static int s_lastBgScrollX = -1;
 
 // FIREBALL
 static int s_flappyFireballW = 0;
@@ -357,7 +358,6 @@ static int flappyRandGapY(int h)
 static void flappyResetWorld(int w, int h)
 {
   s_flappyPlaying = true;
-
   s_flappyDistancePx = 0;
 
   s_fbX = 52;
@@ -599,7 +599,6 @@ void startFlappyFireball()
 
   freeFlappyPipeSprites();
   freeFlappyFireballSprites();
-  freeImpWaveSprites();
   mgmem::logUsage("flappy-after-sprite-free");
 
   const bool pipeOk = ensureFlappyPipeSprites(bgPath);
@@ -708,6 +707,9 @@ static void flappyStep(int w, int h, bool flap)
   const int pipeW = 26;
   const int speedX = 1;
 
+  // Keep gameplay speed the same, but scroll the tiled background every other
+  // physics step. Flappy's 79px-wide repeated bg is one of the heaviest parts
+  // of the frame, so reducing visual bg churn helps frame pacing.
   s_flappyBgScrollX += speedX;
   s_flappyDistancePx += speedX;
 
@@ -1236,9 +1238,6 @@ void drawFlappyFireball()
 
   if (!s_impHit)
   {
-    if ((!s_flappyFireball1Spr || !s_flappyFireball2Spr || !s_flappyFireball3Spr) && s_flappyBgPath[0])
-      ensureFlappyFireballSprites(s_flappyBgPath);
-
     M5Canvas *fbFrames[3] = {s_flappyFireball1Spr, s_flappyFireball2Spr, s_flappyFireball3Spr};
 
     if (fbFrames[0] && fbFrames[1] && fbFrames[2])

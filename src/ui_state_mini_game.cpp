@@ -50,8 +50,9 @@ return;
   }
 
   updateMiniGame(in);
-  drawMiniGame();
-
+  // drawMiniGame();  // Do not draw directly here.
+                    // updateMiniGame() requests redraw; renderUI() owns drawing.
+                    
   if (mgPauseIsPaused())
   {
     uiActionEnterStateClean(UIState::MG_PAUSE, g_app.currentTab, false, in, 150);

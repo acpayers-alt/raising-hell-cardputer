@@ -14,9 +14,11 @@ static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/
 static M5Canvas s_nonPetTile(&M5.Display);
 static bool s_nonPetTileReady = false;
 static bool s_nonPetTileHardFail = false;
+static uint32_t s_nonPetTileRetryAfterMs = 0;
 static int s_nonPetTileW = 0;
 static int s_nonPetTileH = 0;
 static PetType s_nonPetTileCachedType = (PetType)255;
+
 static constexpr int NONPET_TILE_W = 35;
 static constexpr int NONPET_TILE_H = 70;
 
@@ -34,7 +36,12 @@ static inline const char *nonPetTilePathForPet(PetType t)
 
 static bool ensureNonPetTileReady()
 {
+  const uint32_t now = millis();
+
   if (s_nonPetTileHardFail)
+    return false;
+
+  if (s_nonPetTileRetryAfterMs != 0 && now < s_nonPetTileRetryAfterMs)
     return false;
 
   const PetType desiredType = pet.type;
@@ -57,7 +64,15 @@ static bool ensureNonPetTileReady()
   s_nonPetTile.setColorDepth(16);
   if (!s_nonPetTile.createSprite(NONPET_TILE_W, NONPET_TILE_H))
   {
-    Serial.println("[NONPET TILE] createSprite failed");
+    s_nonPetTileRetryAfterMs = now + 30000;
+
+    static uint32_t s_lastCreateFailLogMs = 0;
+    if (now - s_lastCreateFailLogMs > 5000)
+    {
+      Serial.println("[NONPET TILE] createSprite failed; retry delayed");
+      s_lastCreateFailLogMs = now;
+    }
+
     return false;
   }
 
@@ -96,7 +111,8 @@ static bool ensureNonPetTileReady()
   if (s_nonPetTileReady)
     s_nonPetTileCachedType = desiredType;
 
-  s_nonPetTileHardFail = false;
+    s_nonPetTileHardFail = false;
+    s_nonPetTileRetryAfterMs = 0;
 
   if (s_nonPetTileW != NONPET_TILE_W || s_nonPetTileH != NONPET_TILE_H)
   {
@@ -131,6 +147,7 @@ void graphicsReleaseNonPetTileCache()
   s_nonPetTile.deleteSprite();
   s_nonPetTileReady = false;
   s_nonPetTileHardFail = false;
+  s_nonPetTileRetryAfterMs = 0;
   s_nonPetTileW = 0;
   s_nonPetTileH = 0;
   s_nonPetTileCachedType = (PetType)255;
