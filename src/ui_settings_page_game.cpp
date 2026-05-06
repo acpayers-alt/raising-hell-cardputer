@@ -72,19 +72,32 @@ bool HandleGameNewPetConfirm(InputState &input)
   {
     const bool storeFirst = (s_newPetConfirmIndex == 0);
 
-    if (storeFirst)
+    if (storeFirst && saveManagerSaveFileExists())
     {
-      char parkedPath[128];
-      if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
+      char boxedPath[128] = {0};
+
+      if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
       {
-        playBeep();
+        soundError();
         ui_showMessage("Store failed");
+        Serial.println("[UI] Legacy New Pet Store Current FAILED");
         s_newPetConfirmActive = false;
         requestUIRedraw();
         clearInputLatch();
         return true;
       }
+
+      Serial.printf("[UI] Legacy New Pet Store Current OK path=%s\n", boxedPath);
     }
+    else
+    {
+      saveManagerDeletePetOnly();
+    }
+
+    resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+    g_app.newPetFlowActive = false;
+    saveManagerClearNamePendingFlag();
+    saveManagerClearSleepPendingFlag();
 
     s_newPetConfirmActive = false;
     playBeep();

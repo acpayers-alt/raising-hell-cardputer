@@ -31,6 +31,68 @@ static int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
 static bool s_returnToSettings = false;
 static SettingsPage s_returnPage = SettingsPage::TOP;
 
+static PetExportEntry s_storeCurrentEntry{};
+
+static bool shouldShowStoreCurrentRow() { return saveManagerSaveFileExists(); }
+
+static int totalImportRows() { return s_entryCount + (shouldShowStoreCurrentRow() ? 1 : 0); }
+
+static bool isStoreCurrentRow(int index) { return shouldShowStoreCurrentRow() && index == s_entryCount; }
+
+static void currentPetIdHex(char *out, size_t outSize)
+{
+  if (!out || outSize == 0)
+    return;
+
+  out[0] = '\0';
+
+  if (pet.petId == 0)
+    return;
+
+  snprintf(out, outSize, "%llx", (unsigned long long)pet.petId);
+}
+
+static void filterLoadedPetFromEntries()
+{
+  if (!saveManagerSaveFileExists())
+    return;
+
+  char liveId[24];
+  currentPetIdHex(liveId, sizeof(liveId));
+
+  if (!liveId[0])
+    return;
+
+  int write = 0;
+  for (int read = 0; read < s_entryCount; ++read)
+  {
+    // Only filter valid entries with matching pet IDs. Corrupt files should
+    // remain visible so the user can delete them.
+    if (s_entries[read].valid && s_entries[read].petId[0] && strcasecmp(s_entries[read].petId, liveId) == 0)
+    {
+      continue;
+    }
+
+    if (write != read)
+      s_entries[write] = s_entries[read];
+
+    ++write;
+  }
+
+  s_entryCount = write;
+}
+
+static void refreshImportEntries()
+{
+  s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
+  filterLoadedPetFromEntries();
+
+  memset(&s_storeCurrentEntry, 0, sizeof(s_storeCurrentEntry));
+  strncpy(s_storeCurrentEntry.name, "Store Current Pet", sizeof(s_storeCurrentEntry.name) - 1);
+  strncpy(s_storeCurrentEntry.petType, "CURRENT", sizeof(s_storeCurrentEntry.petType) - 1);
+  s_storeCurrentEntry.valid = true;
+}
+
 static void swallowImportInput(InputState &in)
 {
   while (in.kbHasEvent())
@@ -69,7 +131,7 @@ void openImportPetListFromTitle(InputState &in)
 
 void uiImportPetListOnEnter(InputState &in)
 {
-  s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
+  refreshImportEntries();
 
   const int invalidCount = saveManagerLastExportScanInvalidCount();
 
@@ -84,7 +146,7 @@ void uiImportPetListOnEnter(InputState &in)
   if (!s_returnToSettings)
     s_returnPage = SettingsPage::TOP;
 
-  if (s_entryCount <= 0)
+  if (totalImportRows() <= 0)
   {
     if (invalidCount > 0)
     {
@@ -133,8 +195,8 @@ void uiImportPetListHandle(InputState &in)
           playBeep();
           ui_showSuccessMessage("Stored Pet Deleted");
 
-          s_entryCount = saveManagerListPetExports(s_entries, kMaxPetExports);
-          if (s_entryCount <= 0)
+          refreshImportEntries();
+          if (totalImportRows() <= 0)
           {
             s_importIndex = 0;
             s_windowStart = 0;
@@ -188,9 +250,11 @@ void uiImportPetListHandle(InputState &in)
     if (move != 0)
     {
       s_actionIndex += move;
+      const int actionMax = isStoreCurrentRow(s_importIndex) ? 1 : 2;
+
       if (s_actionIndex < 0)
-        s_actionIndex = 2;
-      if (s_actionIndex > 2)
+        s_actionIndex = actionMax;
+      if (s_actionIndex > actionMax)
         s_actionIndex = 0;
 
       playBeep();
@@ -202,6 +266,50 @@ void uiImportPetListHandle(InputState &in)
     if (in.selectOnce || in.encoderPressOnce)
     {
       playBeep();
+
+      if (isStoreCurrentRow(s_importIndex))
+      {
+        if (s_actionIndex == 0)
+        {
+          char boxedPath[128] = {0};
+
+          if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
+          {
+            soundError();
+            ui_showMessage("Store failed");
+            Serial.println("[IMPORT LIST] Store Current Pet FAILED");
+            s_actionMenuActive = false;
+            s_actionIndex = 0;
+            requestUIRedraw();
+            swallowImportInput(in);
+            return;
+          }
+
+          Serial.printf("[IMPORT LIST] Store Current Pet OK path=%s\n", boxedPath);
+
+          resetRuntimeToCleanNoSaveState(/*resetName=*/true);
+          g_app.newPetFlowActive = false;
+          saveManagerClearNamePendingFlag();
+          saveManagerClearSleepPendingFlag();
+
+          s_actionMenuActive = false;
+          s_actionIndex = 0;
+          refreshImportEntries();
+
+          ui_showSuccessMessage("Pet Stored");
+          uiActionEnterStateClean(UIState::TITLE_MENU, Tab::TAB_PET, true, in, 120);
+          requestFullUIRedraw();
+          swallowImportInput(in);
+          return;
+        }
+
+        // Cancel
+        s_actionMenuActive = false;
+        s_actionIndex = 0;
+        requestFullUIRedraw();
+        swallowImportInput(in);
+        return;
+      }
 
       if (s_actionIndex == 0)
       {
@@ -236,7 +344,7 @@ void uiImportPetListHandle(InputState &in)
           else
           {
             char importedPath[128];
-            if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), false))
+            if (saveManagerImportBubAtPath(s_entries[s_importIndex].path, importedPath, sizeof(importedPath), true))
             {
               playBeep();
               s_returnToSettings = false;
@@ -397,12 +505,14 @@ void uiImportPetListHandle(InputState &in)
   if (in.downOnce || in.rightOnce || in.encoderDelta > 0)
     move = +1;
 
-  if (move != 0 && s_entryCount > 0)
+  const int rowCount = totalImportRows();
+
+  if (move != 0 && rowCount > 0)
   {
     s_importIndex += move;
     if (s_importIndex < 0)
-      s_importIndex = s_entryCount - 1;
-    if (s_importIndex >= s_entryCount)
+      s_importIndex = rowCount - 1;
+    if (s_importIndex >= rowCount)
       s_importIndex = 0;
 
     if (s_importIndex < s_windowStart)
@@ -446,7 +556,7 @@ void uiImportPetListHandle(InputState &in)
     return;
   }
 
-  if (s_entryCount <= 0)
+  if (totalImportRows() <= 0)
   {
     playBeep();
     swallowImportInput(in);
@@ -459,22 +569,42 @@ void uiImportPetListHandle(InputState &in)
   swallowImportInput(in);
 }
 
-int uiImportPetListCount() { return s_entryCount; }
+int uiImportPetListCount() { return totalImportRows(); }
 
 int uiImportPetListVisibleCount()
 {
-  const int remaining = s_entryCount - s_windowStart;
+  const int remaining = totalImportRows() - s_windowStart;
+
   return (remaining <= 0) ? 0 : ((remaining < kVisibleRows) ? remaining : kVisibleRows);
 }
 
 int uiImportPetListWindowStart() { return s_windowStart; }
 
-const PetExportEntry &uiImportPetListGetVisible(int idx) { return s_entries[s_windowStart + idx]; }
+const PetExportEntry &uiImportPetListGetVisible(int idx)
+{
+  const int absolute = s_windowStart + idx;
+
+  if (isStoreCurrentRow(absolute))
+    return s_storeCurrentEntry;
+
+  return s_entries[absolute];
+}
 
 int uiImportPetListSelected() { return s_importIndex; }
 
 bool uiImportPetListActionMenuActive() { return s_actionMenuActive; }
 int uiImportPetListActionIndex() { return s_actionIndex; }
+
+bool uiImportPetListSelectedIsStoreCurrent()
+{
+  return isStoreCurrentRow(s_importIndex);
+}
+
+bool uiImportPetListVisibleIsStoreCurrent(int visibleIndex)
+{
+  const int absolute = s_windowStart + visibleIndex;
+  return isStoreCurrentRow(absolute);
+}
 
 bool uiImportPetListConfirmDeleteActive() { return s_confirmDeleteActive; }
 int uiImportPetListConfirmDeleteIndex() { return s_confirmDeleteIndex; }

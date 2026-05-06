@@ -2,8 +2,8 @@
 #include "graphics.h"
 #include <M5GFX.h>
 
-#include "asset_ota.h"
 #include "app_state.h"
+#include "asset_ota.h"
 #include "pet.h"
 #include "save_manager.h"
 #include "ui_defs.h"
@@ -33,17 +33,17 @@ static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_s
 bool isScreenOn();
 
 static void drawTitleMenuText(M5Canvas &dst, const char *text, int x, int y, uint8_t font, uint16_t fg,
-  textdatum_t datum)
+                              textdatum_t datum)
 {
-if (!text || !*text)
-return;
+  if (!text || !*text)
+    return;
 
-dst.setTextFont(font);
-dst.setTextSize(1);
-dst.setTextDatum(datum);
-dst.setTextColor(fg);
-dst.drawString(text, x, y, font);
-dst.setTextDatum(TL_DATUM);
+  dst.setTextFont(font);
+  dst.setTextSize(1);
+  dst.setTextDatum(datum);
+  dst.setTextColor(fg);
+  dst.drawString(text, x, y, font);
+  dst.setTextDatum(TL_DATUM);
 }
 
 void drawImportPetListScreen(bool redrawBg)
@@ -72,16 +72,23 @@ void drawImportPetListScreen(bool redrawBg)
   if (uiImportPetListActionMenuActive())
   {
     const int idx = uiImportPetListActionIndex();
-    const char *items[3] = {"Retrieve", "Delete", "Cancel"};
+    const bool storeCurrent = uiImportPetListSelectedIsStoreCurrent();
+
+    const char *normalItems[3] = {"Retrieve", "Delete", "Cancel"};
+    const char *storeItems[2] = {"Store", "Cancel"};
 
     spr.setTextDatum(TC_DATUM);
     spr.setTextColor(TFT_WHITE);
-    spr.drawString("Stored Pet Options", SCREEN_W / 2, 24, 2);
+    spr.drawString(storeCurrent ? "Current Pet Options" : "Stored Pet Options", SCREEN_W / 2, 24, 2);
 
-    for (int i = 0; i < 3; ++i)
+    const int itemCount = storeCurrent ? 2 : 3;
+
+    for (int i = 0; i < itemCount; ++i)
     {
+      const char *label = storeCurrent ? storeItems[i] : normalItems[i];
+
       spr.setTextColor(i == idx ? TFT_YELLOW : TFT_WHITE);
-      spr.drawString(items[i], SCREEN_W / 2, 52 + (i * 18), 2);
+      spr.drawString(label, SCREEN_W / 2, 52 + (i * 18), 2);
     }
     return;
   }
@@ -106,9 +113,19 @@ void drawImportPetListScreen(bool redrawBg)
   {
     const int y = startY + (i * rowH);
     const bool selected = ((windowStart + i) == selectedIdx);
+    const bool storeCurrentRow = uiImportPetListVisibleIsStoreCurrent(i);
     const PetExportEntry &e = uiImportPetListGetVisible(i);
 
+    if (storeCurrentRow)
+    {
+      spr.setTextDatum(TL_DATUM);
+      spr.setTextColor(selected ? TFT_YELLOW : TFT_WHITE);
+      spr.drawString("Store Current Pet", 6, y, 2);
+      continue;
+    }
+
     bool isCurrent = false;
+
     if (pet.getName()[0] && strcmp(e.name, pet.getName()) == 0)
     {
       isCurrent = true;
@@ -314,7 +331,7 @@ void drawTitleMenuScreen(bool redrawBg)
     Serial.println("[TITLE BG] splash unavailable; using black fallback");
     spr.fillSprite(TFT_BLACK);
   }
-  
+
   const bool hasSave = uiTitleMenuHasSave();
   const bool hasImport = uiTitleMenuHasImport();
   const bool hasName = (pet.getName()[0] != '\0');
@@ -355,7 +372,7 @@ void drawTitleMenuScreen(bool redrawBg)
 
     snprintf(row0Buf, sizeof(row0Buf), "(unnamed) - lvl %u %s", (unsigned)pet.level, typePretty);
   }
-    else
+  else
   {
     snprintf(row0Buf, sizeof(row0Buf), "New Pet");
   }
@@ -414,7 +431,7 @@ void drawTitleMenuScreen(bool redrawBg)
     drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, fg, textdatum_t::top_center);
   }
 
-  #if !PUBLIC_BUILD
+#if !PUBLIC_BUILD
   const char *assetVer = assetOtaInstalledVersion();
   const AssetOtaChannel ch = (AssetOtaChannel)assetOtaGetConfig().channel;
 
