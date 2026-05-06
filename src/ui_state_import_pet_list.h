@@ -28,6 +28,8 @@ const PetExportEntry &uiImportPetListGetVisible(int idx);
 // ─────────────────────────────────────
 bool uiImportPetListActionMenuActive();
 int  uiImportPetListActionIndex();
+bool uiImportPetListSelectedIsStoreCurrent();
+bool uiImportPetListVisibleIsStoreCurrent(int visibleIndex);
 
 // ─────────────────────────────────────
 // Delete confirmation state
