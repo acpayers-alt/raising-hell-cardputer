@@ -1175,18 +1175,33 @@ bool Handle(InputState &input, int move)
 
       if (storeFirst && saveManagerSaveFileExists())
       {
-        char parkedPath[128];
-        if (!saveManagerExportCurrentBubJson(parkedPath, sizeof(parkedPath)))
+        char boxedPath[128] = {0};
+
+        if (!saveManagerBoxCurrentPet(boxedPath, sizeof(boxedPath)))
         {
-          playBeep();
+          soundError();
           ui_showMessage("Store failed");
+          Serial.println("[UI] New Pet Store Current FAILED");
           UiSettingsPages::HideGameNewPetConfirm();
           requestUIRedraw();
           clearInputLatch();
           return true;
         }
+
+        Serial.printf("[UI] New Pet Store Current OK path=%s\n", boxedPath);
+      }
+      else
+      {
+        // User chose not to store current pet first.
+        saveManagerDeletePetOnly();
       }
 
+      UiSettingsPages::HideGameNewPetConfirm();
+      playBeep();
+
+      // Box/store already removes the live save when storeFirst is true.
+      // Otherwise saveManagerDeletePetOnly() handled removal above.
+      
       UiSettingsPages::HideGameNewPetConfirm();
       playBeep();
 
