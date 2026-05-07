@@ -9,7 +9,7 @@ Raise your infernal companion through multiple life stages, feed it, play mini-g
 ![Platform](https://img.shields.io/badge/platform-Cardputer%20ADV-orange)
 ![License](https://img.shields.io/github/license/acpayers-alt/raising-hell-cardputer)
 
-[![Watch the teaser](docs/media/teaser_preview.gif)](https://youtu.be/Lb_xnsyJyCY)
+[![Watch the teaser](media/teaser_preview.gif)](https://youtu.be/Lb_xnsyJyCY)
 
 ## Community
 
