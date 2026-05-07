@@ -93,12 +93,18 @@ static void refreshImportEntries()
   s_storeCurrentEntry.valid = true;
 }
 
-static void swallowImportInput(InputState &in)
+static void swallowImportInput(InputState &in, bool deferredClear = false)
 {
   while (in.kbHasEvent())
     (void)in.kbPop();
+
   in.clearEdges();
-  inputForceClear();
+
+  // Do not schedule a next-frame force clear for ordinary list/menu actions.
+  // That can swallow a fast follow-up Enter after moving selection.
+  if (deferredClear)
+    inputForceClear();
+
   clearInputLatch();
 }
 
@@ -160,7 +166,7 @@ void uiImportPetListOnEnter(InputState &in)
     }
   }
 
-  swallowImportInput(in);
+  swallowImportInput(in, true);
   requestFullUIRedraw();
 }
 
@@ -595,10 +601,7 @@ int uiImportPetListSelected() { return s_importIndex; }
 bool uiImportPetListActionMenuActive() { return s_actionMenuActive; }
 int uiImportPetListActionIndex() { return s_actionIndex; }
 
-bool uiImportPetListSelectedIsStoreCurrent()
-{
-  return isStoreCurrentRow(s_importIndex);
-}
+bool uiImportPetListSelectedIsStoreCurrent() { return isStoreCurrentRow(s_importIndex); }
 
 bool uiImportPetListVisibleIsStoreCurrent(int visibleIndex)
 {
