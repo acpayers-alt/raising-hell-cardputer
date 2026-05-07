@@ -7,6 +7,8 @@
 
 #include "sdcard.h"
 
+#include <WiFi.h>
+
 bool launcherImportWifiCreds(String &outSsid, String &outPwd)
 {
   outSsid = "";
@@ -140,4 +142,41 @@ bool launcherImportWifiCreds(String &outSsid, String &outPwd)
       
   Serial.println("[WIFI] launcher wifi array had no valid ssid/pwd entries");
   return false;
+}
+
+bool launcherWifiSsidVisible(const char *ssid)
+{
+  if (!ssid || !ssid[0])
+    return false;
+
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.disconnect(false, false);
+  WiFi.scanDelete();
+  delay(150);
+
+  Serial.printf("[WIFI] scan for imported SSID '%s'\n", ssid);
+
+  const int n = WiFi.scanNetworks(false, true);
+
+  bool found = false;
+
+  if (n > 0)
+  {
+    for (int i = 0; i < n; ++i)
+    {
+      String seen = WiFi.SSID(i);
+      if (seen == ssid)
+      {
+        found = true;
+        break;
+      }
+    }
+  }
+
+  WiFi.scanDelete();
+
+  Serial.printf("[WIFI] imported SSID visible=%d n=%d ssid='%s'\n", found ? 1 : 0, n, ssid);
+  return found;
 }

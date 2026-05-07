@@ -1441,10 +1441,23 @@ void postBootInitTick()
       if (launcherImportWifiCreds(importedSsid, importedPwd))
       {
         Serial.printf("[BOOTPIPE] launcher creds found for SSID: %s\n", importedSsid.c_str());
-        wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-        bootWifiSetImportedInfo(importedSsid.c_str());
-        uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
-        return;
+
+        ui_showMessage("Importing WiFi...");
+        requestUIRedraw();
+        renderUI();
+
+        if (!launcherWifiSsidVisible(importedSsid.c_str()))
+        {
+          Serial.printf("[BOOTPIPE] imported SSID not visible; entering BOOT_WIFI_PROMPT ssid='%s'\n",
+                        importedSsid.c_str());
+        }
+        else
+        {
+          wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+          bootWifiSetImportedInfo(importedSsid.c_str());
+          uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
+          return;
+        }
       }
 
       Serial.println("[BOOTPIPE] no stored wifi creds and no launcher import; entering BOOT_WIFI_PROMPT");
