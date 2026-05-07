@@ -9,7 +9,7 @@ Raise your infernal companion through multiple life stages, feed it, play mini-g
 ![Platform](https://img.shields.io/badge/platform-Cardputer%20ADV-orange)
 ![License](https://img.shields.io/github/license/acpayers-alt/raising-hell-cardputer)
 
-![Raising Hell](media/rh_multicards.JPG)
+[![Watch the teaser](docs/media/teaser_preview.gif)](https://youtu.be/Lb_xnsyJyCY)
 
 ## Community
 
@@ -381,7 +381,7 @@ If you build this, fork it, improve it, or port it — I’d love to see it.
 ------------------------------------------------------------
 Screenshots
 ------------------------------------------------------------
-
+![Raising Hell](media/rh_multicards.JPG)
 ![Raising Hell](media/Raising_Hell_Credits.JPG)
 ![Choose Your Pet](media/Raising_Hell_Choose.JPG)
 ![Hatch Your Pet](media/Raising_Hell_Hatch.JPG)
