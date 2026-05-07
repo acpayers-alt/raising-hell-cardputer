@@ -74,12 +74,15 @@ bool bootMarkFirmwareSeenAndRequestProvisionIfChanged()
     requestAssetProvisionOnNextBoot();
 
     if (!bootFirmwareMarkerWrite(currentBuildId.c_str()))
-      Serial.println("[BOOT][FW] failed to store current build id");
+    {
+      Serial.println("[BOOT][FW] failed to store current build id; not re-arming one-shot upgrade UI");
+      return false;
+    }
   }
   else
   {
     if (supportLoggingEnabled())
-    Serial.printf("[BOOT][FW] build unchanged id='%s'\n", currentBuildId.c_str());
+      Serial.printf("[BOOT][FW] build unchanged id='%s'\n", currentBuildId.c_str());
   }
 
   return changed;

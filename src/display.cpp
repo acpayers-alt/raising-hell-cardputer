@@ -49,29 +49,9 @@ static uint8_t s_lastUserBrightnessLevel = 1;
 
 static int sanitizeBatteryPercent(int pct)
 {
-<<<<<<< HEAD
   if (pct < 0)
     return -1;
   if (pct > 100)
-=======
-  struct Point
-  {
-    int mv;
-    int pct;
-  };
-
-  // Cardputer ADV reports battery voltage lower than the original Cardputer.
-  // Field data shows a full ADV pack can report around ~4.04V and appear
-  // roughly 20% low with the old curve. Keep 0% aligned near the real boot/
-  // protection floor so the UI does not sit at 0% for hours.
-  static const Point kCurve[] = {
-      {4050, 100}, {4025, 96}, {4000, 92}, {3975, 88}, {3950, 83}, {3925, 78}, {3900, 73}, {3875, 67}, {3850, 61},
-      {3825, 55},  {3800, 49}, {3775, 43}, {3750, 37}, {3725, 31}, {3700, 26}, {3675, 21}, {3650, 17}, {3625, 13},
-      {3600, 10},  {3550, 7},  {3500, 5},  {3450, 3},  {3400, 2},  {3350, 1},  {3300, 0},
-  };
-
-  if (mv >= kCurve[0].mv)
->>>>>>> dev/3.0.0
     return 100;
   return pct;
 }

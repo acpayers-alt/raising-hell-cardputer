@@ -1046,11 +1046,12 @@ static void finalizeBootLanding()
   // ------------------------------------------------------------
   if (g_postProvisionControlsHelpPending)
   {
-    g_postProvisionControlsHelpPending = false;
+    bootPostProvisionControlsHelpClear();
 
     // Re-arm the full onboarding pair, not just controls help.
     g_controlsHelpSeen = 0;
     g_whatsNewSeen = 0;
+    saveSettingsToSD();
   }
 
   if (s_bootFinalLandingState == UIState::TITLE_MENU)
