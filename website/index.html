@@ -2,35 +2,88 @@
 <html>
 <head>
   <title>Raising Hell</title>
+
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <link rel="icon" type="image/png" href="favicon.png">
- <style>
+
+  <style>
     body {
       background: #000;
       color: #fff;
       font-family: monospace;
       text-align: center;
-      padding: 40px;
+      padding: 40px 20px;
+      margin: 0;
     }
+
+    h1 {
+      font-size: 3em;
+      margin-bottom: 10px;
+    }
+
+    p {
+      line-height: 1.6;
+      max-width: 700px;
+      margin: 20px auto;
+    }
+
+    .buttons {
+      margin-top: 30px;
+      margin-bottom: 40px;
+    }
+
     a {
       color: #fff;
       display: inline-block;
       margin: 10px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       border: 1px solid #fff;
       text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    a:hover {
+      background: #fff;
+      color: #000;
+    }
+
+    video {
+      width: 100%;
+      max-width: 900px;
+      margin-top: 30px;
+      border: 1px solid #222;
+    }
+
+    .tagline {
+      margin-top: 40px;
+      opacity: 0.8;
     }
   </style>
 </head>
+
 <body>
 
 <h1>Raising Hell</h1>
-<p>A strange little virtual pet for the M5Stack Cardputer.</p>
 
-<a href="https://github.com/acpayers-alt/raising-hell-cardputer">Download</a>
-<a href="https://discord.gg/RH7dwZqaxV">Join Discord</a>
+<p>
+A strange little virtual pet for the M5Stack Cardputer.
+</p>
 
-<p>Take care of your pet.<br>Or don’t.<br>It will remember</p>
+<div class="buttons">
+  <a href="https://github.com/acpayers-alt/raising-hell-cardputer">Download</a>
+  <a href="https://discord.gg/RH7dwZqaxV">Join Discord</a>
+</div>
+
+<video autoplay muted loop playsinline controls>
+  <source src="assets/teaser.mp4" type="video/mp4">
+</video>
+
+<p class="tagline">
+Take care of your pet.<br>
+Or don’t.<br>
+It will remember.
+</p>
 
 </body>
 </html>
