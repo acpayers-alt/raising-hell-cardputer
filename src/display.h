@@ -72,3 +72,5 @@ void markScreenPowerManualToggle(uint32_t now);
 uint8_t displayGetUserBrightnessLevel();
 void displayRememberUserBrightness(uint8_t level);
 void forceBacklightDuringFade(uint8_t level);
+bool displayWakeBlackoutPending();
+void displayFinishWakeBlackoutAfterFrame();

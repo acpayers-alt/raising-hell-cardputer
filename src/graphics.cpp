@@ -486,18 +486,20 @@ void renderUI()
   if (!isScreenOn())
     return;
 
-  if (g_bootSplashActive)
-  {
-    drawSplashScreen(true);
-    spr.pushSprite(0, 0);
-    return;
-  }
+    if (g_bootSplashActive)
+    {
+      drawSplashScreen(true);
+      spr.pushSprite(0, 0);
+      displayFinishWakeBlackoutAfterFrame();
+      return;
+    }
 
   if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) && g_app.uiState != UIState::CONSOLE &&
       !uiIsBootWifiOnboardingState(g_app.uiState))
   {
     drawBootAssetProvisionScreen("Preparing asset check.", "Please wait...");
     spr.pushSprite(0, 0);
+    displayFinishWakeBlackoutAfterFrame();
     return;
   }
 
@@ -593,6 +595,7 @@ void renderUI()
   anomalyDrawOverlay();
   
   spr.pushSprite(0, 0);
+  displayFinishWakeBlackoutAfterFrame();
 
   bgDrawnForState = true;
   lastDrawnState = g_app.uiState;

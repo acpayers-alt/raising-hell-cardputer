@@ -44,6 +44,8 @@
 static bool g_backlightPulseActive = false;
 
 static uint8_t s_lastUserBrightnessLevel = 1;
+static bool s_wakeBlackoutPending = false;
+static bool s_backlightRailPulseActive = false;
 
 // --- Battery smoothing + curve helpers --------------------------------------
 
@@ -94,6 +96,23 @@ static inline uint8_t clampU8(int v)
   return (uint8_t)v;
 }
 
+static uint8_t configuredBacklightLevel()
+{
+  int b = brightnessValues[brightnessLevel];
+
+  if (b < 0)
+    b = 0;
+  if (b > 255)
+    b = 255;
+
+  return (uint8_t)b;
+}
+
+bool displayWakeBlackoutPending()
+{
+  return s_wakeBlackoutPending;
+}
+
 void initBacklight()
 {
   // Cardputer backlight is handled by M5GFX; no pin init needed.
@@ -118,6 +137,15 @@ static void applyBacklightRaw(uint8_t level)
   }
 
   M5Cardputer.Display.setBrightness(finalLevel);
+}
+
+void displayFinishWakeBlackoutAfterFrame()
+{
+  if (!s_wakeBlackoutPending)
+    return;
+
+  s_wakeBlackoutPending = false;
+  applyBacklightRaw(configuredBacklightLevel());
 }
 
 void forceBacklightDuringFade(uint8_t level) { applyBacklightRaw(level); }
@@ -161,18 +189,22 @@ void setScreenPower(bool on)
   }
 
   // --- going ON / waking ---
+  const bool wakingFromRailPulse = s_backlightRailPulseActive;
+
   M5Cardputer.Display.wakeup();
 
-  // Apply brightness immediately unless the pet-screen intro fade is about to own
-  // the backlight ramp.
-  if (!(g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive())))
+  if (wakingFromRailPulse)
   {
-    int b = brightnessValues[brightnessLevel];
-    if (b < 0)
-      b = 0;
-    if (b > 255)
-      b = 255;
-    SET_BACKLIGHT((uint8_t)b);
+    // The rail-pulse alert path may have painted the physical panel with the
+    // alert color while logical screen state was off. Keep the panel dark until
+    // renderUI() has pushed a real game frame, then restore brightness.
+    applyBacklightRaw(0);
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
+    s_wakeBlackoutPending = true;
+  }
+  else if (!(g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive())))
+  {
+    SET_BACKLIGHT(configuredBacklightLevel());
   }
 
   // Force redraw after wake
@@ -240,8 +272,6 @@ void displayInit()
 
 static bool s_backlightPulseWasScreenOn = false;
 static int s_backlightPulsePrevLevel = -1;
-
-static bool s_backlightRailPulseActive = false;
 
 void backlightRailPulseBegin(uint8_t level)
 {
