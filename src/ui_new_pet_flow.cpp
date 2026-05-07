@@ -74,8 +74,6 @@ void finalizeNewPetFromName(InputState &in)
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
 
   startPetIntroWalkFromLeft();
-  // Now force black AFTER anything else had a chance to touch brightness
-  setBacklight(0);
 
   // Arm fade to begin on next frame
   g_app.petScreenIntroFadePending = true;

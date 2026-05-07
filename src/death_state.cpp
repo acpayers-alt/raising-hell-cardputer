@@ -3,10 +3,10 @@
 #include "app_state.h"
 #include "brightness_state.h"
 #include "display.h"
+#include "pet.h"
 #include "sound.h"
 #include "ui_actions.h"
 #include "ui_invalidate.h"
-#include "pet.h"
 
 // Default to first option (Resurrect).
 int deathMenuIndex = 0;
@@ -63,15 +63,15 @@ void tickDeathTransition(uint32_t now)
   if (g_app.uiState != UIState::DEATH_TRANSITION)
     return;
 
-    if (!s_deathTransitionSoundStarted)
-    {
-      s_deathTransitionSoundStarted = true;
-    
-      soundDeathFlatline();
-    }
-  
-    soundTickFlatlineFade();
-    
+  if (!s_deathTransitionSoundStarted)
+  {
+    s_deathTransitionSoundStarted = true;
+
+    soundDeathFlatline();
+  }
+
+  soundTickFlatlineFade();
+
   if ((int32_t)(now - s_deathTransitionStartMs) < 0)
     return;
 
@@ -80,10 +80,9 @@ void tickDeathTransition(uint32_t now)
   const uint32_t fadeElapsed = (elapsed > kDeathFadeMs) ? kDeathFadeMs : elapsed;
 
   const uint8_t targetBrightness = (uint8_t)brightnessValues[brightnessLevel];
-  const uint8_t fadeBrightness =
-      (uint8_t)(((uint32_t)targetBrightness * (kDeathFadeMs - fadeElapsed)) / kDeathFadeMs);
+  const uint8_t fadeBrightness = (uint8_t)(((uint32_t)targetBrightness * (kDeathFadeMs - fadeElapsed)) / kDeathFadeMs);
 
-  setBacklight(fadeBrightness);
+  forceBacklightDuringFade(fadeBrightness);
 
   requestUIRedraw();
 
