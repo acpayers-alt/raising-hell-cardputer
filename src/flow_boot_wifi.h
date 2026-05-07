@@ -27,4 +27,7 @@ void bootWifiClearImportedInfo();
 
 const char *bootWifiImportedSsid();
 
+void bootWifiMarkLauncherImportExhausted();
+bool bootWifiLauncherImportExhausted();
+
 extern bool g_bootProvisionWifiOnboardingStarted;

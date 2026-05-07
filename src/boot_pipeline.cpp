@@ -1438,14 +1438,15 @@ void postBootInitTick()
 
       // If none are stored, try launcher import.
       String importedSsid, importedPwd;
-      if (launcherImportWifiCreds(importedSsid, importedPwd))
+      if (!bootWifiLauncherImportExhausted() && launcherImportWifiCreds(importedSsid, importedPwd))
       {
         Serial.printf("[BOOTPIPE] launcher creds found for SSID: %s\n", importedSsid.c_str());
 
         ui_showMessage("Importing WiFi...");
         requestUIRedraw();
         renderUI();
-
+        bootWifiMarkLauncherImportExhausted();
+        
         if (!launcherWifiSsidVisible(importedSsid.c_str()))
         {
           Serial.printf("[BOOTPIPE] imported SSID not visible; entering BOOT_WIFI_PROMPT ssid='%s'\n",

@@ -50,6 +50,18 @@ static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
 
+static bool s_bootWifiLauncherImportExhausted = false;
+
+void bootWifiMarkLauncherImportExhausted()
+{
+  if (!s_bootWifiLauncherImportExhausted)
+    Serial.println("[BOOTWIFI] launcher Wi-Fi import exhausted for this boot Wi-Fi session");
+
+  s_bootWifiLauncherImportExhausted = true;
+}
+
+bool bootWifiLauncherImportExhausted() { return s_bootWifiLauncherImportExhausted; }
+
 static bool bootWifiCanSkipToManualTime() { return true; }
 
 static UIState bootWifiManualTimeReturnState()
@@ -312,6 +324,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   }
 
   g_bootProvisionWifiOnboardingStarted = true;
+  s_bootWifiLauncherImportExhausted = false;
 
   String importedSsid;
   String importedPwd;
@@ -332,12 +345,14 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     bootWifiClearStoredProfileFailover();
   }
 
-  // If no stored creds exist, try launcher import once.
-  if (launcherImportWifiCreds(importedSsid, importedPwd))
+  // If no stored creds exist, try launcher import once per boot Wi-Fi session.
+  if (!s_bootWifiLauncherImportExhausted && launcherImportWifiCreds(importedSsid, importedPwd))
   {
     ui_showMessage("Importing WiFi...");
     requestUIRedraw();
     renderUI();
+    bootWifiMarkLauncherImportExhausted();
+
     if (launcherWifiSsidVisible(importedSsid.c_str()))
     {
       settingsSetWifiEnabled(true);
@@ -407,6 +422,7 @@ void uiBootWifiPromptHandle(InputState &in) { (void)UiBootWizardMenu::HandleWifi
 static void bootWifiFallBackToManualEntry(InputState &in)
 {
   bootWifiClearStoredProfileFailover();
+  bootWifiMarkLauncherImportExhausted();
 
   wifiConsoleDisconnect(false);
   bootWifiClearImportedInfo();
@@ -539,12 +555,13 @@ void uiBootWifiWaitHandle(InputState &in)
       String importedSsid;
       String importedPwd;
 
-      if (launcherImportWifiCreds(importedSsid, importedPwd))
+      if (!s_bootWifiLauncherImportExhausted && launcherImportWifiCreds(importedSsid, importedPwd))
       {
         ui_showMessage("Importing WiFi...");
         requestUIRedraw();
         renderUI();
-        
+        bootWifiMarkLauncherImportExhausted();
+
         if (launcherWifiSsidVisible(importedSsid.c_str()))
         {
           settingsSetWifiEnabled(true);
@@ -576,8 +593,11 @@ void uiBootWifiWaitHandle(InputState &in)
         }
 
         Serial.printf(
-            "[BOOTWIFI] imported SSID not visible after stored-profile failover; returning to scan ssid='%s'\n",
+            "[BOOTWIFI] imported SSID not visible after stored-profile failover; entering manual scan ssid='%s'\n",
             importedSsid.c_str());
+
+        bootWifiFallBackToManualEntry(in);
+        return;
       }
 
       bootWifiRetryOrReturnToScan(in);
