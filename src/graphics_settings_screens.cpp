@@ -1075,8 +1075,8 @@ static void drawSystemStatusMenu()
   const uint32_t remSec = upSec % 60UL;
   snprintf(uptimeBuf, sizeof(uptimeBuf), "%lum %lus", (unsigned long)upMin, (unsigned long)remSec);
 
-  char batteryBuf[32];
-  snprintf(batteryBuf, sizeof(batteryBuf), "%d%% %s", batteryPercent, usbPowered ? "(USB)" : "");
+  char batteryBuf[40];
+  snprintf(batteryBuf, sizeof(batteryBuf), "%d%% %dmV %s", batteryPercent, batteryVoltageMv, usbPowered ? "(USB)" : "");
 
   char buildBuf[16];
   char saveVerBuf[16];
