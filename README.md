@@ -11,6 +11,10 @@ Raise your infernal companion through multiple life stages, feed it, play mini-g
 
 [![Watch the teaser](media/teaser.gif)](https://youtu.be/Lb_xnsyJyCY)
 
+<p align="center">
+  <strong>▶ Click the GIF above to watch the teaser trailer</strong>
+</p>
+
 ## Community
 
 Follow live development, report issues, and help shape Raising Hell:
