@@ -4,6 +4,7 @@
 #include "console.h"
 #include "input.h"
 #include "settings_flow_state.h"
+#include "sound.h"
 #include "ui_actions.h"
 #include "ui_input_common.h"
 #include "ui_input_utils.h"
@@ -46,6 +47,8 @@ static inline void swallowTypingAndEdges(InputState &in)
 
 static void returnFromConsoleToSettings(InputState &input)
 {
+  playBeep();
+  
   const UIReturnTarget ret = uiGetReturnTarget();
   uiPopReturnTarget();
 
