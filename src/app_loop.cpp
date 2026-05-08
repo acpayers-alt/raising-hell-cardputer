@@ -242,6 +242,9 @@ static void consumeConfirmInput(InputState &input)
 {
   input.selectOnce = false;
   input.encoderPressOnce = false;
+  input.menuOnce = false;
+  input.homeOnce = false;
+  input.escOnce = false;
 }
 
 void appMainLoopTick()
@@ -797,13 +800,18 @@ void appMainLoopTick()
 
     if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
     {
+      playBeep();
+
       if (wardriveStepsNoticeActive())
         wardriveStepsDismissNotice();
 
       uiDismissToast();
 
-      // HARD CONSUME: this input must not leak into the rest of the frame
+      // HARD CONSUME: this input must not leak into the rest of the frame or
+      // remain latched into the next menu/action after the toast closes.
       consumeConfirmInput(input);
+      clearInputLatch();
+
       requestUIRedraw();
 
       if (consumeUIRedrawRequest())
