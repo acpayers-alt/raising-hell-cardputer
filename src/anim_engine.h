@@ -13,6 +13,7 @@ const PetPerfStats &petPerfStats();
 void petPerfResetStats();
 
 void animTick();
+bool animEnsurePetScreenReady();
 
 // Returns true once per frame change; clears the internal “changed” flag.
 bool animConsumeFrameChanged();
