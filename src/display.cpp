@@ -203,8 +203,8 @@ void setScreenPower(bool on)
   // Force redraw after wake
   requestUIRedraw();
 
-  // Clear edge inputs so a lingering press doesn't immediately re-toggle
-  inputForceClear();
+  // Clear currently-held latches, but do not defer another clear into the next
+  // input tick. Deferred clears can swallow the first real Enter after waking.
   clearInputLatch();
 
   // Rebase animation timers so long screen-off intervals don't stall animation.

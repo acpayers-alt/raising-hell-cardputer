@@ -183,7 +183,10 @@ void uiTitleMenuOnEnter(InputState &in)
   s_titleEnteredMs = millis();
   s_titleActivationArmed = false;
 
-  swallowTitleInput(in, true);
+  // Do not schedule a deferred inputForceClear here.
+  // The title menu already has its own activation arm/release guard below.
+  // A deferred clear can eat the user's first Enter after boot/wake/title landing.
+  swallowTitleInput(in, false);
   refreshTitleMenuAvailability();
 
   invalidateBackgroundCache();

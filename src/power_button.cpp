@@ -191,10 +191,19 @@ void powerButtonTick(uint32_t now)
     inputConsumeEnterOnce();
 
     if (!isScreenOn())
+    {
       motionResetShakeDetector(1200);
 
-    inputForceClear();
-    clearInputLatch();
+      // Going dark: kill carried input aggressively.
+      inputForceClear();
+      clearInputLatch();
+    }
+    else
+    {
+      // Waking: consume GO/Enter leakage via inputConsumeEnterOnce(), but do not
+      // schedule a deferred clear that can eat the user's first real Title Enter.
+      clearInputLatch();
+    }
 
     if (!wasOn && isScreenOn())
     {
