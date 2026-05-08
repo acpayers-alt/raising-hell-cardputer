@@ -108,10 +108,7 @@ static uint8_t configuredBacklightLevel()
   return (uint8_t)b;
 }
 
-bool displayWakeBlackoutPending()
-{
-  return s_wakeBlackoutPending;
-}
+bool displayWakeBlackoutPending() { return s_wakeBlackoutPending; }
 
 void initBacklight()
 {
@@ -189,23 +186,19 @@ void setScreenPower(bool on)
   }
 
   // --- going ON / waking ---
-  const bool wakingFromRailPulse = s_backlightRailPulseActive;
+  const bool petIntroFadeOwnsWake =
+      (g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive()));
 
   M5Cardputer.Display.wakeup();
 
-  if (wakingFromRailPulse)
-  {
-    // The rail-pulse alert path may have painted the physical panel with the
-    // alert color while logical screen state was off. Keep the panel dark until
-    // renderUI() has pushed a real game frame, then restore brightness.
-    applyBacklightRaw(0);
-    M5Cardputer.Display.fillScreen(TFT_BLACK);
+  // The physical display may still contain whatever was last painted while the
+  // logical screen was off, including alert rail-pulse colors. Never restore
+  // brightness before the first real UI frame after wake.
+  applyBacklightRaw(0);
+  M5Cardputer.Display.fillScreen(TFT_BLACK);
+
+  if (!petIntroFadeOwnsWake)
     s_wakeBlackoutPending = true;
-  }
-  else if (!(g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive())))
-  {
-    SET_BACKLIGHT(configuredBacklightLevel());
-  }
 
   // Force redraw after wake
   requestUIRedraw();
