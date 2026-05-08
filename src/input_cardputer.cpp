@@ -77,6 +77,8 @@ static inline bool kbHeldRightArrow() { return kbHeldChar('/'); }
 
 // Some special keys (ESC/Backspace/Delete) don't always contribute to isPressed()/isChange()
 // on all Cardputer keyboard firmwares. Probe a couple of representations so edge latches behave.
+static inline bool kbHeldEnterKey() { return M5Cardputer.Keyboard.keysState().enter; }
+
 static inline bool kbHeldEscKey()
 {
   // Physical "ESC" key on Cardputer is usually the ` / ~ key.
@@ -299,7 +301,7 @@ void clearInputLatch()
   // For latch preservation, only trust the held-probe.
   s_settingsKeyLatched = kbHeldEscKey();
 
-  s_enterLatched = st.enter;                       // preserve held enter
+  s_enterLatched = kbHeldEnterKey();               // preserve only truly held enter
   s_delLatched = (st.del || kbHeldAnyDeleteKey()); // preserve held delete/backspace
 
   s_qLatched = false;
@@ -928,7 +930,7 @@ static void readKeyboard(InputState &out)
         }
         continue;
       }
-      
+
       const char lc = (char)tolower((unsigned char)c);
 
       if (!g_textCaptureMode)
