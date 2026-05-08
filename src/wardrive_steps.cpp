@@ -8,6 +8,7 @@
 #include "display.h"
 #include "graphics.h"
 #include "inventory.h"
+#include "led_status.h"
 #include "motion.h"
 #include "save_manager.h"
 #include "sdcard.h"
@@ -281,10 +282,10 @@ static void queueWardriveNotice(int infReward, ItemType itemReward)
 static void awardWardriveHit()
 {
   if (!saveManagerSaveFileExists())
-{
-  Serial.println("[WARWALK] hit blocked (no saved pet)");
-  return;
-}
+  {
+    Serial.println("[WARWALK] hit blocked (no saved pet)");
+    return;
+  }
   const int infReward = random(4, 13);
 
   addInf(infReward);
@@ -301,6 +302,10 @@ static void awardWardriveHit()
     s_hitsToday++;
 
   queueWardriveNotice(infReward, itemReward);
+
+#if LED_STATUS_ENABLED
+  ledTriggerWarwalkSignalHit();
+#endif
 
   Serial.printf("[WARWALK] fictional hit stepsToday=%lu hitsToday=%lu INF=+%d item=%d\n", (unsigned long)s_stepsToday,
                 (unsigned long)s_hitsToday, infReward, (int)itemReward);

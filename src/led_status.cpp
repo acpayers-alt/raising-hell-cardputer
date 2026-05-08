@@ -161,6 +161,13 @@ static void modeColor(LedPetMode mode, uint8_t &r, uint8_t &g, uint8_t &b)
   switch (mode)
   {
   default:
+
+  case LED_PET_SIGNAL_HIT:
+    r = 0;
+    g = 90;
+    b = 255;
+    break;
+
   case LED_PET_OFF:
     r = 0;
     g = 0;
@@ -212,6 +219,8 @@ static uint8_t flashesForMode(LedPetMode mode)
     return 4;
   case LED_PET_OK:
     return 1;
+  case LED_PET_SIGNAL_HIT:
+    return 3;
   case LED_PET_OFF:
   default:
     return 0;
@@ -240,6 +249,8 @@ static uint16_t onTimeMs(LedPetMode mode)
     return 1100;
   case LED_PET_OK:
     return 800;
+  case LED_PET_SIGNAL_HIT:
+    return 450;
   default:
     return 700;
   }
@@ -255,6 +266,29 @@ static bool g_burstActive = false;
 static uint8_t g_burstFlashesRemaining = 0;
 static bool g_burstLedOn = false;
 static uint32_t g_burstNextMs = 0;
+
+static bool g_oneShotAlertActive = false;
+static LedPetMode g_oneShotAlertMode = LED_PET_OFF;
+
+void ledTriggerWarwalkSignalHit()
+{
+  if (!ledAlertsEnabled)
+    return;
+
+  if (ledAlertsSuppressedForUiState())
+    return;
+
+  g_oneShotAlertActive = true;
+  g_oneShotAlertMode = LED_PET_SIGNAL_HIT;
+
+  // Force the heartbeat driver to start this burst immediately on the next
+  // ledUpdatePetStatus() tick.
+  g_burstActive = false;
+  g_burstFlashesRemaining = 0;
+  g_burstLedOn = false;
+  g_burstNextMs = 0;
+  g_nextHeartbeatMs = millis();
+}
 
 void ledUpdatePetStatus(LedPetMode mode)
 {
@@ -309,12 +343,13 @@ void ledUpdatePetStatus(LedPetMode mode)
   }
 
   const uint32_t now = millis();
+  const LedPetMode effectiveMode = g_oneShotAlertActive ? g_oneShotAlertMode : mode;
 
-  // Mode change: restart soon.
-  if (mode != g_lastMode)
+  // Mode change: restart soon. One-shot alerts start immediately.
+  if (effectiveMode != g_lastMode)
   {
-    g_lastMode = mode;
-    g_nextHeartbeatMs = now + heartbeatIntervalMs(mode);
+    g_lastMode = effectiveMode;
+    g_nextHeartbeatMs = g_oneShotAlertActive ? now : now + heartbeatIntervalMs(effectiveMode);
 
     g_burstActive = false;
     g_burstFlashesRemaining = 0;
@@ -326,7 +361,7 @@ void ledUpdatePetStatus(LedPetMode mode)
   }
 
   // OFF means fully off.
-  if (mode == LED_PET_OFF)
+  if (effectiveMode == LED_PET_OFF)
   {
     ledOff();
 
@@ -341,7 +376,7 @@ void ledUpdatePetStatus(LedPetMode mode)
   if (!g_burstActive)
   {
     if (g_nextHeartbeatMs == 0)
-      g_nextHeartbeatMs = now + heartbeatIntervalMs(mode);
+      g_nextHeartbeatMs = now + heartbeatIntervalMs(effectiveMode);
 
     if ((int32_t)(now - g_nextHeartbeatMs) < 0)
     {
@@ -357,7 +392,7 @@ void ledUpdatePetStatus(LedPetMode mode)
 
     // Start burst.
     g_burstActive = true;
-    g_burstFlashesRemaining = flashesForMode(mode);
+    g_burstFlashesRemaining = flashesForMode(effectiveMode);
     g_burstLedOn = false;
 
     // If screen-off: start rail-only pulse and paint the hardware color
@@ -367,7 +402,7 @@ void ledUpdatePetStatus(LedPetMode mode)
     if (s_screenIsOff)
     {
       uint8_t r, g, b;
-      modeColor(mode, r, g, b);
+      modeColor(effectiveMode, r, g, b);
       backlightRailPulseShowColor(r, g, b);
     }
 
@@ -382,6 +417,14 @@ void ledUpdatePetStatus(LedPetMode mode)
   if (g_burstFlashesRemaining == 0)
   {
     g_burstActive = false;
+
+    if (g_oneShotAlertActive)
+    {
+      g_oneShotAlertActive = false;
+      g_oneShotAlertMode = LED_PET_OFF;
+      g_lastMode = mode;
+    }
+
     g_nextHeartbeatMs = now + heartbeatIntervalMs(mode);
 
     ledOff();
@@ -401,15 +444,15 @@ void ledUpdatePetStatus(LedPetMode mode)
   if (g_burstLedOn)
   {
     uint8_t r, g, b;
-    modeColor(mode, r, g, b);
+    modeColor(effectiveMode, r, g, b);
     ledSetRGB(r, g, b);
-    g_burstNextMs = now + onTimeMs(mode);
+    g_burstNextMs = now + onTimeMs(effectiveMode);
   }
   else
   {
     ledOff();
     g_burstFlashesRemaining--;
-    g_burstNextMs = now + gapTimeMs(mode);
+    g_burstNextMs = now + gapTimeMs(effectiveMode);
   }
 }
 
