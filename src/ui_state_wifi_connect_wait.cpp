@@ -125,14 +125,15 @@ void uiWifiConnectWaitHandle(InputState &in)
     s_connectWaitStartedAtMs = 0;
     g_wifi.connectFailCount = 0;
 
-    if (g_wifi.ssid[0] && g_wifi.pass[0])
+    if (g_wifi.ssid[0])
     {
       wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
-      Serial.printf("[WIFI] saved working creds for SSID: %s\n", g_wifi.ssid);
+      Serial.printf("[WIFI] saved working network for SSID: %s passLen=%u\n", g_wifi.ssid,
+                    (unsigned)strlen(g_wifi.pass));
     }
     else
     {
-      Serial.printf("[WIFI] skip save: ssid='%s' passLen=%u\n", g_wifi.ssid, (unsigned)strlen(g_wifi.pass));
+      Serial.printf("[WIFI] skip save: empty ssid\n");
     }
 
     wifiResetConnectUiState();
@@ -151,7 +152,7 @@ void uiWifiConnectWaitHandle(InputState &in)
   if ((attemptHasHadTime && failedStatus) || timedOut)
   {
     // One automatic retry before bouncing the user back to password entry.
-    if (!s_autoRetryIssued && g_wifi.ssid[0] && g_wifi.pass[0])
+    if (!s_autoRetryIssued && g_wifi.ssid[0])
     {
       s_autoRetryIssued = true;
 

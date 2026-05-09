@@ -619,12 +619,12 @@ void uiBootWifiWaitHandle(InputState &in)
     const char *ssidToSave = nullptr;
     const char *passToSave = nullptr;
 
-    if (wifiSetupSsid[0] && wifiSetupPass[0])
+    if (wifiSetupSsid[0])
     {
       ssidToSave = wifiSetupSsid;
       passToSave = wifiSetupPass;
     }
-    else if (g_wifi.ssid[0] && g_wifi.pass[0])
+    else if (g_wifi.ssid[0])
     {
       ssidToSave = g_wifi.ssid;
       passToSave = g_wifi.pass;
