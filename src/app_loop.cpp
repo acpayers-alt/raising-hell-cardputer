@@ -242,6 +242,7 @@ static void consumeConfirmInput(InputState &input)
 {
   input.selectOnce = false;
   input.encoderPressOnce = false;
+  input.mgSelectOnce = false;
   input.menuOnce = false;
   input.homeOnce = false;
   input.escOnce = false;
@@ -798,7 +799,8 @@ void appMainLoopTick()
     if (blockingUiAutoScreenOffCheck(now))
       return;
 
-    if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
+    if (input.selectOnce || input.encoderPressOnce || input.mgSelectOnce || input.menuOnce || input.homeOnce ||
+        input.escOnce)
     {
       playBeep();
 

@@ -35,7 +35,13 @@ static volatile bool g_forceClear = false;
 // If GO is used for screen power, it may also generate Keyboard Enter.
 // This flag lets main() consume exactly one Enter->Select mapping.
 static volatile bool g_consumeEnterOnce = false;
-void inputConsumeEnterOnce() { g_consumeEnterOnce = true; }
+static uint32_t g_consumeEnterUntilMs = 0;
+
+void inputConsumeEnterOnce()
+{
+  g_consumeEnterOnce = true;
+  g_consumeEnterUntilMs = millis() + 250;
+}
 
 // Text capture mode (console/text input)
 bool g_textCaptureMode = false;
@@ -574,6 +580,8 @@ static void readKeyboard(InputState &out)
   const bool heldL = kbHeldChar('l') || kbHeldChar('L');
 
   const bool heldEnter = st.enter;
+  if (!heldEnter && g_consumeEnterOnce && ((int32_t)(millis() - g_consumeEnterUntilMs) > 0))
+    g_consumeEnterOnce = false;
   const bool heldG = kbHeldChar('g') || kbHeldChar('G');
   const bool heldSpace = kbHeldChar(' ');
 
@@ -1075,9 +1083,11 @@ static void readKeyboard(InputState &out)
 
     if (!s_enterLatched && !g_textCaptureMode)
     {
-      if (g_consumeEnterOnce)
-        g_consumeEnterOnce = false;
-      else
+      const bool consumeFresh = g_consumeEnterOnce && ((int32_t)(millis() - g_consumeEnterUntilMs) <= 0);
+
+      g_consumeEnterOnce = false;
+
+      if (!consumeFresh)
       {
         if (acceptNav(s_navSelMs))
           out.selectOnce = true;
