@@ -995,18 +995,17 @@ static void drawCreditsScreen()
 
   const int blockTopY = (SCREEN_H / 2) + 8;
 
-  const int yCreated = blockTopY;
-  const int yAaron = yCreated + LINE_H;
-  const int yVersion = yAaron + LINE_H;
-  const int yAssets = yVersion + TIGHT_H;
-
+  const int yAaron = blockTopY;
+  const int yFox = yAaron + 24; // slightly larger than normal line spacing
+  const int yVersion = SCREEN_H - 18;
+  
   const int panelPadX = 12;
   const int panelPadY = 2;
   const int panelX = panelPadX;
-  const int panelY = yCreated - panelPadY;
+  const int panelY = yAaron - panelPadY;
   const int panelW = SCREEN_W - (panelPadX * 2);
-  const int panelH = (yAssets - yCreated) + TIGHT_H + (panelPadY * 2);
-
+  const int panelH = (yFox - yAaron) + TIGHT_H + (panelPadY * 2);
+  
   for (int yy = panelY; yy < panelY + panelH; ++yy)
   {
     const int xStart = panelX + ((yy & 1) ? 1 : 0);
@@ -1017,9 +1016,9 @@ static void drawCreditsScreen()
   }
 
   spr.setTextColor(TFT_WHITE);
-  spr.drawString("Created By:", SCREEN_W / 2, yCreated);
-  spr.drawString("Aaron & Finley Ayers", SCREEN_W / 2, yAaron);
-
+  spr.drawString("By Aaron & Finley Ayers", SCREEN_W / 2, yAaron);
+  spr.drawString("FoxKyong - QA/Testing", SCREEN_W / 2, yFox);
+  
   uint16_t versionCol = TFT_DARKGREY;
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
   versionCol = TFT_GREEN;
@@ -1029,18 +1028,13 @@ static void drawCreditsScreen()
 
   spr.setTextColor(versionCol);
 
-  char verLine[48];
-  snprintf(verLine, sizeof(verLine), "Version %s", RH_VERSION_STRING);
-  spr.drawString(verLine, SCREEN_W / 2, yVersion);
-
   const char *assetVer = assetOtaInstalledVersion();
-  char assetLine[48];
-  if (assetVer && assetVer[0])
-    snprintf(assetLine, sizeof(assetLine), "Asset OTA: %s", assetVer);
-  else
-    snprintf(assetLine, sizeof(assetLine), "Asset OTA: none installed");
 
-  spr.drawString(assetLine, SCREEN_W / 2, yAssets);
+  char verLine[64];
+  snprintf(verLine, sizeof(verLine), "Version %s | Assets %s", RH_VERSION_STRING,
+           (assetVer && assetVer[0]) ? assetVer : "none");
+
+  spr.drawString(verLine, SCREEN_W / 2, yVersion);
   spr.setTextDatum(TL_DATUM);
 }
 
