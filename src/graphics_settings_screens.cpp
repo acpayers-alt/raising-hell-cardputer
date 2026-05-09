@@ -998,13 +998,13 @@ static void drawCreditsScreen()
   const int yAaron = blockTopY;
   const int yFox = yAaron + 24; // slightly larger than normal line spacing
   const int yVersion = SCREEN_H - 18;
-  
+
   const int panelPadX = 12;
   const int panelPadY = 2;
   const int panelX = panelPadX;
   const int panelY = yAaron - panelPadY;
   const int panelW = SCREEN_W - (panelPadX * 2);
-  const int panelH = (yFox - yAaron) + TIGHT_H + (panelPadY * 2);
+  const int panelH = SCREEN_H - panelY;
   
   for (int yy = panelY; yy < panelY + panelH; ++yy)
   {
