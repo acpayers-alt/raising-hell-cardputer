@@ -25,8 +25,6 @@ namespace
 {
 constexpr int kTitleMenuCount = 3;
 
-static void swallowTitleInput(InputState &in);
-
 static bool s_titleHasSave = false;
 static bool s_titleHasImport = false;
 static uint32_t s_titleEnteredMs = 0;
@@ -163,13 +161,19 @@ static void titleActivateContinue(InputState &in)
   (void)in;
 }
 
-static void swallowTitleInput(InputState &in)
+static void swallowTitleInput(InputState &in, bool deferredClear = false)
 {
   while (in.kbHasEvent())
     (void)in.kbPop();
 
   in.clearEdges();
-  inputForceClear();
+
+  // Same-screen menu/list cleanup should not schedule a deferred force-clear.
+  // A pending force-clear can eat a legitimate Enter on the next frame if the
+  // user navigates and confirms quickly.
+  if (deferredClear)
+    inputForceClear();
+
   clearInputLatch();
 }
 } // namespace
@@ -179,7 +183,10 @@ void uiTitleMenuOnEnter(InputState &in)
   s_titleEnteredMs = millis();
   s_titleActivationArmed = false;
 
-  swallowTitleInput(in);
+  // Do not schedule a deferred inputForceClear here.
+  // The title menu already has its own activation arm/release guard below.
+  // A deferred clear can eat the user's first Enter after boot/wake/title landing.
+  swallowTitleInput(in, false);
   refreshTitleMenuAvailability();
 
   invalidateBackgroundCache();
@@ -204,7 +211,7 @@ void uiTitleMenuHandle(InputState &in)
 
   const bool activationHeld = in.selectHeld || in.menuHeld || in.encoderHeld;
 
-  if (!activationHeld && (uint32_t)(millis() - s_titleEnteredMs) > 500)
+  if (!activationHeld && (uint32_t)(millis() - s_titleEnteredMs) > 120)
     s_titleActivationArmed = true;
 
   if (!s_titleActivationArmed)

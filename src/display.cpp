@@ -44,45 +44,18 @@
 static bool g_backlightPulseActive = false;
 
 static uint8_t s_lastUserBrightnessLevel = 1;
+static bool s_wakeBlackoutPending = false;
+static bool s_backlightRailPulseActive = false;
 
 // --- Battery smoothing + curve helpers --------------------------------------
 
-static int voltageToPercent(int mv)
+static int sanitizeBatteryPercent(int pct)
 {
-  struct Point
-  {
-    int mv;
-    int pct;
-  };
-
-  // Cardputer battery reporting is voltage-based. This curve is intentionally
-  // conservative at the top and more forgiving through the middle/lower band,
-  // because the old curve reported ~3.7V as nearly empty.
-  static const Point kCurve[] = {
-      {4200, 100}, {4160, 96}, {4120, 92}, {4080, 87}, {4040, 82}, {4000, 76}, {3960, 69}, {3920, 62}, {3880, 55},
-      {3840, 47},  {3800, 39}, {3760, 31}, {3720, 24}, {3680, 17}, {3640, 11}, {3600, 6},  {3560, 2},  {3520, 0},
-  };
-
-  if (mv >= kCurve[0].mv)
+  if (pct < 0)
+    return -1;
+  if (pct > 100)
     return 100;
-
-  const int last = (int)(sizeof(kCurve) / sizeof(kCurve[0])) - 1;
-  if (mv <= kCurve[last].mv)
-    return 0;
-
-  for (int i = 0; i < last; ++i)
-  {
-    if (mv <= kCurve[i].mv && mv >= kCurve[i + 1].mv)
-    {
-      const int x0 = kCurve[i].mv;
-      const int y0 = kCurve[i].pct;
-      const int x1 = kCurve[i + 1].mv;
-      const int y1 = kCurve[i + 1].pct;
-      return y0 + (mv - x0) * (y1 - y0) / (x1 - x0);
-    }
-  }
-
-  return 0;
+  return pct;
 }
 
 static int median5(int a, int b, int c, int d, int e)
@@ -123,6 +96,20 @@ static inline uint8_t clampU8(int v)
   return (uint8_t)v;
 }
 
+static uint8_t configuredBacklightLevel()
+{
+  int b = brightnessValues[brightnessLevel];
+
+  if (b < 0)
+    b = 0;
+  if (b > 255)
+    b = 255;
+
+  return (uint8_t)b;
+}
+
+bool displayWakeBlackoutPending() { return s_wakeBlackoutPending; }
+
 void initBacklight()
 {
   // Cardputer backlight is handled by M5GFX; no pin init needed.
@@ -147,6 +134,15 @@ static void applyBacklightRaw(uint8_t level)
   }
 
   M5Cardputer.Display.setBrightness(finalLevel);
+}
+
+void displayFinishWakeBlackoutAfterFrame()
+{
+  if (!s_wakeBlackoutPending)
+    return;
+
+  s_wakeBlackoutPending = false;
+  applyBacklightRaw(configuredBacklightLevel());
 }
 
 void forceBacklightDuringFade(uint8_t level) { applyBacklightRaw(level); }
@@ -190,25 +186,25 @@ void setScreenPower(bool on)
   }
 
   // --- going ON / waking ---
+  const bool petIntroFadeOwnsWake =
+      (g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive()));
+
   M5Cardputer.Display.wakeup();
 
-  // Apply brightness immediately unless the pet-screen intro fade is about to own
-  // the backlight ramp.
-  if (!(g_app.uiState == UIState::PET_SCREEN && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive())))
-  {
-    int b = brightnessValues[brightnessLevel];
-    if (b < 0)
-      b = 0;
-    if (b > 255)
-      b = 255;
-    SET_BACKLIGHT((uint8_t)b);
-  }
+  // The physical display may still contain whatever was last painted while the
+  // logical screen was off, including alert rail-pulse colors. Never restore
+  // brightness before the first real UI frame after wake.
+  applyBacklightRaw(0);
+  M5Cardputer.Display.fillScreen(TFT_BLACK);
+
+  if (!petIntroFadeOwnsWake)
+    s_wakeBlackoutPending = true;
 
   // Force redraw after wake
   requestUIRedraw();
 
-  // Clear edge inputs so a lingering press doesn't immediately re-toggle
-  inputForceClear();
+  // Clear currently-held latches, but do not defer another clear into the next
+  // input tick. Deferred clears can swallow the first real Enter after waking.
   clearInputLatch();
 
   // Rebase animation timers so long screen-off intervals don't stall animation.
@@ -269,8 +265,6 @@ void displayInit()
 
 static bool s_backlightPulseWasScreenOn = false;
 static int s_backlightPulsePrevLevel = -1;
-
-static bool s_backlightRailPulseActive = false;
 
 void backlightRailPulseBegin(uint8_t level)
 {
@@ -395,6 +389,8 @@ void updateBattery()
   nextMs = now + 250; // 4 Hz
 
   const int rawMv = (int)M5Cardputer.Power.getBatteryVoltage();
+  const int rawPct = sanitizeBatteryPercent((int)M5Cardputer.Power.getBatteryLevel());
+
   const bool mvValid = (rawMv >= 2500 && rawMv <= 5000);
   if (!mvValid)
     return;
@@ -420,8 +416,10 @@ void updateBattery()
   // --- publish voltage -------------------------------------------------------
   batteryVoltageMv = mvFilt;
 
-  // --- percent from curve ----------------------------------------------------
-  const int pct = voltageToPercent(mvFilt);
+  // --- percent from platform API --------------------------------------------
+  // Launcher/Bruce use the M5 power path for presentation. Keep our filtered
+  // voltage for diagnostics/protection, but do not hand-map display percent.
+  const int pct = (rawPct >= 0) ? rawPct : batteryPercent;
 
   // --- USB / external power heuristic ---------------------------------------
   if (!s_havePrevMv)
@@ -522,16 +520,21 @@ void updateBattery()
   static int lastMv = -999;
   static bool lastUsb = false;
 
-  const bool changed = (pct != lastPct) || (mvFilt != lastMv) || (usb != lastUsb);
+  const bool pctValid = (pct >= 0 && pct <= 100);
+  const bool changed = (pctValid && pct != lastPct) || (mvFilt != lastMv) || (usb != lastUsb);
 
   if (changed)
   {
-    batteryPercent = pct;
+    if (pctValid)
+      batteryPercent = pct;
+
     usbPowered = usb;
 
     requestUIRedraw();
 
-    lastPct = pct;
+    if (pctValid)
+      lastPct = pct;
+
     lastMv = mvFilt;
     lastUsb = usb;
   }
@@ -596,8 +599,8 @@ void batteryProtectionTick(uint32_t now)
     return;
   }
 
-  const bool lowNow = (mv > 0 && mv <= 3600);
-  const bool critNow = (mv > 0 && mv <= 3500);
+  const bool lowNow = (mv > 0 && mv <= 3500);
+  const bool critNow = (mv > 0 && mv <= 3250);
 
   if (lowNow)
   {

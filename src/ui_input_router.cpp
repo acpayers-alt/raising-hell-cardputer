@@ -92,8 +92,10 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
     // Do not reset the settings page here.
     // Some flows intentionally return to a specific subpage
     // (for example Pet Options after Restore/Import browsers).
-    clearInputLatch();
-    in.clearEdges();
+    //
+    // Also do not clear input here. Settings entry is already consumed by the
+    // transition/opening path. Clearing edges on the first router tick after
+    // entry can swallow the user's first real Enter press in Settings.
     break;
 
   case UIState::POWER_MENU:

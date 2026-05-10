@@ -1,13 +1,14 @@
 #include "flow_boot_wizard.h"
 
 #include "flow_boot_wifi.h"
+#include "graphics.h"
 #include "launcher_wifi_import.h"
 #include "ui_actions.h"
+#include "ui_invalidate.h"
+#include "ui_runtime.h"
 #include "ui_state_wifi_connect_wait.h"
 #include "wifi_store.h"
 #include "wifi_time.h"
-#include "graphics.h"
-#include "ui_runtime.h"
 
 extern UIState g_bootWizardAfterOkState;
 extern Tab g_bootWizardAfterOkTab;
@@ -18,7 +19,7 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
   g_bootWizardAfterOkTab = afterOkTab;
 
   Serial.println("[BOOTWIZ] bootWizardBegin entered");
-  
+
   ui_setBootSplashActive(false);
   requestFullUIRedraw();
 
@@ -35,7 +36,7 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
 
     bootWifiClearStoredProfileFailover();
   }
-  
+
   // If no stored creds, try launcher import once.
   {
     String importedSsid, importedPwd;
@@ -44,12 +45,24 @@ void bootWizardBegin(UIState afterOkState, Tab afterOkTab)
 
     if (imported)
     {
-      Serial.println("[BOOTWIZ] importing launcher wifi and entering BOOT_WIFI_IMPORTED");
-      wifiResetConnectUiState();
-      wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-      bootWifiSetImportedInfo(importedSsid.c_str());
-      uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
-      return;
+      ui_showMessage("Importing WiFi...");
+      requestUIRedraw();
+      renderUI();
+
+      if (!launcherWifiSsidVisible(importedSsid.c_str()))
+      {
+        Serial.printf("[BOOTWIZ] imported SSID not visible; falling back to manual scan ssid='%s'\n",
+                      importedSsid.c_str());
+      }
+      else
+      {
+        Serial.println("[BOOTWIZ] importing launcher wifi and entering BOOT_WIFI_IMPORTED");
+        wifiResetConnectUiState();
+        wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+        bootWifiSetImportedInfo(importedSsid.c_str());
+        uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
+        return;
+      }
     }
   }
 

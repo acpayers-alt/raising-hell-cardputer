@@ -50,6 +50,18 @@ static char s_bootWifiImportedSsid[33] = {0};
 static uint32_t s_bootWifiImportedAtMs = 0;
 bool bootAssetProvisionRequired();
 
+static bool s_bootWifiLauncherImportExhausted = false;
+
+void bootWifiMarkLauncherImportExhausted()
+{
+  if (!s_bootWifiLauncherImportExhausted)
+    Serial.println("[BOOTWIFI] launcher Wi-Fi import exhausted for this boot Wi-Fi session");
+
+  s_bootWifiLauncherImportExhausted = true;
+}
+
+bool bootWifiLauncherImportExhausted() { return s_bootWifiLauncherImportExhausted; }
+
 static bool bootWifiCanSkipToManualTime() { return true; }
 
 static UIState bootWifiManualTimeReturnState()
@@ -312,6 +324,7 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
   }
 
   g_bootProvisionWifiOnboardingStarted = true;
+  s_bootWifiLauncherImportExhausted = false;
 
   String importedSsid;
   String importedPwd;
@@ -332,34 +345,44 @@ void uiBootAssetWifiRequiredHandle(InputState &in)
     bootWifiClearStoredProfileFailover();
   }
 
-  // If no stored creds exist, try launcher import once.
-  if (launcherImportWifiCreds(importedSsid, importedPwd))
+  // If no stored creds exist, try launcher import once per boot Wi-Fi session.
+  if (!s_bootWifiLauncherImportExhausted && launcherImportWifiCreds(importedSsid, importedPwd))
   {
-    settingsSetWifiEnabled(true);
-    saveSettingsToSD();
-
-    Serial.printf("[BOOTWIFI] using imported wifi creds ssid='%s'\n", importedSsid.c_str());
-
-    bootWifiSetImportedInfo(importedSsid.c_str());
-
-    g_wifi.connectFailCount = 0;
-    g_wifi.aborted = false;
-    g_wifi.returnState = bootWifiPromptReturnState();
-    g_wifi.returnTab = g_bootWizardAfterOkTab;
-
-    strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
-    strlcpy(wifiSetupPass, importedPwd.c_str(), sizeof(wifiSetupPass));
-    wifiSetupBuf[0] = 0;
-
-    wifiResetConnectUiState();
-    wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-
-    uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
+    ui_showMessage("Importing WiFi...");
     requestUIRedraw();
-    uiActionSwallowAll(in);
-    uiDrainKb(in);
-    clearInputLatch();
-    return;
+    renderUI();
+    bootWifiMarkLauncherImportExhausted();
+
+    if (launcherWifiSsidVisible(importedSsid.c_str()))
+    {
+      settingsSetWifiEnabled(true);
+      saveSettingsToSD();
+
+      Serial.printf("[BOOTWIFI] using imported wifi creds ssid='%s'\n", importedSsid.c_str());
+
+      bootWifiSetImportedInfo(importedSsid.c_str());
+
+      g_wifi.connectFailCount = 0;
+      g_wifi.aborted = false;
+      g_wifi.returnState = bootWifiPromptReturnState();
+      g_wifi.returnTab = g_bootWizardAfterOkTab;
+
+      strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
+      strlcpy(wifiSetupPass, importedPwd.c_str(), sizeof(wifiSetupPass));
+      wifiSetupBuf[0] = 0;
+
+      wifiResetConnectUiState();
+      wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+
+      uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
+      requestUIRedraw();
+      uiActionSwallowAll(in);
+      uiDrainKb(in);
+      clearInputLatch();
+      return;
+    }
+
+    Serial.printf("[BOOTWIFI] imported SSID not visible; showing scan picker ssid='%s'\n", importedSsid.c_str());
   }
 
   // Otherwise go to manual setup.
@@ -399,6 +422,7 @@ void uiBootWifiPromptHandle(InputState &in) { (void)UiBootWizardMenu::HandleWifi
 static void bootWifiFallBackToManualEntry(InputState &in)
 {
   bootWifiClearStoredProfileFailover();
+  bootWifiMarkLauncherImportExhausted();
 
   wifiConsoleDisconnect(false);
   bootWifiClearImportedInfo();
@@ -406,16 +430,11 @@ static void bootWifiFallBackToManualEntry(InputState &in)
   g_wifiSetupFromBootWizard = true;
   g_wifi.connectFailCount = 0;
 
-  // If we already know an SSID, start at password entry.
-  if (wifiSetupSsid[0] != 0)
-  {
-    wifiSetupStage = WIFI_SETUP_STAGE_PASS;
-  }
-  else
-  {
-    wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
-  }
-
+  // Imported launcher credentials are not user-selected from the scan picker.
+  // If they fail, return to scan instead of asking for a password for an SSID
+  // that may not be available here.
+  wifiSetupStage = WIFI_SETUP_STAGE_SCAN;
+  wifiSetupSsid[0] = 0;
   wifiSetupPass[0] = 0;
   wifiSetupBuf[0] = 0;
 
@@ -536,33 +555,48 @@ void uiBootWifiWaitHandle(InputState &in)
       String importedSsid;
       String importedPwd;
 
-      if (launcherImportWifiCreds(importedSsid, importedPwd))
+      if (!s_bootWifiLauncherImportExhausted && launcherImportWifiCreds(importedSsid, importedPwd))
       {
-        settingsSetWifiEnabled(true);
-        saveSettingsToSD();
-
-        Serial.printf("[BOOTWIFI] stored profiles failed; trying imported wifi creds ssid='%s'\n",
-                      importedSsid.c_str());
-
-        bootWifiSetImportedInfo(importedSsid.c_str());
-
-        g_wifi.connectFailCount = 0;
-        g_wifi.aborted = false;
-        g_wifi.returnState = bootWifiPromptReturnState();
-        g_wifi.returnTab = g_bootWizardAfterOkTab;
-
-        strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
-        strlcpy(wifiSetupPass, importedPwd.c_str(), sizeof(wifiSetupPass));
-        wifiSetupBuf[0] = 0;
-
-        wifiResetConnectUiState();
-        wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-
-        uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
+        ui_showMessage("Importing WiFi...");
         requestUIRedraw();
-        uiActionSwallowAll(in);
-        uiDrainKb(in);
-        clearInputLatch();
+        renderUI();
+        bootWifiMarkLauncherImportExhausted();
+
+        if (launcherWifiSsidVisible(importedSsid.c_str()))
+        {
+          settingsSetWifiEnabled(true);
+          saveSettingsToSD();
+
+          Serial.printf("[BOOTWIFI] stored profiles failed; trying imported wifi creds ssid='%s'\n",
+                        importedSsid.c_str());
+
+          bootWifiSetImportedInfo(importedSsid.c_str());
+
+          g_wifi.connectFailCount = 0;
+          g_wifi.aborted = false;
+          g_wifi.returnState = bootWifiPromptReturnState();
+          g_wifi.returnTab = g_bootWizardAfterOkTab;
+
+          strlcpy(wifiSetupSsid, importedSsid.c_str(), sizeof(wifiSetupSsid));
+          strlcpy(wifiSetupPass, importedPwd.c_str(), sizeof(wifiSetupPass));
+          wifiSetupBuf[0] = 0;
+
+          wifiResetConnectUiState();
+          wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+
+          uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, g_bootWizardAfterOkTab, true);
+          requestUIRedraw();
+          uiActionSwallowAll(in);
+          uiDrainKb(in);
+          clearInputLatch();
+          return;
+        }
+
+        Serial.printf(
+            "[BOOTWIFI] imported SSID not visible after stored-profile failover; entering manual scan ssid='%s'\n",
+            importedSsid.c_str());
+
+        bootWifiFallBackToManualEntry(in);
         return;
       }
 
@@ -585,12 +619,12 @@ void uiBootWifiWaitHandle(InputState &in)
     const char *ssidToSave = nullptr;
     const char *passToSave = nullptr;
 
-    if (wifiSetupSsid[0] && wifiSetupPass[0])
+    if (wifiSetupSsid[0])
     {
       ssidToSave = wifiSetupSsid;
       passToSave = wifiSetupPass;
     }
-    else if (g_wifi.ssid[0] && g_wifi.pass[0])
+    else if (g_wifi.ssid[0])
     {
       ssidToSave = g_wifi.ssid;
       passToSave = g_wifi.pass;

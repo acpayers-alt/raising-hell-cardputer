@@ -71,15 +71,18 @@ bool bootMarkFirmwareSeenAndRequestProvisionIfChanged()
     Serial.printf("[BOOT][FW] build changed old='%s' new='%s'\n",
                   lastSeenBuildId.length() ? lastSeenBuildId.c_str() : "(none)", currentBuildId.c_str());
 
-    requestAssetProvisionOnNextBoot();
-
     if (!bootFirmwareMarkerWrite(currentBuildId.c_str()))
-      Serial.println("[BOOT][FW] failed to store current build id");
+    {
+      Serial.println("[BOOT][FW] failed to store current build id; skipping optional asset provision request");
+      return false;
+    }
+
+    requestAssetProvisionOnNextBoot();
   }
   else
   {
     if (supportLoggingEnabled())
-    Serial.printf("[BOOT][FW] build unchanged id='%s'\n", currentBuildId.c_str());
+      Serial.printf("[BOOT][FW] build unchanged id='%s'\n", currentBuildId.c_str());
   }
 
   return changed;

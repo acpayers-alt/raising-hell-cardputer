@@ -177,7 +177,6 @@ static void actTop_OpenSystem(InputState &input)
   g_settingsFlow.settingsPage = SettingsPage::SYSTEM;
   g_app.systemSettingsIndex = 0;
   requestUIRedraw();
-  inputForceClear();
   playBeep();
   clearInputLatch();
 }
@@ -187,7 +186,6 @@ static void actTop_OpenWifi(InputState &input)
   g_settingsFlow.settingsPage = SettingsPage::WIFI;
   g_wifi.wifiSettingsIndex = 0;
   requestUIRedraw();
-  inputForceClear();
   playBeep();
   clearInputLatch();
 }
@@ -803,7 +801,6 @@ static void actSystem_OpenWifi(InputState &input)
   g_settingsFlow.settingsPage = SettingsPage::WIFI;
   g_wifi.wifiSettingsIndex = 0;
   requestUIRedraw();
-  inputForceClear();
   playBeep();
   clearInputLatch();
 }

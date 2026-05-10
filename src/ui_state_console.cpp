@@ -4,6 +4,7 @@
 #include "console.h"
 #include "input.h"
 #include "settings_flow_state.h"
+#include "sound.h"
 #include "ui_actions.h"
 #include "ui_input_common.h"
 #include "ui_input_utils.h"
@@ -44,6 +45,23 @@ static inline void swallowTypingAndEdges(InputState &in)
   clearInputLatch();
 }
 
+static void returnFromConsoleToSettings(InputState &input)
+{
+  playBeep();
+  
+  const UIReturnTarget ret = uiGetReturnTarget();
+  uiPopReturnTarget();
+
+  g_settingsFlow.settingsPage = s_consoleReturnPage;
+  g_settingsFlow.settingsReturnPage = s_consoleReturnPage;
+
+  s_consoleReturnToSettings = false;
+  s_consoleReturnPage = SettingsPage::TOP;
+
+  uiActionEnterStateClean(UIState::SETTINGS, ret.tab, true, input, 120);
+  requestUIRedraw();
+}
+
 void uiConsoleHandle(InputState &input)
 {
   if (input.menuOnce || input.escOnce)
@@ -55,9 +73,7 @@ void uiConsoleHandle(InputState &input)
 
     if (s_consoleReturnToSettings)
     {
-      g_settingsFlow.settingsPage = s_consoleReturnPage;
-      closeSettingsAndReturn(input);
-      requestUIRedraw();
+      returnFromConsoleToSettings(input);
       return;
     }
 
@@ -92,9 +108,7 @@ bool closeConsoleAndReturn(InputState &input)
 
   if (s_consoleReturnToSettings)
   {
-    g_settingsFlow.settingsPage = s_consoleReturnPage;
-    closeSettingsAndReturn(input);
-    requestUIRedraw();
+    returnFromConsoleToSettings(input);
     return true;
   }
 

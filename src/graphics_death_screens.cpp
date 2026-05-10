@@ -114,7 +114,7 @@ void drawDeathTransitionScreen(bool redrawBg)
   cachePetAreaBackgroundIfNeeded(needPetBg);
   g_forcePetBgCache = false;
 
-  if (needPetBg)
+  if (redrawBg || needPetBg)
   {
     restorePetAreaFromCache();
   }

@@ -335,7 +335,10 @@ bool sdAssetsPresent()
     {
       if (!SD.exists(path))
       {
-        Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+        if (supportLoggingEnabled())
+        {
+          Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+        }
         return false;
       }
     }
@@ -360,7 +363,8 @@ bool sdAssetsPresent()
   String installedPack;
   if (!assetManifestLoadLocalPackVersion(&installedPack) || !installedPack.length())
   {
-    Serial.println("[ASSETCHK] manifest present but packVersion missing");
+    if (supportLoggingEnabled())
+      Serial.println("[ASSETCHK] manifest present but packVersion missing");
     s_assetDeepCheckDone = true;
     s_assetDeepCheckOk = false;
     return false;
@@ -368,8 +372,11 @@ bool sdAssetsPresent()
 
   if (compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0)
   {
-    Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n", installedPack.c_str(),
-                  RH_MIN_REQUIRED_ASSET_PACK);
+    if (supportLoggingEnabled())
+    {
+      Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n", installedPack.c_str(),
+                    RH_MIN_REQUIRED_ASSET_PACK);
+    }
     s_assetDeepCheckDone = true;
     s_assetDeepCheckOk = false;
     return false;
@@ -388,7 +395,10 @@ bool sdAssetsPresent()
   {
     if (!SD.exists(path))
     {
-      Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+      if (supportLoggingEnabled())
+      {
+        Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+      }
       ok = false;
       break;
     }
@@ -1046,11 +1056,12 @@ static void finalizeBootLanding()
   // ------------------------------------------------------------
   if (g_postProvisionControlsHelpPending)
   {
-    g_postProvisionControlsHelpPending = false;
+    bootPostProvisionControlsHelpClear();
 
     // Re-arm the full onboarding pair, not just controls help.
     g_controlsHelpSeen = 0;
     g_whatsNewSeen = 0;
+    saveSettingsToSD();
   }
 
   if (s_bootFinalLandingState == UIState::TITLE_MENU)
@@ -1438,13 +1449,27 @@ void postBootInitTick()
 
       // If none are stored, try launcher import.
       String importedSsid, importedPwd;
-      if (launcherImportWifiCreds(importedSsid, importedPwd))
+      if (!bootWifiLauncherImportExhausted() && launcherImportWifiCreds(importedSsid, importedPwd))
       {
         Serial.printf("[BOOTPIPE] launcher creds found for SSID: %s\n", importedSsid.c_str());
-        wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
-        bootWifiSetImportedInfo(importedSsid.c_str());
-        uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
-        return;
+
+        ui_showMessage("Importing WiFi...");
+        requestUIRedraw();
+        renderUI();
+        bootWifiMarkLauncherImportExhausted();
+
+        if (!launcherWifiSsidVisible(importedSsid.c_str()))
+        {
+          Serial.printf("[BOOTPIPE] imported SSID not visible; entering BOOT_WIFI_PROMPT ssid='%s'\n",
+                        importedSsid.c_str());
+        }
+        else
+        {
+          wifiConsoleBeginConnect(importedSsid.c_str(), importedPwd.c_str());
+          bootWifiSetImportedInfo(importedSsid.c_str());
+          uiActionEnterState(UIState::BOOT_WIFI_IMPORTED, Tab::TAB_PET, true);
+          return;
+        }
       }
 
       Serial.println("[BOOTPIPE] no stored wifi creds and no launcher import; entering BOOT_WIFI_PROMPT");

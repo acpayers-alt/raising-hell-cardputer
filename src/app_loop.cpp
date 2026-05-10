@@ -85,6 +85,7 @@
 // -----------------------------------------------------------------------------
 #include "debug_state.h"
 #include "led_status.h"
+#include "support_logging_state.h"
 #include "no_legacy_aliases.h"
 
 bool handleMenuInput(InputState &in);
@@ -242,6 +243,10 @@ static void consumeConfirmInput(InputState &input)
 {
   input.selectOnce = false;
   input.encoderPressOnce = false;
+  input.mgSelectOnce = false;
+  input.menuOnce = false;
+  input.homeOnce = false;
+  input.escOnce = false;
 }
 
 void appMainLoopTick()
@@ -550,7 +555,7 @@ void appMainLoopTick()
       {
         assetsPresentNow = sdAssetsPresent();
 
-        if (!assetsPresentNow)
+        if (!assetsPresentNow && supportLoggingEnabled())
         {
           Serial.printf("[SDRUNTIME] probe: sdReady=1 but assetsPresent=0 ui=%d\n", (int)g_app.uiState);
         }
@@ -572,7 +577,10 @@ void appMainLoopTick()
         {
           g_assetsMissing = true;
 
-          Serial.printf("[SDRUNTIME] assets missing after %u consecutive failures\n", s_assetProbeFailCount);
+          if (supportLoggingEnabled())
+          {
+            Serial.printf("[SDRUNTIME] assets missing after %u consecutive failures\n", s_assetProbeFailCount);
+          }
         }
       }
 
@@ -795,15 +803,21 @@ void appMainLoopTick()
     if (blockingUiAutoScreenOffCheck(now))
       return;
 
-    if (input.selectOnce || input.encoderPressOnce || input.menuOnce || input.homeOnce || input.escOnce)
+    if (input.selectOnce || input.encoderPressOnce || input.mgSelectOnce || input.menuOnce || input.homeOnce ||
+        input.escOnce)
     {
+      playBeep();
+
       if (wardriveStepsNoticeActive())
         wardriveStepsDismissNotice();
 
       uiDismissToast();
 
-      // HARD CONSUME: this input must not leak into the rest of the frame
+      // HARD CONSUME: this input must not leak into the rest of the frame or
+      // remain latched into the next menu/action after the toast closes.
       consumeConfirmInput(input);
+      clearInputLatch();
+
       requestUIRedraw();
 
       if (consumeUIRedrawRequest())

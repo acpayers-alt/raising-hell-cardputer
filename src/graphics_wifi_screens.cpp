@@ -6,12 +6,12 @@
 
 #include "display.h"
 #include "graphics_chrome.h"
+#include "graphics_nonpet_bg.h"
+#include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
 #include "pet.h"
 #include "wifi_setup_state.h"
 #include "wifi_time.h"
-#include "graphics_nonpet_bg.h"
-#include "graphics_shared_utils.h"
 
 extern M5Canvas spr;
 
@@ -85,7 +85,8 @@ void drawWifiSetupScreen()
         else if (i <= g_wifi.scanCount)
         {
           const int realIndex = i - 1;
-          snprintf(line, sizeof(line), "%s (%d)", g_wifi.scanSsids[realIndex], (int)g_wifi.scanRssi[realIndex]);
+          snprintf(line, sizeof(line), "%s %s(%d)", g_wifi.scanSsids[realIndex],
+                   g_wifi.scanOpen[realIndex] ? "[open] " : "", (int)g_wifi.scanRssi[realIndex]);
         }
         else
         {

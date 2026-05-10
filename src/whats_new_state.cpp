@@ -37,11 +37,12 @@ void whatsNewDismiss()
 {
   if (!g_whatsNewSeen)
   {
+    g_whatsNewSeen = 1;
+
     if (g_sdReady)
-    {
-      g_whatsNewSeen = 1;
       saveSettingsToSD();
-    }
+    else
+      Serial.println("[WHATSNEW] dismissed but SD not ready; runtime flag only");
   }
 
   inputForceClear();

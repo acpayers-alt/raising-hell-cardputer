@@ -227,6 +227,24 @@ static void resetBaseTo(AnimId id, uint32_t now)
   markFrameChanged();
 }
 
+bool animEnsurePetScreenReady()
+{
+  if (!g_sdReady)
+    return false;
+
+  const uint32_t now = millis();
+  const AnimId desired = animSelectPetScreen();
+
+  if (desired == ANIM_NONE)
+    return false;
+
+  if (desired != s_baseId)
+    resetBaseTo(desired, now);
+
+  const AnimClip *clip = animGetClip(s_baseId);
+  return clip && clip->frameCount > 0;
+}
+
 static void startOverride(AnimId id, uint32_t now)
 {
   s_overridePlaying = true;

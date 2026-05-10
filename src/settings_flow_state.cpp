@@ -22,7 +22,11 @@ void openSettingsWithReturn(UIState returnState, Tab returnTab, SettingsPage pag
 
   uiActionEnterState(UIState::SETTINGS, returnTab, true);
   requestFullUIRedraw();
-  inputForceClear();
+
+  // Clear the shortcut that opened Settings now, but do not defer another
+  // force-clear into the next input tick. A deferred clear can swallow the
+  // user's first Enter press if they select an item immediately after opening
+  // the menu.
   clearInputLatch();
 }
 

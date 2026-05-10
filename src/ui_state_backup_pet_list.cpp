@@ -30,12 +30,18 @@ int s_confirmDeleteIndex = 0; // 0 Yes, 1 No
 bool s_confirmRestoreActive = false;
 int s_confirmRestoreIndex = 0; // 0 Yes, 1 Cancel
 
-static void swallowBackupInput(InputState &in)
+static void swallowBackupInput(InputState &in, bool deferredClear = false)
 {
   while (in.kbHasEvent())
     (void)in.kbPop();
+
   in.clearEdges();
-  inputForceClear();
+
+  // Same-screen cleanup should not schedule a deferred clear. Otherwise a fast
+  // Enter after scrolling/restoring/deleting can be eaten next frame.
+  if (deferredClear)
+    inputForceClear();
+
   clearInputLatch();
 }
 
@@ -221,7 +227,7 @@ void uiBackupPetListOnEnter(InputState &in)
     }
   }
 
-  swallowBackupInput(in);
+  swallowBackupInput(in, true);
   requestFullUIRedraw();
 }
 

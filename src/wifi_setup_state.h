@@ -39,6 +39,7 @@ struct WifiSetupState
   static constexpr int kMaxScanResults = 8;
   char scanSsids[kMaxScanResults][33] = {};
   int16_t scanRssi[kMaxScanResults] = {};
+  bool scanOpen[kMaxScanResults] = {};
 
   uint8_t connectFailCount = 0;
   bool connectResultPending = false;

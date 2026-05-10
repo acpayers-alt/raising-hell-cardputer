@@ -25,7 +25,8 @@ enum LedPetMode : uint8_t {
   LED_PET_SLEEPING,
   LED_PET_DANGER,
   LED_PET_BORED,
-  LED_PET_MAD
+  LED_PET_MAD,
+  LED_PET_SIGNAL_HIT
 };
 
 bool isPetSleepingNow();
@@ -38,3 +39,4 @@ void ledUpdatePetStatus(LedPetMode mode);
 void ledSetScreenOff(bool isOff);
 
 bool ledInputLockActive();
+void ledTriggerWarwalkSignalHit();

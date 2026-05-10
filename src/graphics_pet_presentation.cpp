@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "anim_clips.h"
+#include "anim_engine.h"
 #include "display.h"
 #include "graphics.h"
 #include "graphics_render_utils.h"
@@ -196,14 +197,14 @@ void cachePetAreaBackgroundIfNeeded(bool force)
   {
     static uint32_t s_lastPetBgHardFailRetryMs = 0;
     const uint32_t now = millis();
-  
+
     // Avoid retry storm, but do not make the failure permanent.
     if ((uint32_t)(now - s_lastPetBgHardFailRetryMs) < 3000UL)
     {
       spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
       return;
     }
-  
+
     s_lastPetBgHardFailRetryMs = now;
     force = true;
   }
@@ -239,26 +240,26 @@ void cachePetAreaBackgroundIfNeeded(bool force)
     ok = buildPetLayerCacheViaSpr(bgPath);
   }
 
-if (!ok)
-{
-  petLayerReady = false;
-  s_petBgCachedPath = nullptr;
-  s_petBgCachedType = (PetType)255;
-  s_petBgCachedStage = 255;
+  if (!ok)
+  {
+    petLayerReady = false;
+    s_petBgCachedPath = nullptr;
+    s_petBgCachedType = (PetType)255;
+    s_petBgCachedStage = 255;
 
-  bool directOk = false;
-  if (bgPath)
-    directOk = sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
+    bool directOk = false;
+    if (bgPath)
+      directOk = sprDrawJpgFromSD(bgPath, 0, PET_AREA_Y);
 
-  s_petBgHardFail = !directOk;
+    s_petBgHardFail = !directOk;
 
-  if (!directOk)
-    spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
+    if (!directOk)
+      spr.fillRect(0, PET_AREA_Y, SCREEN_W, PET_AREA_H, TFT_BLACK);
 
-  invalidateBackgroundCache();
-  requestUIRedraw();
-  return;
-}
+    invalidateBackgroundCache();
+    requestUIRedraw();
+    return;
+  }
 
   s_petBgCachedPath = bgPath;
   s_petBgCachedType = pet.type;
@@ -963,7 +964,7 @@ static void drawStepCounterBadge()
 
   char buf[16];
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)steps);
-  
+
   spr.setTextDatum(TL_DATUM);
   spr.setTextFont(1);
   spr.setTextSize(1);
@@ -1043,12 +1044,14 @@ static void drawPetScreenImpl(bool redrawBg)
     s_petScreenPosInitialized = true;
   }
 
+  const bool animReady = animEnsurePetScreenReady();
+
   if (petWalkOverrideActive())
   {
-    if (!drawIntroWalkingPetOverride())
+    if (!drawIntroWalkingPetOverride() && animReady)
       animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
   }
-  else
+  else if (animReady)
   {
     animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
   }

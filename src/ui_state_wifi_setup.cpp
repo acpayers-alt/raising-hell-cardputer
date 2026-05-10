@@ -49,6 +49,7 @@ static void wifiSetupResetScanState()
   {
     g_wifi.scanSsids[i][0] = '\0';
     g_wifi.scanRssi[i] = -127;
+    g_wifi.scanOpen[i] = false;
   }
 }
 
@@ -115,9 +116,10 @@ static void wifiSetupRunBlockingScan()
     if (dup)
       continue;
 
-    strlcpy(g_wifi.scanSsids[g_wifi.scanCount], ssid.c_str(), sizeof(g_wifi.scanSsids[g_wifi.scanCount]));
-    g_wifi.scanRssi[g_wifi.scanCount] = (int16_t)WiFi.RSSI(i);
-    g_wifi.scanCount++;
+      strlcpy(g_wifi.scanSsids[g_wifi.scanCount], ssid.c_str(), sizeof(g_wifi.scanSsids[g_wifi.scanCount]));
+      g_wifi.scanRssi[g_wifi.scanCount] = (int16_t)WiFi.RSSI(i);
+      g_wifi.scanOpen[g_wifi.scanCount] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+      g_wifi.scanCount++;
   }
 
   WiFi.scanDelete();
@@ -201,6 +203,31 @@ static void wifiSetupSelectScanItem()
 
     strlcpy(g_wifi.ssid, g_wifi.scanSsids[realIndex], sizeof(g_wifi.ssid));
     g_wifi.connectFailCount = 0;
+
+    if (g_wifi.scanOpen[realIndex])
+    {
+      g_wifi.pass[0] = '\0';
+
+      if (g_wifiSetupFromBootWizard)
+      {
+        settingsSetWifiEnabled(true);
+        saveSettingsToSD();
+      }
+
+      wifiStoreSave(String(g_wifi.ssid), String(""));
+      Serial.printf("[WIFI] setup saved open network SSID: %s\n", g_wifi.ssid);
+
+      wifiResetConnectUiState();
+      wifiConsoleBeginConnect(g_wifi.ssid, "");
+
+      clearInputLatch();
+      inputForceClear();
+
+      uiActionEnterState(UIState::WIFI_CONNECT_WAIT, g_wifi.returnTab, true);
+      requestUIRedraw();
+      return;
+    }
+
     wifiSetupBeginPasswordEntry();
     return;
   }
@@ -261,9 +288,8 @@ static void wifiSetupCancel()
   {
     g_wifi.buf[0] = '\0';
     g_wifi.pass[0] = '\0';
+    g_wifi.connectFailCount = 0;
     g_wifi.setupStage = WIFI_SETUP_STAGE_SCAN;
-    g_wifi.aborted = true;
-    uiActionEnterState(g_wifi.returnState, g_wifi.returnTab, true);
     requestUIRedraw();
     return;
   }
@@ -322,14 +348,14 @@ static void wifiSetupSelect()
   }
 
   // Persist creds immediately on submit while this is still the source-of-truth moment.
-  if (g_wifi.ssid[0] && g_wifi.pass[0])
+  if (g_wifi.ssid[0])
   {
     wifiStoreSave(String(g_wifi.ssid), String(g_wifi.pass));
-    Serial.printf("[WIFI] setup saved creds for SSID: %s\n", g_wifi.ssid);
+    Serial.printf("[WIFI] setup saved network for SSID: %s passLen=%u\n", g_wifi.ssid, (unsigned)strlen(g_wifi.pass));
   }
   else
   {
-    Serial.printf("[WIFI] setup skip save: ssid='%s' passLen=%u\n", g_wifi.ssid, (unsigned)strlen(g_wifi.pass));
+    Serial.printf("[WIFI] setup skip save: empty ssid\n");
   }
 
   wifiResetConnectUiState();
