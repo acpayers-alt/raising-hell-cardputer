@@ -335,7 +335,10 @@ bool sdAssetsPresent()
     {
       if (!SD.exists(path))
       {
-        Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+        if (supportLoggingEnabled())
+        {
+          Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+        }
         return false;
       }
     }
@@ -360,7 +363,8 @@ bool sdAssetsPresent()
   String installedPack;
   if (!assetManifestLoadLocalPackVersion(&installedPack) || !installedPack.length())
   {
-    Serial.println("[ASSETCHK] manifest present but packVersion missing");
+    if (supportLoggingEnabled())
+      Serial.println("[ASSETCHK] manifest present but packVersion missing");
     s_assetDeepCheckDone = true;
     s_assetDeepCheckOk = false;
     return false;
@@ -368,8 +372,11 @@ bool sdAssetsPresent()
 
   if (compareSemver3(installedPack, RH_MIN_REQUIRED_ASSET_PACK) < 0)
   {
-    Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n", installedPack.c_str(),
-                  RH_MIN_REQUIRED_ASSET_PACK);
+    if (supportLoggingEnabled())
+    {
+      Serial.printf("[ASSETCHK] asset pack too old installed=%s required=%s\n", installedPack.c_str(),
+                    RH_MIN_REQUIRED_ASSET_PACK);
+    }
     s_assetDeepCheckDone = true;
     s_assetDeepCheckOk = false;
     return false;
@@ -388,7 +395,10 @@ bool sdAssetsPresent()
   {
     if (!SD.exists(path))
     {
-      Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+      if (supportLoggingEnabled())
+      {
+        Serial.printf("[ASSETCHK] missing live asset canary: %s\n", path);
+      }
       ok = false;
       break;
     }
@@ -1447,7 +1457,7 @@ void postBootInitTick()
         requestUIRedraw();
         renderUI();
         bootWifiMarkLauncherImportExhausted();
-        
+
         if (!launcherWifiSsidVisible(importedSsid.c_str()))
         {
           Serial.printf("[BOOTPIPE] imported SSID not visible; entering BOOT_WIFI_PROMPT ssid='%s'\n",

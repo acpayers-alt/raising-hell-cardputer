@@ -85,6 +85,7 @@
 // -----------------------------------------------------------------------------
 #include "debug_state.h"
 #include "led_status.h"
+#include "support_logging_state.h"
 #include "no_legacy_aliases.h"
 
 bool handleMenuInput(InputState &in);
@@ -554,7 +555,7 @@ void appMainLoopTick()
       {
         assetsPresentNow = sdAssetsPresent();
 
-        if (!assetsPresentNow)
+        if (!assetsPresentNow && supportLoggingEnabled())
         {
           Serial.printf("[SDRUNTIME] probe: sdReady=1 but assetsPresent=0 ui=%d\n", (int)g_app.uiState);
         }
@@ -576,7 +577,10 @@ void appMainLoopTick()
         {
           g_assetsMissing = true;
 
-          Serial.printf("[SDRUNTIME] assets missing after %u consecutive failures\n", s_assetProbeFailCount);
+          if (supportLoggingEnabled())
+          {
+            Serial.printf("[SDRUNTIME] assets missing after %u consecutive failures\n", s_assetProbeFailCount);
+          }
         }
       }
 
