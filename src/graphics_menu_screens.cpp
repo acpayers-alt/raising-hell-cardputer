@@ -343,6 +343,9 @@ void drawTitleMenuScreen(bool redrawBg)
     const char *typePretty = "Devil";
     switch (pet.type)
     {
+    case PET_ALIEN:
+      typePretty = "Alien";
+      break;
     case PET_ELDRITCH:
       typePretty = "Eldritch";
       break;
@@ -361,6 +364,9 @@ void drawTitleMenuScreen(bool redrawBg)
     const char *typePretty = "Devil";
     switch (pet.type)
     {
+    case PET_ALIEN:
+      typePretty = "Alien";
+      break;
     case PET_ELDRITCH:
       typePretty = "Eldritch";
       break;

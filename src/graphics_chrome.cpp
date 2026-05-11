@@ -18,6 +18,11 @@ PetUIColorScheme uiSchemeForPet(PetType t)
 {
   switch (t)
   {
+  case PET_ALIEN:
+    return PetUIColorScheme{0x0200, 0x07E0, 0xFFFF,
+
+                            0x0200, 0x07E0, 0x87F0, 0xFFFF, 0x0000};
+
   case PET_ELDRITCH:
     return PetUIColorScheme{0x0010, 0x001F, 0xFFFF,
 

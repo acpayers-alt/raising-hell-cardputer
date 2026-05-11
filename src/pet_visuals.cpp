@@ -22,4 +22,7 @@ const PetVisualProfile PET_PROFILES[PET_TYPE_COUNT] = {
 
     // PET_ELDRITCH
     {96, 96, 0, -8, 22, 6, 3, 0, 18},
+
+    // PET_ALIEN
+    {96, 96, 0, -8, 22, 6, 3, 0, 18},
 };

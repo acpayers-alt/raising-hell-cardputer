@@ -2,13 +2,13 @@
 #include "graphics.h"
 #include "graphics_sd_draw.h"
 
-#include <M5GFX.h>
 #include <Arduino.h>
+#include <M5GFX.h>
 
 #include "display.h"
+#include "graphics_render_utils.h"
 #include "pet.h"
 #include "save_manager.h"
-#include "graphics_render_utils.h"
 
 extern M5Canvas spr;
 extern bool g_sdReady;
@@ -20,6 +20,7 @@ bool isScreenOn();
 
 static constexpr const char *DEV_EGG_PNG = "/raising_hell/graphics/pet/egg/dev_egg.png";
 static constexpr const char *ELD_EGG_PNG = "/raising_hell/graphics/pet/egg/eld_egg.png";
+static constexpr const char *AL_EGG_PNG = "/raising_hell/graphics/pet/egg/al_egg.png";
 
 void drawChoosePetScreen(bool redrawBg)
 {
@@ -38,6 +39,9 @@ void drawChoosePetScreen(bool redrawBg)
   const char *eggPath = nullptr;
   switch (pet.type)
   {
+  case PET_ALIEN:
+    eggPath = AL_EGG_PNG;
+    break;
   case PET_ELDRITCH:
     eggPath = ELD_EGG_PNG;
     break;
@@ -69,6 +73,9 @@ void drawChoosePetScreen(bool redrawBg)
   const char *label = "Unknown Egg";
   switch (pet.type)
   {
+  case PET_ALIEN:
+    label = "Alien Egg";
+    break;
   case PET_ELDRITCH:
     label = "Eldritch Egg";
     break;
@@ -77,7 +84,7 @@ void drawChoosePetScreen(bool redrawBg)
     label = "Devil Egg";
     break;
   }
-  
+
   const int eggBottomY = eggY + eggH;
   const int EGG_LABEL_Y = eggBottomY + 2;
   int EGG_PROMPT_Y = screenH - 10; // push down

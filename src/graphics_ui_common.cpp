@@ -7,17 +7,50 @@ extern Pet pet;
 
 uint16_t uiPillOutline(PetType t)
 {
-  return (t == PET_ELDRITCH) ? 0x001F : 0xF800;
+  switch (t)
+  {
+  case PET_ALIEN:
+    return 0x07E0;
+
+  case PET_ELDRITCH:
+    return 0x001F;
+
+  case PET_DEVIL:
+  default:
+    return 0xF800;
+  }
 }
 
 uint16_t uiPillFillSelected(PetType t)
 {
-  return (t == PET_ELDRITCH) ? 0x0018 : 0x2104;
+  switch (t)
+  {
+  case PET_ALIEN:
+    return 0x0200;
+
+  case PET_ELDRITCH:
+    return 0x0018;
+
+  case PET_DEVIL:
+  default:
+    return 0x2104;
+  }
 }
 
 uint16_t uiModalOutline(PetType t)
 {
-  return (t == PET_ELDRITCH) ? 0x001F : 0xF800;
+  switch (t)
+  {
+  case PET_ALIEN:
+    return 0x07E0;
+
+  case PET_ELDRITCH:
+    return 0x001F;
+
+  case PET_DEVIL:
+  default:
+    return 0xF800;
+  }
 }
 
 void drawButton(int x, int y, int w, int h, const char *label, bool selected)

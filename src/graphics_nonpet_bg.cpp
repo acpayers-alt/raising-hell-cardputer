@@ -10,7 +10,7 @@
 
 static const char *PATH_BG_NONPET_TILE_DEV = "/raising_hell/graphics/background/flow/dev_tab_bg.png";
 static const char *PATH_BG_NONPET_TILE_ELD = "/raising_hell/graphics/background/flow/eld_tab_bg.png";
-
+static const char *PATH_BG_NONPET_TILE_AL = "/raising_hell/graphics/background/flow/al_tab_bg.png";
 static M5Canvas s_nonPetTile(&M5.Display);
 static bool s_nonPetTileReady = false;
 static bool s_nonPetTileHardFail = false;
@@ -26,8 +26,12 @@ static inline const char *nonPetTilePathForPet(PetType t)
 {
   switch (t)
   {
+  case PET_ALIEN:
+    return PATH_BG_NONPET_TILE_AL;
+
   case PET_ELDRITCH:
     return PATH_BG_NONPET_TILE_ELD;
+
   case PET_DEVIL:
   default:
     return PATH_BG_NONPET_TILE_DEV;

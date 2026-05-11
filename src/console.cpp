@@ -637,6 +637,8 @@ static const char *petTypeToString(PetType t)
 {
   switch (t)
   {
+  case PET_ALIEN:
+    return "alien";
   case PET_DEVIL:
     return "devil";
   case PET_ELDRITCH:
@@ -662,6 +664,12 @@ static bool parsePetType(const char *s, PetType &out)
     return true;
   }
 
+  if (!strcmp(s, "alien"))
+  {
+    out = PET_ALIEN;
+    return true;
+  }
+  
   return false;
 }
 

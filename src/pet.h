@@ -19,6 +19,7 @@ void petResetUpdateTimers();
 enum PetType : uint8_t {
   PET_DEVIL = 0,
   PET_ELDRITCH,
+  PET_ALIEN,
   PET_TYPE_COUNT
 };
 

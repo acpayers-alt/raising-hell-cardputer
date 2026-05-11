@@ -262,6 +262,8 @@ static const char *petTypeToStringForExport(PetType t)
 {
   switch (t)
   {
+  case PET_ALIEN:
+    return "alien";
   case PET_ELDRITCH:
     return "eldritch";
   case PET_DEVIL:
@@ -287,8 +289,14 @@ static bool petTypeFromStringForImport(const char *s, PetType &out)
     return true;
   }
 
+  if (!strcmp(s, "alien"))
+  {
+    out = PET_ALIEN;
+    return true;
+  }
+
   // Legacy imports from removed pet lines collapse to Devil.
-  if (!strcmp(s, "alien") || !strcmp(s, "kaiju") || !strcmp(s, "anubis") || !strcmp(s, "axolotl"))
+  if (!strcmp(s, "kaiju") || !strcmp(s, "anubis") || !strcmp(s, "axolotl"))
   {
     out = PET_DEVIL;
     return true;
@@ -1083,10 +1091,10 @@ static bool loadGameOptionsFromSD_internal()
 static bool saveGameOptionsToSD_internal()
 {
   const uint32_t now = millis();
-if (now - s_lastGameOptSaveMs < GAMEOPT_DEBOUNCE_MS)
-  return true;
+  if (now - s_lastGameOptSaveMs < GAMEOPT_DEBOUNCE_MS)
+    return true;
 
-s_lastGameOptSaveMs = now;
+  s_lastGameOptSaveMs = now;
 
   if (!g_sdReady)
     return false;
@@ -2510,15 +2518,16 @@ static bool autoHealLoadedSaveIfNeeded()
   {
   case PET_DEVIL:
   case PET_ELDRITCH:
+  case PET_ALIEN:
     break;
-
+  
   default:
     pet.type = PET_DEVIL;
     Serial.printf("[SAVE][AUTOHEAL] invalid pet type %d -> %d\n", petTypeBefore, (int)pet.type);
     changed = true;
     break;
   }
-
+  
   // --------------------------------------------------------------------------
   // Level / XP / evo sanity
   // --------------------------------------------------------------------------

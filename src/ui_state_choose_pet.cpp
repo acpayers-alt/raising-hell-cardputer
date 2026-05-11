@@ -143,17 +143,11 @@ void uiChoosePetHandle(InputState &in)
 
 // This is your existing choice list ordering.
 // Keep identical to legacy:
-#if PUBLIC_BUILD
-  static const PetType kChoices[] = {
-      PET_DEVIL,
-      PET_ELDRITCH,
-  };
-#else
-  static const PetType kChoices[] = {
-      PET_DEVIL,
-      PET_ELDRITCH,
-  };
-#endif
+static const PetType kChoices[] = {
+  PET_DEVIL,
+  PET_ELDRITCH,
+  PET_ALIEN,
+};
 
   const int choiceCount = (int)(sizeof(kChoices) / sizeof(kChoices[0]));
 

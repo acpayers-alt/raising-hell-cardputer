@@ -18,10 +18,16 @@ extern bool g_sdReady;
 
 static const char *pendingEggCrackedPng()
 {
-  if (g_pendingPetType == PET_ELDRITCH)
+  switch (g_pendingPetType)
+  {
+  case PET_ELDRITCH:
     return "/raising_hell/graphics/pet/egg/eld_egg_cracked.png";
-
-  return "/raising_hell/graphics/pet/egg/dev_egg_cracked.png";
+  case PET_ALIEN:
+    return "/raising_hell/graphics/pet/egg/al_egg_cracked.png";
+  case PET_DEVIL:
+  default:
+    return "/raising_hell/graphics/pet/egg/dev_egg_cracked.png";
+  }
 }
 
 static const char *const *pendingEggCrackFrames()
@@ -40,7 +46,23 @@ static const char *const *pendingEggCrackFrames()
       "/raising_hell/graphics/pet/egg/anim/eld/eld_crack4.png",
   };
 
-  return (g_pendingPetType == PET_ELDRITCH) ? eldFrames : devFrames;
+  static const char *const alFrames[4] = {
+      "/raising_hell/graphics/pet/egg/anim/al/al_crack1.png",
+      "/raising_hell/graphics/pet/egg/anim/al/al_crack2.png",
+      "/raising_hell/graphics/pet/egg/anim/al/al_crack3.png",
+      "/raising_hell/graphics/pet/egg/anim/al/al_crack4.png",
+  };
+
+  switch (g_pendingPetType)
+  {
+  case PET_ELDRITCH:
+    return eldFrames;
+  case PET_ALIEN:
+    return alFrames;
+  case PET_DEVIL:
+  default:
+    return devFrames;
+  }
 }
 
 static const char *pendingHatchMessage()
@@ -49,6 +71,8 @@ static const char *pendingHatchMessage()
   {
   case PET_ELDRITCH:
     return "You hatched a baby eldritch";
+  case PET_ALIEN:
+    return "You hatched a baby alien";
   case PET_DEVIL:
   default:
     return "You hatched a baby devil";
