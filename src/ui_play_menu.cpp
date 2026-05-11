@@ -12,25 +12,19 @@ struct MenuItem
   void (*onSelect)();
 };
 
-static void actFlappy()
-{
-  startFlappyFireball();
-}
+static void actFlappy() { startFlappyFireball(); }
 
-static void actDodger()
-{
-  startInfernalDodger();
-}
+static void actDodger() { startInfernalDodger(); }
 
-static void actCrossy()
-{
-  startCrossyRoad();
-}
+static void actCrossy() { startCrossyRoad(); }
+
+static void actAbduction() { startAbductionBeam(); }
 
 static const MenuItem kItems[] = {
     {"Flappy Fireball", actFlappy},
     {"Fireball Run", actDodger},
     {"Crossy Hell", actCrossy},
+    {"Abduction Beam", actAbduction},
 };
 
 static const char *flappyMenuLabelForPet()
@@ -69,12 +63,22 @@ static const char *crossyMenuLabelForPet()
   }
 }
 
+static const char *abductionMenuLabelForPet()
+{
+  switch (pet.type)
+  {
+  case PET_ELDRITCH:
+    return "Harvest Beam";
+
+  case PET_DEVIL:
+  default:
+    return "Soul Beam";
+  }
+}
+
 } // namespace
 
-int uiPlayMenuCount()
-{
-  return (int)(sizeof(kItems) / sizeof(kItems[0]));
-}
+int uiPlayMenuCount() { return (int)(sizeof(kItems) / sizeof(kItems[0])); }
 
 const char *uiPlayMenuLabel(int idx)
 {
@@ -89,6 +93,8 @@ const char *uiPlayMenuLabel(int idx)
     return dodgerMenuLabelForPet();
   case 2:
     return crossyMenuLabelForPet();
+  case 3:
+    return abductionMenuLabelForPet();
   default:
     return kItems[idx].label;
   }

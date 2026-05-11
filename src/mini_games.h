@@ -1,20 +1,22 @@
 #pragma once
 #include "input.h"
 
-enum class MiniGame {
+enum class MiniGame
+{
   NONE = 0,
   FLAPPY_FIREBALL,
   RESURRECTION,
   CROSSY_ROAD,
   INFERNAL_DODGER,
+  ABDUCTION_BEAM,
 };
 
 void miniGameExitToReturnUi(bool beginLockout);
-void updateMiniGame(const InputState& input);
+void updateMiniGame(const InputState &input);
 void drawMiniGame();
 
 void startCrossyRoad();
-void updateCrossyRoad(const InputState& input);
+void updateCrossyRoad(const InputState &input);
 
 // Global state
 extern MiniGame currentMiniGame;
@@ -25,22 +27,27 @@ extern bool playerWon;
 // -----------------------------------------------------------------------------
 // Resurrection Run (side-scroller)
 void startResurrectionRun();
-void updateResurrectionRun(const InputState& input);
+void updateResurrectionRun(const InputState &input);
 void drawResurrectionRun();
 
 // Flappy Fireball
 void startFlappyFireball();
-void updateFlappyFireball(const InputState& input);
+void updateFlappyFireball(const InputState &input);
 void drawFlappyFireball();
 
 // Infernal Dodger
 void startInfernalDodger();
-void updateInfernalDodger(const InputState& input);
+void updateInfernalDodger(const InputState &input);
 void drawInfernalDodger();
+
+// Abduction Beam
+void startAbductionBeam();
+void updateAbductionBeam(const InputState &input);
+void drawAbductionBeam();
 
 // Implemented in menu_actions.cpp (mini_games.cpp calls this)
 void onResurrectionMiniGameResult(bool success);
 
-//Pause Menu Helpers
+// Pause Menu Helpers
 bool miniGameIsShowingIntro();
 void miniGameCancelFromIntro();

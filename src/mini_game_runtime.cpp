@@ -48,6 +48,9 @@ extern void drawCrossyRoad();
 extern void updateInfernalDodger(const InputState &input);
 extern void drawInfernalDodger();
 
+extern void updateAbductionBeam(const InputState &input);
+extern void drawAbductionBeam();
+
 extern void updateResurrectionRun(const InputState &input);
 extern void drawResurrectionRun();
 
@@ -292,6 +295,8 @@ static const char *mgGameName(MiniGame game)
     return "Crossy Road";
   case MiniGame::INFERNAL_DODGER:
     return "Infernal Dodger";
+  case MiniGame::ABDUCTION_BEAM:
+    return "Abduction Beam";
   case MiniGame::RESURRECTION:
     return "Resurrection Run";
   default:
@@ -306,6 +311,7 @@ static bool mgCountsForRepeatBoredom(MiniGame game)
   case MiniGame::FLAPPY_FIREBALL:
   case MiniGame::CROSSY_ROAD:
   case MiniGame::INFERNAL_DODGER:
+  case MiniGame::ABDUCTION_BEAM:
     return true;
 
   default:
@@ -531,6 +537,9 @@ void mgSyncGameTimebases(uint32_t now)
     s_crossyLastLaneMs = now;
     break;
 
+  case MiniGame::ABDUCTION_BEAM:
+    break;
+
   case MiniGame::RESURRECTION:
     rr_lastMs = now;
     break;
@@ -591,6 +600,10 @@ void updateMiniGame(const InputState &input)
     updateInfernalDodger(input);
     break;
 
+  case MiniGame::ABDUCTION_BEAM:
+    updateAbductionBeam(input);
+    break;
+
   case MiniGame::RESURRECTION:
     updateResurrectionRun(input);
     break;
@@ -626,6 +639,10 @@ void drawMiniGame()
 
   case MiniGame::INFERNAL_DODGER:
     drawInfernalDodger();
+    break;
+
+  case MiniGame::ABDUCTION_BEAM:
+    drawAbductionBeam();
     break;
 
   case MiniGame::RESURRECTION:

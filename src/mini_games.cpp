@@ -71,6 +71,9 @@ static void releaseMiniGameAssetsFor(MiniGame game)
     freeDodgerSprites();
     break;
 
+  case MiniGame::ABDUCTION_BEAM:
+    break;
+
   case MiniGame::RESURRECTION:
     freeResRunSprites();
     break;
@@ -155,6 +158,9 @@ bool miniGameIsShowingIntro()
 
   case MiniGame::INFERNAL_DODGER:
     return dodgerIsShowingIntro();
+
+  case MiniGame::ABDUCTION_BEAM:
+    return false;
 
   case MiniGame::RESURRECTION:
     return resRunIsShowingIntro();
