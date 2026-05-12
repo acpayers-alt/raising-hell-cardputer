@@ -79,6 +79,8 @@ enum AnimId : uint16_t
   ANIM_ELD_ELDER_SICK_SNEEZE,
   ANIM_ELD_ELDER_SLEEPY_HOLD,
 
+  // Alien (baby)
+  ANIM_ALIEN_BABY_HAPPY,
 };
 
 struct AnimClip

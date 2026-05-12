@@ -501,6 +501,16 @@ static const char *kEldElderSleepyHold[] = {
 };
 
 // ---------------------------
+// Alien baby HAPPY
+// ---------------------------
+static const char *kAlienBabyHappy[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn2.png",
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn3.png",
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn4.png",
+};
+
+// ---------------------------
 // Clip table
 // ---------------------------
 static const AnimClip kClips[] = {
@@ -563,6 +573,7 @@ static const AnimClip kClips[] = {
     {ANIM_ELD_ELDER_SICK_SNEEZE, kEldElderSickSneeze, 6, 90, true},
     {ANIM_ELD_ELDER_SLEEPY_HOLD, kEldElderSleepyHold, 4, 130, true},
 
+    {ANIM_ALIEN_BABY_HAPPY, kAlienBabyHappy, 4, 220, true},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -779,6 +790,28 @@ static AnimId eldElderClipForMood(PetMood mood)
   }
 }
 
+static AnimId alienBabyClipForMood(PetMood mood)
+{
+  switch (mood)
+  {
+  case MOOD_HAPPY:
+  default:
+    return ANIM_ALIEN_BABY_HAPPY;
+  }
+}
+
+static AnimId alienClipForMood(uint8_t stage, PetMood mood)
+{
+  // Alien only has baby clips for now.
+  // Keep the stage switch in place so teen/adult/elder can be filled in cleanly later.
+  switch (stage)
+  {
+  case 0:
+  default:
+    return alienBabyClipForMood(mood);
+  }
+}
+
 AnimId animSelectPetScreen()
 {
   // Animate whenever the UI is showing a surface that still displays the pet.
@@ -814,9 +847,11 @@ AnimId animSelectPetScreen()
         return ANIM_DEV_ELDER_TIRED_SIT;
       }
     }
+
     return devClipForMood(pet.evoStage, pet.getMood());
   }
 
+  // Eldritch uses its full stage/mood routing.
   if (pet.type == PET_ELDRITCH)
   {
     if (clockModeSleepingOverride)
@@ -864,19 +899,18 @@ AnimId animSelectPetScreen()
     }
   }
 
-    switch (pet.evoStage)
-    {
-    case 0:
-      return eldBabyClipForMood(pet.getMood());
-    case 1:
-      return eldTeenClipForMood(pet.getMood());
-    case 2:
-      return eldAdultClipForMood(pet.getMood());
-    case 3:
-      return eldElderClipForMood(pet.getMood());
-    default:
-      return ANIM_ELD_ELDER_IDLE_1F;
-    }
-  
+  // Alien uses its own stage router.
+  // For now, all Alien stages resolve to baby happy until more Alien clips exist.
+  if (pet.type == PET_ALIEN)
+  {
+    if (clockModeSleepingOverride)
+      return alienClipForMood(pet.evoStage, MOOD_TIRED);
+
+    if (pet.isSleeping)
+      return alienClipForMood(pet.evoStage, MOOD_TIRED);
+
+    return alienClipForMood(pet.evoStage, pet.getMood());
+  }
+
   return ANIM_NONE;
 }
