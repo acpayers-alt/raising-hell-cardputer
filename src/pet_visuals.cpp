@@ -24,5 +24,5 @@ const PetVisualProfile PET_PROFILES[PET_TYPE_COUNT] = {
     {96, 96, 0, -8, 22, 6, 3, 0, 18},
 
     // PET_ALIEN
-    {96, 96, 0, -8, 22, 6, 3, 0, 18},
+    {96, 96, 0, -20, 22, 6, 3, 0, 18},
 };

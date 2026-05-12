@@ -364,6 +364,13 @@ static const char *PATH_ELD_EL_WALK2 = "/raising_hell/graphics/pet/anim/eld/ed/w
 static const char *PATH_ELD_EL_WALK1_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft1.png";
 static const char *PATH_ELD_EL_WALK2_L = "/raising_hell/graphics/pet/anim/eld/ed/wlk/eld_ed_walkleft2.png";
 
+// ---------------- ALIEN ----------------
+
+// Baby
+static const char *PATH_AL_BB_WALK1 = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walk1.png";
+static const char *PATH_AL_BB_WALK2 = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walk2.png";
+static const char *PATH_AL_BB_WALK1_L = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walkleft1.png";
+static const char *PATH_AL_BB_WALK2_L = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walkleft2.png";
 // ============================================================================
 // WANDER SYSTEM
 // ============================================================================
@@ -431,6 +438,7 @@ bool petWalkOverrideActive() { return petPresentationAnimating(); }
 static const PetRenderProfile kPetProfile[] = {
     {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET}, // DEVIL
     {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET}, // ELDRITCH
+    {PET_SPR_W, PET_SPR_H, PET_X_OFFSET, PET_Y_OFFSET}, // ALIEN
 };
 
 const PetRenderProfile &getPetProfile(PetType t)
@@ -829,6 +837,15 @@ static int getWalkBaselineAdjustForPet()
       return -6;
     }
 
+  case PET_ALIEN:
+    switch (pet.evoStage)
+    {
+    case 0:
+      return -5;
+    default:
+      return -5;
+    }
+
   default:
     return -2;
   }
@@ -924,6 +941,24 @@ bool drawIntroWalkingPetOverride()
           path = frame ? PATH_ELD_EL_WALK2_L : PATH_ELD_EL_WALK1_L;
         else
           path = frame ? PATH_ELD_EL_WALK2 : PATH_ELD_EL_WALK1;
+      }
+    }
+    else if (pet.type == PET_ALIEN)
+    {
+      if (pet.evoStage == 0)
+      {
+        if (facingLeft)
+          path = frame ? PATH_AL_BB_WALK2_L : PATH_AL_BB_WALK1_L;
+        else
+          path = frame ? PATH_AL_BB_WALK2 : PATH_AL_BB_WALK1;
+      }
+      else
+      {
+        // Temporary fallback until Alien teen/adult/elder walk frames exist.
+        if (facingLeft)
+          path = frame ? PATH_AL_BB_WALK2_L : PATH_AL_BB_WALK1_L;
+        else
+          path = frame ? PATH_AL_BB_WALK2 : PATH_AL_BB_WALK1;
       }
     }
   }
