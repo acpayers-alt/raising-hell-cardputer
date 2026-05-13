@@ -50,6 +50,8 @@ static PetType s_petBgCachedType = (PetType)255;
 static uint8_t s_petBgCachedStage = 255;
 static bool s_petBgHardFail = false;
 
+static bool s_petFacingLeft = false;
+
 static bool ensurePetLayer();
 
 // UI / rendering hooks
@@ -371,6 +373,7 @@ static const char *PATH_AL_BB_WALK1 = "/raising_hell/graphics/pet/anim/al/bb/wlk
 static const char *PATH_AL_BB_WALK2 = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walk2.png";
 static const char *PATH_AL_BB_WALK1_L = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walkleft1.png";
 static const char *PATH_AL_BB_WALK2_L = "/raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walkleft2.png";
+
 // ============================================================================
 // WANDER SYSTEM
 // ============================================================================
@@ -430,6 +433,8 @@ bool petPresentationAnimating()
 }
 
 bool petWalkOverrideActive() { return petPresentationAnimating(); }
+
+bool petPresentationFacingLeft() { return s_petFacingLeft; }
 
 // ============================================================================
 // PET PROFILE
@@ -875,6 +880,9 @@ bool drawIntroWalkingPetOverride()
     facingLeft = (s_petHomeX < s_petScreenX);
   }
 
+  if (walking)
+  s_petFacingLeft = facingLeft;
+  
   const char *path = nullptr;
 
   if (walking)

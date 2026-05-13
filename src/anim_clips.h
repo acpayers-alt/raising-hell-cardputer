@@ -81,6 +81,8 @@ enum AnimId : uint16_t
 
   // Alien (baby)
   ANIM_ALIEN_BABY_HAPPY,
+  ANIM_ALIEN_BABY_HAPPY_GUN,
+  ANIM_ALIEN_BABY_HAPPY_GUN_LEFT,
 };
 
 struct AnimClip

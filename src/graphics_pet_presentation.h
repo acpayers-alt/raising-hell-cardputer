@@ -29,3 +29,5 @@ void clearPetPresentationIntroHandoff();
 bool petPresentationScriptedIntroActive();
 bool petPresentationAnimating();
 bool petWalkOverrideActive();
+
+bool petPresentationFacingLeft();

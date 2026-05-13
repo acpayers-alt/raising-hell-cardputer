@@ -1,6 +1,7 @@
 #include "anim_clips.h"
 
 #include "app_state.h"
+#include "graphics_pet_presentation.h"
 #include "pet.h"
 #include "pet_state.h"
 #include "ui_runtime.h"
@@ -510,6 +511,16 @@ static const char *kAlienBabyHappy[] = {
     "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn4.png",
 };
 
+static const char *kAlienBabyHappyGun[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_gun1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_gun2.png",
+};
+
+static const char *kAlienBabyHappyGunLeft[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_left_gun1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_left_gun2.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -574,6 +585,8 @@ static const AnimClip kClips[] = {
     {ANIM_ELD_ELDER_SLEEPY_HOLD, kEldElderSleepyHold, 4, 130, true},
 
     {ANIM_ALIEN_BABY_HAPPY, kAlienBabyHappy, 4, 220, true},
+    {ANIM_ALIEN_BABY_HAPPY_GUN, kAlienBabyHappyGun, 2, 220, true},
+    {ANIM_ALIEN_BABY_HAPPY_GUN_LEFT, kAlienBabyHappyGunLeft, 2, 220, true},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -792,12 +805,27 @@ static AnimId eldElderClipForMood(PetMood mood)
 
 static AnimId alienBabyClipForMood(PetMood mood)
 {
-  switch (mood)
+  static bool happyChoiceGun = false;
+  static unsigned long nextHappyChoiceAt = 0;
+
+  if (mood != MOOD_HAPPY)
   {
-  case MOOD_HAPPY:
-  default:
+    nextHappyChoiceAt = 0;
     return ANIM_ALIEN_BABY_HAPPY;
   }
+
+  const unsigned long now = millis();
+
+  if (nextHappyChoiceAt == 0 || now >= nextHappyChoiceAt)
+  {
+    happyChoiceGun = (random(2) == 0);
+    nextHappyChoiceAt = now + random(4500UL, 9000UL);
+  }
+
+  if (!happyChoiceGun)
+    return ANIM_ALIEN_BABY_HAPPY;
+
+  return petPresentationFacingLeft() ? ANIM_ALIEN_BABY_HAPPY_GUN_LEFT : ANIM_ALIEN_BABY_HAPPY_GUN;
 }
 
 static AnimId alienClipForMood(uint8_t stage, PetMood mood)
