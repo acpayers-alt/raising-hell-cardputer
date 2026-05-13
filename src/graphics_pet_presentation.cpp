@@ -396,6 +396,7 @@ static int s_petWanderSideBX = 0;
 
 static uint32_t s_petWanderUntilMs = 0;
 static uint32_t s_petWanderLastStepMs = 0;
+static uint8_t s_petWalkFrame = 0;
 
 static constexpr int kPetWanderRangePx = 55;
 static constexpr int kPetWanderMinMovePx = 28;
@@ -511,6 +512,7 @@ void resetPetWanderToHome()
   s_petWanderState = PetWanderState::HOME_IDLE;
   s_petWanderLastStepMs = 0;
 
+  s_petWalkFrame = 0;
   scheduleNextPetWander();
 }
 
@@ -542,6 +544,8 @@ void startPetIntroWalkFromLeft()
   s_petScreenY = s_petHomeY;
 
   s_petScreenPosInitialized = true;
+
+  s_petWalkFrame = 0;
 
   s_petIntroWalkActive = true;
   s_petIntroWalkLastStepMs = millis();
@@ -603,6 +607,7 @@ void tickPetIntroWalk()
     if (s_petScreenX > homeX)
       s_petScreenX = homeX;
 
+    s_petWalkFrame ^= 1;
     requestUIRedraw();
   }
 
@@ -713,6 +718,7 @@ void tickPetWander()
       return;
     }
 
+    s_petWalkFrame = 0;
     s_petWanderTargetX = s_petWanderSideAX;
     s_petWanderState = PetWanderState::MOVING_TO_SIDE_A;
     s_petWanderLastStepMs = now;
@@ -736,6 +742,7 @@ void tickPetWander()
     }
 
     s_petScreenX += (s_petScreenX < s_petWanderTargetX) ? kPetWanderStepPx : -kPetWanderStepPx;
+    s_petWalkFrame ^= 1;
     requestUIRedraw();
     return;
   }
@@ -768,6 +775,7 @@ void tickPetWander()
     }
 
     s_petScreenX += (s_petScreenX < s_petWanderTargetX) ? kPetWanderStepPx : -kPetWanderStepPx;
+    s_petWalkFrame ^= 1;
     requestUIRedraw();
     return;
   }
@@ -802,6 +810,7 @@ void tickPetWander()
     }
 
     s_petScreenX += (dx > 0) ? kPetWanderStepPx : -kPetWanderStepPx;
+    s_petWalkFrame ^= 1;
     requestUIRedraw();
     return;
   }
@@ -881,13 +890,13 @@ bool drawIntroWalkingPetOverride()
   }
 
   if (walking)
-  s_petFacingLeft = facingLeft;
-  
+    s_petFacingLeft = facingLeft;
+
   const char *path = nullptr;
 
   if (walking)
   {
-    const uint32_t frame = (millis() / kPetIntroWalkFrameMs) & 1U;
+    const uint32_t frame = s_petWalkFrame & 1U;
 
     if (pet.type == PET_DEVIL)
     {
