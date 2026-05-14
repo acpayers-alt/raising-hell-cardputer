@@ -119,6 +119,7 @@ bool uiStateBlocksOverlays(UIState s)
   case UIState::BURIAL_SCREEN:
   case UIState::PET_SLEEPING:
   case UIState::MINI_GAME:
+  case UIState::ACTIVITY_FISHING:
   case UIState::WIFI_SETUP:
   case UIState::WIFI_CONNECT_WAIT:
   case UIState::SET_TIME:
