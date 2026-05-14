@@ -521,6 +521,17 @@ static const char *kAlienBabyHappyGunLeft[] = {
     "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_left_gun2.png",
 };
 
+static const char *kAlienBabyBoredIdle[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
+};
+
+static const char *kAlienBabyBoredBlink[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink2.png",
+    "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink2.png",
+    "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -587,6 +598,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_BABY_HAPPY, kAlienBabyHappy, 4, 220, true},
     {ANIM_ALIEN_BABY_HAPPY_GUN, kAlienBabyHappyGun, 2, 220, true},
     {ANIM_ALIEN_BABY_HAPPY_GUN_LEFT, kAlienBabyHappyGunLeft, 2, 220, true},
+    {ANIM_ALIEN_BABY_BORED_IDLE, kAlienBabyBoredIdle, 1, 1000, true},
+    {ANIM_ALIEN_BABY_BORED_BLINK, kAlienBabyBoredBlink, 4, 120, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -611,6 +624,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Devil adult tired chair: hold frame 1, occasionally blink (2->3) then return to 1.
     {ANIM_DEV_ADULT_TIRED_CHAIR_IDLE, ANIM_DEV_ADULT_TIRED_CHAIR_BLINK, 9UL * 1000UL, 11UL * 1000UL},
+
+    // Alien baby bored: hold frame 1, occasionally blink.
+    {ANIM_ALIEN_BABY_BORED_IDLE, ANIM_ALIEN_BABY_BORED_BLINK, 2500UL, 6500UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -805,6 +821,9 @@ static AnimId eldElderClipForMood(PetMood mood)
 
 static AnimId alienBabyClipForMood(PetMood mood)
 {
+  if (mood == MOOD_BORED)
+    return ANIM_ALIEN_BABY_BORED_IDLE;
+
   static bool happyChoiceGun = false;
   static unsigned long nextHappyChoiceAt = 0;
 
