@@ -31,7 +31,8 @@ enum class FishingState : uint8_t
 {
   IDLE = 0,
   LINE_OUT,
-  BITE
+  BITE,
+  REELING,
 };
 
 static FishingState s_state = FishingState::IDLE;
@@ -58,6 +59,14 @@ static constexpr int kActivityBgH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
 
 static constexpr int kFishingPetAnchorX = 68;
 static constexpr int kFishingPetAnchorBottomY = TOP_BAR_H + kActivityBgH - 4;
+
+static uint8_t s_reelTaps = 0;
+static uint32_t s_reelExpiresAtMs = 0;
+static uint16_t s_sessionCatches = 0;
+static uint16_t s_sessionInf = 0;
+
+static constexpr uint8_t kReelTapsNeeded = 6;
+static constexpr uint32_t kReelWindowMs = 2200;
 
 static const char *fishingPetPlaceholderFrame()
 {
@@ -135,7 +144,7 @@ static void drawFishingRig()
 
   drawFishingLine();
 
-  if (s_state == FishingState::BITE)
+  if (s_state == FishingState::BITE || s_state == FishingState::REELING)
   {
     const bool bobberVisible = ((now / 160UL) & 1U) == 0;
     drawBobber(bobberVisible);
@@ -184,15 +193,34 @@ static void beginCast()
   requestUIRedraw();
 }
 
+static void fishEscaped()
+{
+  const uint32_t now = millis();
+
+  scheduleNextBite(now);
+  s_biteExpiresAtMs = 0;
+  s_reelTaps = 0;
+  s_reelExpiresAtMs = 0;
+  s_state = FishingState::LINE_OUT;
+
+  soundError();
+  requestUIRedraw();
+}
+
 static void claimReward()
 {
   s_lastReward = random(3, 13);
   addInf(s_lastReward);
 
+  s_sessionCatches++;
+  s_sessionInf += s_lastReward;
+
   const uint32_t now = millis();
   scheduleNextBite(now);
 
   s_biteExpiresAtMs = 0;
+  s_reelTaps = 0;
+  s_reelExpiresAtMs = 0;
   s_state = FishingState::LINE_OUT;
 
   soundWin();
@@ -207,6 +235,10 @@ void activityFishingOnEnter()
   s_biteExpiresAtMs = 0;
   s_nextAnimRedrawMs = 0;
   s_lastReward = 0;
+  s_reelTaps = 0;
+  s_reelExpiresAtMs = 0;
+  s_sessionCatches = 0;
+  s_sessionInf = 0;
 }
 
 void activityFishingHandle(InputState &in)
@@ -229,7 +261,23 @@ void activityFishingHandle(InputState &in)
     }
     else if (s_state == FishingState::BITE)
     {
-      claimReward();
+      s_state = FishingState::REELING;
+      s_reelTaps = 1;
+      s_reelExpiresAtMs = now + kReelWindowMs;
+      soundClick();
+      requestUIRedraw();
+    }
+    else if (s_state == FishingState::REELING)
+    {
+      if (s_reelTaps < 255)
+        s_reelTaps++;
+
+      soundClick();
+
+      if (s_reelTaps >= kReelTapsNeeded)
+        claimReward();
+      else
+        requestUIRedraw();
     }
 
     in.clearEdges();
@@ -245,11 +293,11 @@ void activityFishingHandle(InputState &in)
   }
   else if (s_state == FishingState::BITE && (int32_t)(now - s_biteExpiresAtMs) >= 0)
   {
-    s_state = FishingState::LINE_OUT;
-    scheduleNextBite(now);
-    s_biteExpiresAtMs = 0;
-    soundError();
-    requestUIRedraw();
+    fishEscaped();
+  }
+  else if (s_state == FishingState::REELING && (int32_t)(now - s_reelExpiresAtMs) >= 0)
+  {
+    fishEscaped();
   }
 
   if (s_state != FishingState::IDLE && (int32_t)(now - s_nextAnimRedrawMs) >= 0)
@@ -257,6 +305,48 @@ void activityFishingHandle(InputState &in)
     s_nextAnimRedrawMs = now + kFishingAnimFrameMs;
     requestUIRedraw();
   }
+}
+
+static void drawFishingBottomBar()
+{
+  const PetUIColorScheme ui = uiSchemeForPet(pet.type);
+  const int y = SCREEN_H - TAB_BAR_H;
+
+  spr.fillRect(0, y, SCREEN_W, TAB_BAR_H, ui.tabBg);
+  spr.drawFastHLine(0, y, SCREEN_W, ui.tabOutline);
+
+  char buf[64];
+
+  if (s_state == FishingState::IDLE)
+  {
+    snprintf(buf, sizeof(buf), "Press Enter to cast");
+  }
+  else if (s_state == FishingState::LINE_OUT)
+  {
+    if (s_sessionCatches > 0)
+      snprintf(buf, sizeof(buf), "%u catches  %u INF", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
+    else
+      snprintf(buf, sizeof(buf), "Waiting for a bite...");
+  }
+  else if (s_state == FishingState::BITE)
+  {
+    snprintf(buf, sizeof(buf), "Bite! Press Enter!");
+  }
+  else if (s_state == FishingState::REELING)
+  {
+    snprintf(buf, sizeof(buf), "Mash Enter! %u/%u", (unsigned)s_reelTaps, (unsigned)kReelTapsNeeded);
+  }
+  else
+  {
+    snprintf(buf, sizeof(buf), "Fishing");
+  }
+
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextFont(1);
+  spr.setTextSize(1);
+  spr.setTextColor(ui.tabTextOff, ui.tabBg);
+  spr.drawString(buf, SCREEN_W / 2, y + (TAB_BAR_H / 2));
+  spr.setTextDatum(TL_DATUM);
 }
 
 void activityFishingDraw(bool redrawBg)
@@ -281,7 +371,7 @@ void activityFishingDraw(bool redrawBg)
   drawFishingRig();
 
   drawTopBar();
-  drawTabBar();
+  drawFishingBottomBar();
 
   // HUD/status overlay temporarily disabled so the full background art is visible.
   spr.setTextDatum(TL_DATUM);
