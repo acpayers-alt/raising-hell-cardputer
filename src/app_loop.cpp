@@ -85,8 +85,8 @@
 // -----------------------------------------------------------------------------
 #include "debug_state.h"
 #include "led_status.h"
-#include "support_logging_state.h"
 #include "no_legacy_aliases.h"
+#include "support_logging_state.h"
 
 bool handleMenuInput(InputState &in);
 
@@ -890,7 +890,8 @@ void appMainLoopTick()
     }
   }
 
-  if (g_app.uiState != UIState::CONSOLE && g_app.uiState != UIState::MINI_GAME)
+  if (g_app.uiState != UIState::CONSOLE && g_app.uiState != UIState::MINI_GAME &&
+      g_app.uiState != UIState::ACTIVITY_FISHING)
   {
     if (input.upOnce || input.downOnce || (input.encoderDelta != 0))
       soundMenuTick();

@@ -33,6 +33,7 @@ enum class FishingState : uint8_t
   LINE_OUT,
   BITE,
   REELING,
+  POST_CATCH
 };
 
 static FishingState s_state = FishingState::IDLE;
@@ -65,8 +66,22 @@ static uint32_t s_reelExpiresAtMs = 0;
 static uint16_t s_sessionCatches = 0;
 static uint16_t s_sessionInf = 0;
 
-static constexpr uint8_t kReelTapsNeeded = 6;
-static constexpr uint32_t kReelWindowMs = 2200;
+static uint8_t s_reelTapsNeeded = 6;
+
+static constexpr uint8_t kReelTapsMin = 4;
+static constexpr uint8_t kReelTapsMax = 10;
+
+static constexpr uint32_t kReelWindowMs = 3600;
+
+static uint32_t s_inputLockedUntilMs = 0;
+static constexpr uint32_t kPostCatchInputLockMs = 1000;
+static constexpr uint32_t kPostCatchExtendLockMs = 250;
+
+static uint32_t s_postCatchUntilMs = 0;
+static uint32_t s_postCatchQuietSinceMs = 0;
+static constexpr uint32_t kPostCatchQuietMs = 900;
+static bool s_castArmed = true;
+static constexpr uint32_t kPostCatchReadyMs = 900;
 
 static const char *fishingPetPlaceholderFrame()
 {
@@ -137,7 +152,7 @@ static void drawBiteRipples(uint32_t now)
 
 static void drawFishingRig()
 {
-  if (s_state == FishingState::IDLE)
+  if (s_state == FishingState::IDLE || s_state == FishingState::POST_CATCH)
     return;
 
   const uint32_t now = millis();
@@ -197,11 +212,13 @@ static void fishEscaped()
 {
   const uint32_t now = millis();
 
-  scheduleNextBite(now);
+  s_nextBiteAtMs = 0;
   s_biteExpiresAtMs = 0;
   s_reelTaps = 0;
   s_reelExpiresAtMs = 0;
-  s_state = FishingState::LINE_OUT;
+  s_postCatchUntilMs = now + kPostCatchReadyMs;
+  s_postCatchQuietSinceMs = 0;
+  s_state = FishingState::POST_CATCH;
 
   soundError();
   requestUIRedraw();
@@ -216,12 +233,17 @@ static void claimReward()
   s_sessionInf += s_lastReward;
 
   const uint32_t now = millis();
-  scheduleNextBite(now);
-
+  s_nextBiteAtMs = 0;
   s_biteExpiresAtMs = 0;
   s_reelTaps = 0;
   s_reelExpiresAtMs = 0;
-  s_state = FishingState::LINE_OUT;
+  s_inputLockedUntilMs = now + kPostCatchInputLockMs;
+  s_postCatchUntilMs = now + kPostCatchReadyMs;
+  s_postCatchQuietSinceMs = 0;
+  s_state = FishingState::POST_CATCH;
+  s_castArmed = false;
+  inputForceClear();
+  inputForceClear();
 
   soundWin();
   requestUIRedraw();
@@ -239,6 +261,11 @@ void activityFishingOnEnter()
   s_reelExpiresAtMs = 0;
   s_sessionCatches = 0;
   s_sessionInf = 0;
+  s_inputLockedUntilMs = 0;
+  s_reelTapsNeeded = 6;
+  s_postCatchUntilMs = 0;
+  s_castArmed = true;
+  s_postCatchQuietSinceMs = 0;
 }
 
 void activityFishingHandle(InputState &in)
@@ -250,21 +277,63 @@ void activityFishingHandle(InputState &in)
   }
 
   const bool confirmOnce = in.selectOnce || in.encoderPressOnce || in.mgSelectOnce;
-
   const uint32_t now = millis();
+
+  if (s_state == FishingState::POST_CATCH)
+  {
+    const bool confirmDown =
+        in.selectOnce || in.encoderPressOnce || in.mgSelectOnce || in.selectHeld || in.encoderHeld || in.mgSelectHeld;
+
+    if (confirmDown)
+    {
+      s_postCatchQuietSinceMs = 0;
+      s_postCatchUntilMs = now + kPostCatchReadyMs;
+      in.clearEdges();
+      return;
+    }
+
+    if (s_postCatchQuietSinceMs == 0)
+      s_postCatchQuietSinceMs = now;
+
+    const bool cooldownDone = (int32_t)(now - s_postCatchUntilMs) >= 0;
+    const bool quietDone = (uint32_t)(now - s_postCatchQuietSinceMs) >= kPostCatchQuietMs;
+
+    if (cooldownDone && quietDone)
+    {
+      s_state = FishingState::IDLE;
+      s_postCatchUntilMs = 0;
+      s_postCatchQuietSinceMs = 0;
+      s_castArmed = true;
+      requestUIRedraw();
+    }
+
+    in.clearEdges();
+    return;
+  }
+
+  const bool inputLocked = (int32_t)(now - s_inputLockedUntilMs) < 0;
+
+  if (inputLocked)
+  {
+    if (confirmOnce)
+      s_inputLockedUntilMs = now + kPostCatchExtendLockMs;
+
+    in.clearEdges();
+    return;
+  }
 
   if (confirmOnce)
   {
-    if (s_state == FishingState::IDLE)
+    if (s_state == FishingState::IDLE && s_castArmed)
     {
       beginCast();
     }
     else if (s_state == FishingState::BITE)
     {
       s_state = FishingState::REELING;
+      s_reelTapsNeeded = (uint8_t)random((long)kReelTapsMin, (long)kReelTapsMax + 1L);
       s_reelTaps = 1;
       s_reelExpiresAtMs = now + kReelWindowMs;
-      soundClick();
       requestUIRedraw();
     }
     else if (s_state == FishingState::REELING)
@@ -272,12 +341,15 @@ void activityFishingHandle(InputState &in)
       if (s_reelTaps < 255)
         s_reelTaps++;
 
-      soundClick();
-
-      if (s_reelTaps >= kReelTapsNeeded)
+      if (s_reelTaps >= s_reelTapsNeeded)
+      {
         claimReward();
+      }
       else
+      {
+        s_nextAnimRedrawMs = 0;
         requestUIRedraw();
+      }
     }
 
     in.clearEdges();
@@ -307,6 +379,27 @@ void activityFishingHandle(InputState &in)
   }
 }
 
+static void drawReelProgressBar(int y)
+{
+  if (s_state != FishingState::REELING)
+    return;
+
+  const int barW = 86;
+  const int barH = 5;
+  const int barX = (SCREEN_W - barW) / 2;
+  const int barY = y - barH - 3;
+
+  uint8_t needed = s_reelTapsNeeded;
+  if (needed == 0)
+    needed = 1;
+
+  int fillW = ((int)s_reelTaps * barW) / (int)needed;
+  fillW = clampi(fillW, 0, barW);
+
+  spr.drawRect(barX, barY, barW, barH, TFT_DARKGREY);
+  spr.fillRect(barX + 1, barY + 1, fillW > 2 ? fillW - 2 : 0, barH - 2, TFT_WHITE);
+}
+
 static void drawFishingBottomBar()
 {
   const PetUIColorScheme ui = uiSchemeForPet(pet.type);
@@ -334,7 +427,11 @@ static void drawFishingBottomBar()
   }
   else if (s_state == FishingState::REELING)
   {
-    snprintf(buf, sizeof(buf), "Mash Enter! %u/%u", (unsigned)s_reelTaps, (unsigned)kReelTapsNeeded);
+    snprintf(buf, sizeof(buf), "Mash Enter to reel!");
+  }
+  else if (s_state == FishingState::POST_CATCH)
+  {
+    snprintf(buf, sizeof(buf), "%u catches  %u INF", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
   }
   else
   {
@@ -346,6 +443,7 @@ static void drawFishingBottomBar()
   spr.setTextSize(1);
   spr.setTextColor(ui.tabTextOff, ui.tabBg);
   spr.drawString(buf, SCREEN_W / 2, y + (TAB_BAR_H / 2));
+  drawReelProgressBar(y);
   spr.setTextDatum(TL_DATUM);
 }
 
