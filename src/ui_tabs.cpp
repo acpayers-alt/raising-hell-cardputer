@@ -21,7 +21,7 @@ static inline UIState uiStateForTab(Tab t)
     // PET/Stats/Feed/Play all ride the pet screen handler
     case Tab::TAB_PET:
     case Tab::TAB_STATS:
-    case Tab::TAB_FEED:
+    case Tab::TAB_ACTIVITIES:
     case Tab::TAB_PLAY:
     default:
       return UIState::PET_SCREEN;

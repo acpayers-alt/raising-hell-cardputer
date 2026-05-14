@@ -23,9 +23,11 @@
 #include "shop_screen_state.h"
 #include "sound.h"
 #include "ui_feed_menu.h"
+#include "ui_icons.h"
 #include "ui_menu_state.h"
 #include "ui_sleep_menu.h"
-#include "ui_icons.h"
+
+#include "ui_activities_menu.h"
 
 // Shop item icons (per-pet theme)
 static const char *PATH_SHOP_DEV_FOOD = "/raising_hell/graphics/ui/shop_items/dev/dev_food.png";
@@ -291,39 +293,39 @@ void drawShopScreen()
 
   // Price (icon + value)
   const int cost = availableItems[g_shopScreen.selectedIndex].price;
-  
+
   spr.setTextFont(2);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  
+
   // Right-aligned anchor
   const int priceRightX = panelX + panelW - 8;
   const int priceY = imgY + (imgH - spr.fontHeight()) / 2;
-  
+
   // Measure text first so we can right-align the whole block
   String priceStr = String(cost);
   const int textW = spr.textWidth(priceStr);
-  
+
   // Icon placement (to the left of text)
   const int iconW = INF_ICON_LARGE_W;
   const int iconH = INF_ICON_LARGE_H;
-  
+
   // total width = icon + spacing + text
   const int totalW = iconW + 3 + textW;
-  
+
   // starting X so the whole thing is right-aligned
   const int startX = priceRightX - totalW;
-  
+
   // vertically center icon relative to image block
   const int iconY = imgY + (imgH - iconH) / 2;
-  
+
   // draw icon
   drawHudIconCached(INF_ICON_LARGE_PATH, startX, iconY);
-    
+
   // draw number
   spr.setTextDatum(TL_DATUM);
   spr.drawString(priceStr, startX + iconW + 3, priceY);
-  
+
   // Effects at the bottom
   String eff;
   switch (selType)
@@ -360,6 +362,62 @@ void drawShopScreen()
     spr.drawString(eff, effectsX, effectsY);
     spr.setTextDatum(TL_DATUM);
   }
+}
+
+void drawActivitiesMenu()
+{
+  drawNonPetTabBackground();
+  drawTopBar();
+  drawTabBar();
+
+  const int contentY = TOP_BAR_H;
+  const int contentH = SCREEN_H - TOP_BAR_H - TAB_BAR_H;
+  const int contentBottom = contentY + contentH;
+
+  const int totalItems = uiActivitiesMenuCount();
+  feedMenuIndex = clampi(feedMenuIndex, 0, totalItems - 1);
+
+  constexpr int MAX_VISIBLE = 3;
+  int start = 0, visCount = 0;
+  listWindow(totalItems, feedMenuIndex, MAX_VISIBLE, start, visCount);
+
+  const int itemH = 22;
+  const int gap = 6;
+  const int totalH = visCount * itemH + (visCount - 1) * gap;
+
+  const int boxW = (SCREEN_W * 3) / 4;
+  const int boxX = (SCREEN_W - boxW) / 2;
+  const int radius = 10;
+
+  int startY = contentY + (contentH - totalH) / 2;
+  startY = clampi(startY, contentY, contentBottom - totalH);
+
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+  spr.setTextDatum(TL_DATUM);
+
+  for (int row = 0; row < visCount; row++)
+  {
+    const int i = start + row;
+    const int y = startY + row * (itemH + gap);
+    const bool sel = (i == feedMenuIndex);
+
+    const uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
+    const uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
+    const uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
+
+    spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);
+    spr.drawRoundRect(boxX, y, boxW, itemH, radius, outline);
+
+    const int cx = boxX + boxW / 2;
+    const int th = spr.fontHeight();
+    const int ty = y + (itemH - th) / 2;
+
+    spr.setTextColor(textCol, fill);
+    spr.drawCentreString(uiActivitiesMenuLabel(i), cx, ty, 2);
+  }
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 void drawFeedMenu()

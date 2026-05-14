@@ -10,7 +10,7 @@ enum class Tab : uint8_t
 {
   TAB_PET,
   TAB_STATS,
-  TAB_FEED,
+  TAB_ACTIVITIES,
   TAB_PLAY,
   TAB_SLEEP,
   TAB_INV,
@@ -56,6 +56,7 @@ enum class UIState : uint8_t
   BACKUP_PET_LIST = 30,
   CLOCK_MODE = 31,
   WHATS_NEW = 32,
+  ACTIVITY_FISHING = 33,
 };
 
 // --------------------
@@ -65,7 +66,7 @@ enum class HomeApp : uint8_t
 {
   PET,
   STATS,
-  FEED,
+  ACTIVITIES,
   PLAY,
   SLEEP,
   INVENTORY,

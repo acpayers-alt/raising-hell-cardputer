@@ -277,7 +277,7 @@ void drawTabBar()
 
   constexpr int MAX_VISIBLE_TABS = 5;
 
-  static const char *labels[] = {"PET", "STAT", "FEED", "PLAY", "SLEEP", "INV", "SHOP"};
+  static const char *labels[] = {"PET", "STAT", "ACT", "PLAY", "SLEEP", "INV", "SHOP"};
   const int labelsCount = (int)(sizeof(labels) / sizeof(labels[0]));
 
   spr.fillRect(0, y, SCREEN_W, TAB_BAR_H, bg);

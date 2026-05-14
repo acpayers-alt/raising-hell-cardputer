@@ -16,6 +16,8 @@
 #include "whats_new_state.h"
 #include "wifi_setup_state.h"
 
+#include "activity_fishing.h"
+
 bool g_suppressMenuTick = false;
 
 // ----------------------------------------------------------------------------
@@ -101,6 +103,10 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
   case UIState::POWER_MENU:
     clearInputLatch();
     in.clearEdges();
+    break;
+
+  case UIState::ACTIVITY_FISHING:
+    activityFishingOnEnter();
     break;
 
   default:

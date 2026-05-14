@@ -17,6 +17,8 @@
 #include "ui_menu_state.h" // feedMenuIndex, playMenuIndex
 #include "ui_play_menu.h"
 
+#include "ui_activities_menu.h"
+
 // PET/STATS/FEED/PLAY all ride UIState::PET_SCREEN.
 //
 // IMPORTANT:
@@ -40,10 +42,10 @@ static void handlePetScreen_local(InputState &input)
     inputSetTextCapture(false);
   }
 
-  if (g_app.currentTab == Tab::TAB_FEED)
+  if (g_app.currentTab == Tab::TAB_ACTIVITIES)
   {
-    const int kFeedItems = uiFeedMenuCount();
-    if (kFeedItems <= 0)
+    const int kItems = uiActivitiesMenuCount();
+    if (kItems <= 0)
       return;
 
     int mv = 0;
@@ -56,8 +58,8 @@ static void handlePetScreen_local(InputState &input)
     {
       feedMenuIndex += mv;
       while (feedMenuIndex < 0)
-        feedMenuIndex += kFeedItems;
-      feedMenuIndex %= kFeedItems;
+        feedMenuIndex += kItems;
+      feedMenuIndex %= kItems;
 
       requestUIRedraw();
       playBeep();
@@ -71,7 +73,7 @@ static void handlePetScreen_local(InputState &input)
     if (confirmOnce)
     {
       inputForceClear();
-      uiFeedMenuActivate(feedMenuIndex, input);
+      uiActivitiesMenuActivate(feedMenuIndex, input);
       swallowThisFrame(input);
     }
     return;
@@ -127,7 +129,7 @@ static void handlePetScreen_local(InputState &input)
       }
 
       const int selectedIndex = playMenuIndex;
-      
+
       // Clear any queued/held input so Enter doesn't immediately act in the game.
       inputForceClear();
 

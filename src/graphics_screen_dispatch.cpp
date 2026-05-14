@@ -16,6 +16,8 @@
 // -----------------------------------------------------------------------------
 // Forward declarations for draw helpers still owned by other modules
 // -----------------------------------------------------------------------------
+void activityFishingDraw(bool redrawBg);
+void drawActivitiesMenu();
 
 void drawPetScreen(bool redrawBg);
 void drawFeedMenu();
@@ -69,8 +71,8 @@ static void drawTabDrivenScreen(bool redrawBg)
   case Tab::TAB_STATS:
     drawStatsTab(redrawBg);
     break;
-  case Tab::TAB_FEED:
-    drawFeedMenu();
+  case Tab::TAB_ACTIVITIES:
+    drawActivitiesMenu();
     break;
   case Tab::TAB_PLAY:
     drawPlayTab(redrawBg);
@@ -239,6 +241,10 @@ void drawCurrentScreen(bool redrawBg)
   case UIState::SETTINGS:
     drawSettingsMenu();
     break;
+
+  case UIState::ACTIVITY_FISHING:
+    activityFishingDraw(redrawBg);
+    return;
 
   case UIState::SLEEP_MENU:
     drawSleepMenu();

@@ -28,7 +28,7 @@ void uiTabDrivenHandle(InputState& in)
       return;
 
     case Tab::TAB_PET:
-    case Tab::TAB_FEED:
+    case Tab::TAB_ACTIVITIES:
     case Tab::TAB_PLAY:
     default:
       uiPetScreenHandle(in);
