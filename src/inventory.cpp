@@ -7,6 +7,7 @@
 #include "evolution_flow.h"
 #include "graphics.h"
 #include "pet.h"
+#include "pet_action_gate.h"
 #include "save_manager.h"
 #include "savegame.h"
 
@@ -477,17 +478,8 @@ void Inventory::useSelectedItem()
 
     const PetMood mood = pet.getMood();
 
-    if (mood == MOOD_SICK)
-    {
-      ui_showMessage("Too sick to evolve");
+    if (uiBlockIfPetConditionBarsAction())
       return;
-    }
-
-    if (mood != MOOD_HAPPY && mood != MOOD_BORED)
-    {
-      ui_showMessage("Must be happy or bored");
-      return;
-    }
 
     const uint8_t fromStage = pet.evoStage;
     const uint8_t toStage = (uint8_t)(pet.evoStage + 1);

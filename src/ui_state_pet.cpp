@@ -10,6 +10,7 @@
 #include "input.h"
 #include "mini_games.h" // startFlappyFireball(), startInfernalDodger(), startCrossyRoad()
 #include "pet.h"
+#include "pet_action_gate.h"
 #include "save_manager.h"
 #include "sound.h"
 #include "ui_actions.h" // uiActionSwallowEdges, uiActionDrainKb
@@ -72,6 +73,12 @@ static void handlePetScreen_local(InputState &input)
 
     if (confirmOnce)
     {
+      if (uiBlockIfPetConditionBarsAction())
+      {
+        swallowThisFrame(input);
+        return;
+      }
+
       inputForceClear();
       uiActivitiesMenuActivate(feedMenuIndex, input);
       swallowThisFrame(input);
@@ -109,21 +116,8 @@ static void handlePetScreen_local(InputState &input)
 
     if (confirmOnce)
     {
-      if (pet.getMood() == MOOD_SICK)
+      if (uiBlockIfPetConditionBarsAction())
       {
-        char msg[64];
-        snprintf(msg, sizeof(msg), "%s is too sick to play.", pet.getName());
-
-        ui_showMessage(msg);
-        soundError();
-        swallowThisFrame(input);
-        return;
-      }
-
-      if (pet.energy < 10)
-      {
-        ui_showMessage("Too tired!");
-        soundError();
         swallowThisFrame(input);
         return;
       }
