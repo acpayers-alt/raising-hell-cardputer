@@ -178,6 +178,32 @@ const char *getBioStatusImagePath()
     }
   }
 
+  // --------------------------------------------------------------------------
+  // ALIEN BIOS
+  // --------------------------------------------------------------------------
+  if (pet.type == PET_ALIEN)
+  {
+    // ---------------- BABY ----------------
+    if (pet.evoStage == 0)
+    {
+      switch (mood)
+      {
+      case MOOD_SICK:
+        return "/raising_hell/graphics/pet/bio/al/bb/al_bb_sck_bio.png";
+      case MOOD_TIRED:
+        return "/raising_hell/graphics/pet/bio/al/bb/al_bb_trd_bio.png";
+      case MOOD_HUNGRY:
+        return "/raising_hell/graphics/pet/bio/al/bb/al_bb_hgy_bio.png";
+      case MOOD_MAD:
+        return "/raising_hell/graphics/pet/bio/al/bb/al_bb_agy_bio.png";
+      case MOOD_BORED:
+        return "/raising_hell/graphics/pet/bio/al/bb/al_bb_brd_bio.png";
+      default:
+        return "/raising_hell/graphics/pet/bio/al/bb/al_bb_hpy_bio.png";
+      }
+    }
+  }
+
   // Fallback for future stages
   return "/raising_hell/graphics/pet/bio/eld/eld_baby_hpy_bio.png";
 }

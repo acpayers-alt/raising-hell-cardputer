@@ -53,10 +53,10 @@ static constexpr uint32_t kBiteWindowMs = 1500;
 static constexpr uint32_t kFishingAnimFrameMs = 120;
 static constexpr uint32_t kCastingPoseMs = 260;
 
-static constexpr int kRodTipX = 110;
-static constexpr int kRodTipY = TOP_BAR_H + 20;
+static constexpr int kRodTipX = 115;
+static constexpr int kRodTipY = TOP_BAR_H + 18;
 static constexpr int kReelRodTipX = 123;
-static constexpr int kReelRodTipY = TOP_BAR_H + 30;
+static constexpr int kReelRodTipY = TOP_BAR_H + 33;
 static constexpr int kBobberX = 171;
 static constexpr int kBobberY = TOP_BAR_H + 61;
 
