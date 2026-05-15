@@ -47,8 +47,8 @@ static bool s_showCatchPose = false;
 static int s_lastReward = 0;
 
 static constexpr uint32_t kFishingCatchXp = 50;
-static constexpr uint32_t kMinBiteDelayMs = 1800;
-static constexpr uint32_t kMaxBiteDelayMs = 4200;
+static constexpr uint32_t kMinBiteDelayMs = 2200;
+static constexpr uint32_t kMaxBiteDelayMs = 7200;
 static constexpr uint32_t kBiteWindowMs = 1500;
 static constexpr uint32_t kFishingAnimFrameMs = 120;
 static constexpr uint32_t kCastingPoseMs = 260;
@@ -531,6 +531,44 @@ static void drawFishingBottomBar()
   spr.setTextDatum(TL_DATUM);
 }
 
+static void drawBaitCounter()
+{
+  const int baitCount = g_app.inventory.countType(ITEM_FISHING_BAIT);
+
+  char buf[24];
+  std::snprintf(buf, sizeof(buf), "Bait: %d", baitCount);
+
+  spr.setTextFont(2);
+  spr.setTextSize(1);
+
+  const int textW = spr.textWidth(buf);
+  const int textH = spr.fontHeight();
+
+  const int padX = 4;
+  const int padY = 2;
+  const int boxW = textW + padX * 2;
+  const int boxH = textH + padY * 2;
+  const int boxX = SCREEN_W - boxW - 4;
+  const int boxY = TOP_BAR_H + 3;
+
+  for (int y = boxY; y < boxY + boxH; ++y)
+  {
+    for (int x = boxX; x < boxX + boxW; ++x)
+    {
+      if (((x + y) & 1) == 0)
+        spr.drawPixel(x, y, 0x4208);
+    }
+  }
+
+  spr.drawRect(boxX, boxY, boxW, boxH, 0x630C);
+
+  spr.setTextDatum(TL_DATUM);
+  spr.setTextColor(TFT_WHITE); // transparent text background
+  spr.drawString(buf, boxX + padX, boxY + padY);
+
+  spr.setTextDatum(TL_DATUM);
+}
+
 void activityFishingDraw(bool redrawBg)
 {
   (void)redrawBg;
@@ -551,6 +589,7 @@ void activityFishingDraw(bool redrawBg)
 
   drawFishingPet();
   drawFishingRig();
+  drawBaitCounter();
 
   drawTopBar();
   drawFishingBottomBar();
