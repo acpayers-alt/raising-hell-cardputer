@@ -495,10 +495,7 @@ static void drawFishingBottomBar()
   }
   else if (s_state == FishingState::LINE_OUT)
   {
-    if (s_sessionCatches > 0)
-      snprintf(buf, sizeof(buf), "%u catches  +%u XP", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
-    else
-      snprintf(buf, sizeof(buf), "Waiting for a bite...");
+    snprintf(buf, sizeof(buf), "Waiting for a bite...");
   }
   else if (s_state == FishingState::BITE)
   {
