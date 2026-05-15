@@ -394,6 +394,17 @@ void activityFishingHandle(InputState &in)
     {
       beginCast();
     }
+    else if (s_state == FishingState::LINE_OUT)
+    {
+      s_nextBiteAtMs = 0;
+      s_biteExpiresAtMs = 0;
+      s_reelTaps = 0;
+      s_reelExpiresAtMs = 0;
+      s_showCatchPose = false;
+      s_state = FishingState::IDLE;
+      s_castArmed = true;
+      requestUIRedraw();
+    }
     else if (s_state == FishingState::BITE)
     {
       s_state = FishingState::REELING;
