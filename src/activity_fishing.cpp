@@ -14,6 +14,7 @@
 #include "graphics_shared_utils.h"
 #include "graphics_ui_common.h"
 #include "input.h"
+#include "inventory.h"
 #include "pet.h"
 #include "pet_visuals.h"
 #include "save_manager.h"
@@ -45,7 +46,7 @@ static uint32_t s_castingUntilMs = 0;
 static bool s_showCatchPose = false;
 static int s_lastReward = 0;
 
-static constexpr int kFishingEnergyCost = 4;
+static constexpr uint32_t kFishingCatchXp = 50;
 static constexpr uint32_t kMinBiteDelayMs = 1800;
 static constexpr uint32_t kMaxBiteDelayMs = 4200;
 static constexpr uint32_t kBiteWindowMs = 1500;
@@ -223,15 +224,14 @@ static const char *fishingBgForPet()
 
 static void beginCast()
 {
-  if (pet.energy < kFishingEnergyCost)
+  if (!g_app.inventory.hasItem(ITEM_FISHING_BAIT))
   {
-    ui_showMessage("Too tired to cast.");
+    ui_showMessage("Need bait.");
     soundError();
     return;
   }
 
-  pet.energy = constrain(pet.energy - kFishingEnergyCost, 0, 100);
-  saveManagerMarkDirty();
+  g_app.inventory.removeItem(ITEM_FISHING_BAIT, 1);
 
   const uint32_t now = millis();
 
@@ -263,11 +263,10 @@ static void fishEscaped()
 
 static void claimReward()
 {
-  s_lastReward = random(3, 13);
-  addInf(s_lastReward);
+  s_lastReward = (int)kFishingCatchXp;
+  pet.addXP(kFishingCatchXp);
 
   s_sessionCatches++;
-  s_sessionInf += s_lastReward;
 
   const uint32_t now = millis();
   s_nextBiteAtMs = 0;
@@ -396,6 +395,9 @@ void activityFishingHandle(InputState &in)
     }
     else if (s_state == FishingState::LINE_OUT)
     {
+      // Reel in before a bite: return the unused bait.
+      g_app.inventory.addItem(ITEM_FISHING_BAIT, 1);
+
       s_nextBiteAtMs = 0;
       s_biteExpiresAtMs = 0;
       s_reelTaps = 0;
@@ -494,7 +496,7 @@ static void drawFishingBottomBar()
   else if (s_state == FishingState::LINE_OUT)
   {
     if (s_sessionCatches > 0)
-      snprintf(buf, sizeof(buf), "%u catches  %u INF", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
+      snprintf(buf, sizeof(buf), "%u catches  +%u XP", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
     else
       snprintf(buf, sizeof(buf), "Waiting for a bite...");
   }
@@ -508,7 +510,8 @@ static void drawFishingBottomBar()
   }
   else if (s_state == FishingState::POST_CATCH)
   {
-    snprintf(buf, sizeof(buf), "%u catches  %u INF", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
+    snprintf(buf, sizeof(buf), "%u catches  +%u XP", (unsigned)s_sessionCatches,
+             (unsigned)(s_sessionCatches * kFishingCatchXp));
   }
   else if (s_state == FishingState::CASTING)
   {

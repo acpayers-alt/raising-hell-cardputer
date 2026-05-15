@@ -39,6 +39,8 @@ static const char *itemNameForPet(ItemType type, PetType petType)
       return "Ink Sigil Chalk";
     case ITEM_ELDRITCH_EYE:
       return "Staring Pearl";
+    case ITEM_FISHING_BAIT:
+      return "Fishing Bait";
     default:
       return "";
     }
@@ -57,6 +59,8 @@ static const char *itemNameForPet(ItemType type, PetType petType)
       return "Ritual Chalk";
     case ITEM_ELDRITCH_EYE:
       return "Eldritch Eye";
+    case ITEM_FISHING_BAIT:
+      return "Fishing Bait";
     default:
       return "";
     }
@@ -84,6 +88,8 @@ static const char *itemDescForPet(ItemType type, PetType petType)
   case ITEM_ELDRITCH_EYE:
     return eld ? "A pearl that stares back—do not blink." : "A forbidden eye artifact. It watches.";
 
+  case ITEM_FISHING_BAIT:
+    return "Used to cast a line while fishing.";
   case ITEM_NONE:
   default:
     return "";
@@ -124,6 +130,9 @@ ItemDeltas inventoryPreviewDeltas(ItemType type)
 
   case ITEM_ELDRITCH_EYE:
     d.xp = 10;
+    break;
+
+  case ITEM_FISHING_BAIT:
     break;
 
   default:
@@ -238,7 +247,7 @@ void Inventory::fromPersist(const InvPersist &in)
     const uint8_t t = in.slots[i].type;
     const uint8_t q = in.slots[i].qty;
 
-    if (t > (uint8_t)ITEM_ELDRITCH_EYE)
+    if (t > (uint8_t)ITEM_FISHING_BAIT)
       continue;
 
     items[i].type = (ItemType)t;
@@ -489,6 +498,10 @@ void Inventory::useSelectedItem()
     changedPet = true;
     break;
   }
+
+  case ITEM_FISHING_BAIT:
+    ui_showMessage("Use this while fishing.");
+    return;
 
   default:
     return;

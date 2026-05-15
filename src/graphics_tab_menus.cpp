@@ -60,6 +60,8 @@ static ItemType shopItemTypeForIndexLocal(int idx)
     return ITEM_RITUAL_CHALK;
   case 4:
     return ITEM_ELDRITCH_EYE;
+  case 5:
+    return ITEM_FISHING_BAIT;
   default:
     return ITEM_NONE;
   }
@@ -277,6 +279,9 @@ void drawShopScreen()
   case ITEM_ELDRITCH_EYE:
     imgPath = eldTheme ? PATH_SHOP_ELD_EVO : PATH_SHOP_DEV_EVO;
     break;
+  case ITEM_FISHING_BAIT:
+    imgPath = eldTheme ? PATH_SHOP_ELD_FOOD : PATH_SHOP_DEV_FOOD;
+    break;
   default:
     imgPath = nullptr;
     break;
@@ -344,6 +349,9 @@ void drawShopScreen()
     break;
   case ITEM_ELDRITCH_EYE:
     eff = "Evolve Now";
+    break;
+  case ITEM_FISHING_BAIT:
+    eff = "Fishing x3";
     break;
   default:
     eff = "";
