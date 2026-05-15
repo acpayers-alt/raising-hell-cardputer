@@ -848,9 +848,18 @@ void appMainLoopTick()
 
     if (input.selectOnce || input.encoderPressOnce)
     {
-      uiDismissLevelUpPopup();
       consumeConfirmInput(input);
-      requestUIRedraw();
+
+      if (uiLevelUpPopupCanDismiss())
+      {
+        uiDismissLevelUpPopup();
+        requestUIRedraw();
+      }
+      else
+      {
+        inputForceClear();
+        requestUIRedraw();
+      }
     }
     else
     {

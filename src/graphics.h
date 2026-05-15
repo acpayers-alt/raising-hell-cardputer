@@ -1,10 +1,10 @@
 #pragma once
 
 #include "activity.h"
+#include "graphics_sd_draw.h"
 #include "ui_defs.h"
 #include <Arduino.h>
 #include <M5GFX.h>
-#include "graphics_sd_draw.h"
 
 #ifndef TFT_BLACK
 #define TFT_BLACK 0x0000
@@ -101,6 +101,7 @@ void startPetIntroWalkFromLeft();
 // Level-up modal
 void uiShowLevelUpPopup(uint16_t newLevel);
 bool uiIsLevelUpPopupActive();
+bool uiLevelUpPopupCanDismiss();
 void uiDismissLevelUpPopup();
 void uiDrawLevelUpPopup(); // draws overlay into spr (does not push)
 

@@ -15,6 +15,8 @@ extern Pet pet;
 
 static bool g_levelUpPopupActive = false;
 static uint16_t g_levelUpPopupLevel = 0;
+static uint32_t g_levelUpPopupShownAtMs = 0;
+static constexpr uint32_t kLevelUpPopupMinHoldMs = 1000;
 
 static bool g_toastActive = false;
 static uint32_t g_toastUntilMs = 0;
@@ -129,18 +131,25 @@ void uiShowLevelUpPopup(uint16_t newLevel)
 {
   g_levelUpPopupActive = true;
   g_levelUpPopupLevel = newLevel;
+  g_levelUpPopupShownAtMs = millis();
   invalidateBackgroundCache();
   requestUIRedraw();
 }
 
-bool uiIsLevelUpPopupActive()
+bool uiIsLevelUpPopupActive() { return g_levelUpPopupActive; }
+
+bool uiLevelUpPopupCanDismiss()
 {
-  return g_levelUpPopupActive;
+  if (!g_levelUpPopupActive)
+    return false;
+
+  return (uint32_t)(millis() - g_levelUpPopupShownAtMs) >= kLevelUpPopupMinHoldMs;
 }
 
 void uiDismissLevelUpPopup()
 {
   g_levelUpPopupActive = false;
+  g_levelUpPopupShownAtMs = 0;
   invalidateBackgroundCache();
   requestUIRedraw();
 }
@@ -191,25 +200,13 @@ static void uiShowToastInternal(const char *msg, uint32_t durationMs)
   requestUIRedraw();
 }
 
-void ui_showMessage(const char *msg)
-{
-  uiShowToastInternal(msg, 900);
-}
+void ui_showMessage(const char *msg) { uiShowToastInternal(msg, 900); }
 
-void ui_showTimedMessage(const char *msg, uint32_t durationMs)
-{
-  uiShowToastInternal(msg, durationMs);
-}
+void ui_showTimedMessage(const char *msg, uint32_t durationMs) { uiShowToastInternal(msg, durationMs); }
 
-bool uiToastIsActive()
-{
-  return g_toastActive;
-}
+bool uiToastIsActive() { return g_toastActive; }
 
-bool uiToastIsPersistent()
-{
-  return g_toastActive && g_toastUntilMs == 0;
-}
+bool uiToastIsPersistent() { return g_toastActive && g_toastUntilMs == 0; }
 
 void uiDismissToast()
 {
@@ -222,10 +219,7 @@ void uiDismissToast()
   requestFullUIRedraw();
 }
 
-void ui_showSuccessMessage(const char *msg)
-{
-  uiShowToastInternal(msg, 1200);
-}
+void ui_showSuccessMessage(const char *msg) { uiShowToastInternal(msg, 1200); }
 
 void uiBeginAlertScreenFlash(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -339,7 +333,7 @@ void uiDrawToastOverlay()
   }
 
   spr.setTextDatum(TL_DATUM);
-  
+
   requestUIRedraw();
 }
 
@@ -390,7 +384,4 @@ static void drawPowerMenuOverlay()
   spr.setTextDatum(TL_DATUM);
 }
 
-void drawPowerMenu()
-{
-  drawPowerMenuOverlay();
-}
+void drawPowerMenu() { drawPowerMenuOverlay(); }
