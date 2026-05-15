@@ -30,6 +30,7 @@ namespace
 enum class FishingState : uint8_t
 {
   IDLE = 0,
+  CASTING,
   LINE_OUT,
   BITE,
   REELING,
@@ -40,6 +41,8 @@ static FishingState s_state = FishingState::IDLE;
 static uint32_t s_nextBiteAtMs = 0;
 static uint32_t s_biteExpiresAtMs = 0;
 static uint32_t s_nextAnimRedrawMs = 0;
+static uint32_t s_castingUntilMs = 0;
+static bool s_showCatchPose = false;
 static int s_lastReward = 0;
 
 static constexpr int kFishingEnergyCost = 4;
@@ -47,9 +50,12 @@ static constexpr uint32_t kMinBiteDelayMs = 1800;
 static constexpr uint32_t kMaxBiteDelayMs = 4200;
 static constexpr uint32_t kBiteWindowMs = 1500;
 static constexpr uint32_t kFishingAnimFrameMs = 120;
+static constexpr uint32_t kCastingPoseMs = 260;
 
-static constexpr int kRodTipX = 88;
-static constexpr int kRodTipY = TOP_BAR_H + 47;
+static constexpr int kRodTipX = 110;
+static constexpr int kRodTipY = TOP_BAR_H + 20;
+static constexpr int kReelRodTipX = 123;
+static constexpr int kReelRodTipY = TOP_BAR_H + 30;
 static constexpr int kBobberX = 171;
 static constexpr int kBobberY = TOP_BAR_H + 61;
 
@@ -83,8 +89,28 @@ static constexpr uint32_t kPostCatchQuietMs = 900;
 static bool s_castArmed = true;
 static constexpr uint32_t kPostCatchReadyMs = 900;
 
-static const char *fishingPetPlaceholderFrame()
+static const char *fishingPetFrameForState()
 {
+  if (pet.type == PET_ALIEN && pet.evoStage == 0)
+  {
+    switch (s_state)
+    {
+    case FishingState::CASTING:
+      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim4.png";
+    case FishingState::LINE_OUT:
+    case FishingState::BITE:
+      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim2.png";
+    case FishingState::REELING:
+      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim3.png";
+    case FishingState::POST_CATCH:
+      return s_showCatchPose ? "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim5.png"
+                             : "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim1.png";
+    case FishingState::IDLE:
+    default:
+      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim1.png";
+    }
+  }
+
   const AnimClip *clip = animGetClip(ANIM_ALIEN_BABY_BORED_IDLE);
   if (!clip || !clip->frames || clip->frameCount == 0)
     return nullptr;
@@ -92,9 +118,9 @@ static const char *fishingPetPlaceholderFrame()
   return clip->frames[0];
 }
 
-static void drawFishingPetPlaceholder()
+static void drawFishingPet()
 {
-  const char *path = fishingPetPlaceholderFrame();
+  const char *path = fishingPetFrameForState();
   if (!path || !path[0])
     return;
 
@@ -113,7 +139,13 @@ static void scheduleNextBite(uint32_t now)
   s_nextBiteAtMs = now + random((long)kMinBiteDelayMs, (long)kMaxBiteDelayMs + 1L);
 }
 
-static void drawFishingLine() { spr.drawLine(kRodTipX, kRodTipY, kBobberX, kBobberY, TFT_WHITE); }
+static void drawFishingLine()
+{
+  const int rodX = (s_state == FishingState::REELING) ? kReelRodTipX : kRodTipX;
+  const int rodY = (s_state == FishingState::REELING) ? kReelRodTipY : kRodTipY;
+
+  spr.drawLine(rodX, rodY, kBobberX, kBobberY, TFT_WHITE);
+}
 
 static void drawBobber(bool visible)
 {
@@ -152,7 +184,10 @@ static void drawBiteRipples(uint32_t now)
 
 static void drawFishingRig()
 {
-  if (s_state == FishingState::IDLE || s_state == FishingState::POST_CATCH)
+  if (s_state == FishingState::IDLE || s_state == FishingState::CASTING || s_state == FishingState::POST_CATCH)
+    return;
+
+  if (s_state == FishingState::LINE_OUT && s_nextBiteAtMs == 0)
     return;
 
   const uint32_t now = millis();
@@ -199,10 +234,12 @@ static void beginCast()
   saveManagerMarkDirty();
 
   const uint32_t now = millis();
-  scheduleNextBite(now);
 
+  s_nextBiteAtMs = 0;
   s_biteExpiresAtMs = 0;
-  s_state = FishingState::LINE_OUT;
+  s_castingUntilMs = now + kCastingPoseMs;
+  s_showCatchPose = false;
+  s_state = FishingState::CASTING;
 
   soundClick();
   requestUIRedraw();
@@ -240,6 +277,7 @@ static void claimReward()
   s_inputLockedUntilMs = now + kPostCatchInputLockMs;
   s_postCatchUntilMs = now + kPostCatchReadyMs;
   s_postCatchQuietSinceMs = 0;
+  s_showCatchPose = true;
   s_state = FishingState::POST_CATCH;
   s_castArmed = false;
   inputForceClear();
@@ -256,6 +294,8 @@ void activityFishingOnEnter()
   s_nextBiteAtMs = 0;
   s_biteExpiresAtMs = 0;
   s_nextAnimRedrawMs = 0;
+  s_castingUntilMs = 0;
+  s_showCatchPose = false;
   s_lastReward = 0;
   s_reelTaps = 0;
   s_reelExpiresAtMs = 0;
@@ -304,6 +344,32 @@ void activityFishingHandle(InputState &in)
       s_postCatchUntilMs = 0;
       s_postCatchQuietSinceMs = 0;
       s_castArmed = true;
+      requestUIRedraw();
+    }
+
+    in.clearEdges();
+    return;
+  }
+
+  if (s_state == FishingState::CASTING)
+  {
+    if ((int32_t)(now - s_castingUntilMs) >= 0)
+    {
+      s_castingUntilMs = 0;
+      s_state = FishingState::LINE_OUT;
+      s_nextAnimRedrawMs = now + 180UL;
+      requestUIRedraw();
+    }
+
+    in.clearEdges();
+    return;
+  }
+
+  if (s_state == FishingState::LINE_OUT && s_nextBiteAtMs == 0)
+  {
+    if ((int32_t)(now - s_nextAnimRedrawMs) >= 0)
+    {
+      scheduleNextBite(now);
       requestUIRedraw();
     }
 
@@ -433,6 +499,10 @@ static void drawFishingBottomBar()
   {
     snprintf(buf, sizeof(buf), "%u catches  %u INF", (unsigned)s_sessionCatches, (unsigned)s_sessionInf);
   }
+  else if (s_state == FishingState::CASTING)
+  {
+    snprintf(buf, sizeof(buf), "Casting...");
+  }
   else
   {
     snprintf(buf, sizeof(buf), "Fishing");
@@ -465,7 +535,7 @@ void activityFishingDraw(bool redrawBg)
     spr.fillRect(kActivityBgX, kActivityBgY, kActivityBgW, kActivityBgH, TFT_BLACK);
   }
 
-  drawFishingPetPlaceholder();
+  drawFishingPet();
   drawFishingRig();
 
   drawTopBar();
