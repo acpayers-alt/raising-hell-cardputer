@@ -32,14 +32,14 @@ static const char *PATH_BG_SPLASH = "/raising_hell/graphics/background/flow/rh_s
 // Provided by graphics.cpp
 bool isScreenOn();
 
-static void drawTitleMenuText(M5Canvas &dst, const char *text, int x, int y, uint8_t font, uint16_t fg,
+static void drawTitleMenuText(M5Canvas &dst, const char *text, int x, int y, uint8_t font, uint8_t size, uint16_t fg,
                               textdatum_t datum)
 {
   if (!text || !*text)
     return;
 
   dst.setTextFont(font);
-  dst.setTextSize(1);
+  dst.setTextSize(size);
   dst.setTextDatum(datum);
   dst.setTextColor(fg);
   dst.drawString(text, x, y, font);
@@ -293,6 +293,16 @@ void drawBackupPetListScreen(bool redrawBg)
   }
 }
 
+static void drawTitleScrollUpIndicator(int cx, int cy, uint16_t color)
+{
+  spr.fillTriangle(cx, cy - 5, cx - 6, cy + 5, cx + 6, cy + 5, color);
+}
+
+static void drawTitleScrollDownIndicator(int cx, int cy, uint16_t color)
+{
+  spr.fillTriangle(cx, cy + 5, cx - 6, cy - 5, cx + 6, cy - 5, color);
+}
+
 void drawTitleMenuScreen(bool redrawBg)
 {
   (void)redrawBg;
@@ -384,16 +394,33 @@ void drawTitleMenuScreen(bool redrawBg)
   }
 
   const char *storageLabel = hasImport ? "Pet Storage" : "Pet Storage Empty";
-  const char *labels[3] = {row0Buf, storageLabel, "Settings"};
-  const bool enabled[3] = {true, true, true};
+  const char *labels[4] = {row0Buf, storageLabel, "Photo Gallery", "Settings"};
+  const bool enabled[4] = {true, hasImport, true, true};
 
   const int rowH = 18;
-  const int itemCount = 3;
+  const int itemCount = 4;
+  const int maxVisible = 3;
+
+  int start = 0;
+  int visCount = itemCount;
+
+  if (itemCount > maxVisible)
+  {
+    visCount = maxVisible;
+
+    if (g_titleMenuIndex <= 0)
+      start = 0;
+    else if (g_titleMenuIndex >= itemCount - 1)
+      start = itemCount - visCount;
+    else
+      start = g_titleMenuIndex - 1;
+  }
+
   const int menuTopY = (SCREEN_H / 2) + 12;
   const int menuPadX = 12;
   const int menuPadY = 8;
   const int menuBoxY = menuTopY - menuPadY;
-  const int menuBoxH = (itemCount * rowH) + (menuPadY * 2);
+  const int menuBoxH = (visCount * rowH) + (menuPadY * 2);
 
   const int panelX = menuPadX;
   const int panelY = menuBoxY;
@@ -409,9 +436,10 @@ void drawTitleMenuScreen(bool redrawBg)
     }
   }
 
-  for (int i = 0; i < itemCount; ++i)
+  for (int row = 0; row < visCount; ++row)
   {
-    const int rowY = menuTopY + (i * rowH);
+    const int i = start + row;
+    const int rowY = menuTopY + (row * rowH);
     const bool selected = (i == g_titleMenuIndex);
 
     uint16_t fg = TFT_WHITE;
@@ -430,12 +458,23 @@ void drawTitleMenuScreen(bool redrawBg)
       const int leftArrowX = (SCREEN_W / 2) - (textW / 2) - arrowGap;
       const int rightArrowX = (SCREEN_W / 2) + (textW / 2) + arrowGap;
 
-      drawTitleMenuText(spr, "<", leftArrowX, rowY, 2, TFT_YELLOW, textdatum_t::top_right);
-      drawTitleMenuText(spr, ">", rightArrowX, rowY, 2, TFT_YELLOW, textdatum_t::top_left);
+      drawTitleMenuText(spr, "<", leftArrowX, rowY, 2, 1, TFT_YELLOW, textdatum_t::top_right);
+      drawTitleMenuText(spr, ">", rightArrowX, rowY, 2, 1, TFT_YELLOW, textdatum_t::top_left);
     }
 
-    drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, fg, textdatum_t::top_center);
+    drawTitleMenuText(spr, labels[i], SCREEN_W / 2, rowY, 2, 1, fg, textdatum_t::top_center);
   }
+
+  // Scroll indicators.
+  const int arrowX = panelX + panelW - 10;
+  const int arrowUpY = panelY + 8;
+  const int arrowDownY = panelY + panelH - 14;
+
+  if (start > 0)
+    drawTitleScrollUpIndicator(arrowX, arrowUpY, TFT_YELLOW);
+
+  if (start + visCount < itemCount)
+    drawTitleScrollDownIndicator(arrowX, arrowDownY, TFT_YELLOW);
 
 #if !PUBLIC_BUILD
   const char *assetVer = assetOtaInstalledVersion();

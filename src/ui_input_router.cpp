@@ -12,6 +12,7 @@
 #include "ui_state_handlers.h"
 #include "ui_state_import_pet_list.h"
 #include "ui_state_pet_sleeping.h"
+#include "ui_state_photo_gallery.h"
 #include "ui_state_title_menu.h"
 #include "whats_new_state.h"
 #include "wifi_setup_state.h"
@@ -107,6 +108,10 @@ static void uiRunStateEntryHooks(UIState state, InputState &in)
 
   case UIState::ACTIVITY_FISHING:
     activityFishingOnEnter();
+    break;
+
+  case UIState::PHOTO_GALLERY:
+    uiPhotoGalleryOnEnter(in);
     break;
 
   default:

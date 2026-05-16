@@ -57,6 +57,8 @@ void drawBootNtpWaitScreen(bool wifiConnected, bool timeSynced);
 void drawTitleMenuScreen(bool redrawBg);
 void drawSettingsMenu();
 
+void drawPhotoGalleryScreen(bool redrawBg);
+
 bool wifiIsConnected();
 int wifiRssi();
 bool timeIsSynced();
@@ -127,6 +129,7 @@ bool uiStateBlocksOverlays(UIState s)
   case UIState::NAME_PET:
   case UIState::EVOLUTION:
   case UIState::CLOCK_MODE:
+  case UIState::PHOTO_GALLERY:
     return true;
   default:
     return false;
@@ -176,6 +179,10 @@ void drawCurrentScreen(bool redrawBg)
 
   case UIState::CLOCK_MODE:
     drawClockModeScreen(redrawBg);
+    return;
+
+  case UIState::PHOTO_GALLERY:
+    drawPhotoGalleryScreen(redrawBg);
     return;
 
   case UIState::IMPORT_PET_LIST:

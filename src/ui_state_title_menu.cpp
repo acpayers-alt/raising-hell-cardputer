@@ -18,12 +18,13 @@
 #include "ui_state_choose_pet.h"
 #include "ui_state_import_pet_list.h"
 #include "ui_state_pet_sleeping.h"
+#include "ui_state_photo_gallery.h"
 
 int g_titleMenuIndex = 0;
 
 namespace
 {
-constexpr int kTitleMenuCount = 3;
+constexpr int kTitleMenuCount = 4;
 
 static bool s_titleHasSave = false;
 static bool s_titleHasImport = false;
@@ -61,7 +62,8 @@ enum TitleMenuItem : int
 {
   TITLE_CONTINUE = 0,
   TITLE_IMPORT = 1,
-  TITLE_SETTINGS = 2,
+  TITLE_PHOTO_GALLERY = 2,
+  TITLE_SETTINGS = 3,
 };
 
 static bool titleItemEnabled(int idx)
@@ -72,6 +74,8 @@ static bool titleItemEnabled(int idx)
     return true; // Continue or New Pet
   case TITLE_IMPORT:
     return s_titleHasImport;
+  case TITLE_PHOTO_GALLERY:
+    return true;
   case TITLE_SETTINGS:
     return true;
   default:
@@ -85,6 +89,8 @@ static int titleFirstEnabledItem()
     return TITLE_CONTINUE;
   if (titleItemEnabled(TITLE_IMPORT))
     return TITLE_IMPORT;
+  if (titleItemEnabled(TITLE_PHOTO_GALLERY))
+    return TITLE_PHOTO_GALLERY;
   if (titleItemEnabled(TITLE_SETTINGS))
     return TITLE_SETTINGS;
   return TITLE_SETTINGS;
@@ -294,6 +300,14 @@ void uiTitleMenuHandle(InputState &in)
   {
     playBeep();
     openImportPetListFromTitle(in);
+    swallowTitleInput(in);
+    return;
+  }
+
+  case TITLE_PHOTO_GALLERY:
+  {
+    playBeep();
+    openPhotoGalleryFromTitle(in);
     swallowTitleInput(in);
     return;
   }

@@ -57,6 +57,7 @@ enum class UIState : uint8_t
   CLOCK_MODE = 31,
   WHATS_NEW = 32,
   ACTIVITY_FISHING = 33,
+  PHOTO_GALLERY = 34,
 };
 
 // --------------------

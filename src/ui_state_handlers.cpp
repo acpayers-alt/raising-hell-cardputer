@@ -27,11 +27,12 @@
 #include "ui_state_name_pet.h"        // uiNamePetHandle
 #include "ui_state_pet.h"             // uiPetScreenHandle
 #include "ui_state_pet_sleeping.h"    // uiPetSleepingHandle
-#include "ui_state_settings.h"        // uiSettingsHandle
-#include "ui_state_shop.h"            // uiShopHandle
-#include "ui_state_sleep_menu.h"      // uiSleepMenuHandle
-#include "ui_state_tab_driven.h"      // uiTabDrivenHandle
-#include "ui_state_title_menu.h"      // uiTitleMenuHandle
+#include "ui_state_photo_gallery.h"
+#include "ui_state_settings.h"   // uiSettingsHandle
+#include "ui_state_shop.h"       // uiShopHandle
+#include "ui_state_sleep_menu.h" // uiSleepMenuHandle
+#include "ui_state_tab_driven.h" // uiTabDrivenHandle
+#include "ui_state_title_menu.h" // uiTitleMenuHandle
 
 #include "activity_fishing.h"
 
@@ -41,7 +42,7 @@
 #include "ui_state_wifi_connect_wait.h" // uiWifiConnectWaitHandle
 #include "ui_state_wifi_setup.h"        // uiWifiSetupHandle
 
-static constexpr int kUiStateCount = 34;
+static constexpr int kUiStateCount = 35;
 
 static inline int toIndex(UIState s) { return (int)s; }
 
@@ -80,6 +81,7 @@ static StateHandlerFn kHandlers[kUiStateCount] = {
     /* 31 CLOCK_MODE                 */ uiClockModeHandle,
     /* 32 WHATS_NEW                  */ uiWhatsNewHandle,
     /* 33 ACTIVITY_FISHING           */ activityFishingHandle,
+    /* 34 PHOTO_GALLERY              */ uiPhotoGalleryHandle,
 };
 
 StateHandlerFn uiGetStateHandler(UIState state)
