@@ -970,6 +970,13 @@ static void readKeyboard(InputState &out)
           continue;
         }
 
+        // P -> save current screen photo to SD
+        if (lc == 'p')
+        {
+          out.photoOnce = true;
+          continue;
+        }
+
         // Bottom row tab jumps
         switch (lc)
         {

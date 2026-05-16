@@ -46,6 +46,7 @@ struct InputState
   bool leftOnce = false;
   bool rightOnce = false;
   bool encoderPressOnce = false;
+  bool photoOnce = false;
 
   bool screenOnce = false;
 
@@ -129,6 +130,7 @@ struct InputState
     hotSettings = false;
     consoleOnce = false;
     controlsOnce = false;
+    photoOnce = false;
     keyEOnce = false;
     keyEHeld = false;
     keySOnce = false;

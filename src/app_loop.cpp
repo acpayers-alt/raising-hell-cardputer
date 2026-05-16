@@ -36,6 +36,7 @@
 #include "display_state.h"
 #include "graphics.h"
 #include "menu_actions.h"
+#include "photo_capture.h"
 #include "settings_flow_state.h"
 #include "ui_actions.h"
 #include "ui_input_router.h"
@@ -1182,6 +1183,21 @@ void appMainLoopTick()
 
     invalidateBackgroundCache();
     requestUIRedraw();
+    input = InputState{};
+    clearInputLatch();
+    return;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PHOTO HOTKEY
+  // ---------------------------------------------------------------------------
+  if (input.photoOnce)
+  {
+    noteUserActivity();
+
+    const bool ok = photoCaptureCurrentScreen();
+    ui_showSuccessMessage(ok ? "Photo saved!" : "Photo failed");
+
     input = InputState{};
     clearInputLatch();
     return;
