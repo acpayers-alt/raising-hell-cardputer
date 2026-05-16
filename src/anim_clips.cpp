@@ -532,6 +532,20 @@ static const char *kAlienBabyBoredBlink[] = {
     "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
 };
 
+static const char *kAlienBabyAngryStomp[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_stomp1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_stomp2.png",
+};
+
+static const char *kAlienBabyAngryPounce[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce3.png",
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce2.png",
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce3.png",
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce2.png",
+    "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce1.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -600,6 +614,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_BABY_HAPPY_GUN_LEFT, kAlienBabyHappyGunLeft, 2, 220, true},
     {ANIM_ALIEN_BABY_BORED_IDLE, kAlienBabyBoredIdle, 1, 1000, true},
     {ANIM_ALIEN_BABY_BORED_BLINK, kAlienBabyBoredBlink, 4, 120, false},
+    {ANIM_ALIEN_BABY_ANGRY_STOMP, kAlienBabyAngryStomp, 2, 140, true},
+    {ANIM_ALIEN_BABY_ANGRY_POUNCE, kAlienBabyAngryPounce, 6, 90, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -627,6 +643,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien baby bored: hold frame 1, occasionally blink.
     {ANIM_ALIEN_BABY_BORED_IDLE, ANIM_ALIEN_BABY_BORED_BLINK, 2500UL, 6500UL},
+
+    // Alien baby angry: stomp loops; pounce triggers occasionally.
+    {ANIM_ALIEN_BABY_ANGRY_STOMP, ANIM_ALIEN_BABY_ANGRY_POUNCE, 4500UL, 9000UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -821,6 +840,9 @@ static AnimId eldElderClipForMood(PetMood mood)
 
 static AnimId alienBabyClipForMood(PetMood mood)
 {
+  if (mood == MOOD_MAD)
+    return ANIM_ALIEN_BABY_ANGRY_STOMP;
+
   if (mood == MOOD_BORED)
     return ANIM_ALIEN_BABY_BORED_IDLE;
 
