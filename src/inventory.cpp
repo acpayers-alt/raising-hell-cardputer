@@ -114,7 +114,6 @@ ItemDeltas inventoryPreviewDeltas(ItemType type)
   case ITEM_SOUL_FOOD:
     d.hunger = 30;
     d.happiness = 10;
-    d.energy = 10;
     break;
 
   case ITEM_CURSED_RELIC:
@@ -426,8 +425,6 @@ void Inventory::useSelectedItem()
   {
     pet.hunger = constrain(pet.hunger + 30, 0, 100);
     pet.happiness = constrain(pet.happiness + 10, 0, 100);
-    pet.energy = constrain(pet.energy + 10, 0, 100);
-
     char msg[48];
     snprintf(msg, sizeof(msg), "Fed %s!", itemNameForPet(it.type, pet.type));
     ui_showMessage(msg);
@@ -552,7 +549,6 @@ static bool applyItemEffect_NoUi(ItemType type)
   case ITEM_SOUL_FOOD:
     pet.hunger = constrain(pet.hunger + 30, 0, 100);
     pet.happiness = constrain(pet.happiness + 10, 0, 100);
-    pet.energy = constrain(pet.energy + 10, 0, 100);
     return true;
 
   case ITEM_CURSED_RELIC:

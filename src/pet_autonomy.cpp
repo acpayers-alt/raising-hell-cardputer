@@ -22,6 +22,7 @@ static constexpr int kAutoSleepEnergyThreshold = 5;
 static constexpr int kAutoSleepHealthThreshold = 20;
 static constexpr uint32_t kPizzaCooldownMs = 12UL * 60UL * 60UL * 1000UL;
 static constexpr uint32_t kMischiefCooldownMs = 6UL * 60UL * 60UL * 1000UL;
+static constexpr uint32_t kAutoSleepCooldownMs = 24UL * 60UL * 60UL * 1000UL;
 
 // Prevent reboot farming / repeated boot penalties when the pet is already angry.
 // Mischief cooldown is RAM-only, so rebooting would otherwise make it immediately eligible again.
@@ -215,6 +216,7 @@ static void doAutoSleep()
 {
   tallyAutoSleep();
   writeAutoSleepNoticeFlag();
+  s_lastAutoSleepRollMs = millis();
 
   saveManagerEnterSleepState();
 
@@ -288,7 +290,11 @@ void petAutonomyTick(uint32_t nowMs)
   if (s_autoSleepSuppressUntilMs != 0 && !autoSleepSuppressed)
     s_autoSleepSuppressUntilMs = 0;
 
-  const bool shouldPassOut = !autoSleepSuppressed && (exhausted || criticallyStarving);
+  const bool autoSleepCooldownReady =
+      s_lastAutoSleepRollMs == 0 || (uint32_t)(nowMs - s_lastAutoSleepRollMs) >= kAutoSleepCooldownMs;
+
+  const bool shouldPassOut = !autoSleepSuppressed && autoSleepCooldownReady && (exhausted || criticallyStarving);
+
   const bool angry = (pet.getMood() == MOOD_MAD);
 
   // --- Pizza: emergency rescue, cooldown-gated ---
@@ -312,10 +318,6 @@ void petAutonomyTick(uint32_t nowMs)
   {
     doAutoSleep();
     return;
-  }
-  else
-  {
-    s_lastAutoSleepRollMs = 0;
   }
 
   // --- Mischief: chance + cooldown-gated ---

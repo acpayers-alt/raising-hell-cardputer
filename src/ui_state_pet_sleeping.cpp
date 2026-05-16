@@ -84,9 +84,6 @@ void uiPetSleepingWakeAndReturn(InputState &in, uint16_t drainMs, bool forceRend
   // bounce the pet back to sleep before the player can feed/heal it.
   petAutonomySuppressAutoSleepUntil(millis() + 10UL * 60UL * 1000UL);
 
-  if (pet.energy < 10)
-    pet.energy = 10;
-
   saveManagerClearSleepPendingFlag();
   saveManagerMarkDirty();
 
