@@ -21,4 +21,5 @@ PetUIColorScheme uiSchemeForPet(PetType t);
 String formatTime();
 
 void drawTopBar();
+void drawTopBarClockMode();
 void drawTabBar();

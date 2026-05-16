@@ -120,12 +120,12 @@ static void drawWifiIcon(int x, int y)
   }
 }
 
-void drawTopBar()
+static void drawTopBarImpl(bool drawClock, bool letterboxBlack)
 {
   const PetUIColorScheme ui = uiSchemeForPet(pet.type);
-  const uint16_t bg = ui.topBg;
-  const uint16_t outline = ui.topOutline;
-  const uint16_t text = ui.topText;
+  const uint16_t bg = letterboxBlack ? TFT_BLACK : ui.topBg;
+  const uint16_t outline = letterboxBlack ? TFT_BLACK : ui.topOutline;
+  const uint16_t text = letterboxBlack ? TFT_WHITE : ui.topText;
 
   const int padL = 10;
   const int padR = 4;
@@ -169,7 +169,8 @@ void drawTopBar()
     timeX = 0;
 
   spr.setTextDatum(TL_DATUM);
-  spr.drawString(t, timeX, (TOP_BAR_H - 8) / 2);
+  if (drawClock)
+    spr.drawString(t, timeX, (TOP_BAR_H - 8) / 2);
 
   drawWifiIcon(wifiX, wifiY);
 
@@ -199,7 +200,7 @@ void drawTopBar()
     }
   }
 
-  const int titleMaxRight = timeX - 6;
+  const int titleMaxRight = drawClock ? (timeX - 6) : (wifiX - 6);
   const int titleY = (TOP_BAR_H - 8) / 2;
 
   const char *petName = pet.name;
@@ -254,6 +255,10 @@ void drawTopBar()
 
   spr.setTextDatum(TL_DATUM);
 }
+
+void drawTopBar() { drawTopBarImpl(true, false); }
+
+void drawTopBarClockMode() { drawTopBarImpl(false, true); }
 
 static void tabWindow(int total, int current, int maxVisible, int &start, int &count)
 {

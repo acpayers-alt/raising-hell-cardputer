@@ -88,7 +88,7 @@ static void drawSleepStepCounterBadge()
   spr.drawString(buf, x + 15, y + 3);
 }
 
-static void drawSleepScreenImpl(bool redrawBg);
+static void drawSleepScreenImpl(bool redrawBg, bool drawHud);
 
 void sleepBgNotifyScreenWake()
 {
@@ -147,7 +147,7 @@ static void drawPassOutNotice()
   spr.setTextDatum(TL_DATUM);
 }
 
-static void drawSleepScreenImpl(bool redrawBg)
+static void drawSleepScreenImpl(bool redrawBg, bool drawHud)
 {
   if (!isScreenOn())
     return;
@@ -348,11 +348,16 @@ static void drawSleepScreenImpl(bool redrawBg)
     }
   }
 
-  drawTopBar();
-  drawMiniStatPreviewSleepLeft();
-  drawSleepStepCounterBadge();
-  drawPassOutNotice();
-  drawSleepMeterBar();
+  if (drawHud)
+  {
+    drawTopBar();
+    drawMiniStatPreviewSleepLeft();
+    drawSleepStepCounterBadge();
+    drawPassOutNotice();
+    drawSleepMeterBar();
+  }
 }
 
-void drawSleepScreen() { drawSleepScreenImpl(true); }
+void drawSleepScreen() { drawSleepScreenImpl(true, true); }
+
+void drawSleepScreenSceneOnly() { drawSleepScreenImpl(true, false); }
