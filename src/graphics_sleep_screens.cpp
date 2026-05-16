@@ -61,7 +61,7 @@ static void drawSleepStepCounterBadge()
 
   char buf[16];
   snprintf(buf, sizeof(buf), "%lu", (unsigned long)steps);
-  
+
   spr.setTextDatum(TL_DATUM);
   spr.setTextFont(1);
   spr.setTextSize(1);
@@ -109,6 +109,14 @@ void sleepAnimHeartbeat(uint32_t now)
   }
 }
 
+static uint32_t randomSleepTriggerDelay(uint32_t minMs, uint32_t maxMs)
+{
+  if (maxMs <= minMs)
+    return minMs;
+
+  return minMs + (uint32_t)random((long)(maxMs - minMs + 1));
+}
+
 static void drawPassOutNotice()
 {
   if (!petAutonomyPassOutNoticePending())
@@ -131,11 +139,11 @@ static void drawPassOutNotice()
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   char msg[64];
   const char *name = pet.name && pet.name[0] ? pet.name : "Pet";
-  
+
   snprintf(msg, sizeof(msg), "%s passed out", name);
-  
+
   spr.drawString(msg, SCREEN_W / 2, y + (boxH / 2));
-  
+
   spr.setTextDatum(TL_DATUM);
 }
 
@@ -149,6 +157,9 @@ static void drawSleepScreenImpl(bool redrawBg)
   static bool s_hasBg = false;
 
   static uint8_t s_mode = 0;
+  static bool s_triggerActive = false;
+  static uint8_t s_triggerFrame = 0;
+  static uint32_t s_nextTriggerMs = 0;
 
   const uint32_t now = millis();
 
@@ -170,6 +181,9 @@ static void drawSleepScreenImpl(bool redrawBg)
     s_nextFrameMs = 0;
     s_hasBg = false;
     redrawBg = true;
+    s_triggerActive = false;
+    s_triggerFrame = 0;
+    s_nextTriggerMs = 0;
     freeSleepAnimFrameCache();
   }
 
@@ -182,27 +196,43 @@ static void drawSleepScreenImpl(bool redrawBg)
 
   const bool modeChanged = (s_mode != s_lastMode);
 
-  const char *const *frames = sel.frames;
-  uint8_t frameCount = sel.frameCount;
-  uint32_t frameMs = sel.frameMs;
+  const char *const *baseFrames = sel.frames;
+  uint8_t baseFrameCount = sel.frameCount;
+  uint32_t baseFrameMs = sel.frameMs;
+
+  const bool triggerConfigured = sel.triggerFrames && sel.triggerFrameCount > 0 && sel.triggerFrameMs > 0 &&
+                                 sel.triggerMinMs > 0 && sel.triggerMaxMs >= sel.triggerMinMs;
 
   const bool anyKick = (kick || wakeKick);
 
-  if (anyKick && frames && frameCount > 0 && frameMs > 0)
+  if (!triggerConfigured)
+  {
+    s_triggerActive = false;
+    s_triggerFrame = 0;
+    s_nextTriggerMs = 0;
+  }
+  else if (s_nextTriggerMs == 0)
+  {
+    s_nextTriggerMs = now + randomSleepTriggerDelay(sel.triggerMinMs, sel.triggerMaxMs);
+  }
+
+  if (anyKick && baseFrames && baseFrameCount > 0 && baseFrameMs > 0)
   {
     s_animInited = true;
     s_nextFrameMs = now;
+    s_triggerActive = false;
+    s_triggerFrame = 0;
 
-    if (frameCount > 1)
+    if (baseFrameCount > 1)
     {
-      s_frame = (uint8_t)((s_frame + 1) % frameCount);
+      s_frame = (uint8_t)((s_frame + 1) % baseFrameCount);
       frameChanged = true;
     }
 
     s_hasBg = false;
   }
 
-  if (frames && frameCount > 0 && frameMs > 0)
+  if (baseFrames && baseFrameCount > 0 && baseFrameMs > 0)
   {
     if (!s_animInited || modeChanged)
     {
@@ -217,23 +247,63 @@ static void drawSleepScreenImpl(bool redrawBg)
 
       freeSleepAnimFrameCache();
     }
-    else
+    else if (s_triggerActive)
     {
       const int32_t late = (int32_t)(now - s_nextFrameMs);
       if (late >= 0)
       {
-        uint32_t steps = 1u + (uint32_t)late / (uint32_t)frameMs;
-        if (steps > frameCount)
-          steps = frameCount;
+        uint32_t steps = 1u + (uint32_t)late / sel.triggerFrameMs;
 
-        s_frame = (uint8_t)((s_frame + steps) % frameCount);
-        s_nextFrameMs += steps * frameMs;
+        if ((uint32_t)s_triggerFrame + steps >= sel.triggerFrameCount)
+        {
+          s_triggerActive = false;
+          s_triggerFrame = 0;
+          s_nextTriggerMs = now + randomSleepTriggerDelay(sel.triggerMinMs, sel.triggerMaxMs);
+          s_nextFrameMs = now + baseFrameMs;
+        }
+        else
+        {
+          s_triggerFrame = (uint8_t)(s_triggerFrame + steps);
+          s_nextFrameMs += steps * sel.triggerFrameMs;
+        }
+
         frameChanged = true;
       }
     }
+    else
+    {
+      if (triggerConfigured && (int32_t)(now - s_nextTriggerMs) >= 0)
+      {
+        s_triggerActive = true;
+        s_triggerFrame = 0;
+        s_nextFrameMs = now + sel.triggerFrameMs;
+        frameChanged = true;
+      }
+      else
+      {
+        const int32_t late = (int32_t)(now - s_nextFrameMs);
+        if (late >= 0)
+        {
+          uint32_t steps = 1u + (uint32_t)late / (uint32_t)baseFrameMs;
+          if (steps > baseFrameCount)
+            steps = baseFrameCount;
 
-    bgPath = frames[s_frame];
+          s_frame = (uint8_t)((s_frame + steps) % baseFrameCount);
+          s_nextFrameMs += steps * baseFrameMs;
+          frameChanged = true;
+        }
+      }
+    }
+
+    if (s_triggerActive)
+      bgPath = sel.triggerFrames[s_triggerFrame];
+    else
+      bgPath = baseFrames[s_frame];
   }
+
+  const char *const *frames = s_triggerActive ? sel.triggerFrames : baseFrames;
+  uint8_t frameCount = s_triggerActive ? sel.triggerFrameCount : baseFrameCount;
+  uint32_t frameMs = s_triggerActive ? sel.triggerFrameMs : baseFrameMs;
 
   s_lastMode = s_mode;
 
