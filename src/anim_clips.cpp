@@ -546,6 +546,15 @@ static const char *kAlienBabyAngryPounce[] = {
     "/raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce1.png",
 };
 
+static const char *kAlienBabyTiredLay[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay2.png",
+};
+
+static const char *kAlienBabyTiredHold[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay3.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -616,6 +625,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_BABY_BORED_BLINK, kAlienBabyBoredBlink, 4, 120, false},
     {ANIM_ALIEN_BABY_ANGRY_STOMP, kAlienBabyAngryStomp, 2, 140, true},
     {ANIM_ALIEN_BABY_ANGRY_POUNCE, kAlienBabyAngryPounce, 6, 90, false},
+    {ANIM_ALIEN_BABY_TIRED_LAY, kAlienBabyTiredLay, 2, 850, true},
+    {ANIM_ALIEN_BABY_TIRED_HOLD, kAlienBabyTiredHold, 1, 3500, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -646,6 +657,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien baby angry: stomp loops; pounce triggers occasionally.
     {ANIM_ALIEN_BABY_ANGRY_STOMP, ANIM_ALIEN_BABY_ANGRY_POUNCE, 4500UL, 9000UL},
+
+    // Alien baby tired: gentle lay loop; occasional longer exhausted hold.
+    {ANIM_ALIEN_BABY_TIRED_LAY, ANIM_ALIEN_BABY_TIRED_HOLD, 5000UL, 12000UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -842,6 +856,9 @@ static AnimId alienBabyClipForMood(PetMood mood)
 {
   if (mood == MOOD_MAD)
     return ANIM_ALIEN_BABY_ANGRY_STOMP;
+
+  if (mood == MOOD_TIRED)
+    return ANIM_ALIEN_BABY_TIRED_LAY;
 
   if (mood == MOOD_BORED)
     return ANIM_ALIEN_BABY_BORED_IDLE;

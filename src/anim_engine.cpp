@@ -639,7 +639,14 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
   int h = 0;
   if (pngReadWHCached(path, &w, &h))
   {
-    const int drawX = centerX - (w / 2);
+    int drawX = centerX - (w / 2);
+
+    // Nudge only the Alien baby tired animations slightly left.
+    if (id == ANIM_ALIEN_BABY_TIRED_LAY || id == ANIM_ALIEN_BABY_TIRED_HOLD)
+    {
+      drawX -= 20;
+    }
+
     const int drawY = bottomY - h;
     (void)drawPngPathAnim(path, drawX, drawY);
   }
