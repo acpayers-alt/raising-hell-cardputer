@@ -62,6 +62,8 @@ static ItemType shopItemTypeForIndexLocal(int idx)
     return ITEM_ELDRITCH_EYE;
   case 5:
     return ITEM_FISHING_BAIT;
+  case 6:
+    return ITEM_INFERNAL_PACIFIER;
   default:
     return ITEM_NONE;
   }
@@ -282,6 +284,9 @@ void drawShopScreen()
   case ITEM_FISHING_BAIT:
     imgPath = eldTheme ? PATH_SHOP_ELD_FOOD : PATH_SHOP_DEV_FOOD;
     break;
+  case ITEM_INFERNAL_PACIFIER:
+    imgPath = eldTheme ? PATH_SHOP_ELD_EVO : PATH_SHOP_DEV_EVO;
+    break;
   default:
     imgPath = nullptr;
     break;
@@ -352,6 +357,9 @@ void drawShopScreen()
     break;
   case ITEM_FISHING_BAIT:
     eff = "Fishing x3";
+    break;
+  case ITEM_INFERNAL_PACIFIER:
+    eff = "Return to Baby";
     break;
   default:
     eff = "";
@@ -787,6 +795,7 @@ void drawInventoryMenu()
   }
 
   const bool isEvoItem = (!empty && hoveredType == ITEM_ELDRITCH_EYE);
+  const bool isDeEvoItem = (!empty && hoveredType == ITEM_INFERNAL_PACIFIER);
   const uint16_t evoLevel = pet.nextEvoMinLevel(); // 0 if no further evolution
   const bool evoReady = (evoLevel != 0) && pet.canEvolveNext();
 
@@ -847,6 +856,31 @@ void drawInventoryMenu()
       spr.setTextColor(evoReady ? TFT_YELLOW : TFT_RED, TFT_BLACK);
       spr.drawString(evoReady ? "Available" : "Not Available", x, y);
     }
+
+    spr.setTextDatum(TL_DATUM);
+  }
+  else if (isDeEvoItem)
+  {
+    // 3-line de-evolve readout: Title / Preserve Progress / Availability
+    const int lineGap = 1;
+
+    spr.setTextFont(2);
+    spr.setTextSize(1);
+    spr.setTextDatum(TL_DATUM);
+
+    // Line 1: Title
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawString("Return to Baby", x, y);
+    y += spr.fontHeight() + lineGap;
+
+    // Line 2: Preserve progression
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawString("Keeps level + XP", x, y);
+    y += spr.fontHeight() + lineGap;
+
+    // Line 3: Availability
+    spr.setTextColor((pet.evoStage > 0) ? TFT_YELLOW : TFT_RED, TFT_BLACK);
+    spr.drawString((pet.evoStage > 0) ? "Available" : "Already Baby", x, y);
 
     spr.setTextDatum(TL_DATUM);
   }

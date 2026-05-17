@@ -42,6 +42,8 @@ static const char *itemNameForPet(ItemType type, PetType petType)
       return "Staring Pearl";
     case ITEM_FISHING_BAIT:
       return "Fishing Bait";
+    case ITEM_INFERNAL_PACIFIER:
+      return "Infernal Pacifier";
     default:
       return "";
     }
@@ -62,6 +64,8 @@ static const char *itemNameForPet(ItemType type, PetType petType)
       return "Eldritch Eye";
     case ITEM_FISHING_BAIT:
       return "Fishing Bait";
+    case ITEM_INFERNAL_PACIFIER:
+      return "Infernal Pacifier";
     default:
       return "";
     }
@@ -91,6 +95,10 @@ static const char *itemDescForPet(ItemType type, PetType petType)
 
   case ITEM_FISHING_BAIT:
     return "Used to cast a line while fishing.";
+
+  case ITEM_INFERNAL_PACIFIER:
+    return "Returns your pet to baby form.";
+
   case ITEM_NONE:
   default:
     return "";
@@ -247,7 +255,7 @@ void Inventory::fromPersist(const InvPersist &in)
     const uint8_t t = in.slots[i].type;
     const uint8_t q = in.slots[i].qty;
 
-    if (t > (uint8_t)ITEM_FISHING_BAIT)
+    if (t > (uint8_t)ITEM_INFERNAL_PACIFIER)
       continue;
 
     items[i].type = (ItemType)t;
@@ -488,6 +496,24 @@ void Inventory::useSelectedItem()
     break;
   }
 
+  case ITEM_INFERNAL_PACIFIER:
+  {
+    if (pet.evoStage == 0)
+    {
+      ui_showMessage("Already baby");
+      return;
+    }
+
+    const uint8_t oldStage = pet.evoStage;
+    pet.setEvoStage(0);
+
+    Serial.printf("[ITEM] Infernal Pacifier evo %u->0\n", (unsigned)oldStage);
+    ui_showMessage("Returned to baby form");
+
+    changedPet = true;
+    break;
+  }
+
   case ITEM_FISHING_BAIT:
     ui_showMessage("Use this while fishing.");
     return;
@@ -564,6 +590,13 @@ static bool applyItemEffect_NoUi(ItemType type)
     return true;
 
   case ITEM_ELDRITCH_EYE:
+
+  case ITEM_INFERNAL_PACIFIER:
+    if (pet.evoStage == 0)
+      return false;
+    pet.setEvoStage(0);
+    return true;
+
   default:
     return false;
   }

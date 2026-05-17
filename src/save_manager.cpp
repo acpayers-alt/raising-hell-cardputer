@@ -319,6 +319,10 @@ static const char *itemTypeToStringForExport(ItemType t)
     return "RITUAL_CHALK";
   case ITEM_ELDRITCH_EYE:
     return "ELDRITCH_EYE";
+  case ITEM_FISHING_BAIT:
+    return "FISHING_BAIT";
+  case ITEM_INFERNAL_PACIFIER:
+    return "INFERNAL_PACIFIER";
   default:
     return "ITEM_NONE";
   }
@@ -351,6 +355,16 @@ static bool itemTypeFromStringForImport(const char *s, ItemType &out)
   if (!strcmp(s, "ELDRITCH_EYE"))
   {
     out = ITEM_ELDRITCH_EYE;
+    return true;
+  }
+  if (!strcmp(s, "FISHING_BAIT"))
+  {
+    out = ITEM_FISHING_BAIT;
+    return true;
+  }
+  if (!strcmp(s, "INFERNAL_PACIFIER"))
+  {
+    out = ITEM_INFERNAL_PACIFIER;
     return true;
   }
   if (!strcmp(s, "ITEM_NONE"))
@@ -1376,7 +1390,7 @@ static void migrateV3ToRuntime(const SavePayloadV3 &p3)
     if (t == (uint8_t)ITEM_NONE || q == 0)
       continue;
 
-    if (t > (uint8_t)ITEM_ELDRITCH_EYE)
+    if (t > (uint8_t)ITEM_INFERNAL_PACIFIER)
     {
       Serial.printf("[SAVE][V3] skip invalid inv slot=%d type=%u qty=%u\n", i, (unsigned)t, (unsigned)q);
       continue;
@@ -2520,14 +2534,14 @@ static bool autoHealLoadedSaveIfNeeded()
   case PET_ELDRITCH:
   case PET_ALIEN:
     break;
-  
+
   default:
     pet.type = PET_DEVIL;
     Serial.printf("[SAVE][AUTOHEAL] invalid pet type %d -> %d\n", petTypeBefore, (int)pet.type);
     changed = true;
     break;
   }
-  
+
   // --------------------------------------------------------------------------
   // Level / XP / evo sanity
   // --------------------------------------------------------------------------
