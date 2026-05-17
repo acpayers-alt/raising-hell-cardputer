@@ -59,9 +59,9 @@ static ItemType shopItemTypeForIndexLocal(int idx)
   case 3:
     return ITEM_RITUAL_CHALK;
   case 4:
-    return ITEM_ELDRITCH_EYE;
-  case 5:
     return ITEM_FISHING_BAIT;
+  case 5:
+    return ITEM_ELDRITCH_EYE;
   case 6:
     return ITEM_INFERNAL_PACIFIER;
   default:
