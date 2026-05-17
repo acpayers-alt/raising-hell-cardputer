@@ -16,6 +16,7 @@
 #include "pet_autonomy.h"
 #include "save_manager.h"
 #include "wardrive_steps.h"
+#include <SD.h>
 
 // -----------------------------------------------------------------------------
 // External state (owned elsewhere)
@@ -326,21 +327,47 @@ static void drawSleepScreenImpl(bool redrawBg, bool drawHud)
 
     if (!ok)
     {
-      if (g_sdReady && bgPath)
+      if (g_sdReady && bgPath && bgPath[0])
       {
         const char *ext = strrchr(bgPath, '.');
         const bool isPng = (ext && (strcasecmp(ext, ".png") == 0));
-        if (isPng)
+        const bool isJpg = (ext && ((strcasecmp(ext, ".jpg") == 0) || (strcasecmp(ext, ".jpeg") == 0)));
+
+        if (!SD.exists(bgPath))
+        {
+          Serial.printf("[SLEEP ANIM] missing file path=%s\n", bgPath);
+        }
+        else if (isPng)
+        {
           ok = sprDrawPngFromSD(bgPath, 0, 18);
-        else
+          if (!ok)
+            Serial.printf("[SLEEP ANIM] png decode failed path=%s\n", bgPath);
+        }
+        else if (isJpg)
+        {
           ok = sprDrawJpgFromSD(bgPath, 0, 18);
+          if (!ok)
+            Serial.printf("[SLEEP ANIM] jpg decode failed path=%s\n", bgPath);
+        }
+        else
+        {
+          Serial.printf("[SLEEP ANIM] unsupported extension path=%s\n", bgPath);
+        }
+      }
+      else
+      {
+        Serial.println("[SLEEP ANIM] no bgPath selected");
       }
     }
 
     if (!ok)
     {
-      spr.fillRect(0, 0, SCREEN_W, SCREEN_H, TFT_BLACK);
-      s_hasBg = false;
+      // Do not wipe the full scene if a single sleep animation frame fails.
+      // Preserve the last good frame when possible.
+      if (!s_hasBg)
+      {
+        spr.fillRect(0, 0, SCREEN_W, SCREEN_H, TFT_BLACK);
+      }
     }
     else
     {
