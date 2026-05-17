@@ -648,9 +648,18 @@ void Pet::update()
   static constexpr uint32_t ENERGY_STEP_MS = 576000UL;
   static constexpr uint32_t HP_STEP_MS = 216000UL;
 
-  const uint32_t hungerStep = applyDecayModeToStep(HUNGER_STEP_MS);
+  uint32_t hungerStep = applyDecayModeToStep(HUNGER_STEP_MS);
   const uint32_t energyStep = applyDecayModeToStep(ENERGY_STEP_MS);
   const uint32_t hpStep = applyDecayModeToStep(HP_STEP_MS);
+
+  // Awake + low rest makes hunger drain faster.
+  // Do not apply while sleeping; sleep remains the recovery/protection state.
+  if (!sleepingNow && energy < 25)
+  {
+    hungerStep /= 2;
+    if (hungerStep < 1000UL)
+      hungerStep = 1000UL;
+  }
 
   bool changed = false;
 
@@ -752,7 +761,7 @@ void Pet::update()
   static constexpr uint32_t REGEN_STEP_MS = 600000UL; // 10m
   const uint32_t regenStep = applyDecayModeToStep(REGEN_STEP_MS);
 
-  const bool canRegen = (hunger >= 30 && energy > 15);
+  const bool canRegen = !sleepingNow && (hunger >= 30 && energy > 15);
   if (canRegen && health < 100)
   {
     s_regenAccMs += dt;
