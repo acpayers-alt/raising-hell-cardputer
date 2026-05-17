@@ -644,7 +644,9 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
     // Nudge only the Alien baby tired animations slightly left.
     if (id == ANIM_ALIEN_BABY_TIRED_LAY || id == ANIM_ALIEN_BABY_TIRED_HOLD)
     {
-      drawX -= 20;
+      // Pet screen needs a slight left nudge, but Clock Mode already parks
+      // the sprite near the left edge. Move it back right there so it stays on-screen.
+      drawX += (g_app.uiState == UIState::CLOCK_MODE) ? 12 : -8;
     }
 
     const int drawY = bottomY - h;

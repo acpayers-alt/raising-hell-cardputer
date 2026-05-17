@@ -144,13 +144,12 @@ void drawClockModeScreen(bool redrawBg)
   int homeY = 0;
   getPetHomeScreenPosition(homeX, homeY);
 
-  const int clockHomeX = (SCREEN_W / 2) - 65;
+  const int clockHomeX = homeX;
   const int clockHomeY = homeY;
 
   const PetMood mood = petResolveMood(pet);
   const bool wanderAllowed = (mood == MOOD_HAPPY || mood == MOOD_BORED);
 
-  drawClockModeDateTimeOverlay();
   // Clock Mode uses its own horizontal placement, but the vertical anchor and
   // motion ownership now live in the presentation module.
   if (wanderAllowed && petWalkOverrideActive())
@@ -165,12 +164,7 @@ void drawClockModeScreen(bool redrawBg)
     animDrawPetFrameAnchoredBottom(drawX, drawY);
   }
 
-  // Always repaint the footer strip in Clock Mode.
-  // Do not rely on the pet-area restore path to preserve it.
-  spr.fillRect(0, SCREEN_H - TAB_BAR_H, SCREEN_W, TAB_BAR_H, TFT_BLACK);
-
-  spr.setTextDatum(BC_DATUM);
-  spr.drawString("ESC: Back", SCREEN_W / 2, SCREEN_H - 4, 1);
-
-  spr.setTextDatum(TL_DATUM);
+  // Draw the full clock/date overlay last so the time always appears
+  // in front of the pet sprite, matching the sleep clock screen behavior.
+  drawClockModeDateTimeOverlay();
 }

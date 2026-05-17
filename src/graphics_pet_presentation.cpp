@@ -493,13 +493,31 @@ const PetRenderProfile &getPetProfile(PetType t)
 // POSITIONING
 // ============================================================================
 
+static int getClockModePetHomeX(const PetRenderProfile &prof)
+{
+  // Park the pet to the left of the first large clock digit.
+  // This keeps static mood poses from covering the time while still allowing
+  // walking/wandering pets to roam from a safe starting point.
+  static constexpr int kClockFirstDigitApproxX = (SCREEN_W / 2) - 52;
+  static constexpr int kClockDigitClearancePx = 6;
+
+  const int maxAnchorX = kClockFirstDigitApproxX - (PET_SPR_W / 2) - kClockDigitClearancePx;
+  const int minAnchorX = PET_SPR_W / 2;
+
+  return clampi(maxAnchorX + prof.xOff, minAnchorX, SCREEN_W - (PET_SPR_W / 2));
+}
+
 void getPetHomeScreenPosition(int &outX, int &outY)
 {
   const int petAreaW = SCREEN_W - MINI_STAT_W - MINI_STAT_PAD;
 
   const PetRenderProfile &prof = getPetProfile(pet.type);
 
-  outX = (petAreaW / 2) + prof.xOff;
+  if (g_app.uiState == UIState::CLOCK_MODE && !pet.isSleeping)
+    outX = getClockModePetHomeX(prof);
+  else
+    outX = (petAreaW / 2) + prof.xOff;
+
   outY = (PET_AREA_Y + PET_AREA_H) + prof.yOff;
 }
 
@@ -536,6 +554,11 @@ static void scheduleNextPetWander()
 
 static bool alienBabyBoredTeleportEligible(PetMood mood)
 {
+  // Do not allow teleporting in Clock Mode. Clock Mode parks the pet safely
+  // beside the time display, and teleport can yank it back across the clock.
+  if (g_app.uiState == UIState::CLOCK_MODE)
+    return false;
+
   return pet.type == PET_ALIEN && pet.evoStage == 0 && mood == MOOD_BORED && !pet.isSleeping &&
          s_petWanderState == PetWanderState::HOME_IDLE && !s_petIntroWalkActive && !s_petIntroArriveTurnActive &&
          !s_petIntroStandHoldActive && !s_petIntroHandoffActive;
@@ -704,10 +727,22 @@ void resetClockModePetPresentation()
   s_petIntroStandHoldActive = false;
   s_petIntroHandoffActive = false;
 
-  s_petWanderState = PetWanderState::HOME_IDLE;
+  getPetHomeScreenPosition(s_petHomeX, s_petHomeY);
 
-  s_petScreenPosInitialized = false;
+  s_petScreenX = s_petHomeX;
+  s_petScreenY = s_petHomeY;
+  s_petScreenPosInitialized = true;
+
+  s_petWanderTargetX = s_petHomeX;
+  s_petWanderSideAX = s_petHomeX;
+  s_petWanderSideBX = s_petHomeX;
+
+  s_petWanderState = PetWanderState::HOME_IDLE;
+  s_petWanderLastStepMs = 0;
+  s_petWalkFrame = 0;
+
   cancelAlienBabyBoredTeleport();
+  scheduleNextPetWander();
 }
 
 // ============================================================================
