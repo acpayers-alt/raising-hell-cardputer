@@ -1062,7 +1062,10 @@ void appMainLoopTick()
   }
 
   // AUTO-RETURN TO PET TAB
-  if (g_app.uiState == UIState::PET_SCREEN && g_app.currentTab != Tab::TAB_PET)
+  const bool shouldAutoReturnToPet = (g_app.uiState == UIState::PET_SCREEN && g_app.currentTab != Tab::TAB_PET) ||
+                                     (g_app.uiState == UIState::SHOP) || (g_app.uiState == UIState::INVENTORY);
+
+  if (shouldAutoReturnToPet)
   {
     const uint32_t nowMs = millis();
     if ((uint32_t)(nowMs - getLastInputActivityMs()) >= 60000UL)
