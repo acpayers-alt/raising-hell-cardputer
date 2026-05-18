@@ -18,6 +18,8 @@ static PetPerfStats s_petPerfStats;
 
 const PetPerfStats &petPerfStats() { return s_petPerfStats; }
 
+static bool s_frameChanged = false;
+
 void petPerfResetStats()
 {
   s_petPerfStats.petFrameMs = 0;
@@ -83,6 +85,95 @@ static bool drawPngPathAnim(const char *path, int x, int y)
   const uint16_t sample = (uint16_t)(millis() - sdStartMs);
   s_petPerfStats.petSpriteDrawMs = smoothPerfMs(s_petPerfStats.petSpriteDrawMs, sample);
   return ok;
+}
+
+static const char *kThoughtBurgerFrames[] = {
+    "/raising_hell/graphics/ui/thought_bubbles/thought_burger1.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_burger2.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_burger3.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_burger4.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_burger5.png",
+};
+
+static uint8_t s_burgerThoughtFrame = 0;
+static uint32_t s_burgerThoughtNextMs = 0;
+static uint32_t s_burgerThoughtHoldUntilMs = 0;
+static bool s_burgerThoughtHolding = false;
+
+static void resetBurgerThought()
+{
+  s_burgerThoughtFrame = 0;
+  s_burgerThoughtNextMs = 0;
+  s_burgerThoughtHoldUntilMs = 0;
+  s_burgerThoughtHolding = false;
+}
+
+static uint8_t tickBurgerThoughtFrame()
+{
+  const uint32_t now = millis();
+
+  if (s_burgerThoughtNextMs == 0)
+  {
+    s_burgerThoughtFrame = 0;
+    s_burgerThoughtNextMs = now + 180;
+    s_burgerThoughtHolding = false;
+    s_burgerThoughtHoldUntilMs = 0;
+    return s_burgerThoughtFrame;
+  }
+
+  if ((int32_t)(now - s_burgerThoughtNextMs) < 0)
+    return s_burgerThoughtFrame;
+
+  if (s_burgerThoughtHolding)
+  {
+    // During the hold, loop 4 -> 5 -> 4 -> 5 for several seconds.
+    s_burgerThoughtFrame = (s_burgerThoughtFrame == 3) ? 4 : 3;
+    s_burgerThoughtNextMs = now + 220;
+
+    if ((int32_t)(now - s_burgerThoughtHoldUntilMs) >= 0)
+    {
+      s_burgerThoughtFrame = 0;
+      s_burgerThoughtHolding = false;
+      s_burgerThoughtHoldUntilMs = 0;
+      s_burgerThoughtNextMs = now + 180;
+    }
+
+    return s_burgerThoughtFrame;
+  }
+
+  if (s_burgerThoughtFrame < 3)
+  {
+    // Intro: 1 -> 2 -> 3 -> 4
+    ++s_burgerThoughtFrame;
+    s_burgerThoughtNextMs = now + 180;
+
+    if (s_burgerThoughtFrame == 3)
+    {
+      s_burgerThoughtHolding = true;
+      s_burgerThoughtHoldUntilMs = now + 5000UL;
+    }
+
+    return s_burgerThoughtFrame;
+  }
+
+  s_burgerThoughtFrame = 0;
+  s_burgerThoughtNextMs = now + 180;
+  return s_burgerThoughtFrame;
+}
+
+static void drawBurgerThoughtBubbleForHungryAlienBaby(int petDrawX, int petDrawY, int petW)
+{
+  const uint8_t frame = tickBurgerThoughtFrame();
+  const char *path = kThoughtBurgerFrames[frame];
+
+  if (!path || !path[0])
+    return;
+
+  // Position relative to the sprite so this can be reused/tuned later.
+  const int bubbleX = petDrawX + petW - 10;
+  const int bubbleY = petDrawY - 4;
+
+  (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
 
 // Read PNG width/height from IHDR. Fast and avoids drawing just to measure.
@@ -182,8 +273,6 @@ static uint32_t s_overrideNextMs = 0;
 static bool s_overridePlaying = false;
 
 static uint32_t s_nextTriggerMs = 0;
-
-static bool s_frameChanged = false;
 
 static uint32_t randRangeInclusive(uint32_t lo, uint32_t hi)
 {
@@ -296,6 +385,9 @@ void animTick()
 
   // Choose base clip for the pet screen
   const AnimId desired = animSelectPetScreen();
+
+  if (desired != ANIM_ALIEN_BABY_HUNGRY_STAND)
+    resetBurgerThought();
 
   // Leaving pet tab/screen => ANIM_NONE
   if (desired == ANIM_NONE)
@@ -651,6 +743,9 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
 
     const int drawY = bottomY - h;
     (void)drawPngPathAnim(path, drawX, drawY);
+
+    if (id == ANIM_ALIEN_BABY_HUNGRY_STAND)
+      drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w);
   }
   else
   {

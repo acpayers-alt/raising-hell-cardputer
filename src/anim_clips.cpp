@@ -521,6 +521,11 @@ static const char *kAlienBabyHappyGunLeft[] = {
     "/raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_left_gun2.png",
 };
 
+static const char *kAlienBabyHungryStand[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/hgy/al_bb_hgy_stand1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/hgy/al_bb_hgy_stand2.png",
+};
+
 static const char *kAlienBabyBoredIdle[] = {
     "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
 };
@@ -621,6 +626,7 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_BABY_HAPPY, kAlienBabyHappy, 4, 220, true},
     {ANIM_ALIEN_BABY_HAPPY_GUN, kAlienBabyHappyGun, 2, 220, true},
     {ANIM_ALIEN_BABY_HAPPY_GUN_LEFT, kAlienBabyHappyGunLeft, 2, 220, true},
+    {ANIM_ALIEN_BABY_HUNGRY_STAND, kAlienBabyHungryStand, 2, 260, true},
     {ANIM_ALIEN_BABY_BORED_IDLE, kAlienBabyBoredIdle, 1, 1000, true},
     {ANIM_ALIEN_BABY_BORED_BLINK, kAlienBabyBoredBlink, 4, 120, false},
     {ANIM_ALIEN_BABY_ANGRY_STOMP, kAlienBabyAngryStomp, 2, 140, true},
@@ -856,6 +862,9 @@ static AnimId alienBabyClipForMood(PetMood mood)
 {
   if (mood == MOOD_MAD)
     return ANIM_ALIEN_BABY_ANGRY_STOMP;
+
+  if (mood == MOOD_HUNGRY)
+    return ANIM_ALIEN_BABY_HUNGRY_STAND;
 
   if (mood == MOOD_TIRED)
     return ANIM_ALIEN_BABY_TIRED_LAY;
