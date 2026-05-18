@@ -202,6 +202,66 @@ const char *getBioStatusImagePath()
         return "/raising_hell/graphics/pet/bio/al/bb/al_bb_hpy_bio.png";
       }
     }
+
+    // ---------------- TEEN ----------------
+    if (pet.evoStage == 1)
+    {
+      switch (mood)
+      {
+      case MOOD_SICK:
+        return "/raising_hell/graphics/pet/bio/al/tn/al_tn_sck_bio.png";
+      case MOOD_TIRED:
+        return "/raising_hell/graphics/pet/bio/al/tn/al_tn_trd_bio.png";
+      case MOOD_HUNGRY:
+        return "/raising_hell/graphics/pet/bio/al/tn/al_tn_hgy_bio.png";
+      case MOOD_MAD:
+        return "/raising_hell/graphics/pet/bio/al/tn/al_tn_agy_bio.png";
+      case MOOD_BORED:
+        return "/raising_hell/graphics/pet/bio/al/tn/al_tn_brd_bio.png";
+      default:
+        return "/raising_hell/graphics/pet/bio/al/tn/al_tn_hpy_bio.png";
+      }
+    }
+
+    // ---------------- ADULT ----------------
+    if (pet.evoStage == 2)
+    {
+      switch (mood)
+      {
+      case MOOD_SICK:
+        return "/raising_hell/graphics/pet/bio/al/ad/al_ad_sck_bio.png";
+      case MOOD_TIRED:
+        return "/raising_hell/graphics/pet/bio/al/ad/al_ad_trd_bio.png";
+      case MOOD_HUNGRY:
+        return "/raising_hell/graphics/pet/bio/al/ad/al_ad_hgy_bio.png";
+      case MOOD_MAD:
+        return "/raising_hell/graphics/pet/bio/al/ad/al_ad_agy_bio.png";
+      case MOOD_BORED:
+        return "/raising_hell/graphics/pet/bio/al/ad/al_ad_brd_bio.png";
+      default:
+        return "/raising_hell/graphics/pet/bio/al/ad/al_ad_hpy_bio.png";
+      }
+    }
+
+    // ---------------- ELDER ----------------
+    if (pet.evoStage >= 3)
+    {
+      switch (mood)
+      {
+      case MOOD_SICK:
+        return "/raising_hell/graphics/pet/bio/al/ed/al_ed_sck_bio.png";
+      case MOOD_TIRED:
+        return "/raising_hell/graphics/pet/bio/al/ed/al_ed_trd_bio.png";
+      case MOOD_HUNGRY:
+        return "/raising_hell/graphics/pet/bio/al/ed/al_ed_hgy_bio.png";
+      case MOOD_MAD:
+        return "/raising_hell/graphics/pet/bio/al/ed/al_ed_agy_bio.png";
+      case MOOD_BORED:
+        return "/raising_hell/graphics/pet/bio/al/ed/al_ed_brd_bio.png";
+      default:
+        return "/raising_hell/graphics/pet/bio/al/ed/al_ed_hpy_bio.png";
+      }
+    }
   }
 
   // Fallback for future stages
