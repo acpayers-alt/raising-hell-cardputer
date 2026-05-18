@@ -526,6 +526,17 @@ static const char *kAlienBabyHungryStand[] = {
     "/raising_hell/graphics/pet/anim/al/bb/hgy/al_bb_hgy_stand2.png",
 };
 
+static const char *kAlienBabySickMoan[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_moan1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_moan2.png",
+};
+
+static const char *kAlienBabySickSneeze[] = {
+    "/raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_sneeze1.png",
+    "/raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_sneeze2.png",
+    "/raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_sneeze3.png",
+};
+
 static const char *kAlienBabyBoredIdle[] = {
     "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
 };
@@ -627,6 +638,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_BABY_HAPPY_GUN, kAlienBabyHappyGun, 2, 220, true},
     {ANIM_ALIEN_BABY_HAPPY_GUN_LEFT, kAlienBabyHappyGunLeft, 2, 220, true},
     {ANIM_ALIEN_BABY_HUNGRY_STAND, kAlienBabyHungryStand, 2, 260, true},
+    {ANIM_ALIEN_BABY_SICK_MOAN, kAlienBabySickMoan, 2, 420, true},
+    {ANIM_ALIEN_BABY_SICK_SNEEZE, kAlienBabySickSneeze, 3, 120, false},
     {ANIM_ALIEN_BABY_BORED_IDLE, kAlienBabyBoredIdle, 1, 1000, true},
     {ANIM_ALIEN_BABY_BORED_BLINK, kAlienBabyBoredBlink, 4, 120, false},
     {ANIM_ALIEN_BABY_ANGRY_STOMP, kAlienBabyAngryStomp, 2, 140, true},
@@ -666,6 +679,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien baby tired: gentle lay loop; occasional longer exhausted hold.
     {ANIM_ALIEN_BABY_TIRED_LAY, ANIM_ALIEN_BABY_TIRED_HOLD, 5000UL, 12000UL},
+
+    // Alien baby sick: moan loop; sneeze triggers occasionally.
+    {ANIM_ALIEN_BABY_SICK_MOAN, ANIM_ALIEN_BABY_SICK_SNEEZE, 4500UL, 9000UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -862,6 +878,9 @@ static AnimId alienBabyClipForMood(PetMood mood)
 {
   if (mood == MOOD_MAD)
     return ANIM_ALIEN_BABY_ANGRY_STOMP;
+
+  if (mood == MOOD_SICK)
+    return ANIM_ALIEN_BABY_SICK_MOAN;
 
   if (mood == MOOD_HUNGRY)
     return ANIM_ALIEN_BABY_HUNGRY_STAND;

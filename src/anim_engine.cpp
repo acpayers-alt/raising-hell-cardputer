@@ -260,6 +260,92 @@ static bool pngReadWHCached(const char *path, int *outW, int *outH)
   return true;
 }
 
+static const char *kThoughtHealthFrames[] = {
+    "/raising_hell/graphics/ui/thought_bubbles/thought_health1.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_health2.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_health3.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_health4.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_health5.png",
+};
+
+static uint8_t s_healthThoughtFrame = 0;
+static uint32_t s_healthThoughtNextMs = 0;
+static uint32_t s_healthThoughtHoldUntilMs = 0;
+static bool s_healthThoughtHolding = false;
+
+static void resetHealthThought()
+{
+  s_healthThoughtFrame = 0;
+  s_healthThoughtNextMs = 0;
+  s_healthThoughtHoldUntilMs = 0;
+  s_healthThoughtHolding = false;
+}
+
+static uint8_t tickHealthThoughtFrame()
+{
+  const uint32_t now = millis();
+
+  if (s_healthThoughtNextMs == 0)
+  {
+    s_healthThoughtFrame = 0;
+    s_healthThoughtNextMs = now + 180;
+    s_healthThoughtHolding = false;
+    s_healthThoughtHoldUntilMs = 0;
+    return s_healthThoughtFrame;
+  }
+
+  if ((int32_t)(now - s_healthThoughtNextMs) < 0)
+    return s_healthThoughtFrame;
+
+  if (s_healthThoughtHolding)
+  {
+    s_healthThoughtFrame = (s_healthThoughtFrame == 3) ? 4 : 3;
+    s_healthThoughtNextMs = now + 220;
+
+    if ((int32_t)(now - s_healthThoughtHoldUntilMs) >= 0)
+    {
+      s_healthThoughtFrame = 0;
+      s_healthThoughtHolding = false;
+      s_healthThoughtHoldUntilMs = 0;
+      s_healthThoughtNextMs = now + 180;
+    }
+
+    return s_healthThoughtFrame;
+  }
+
+  if (s_healthThoughtFrame < 3)
+  {
+    ++s_healthThoughtFrame;
+    s_healthThoughtNextMs = now + 180;
+
+    if (s_healthThoughtFrame == 3)
+    {
+      s_healthThoughtHolding = true;
+      s_healthThoughtHoldUntilMs = now + 5000UL;
+    }
+
+    return s_healthThoughtFrame;
+  }
+
+  s_healthThoughtFrame = 0;
+  s_healthThoughtNextMs = now + 180;
+  return s_healthThoughtFrame;
+}
+
+static void drawHealthThoughtBubbleForSickAlienBaby(int petDrawX, int petDrawY, int petW)
+{
+  const uint8_t frame = tickHealthThoughtFrame();
+  const char *path = kThoughtHealthFrames[frame];
+
+  if (!path || !path[0])
+    return;
+
+  const int bubbleX = petDrawX + petW - 10;
+  const int bubbleY = petDrawY - 4;
+
+  (void)drawPngPathAnim(path, bubbleX, bubbleY);
+}
+
 // -----------------------------------------------------------------------------
 // Engine state
 // -----------------------------------------------------------------------------
@@ -388,6 +474,9 @@ void animTick()
 
   if (desired != ANIM_ALIEN_BABY_HUNGRY_STAND)
     resetBurgerThought();
+
+  if (desired != ANIM_ALIEN_BABY_SICK_MOAN)
+    resetHealthThought();
 
   // Leaving pet tab/screen => ANIM_NONE
   if (desired == ANIM_NONE)
@@ -746,6 +835,9 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
 
     if (id == ANIM_ALIEN_BABY_HUNGRY_STAND)
       drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w);
+
+    if (id == ANIM_ALIEN_BABY_SICK_MOAN || id == ANIM_ALIEN_BABY_SICK_SNEEZE)
+      drawHealthThoughtBubbleForSickAlienBaby(drawX, drawY, w);
   }
   else
   {
