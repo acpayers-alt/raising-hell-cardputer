@@ -149,7 +149,13 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin)
     // Place icon so it sits just left of the text block
     const int coinIconX = coinRightX - coinTextW - coinGap - 16;
 
-    drawMiniStatIconCached(INF_COIN_ICON_PATH, coinIconX, headerIconY);
+    // Large INF icon is 10x14. Give it a larger black backing so it fully
+    // blends into the mini-stats panel.
+    const int iconDrawX = coinIconX + 9;
+    const int iconDrawY = headerIconY + 2; // nudge down 2 pixels
+
+    spr.fillRect(iconDrawX - 2, iconDrawY - 1, 14, 15, TFT_BLACK);
+    drawMiniStatIconCached(INF_ICON_LARGE_PATH, iconDrawX, iconDrawY);
 
     // fake-bold / slightly larger-looking text
     spr.drawString(infBuf, coinRightX, topTextY);
