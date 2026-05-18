@@ -35,12 +35,24 @@ static const char *PATH_SHOP_DEV_MOOD = "/raising_hell/graphics/ui/shop_items/de
 static const char *PATH_SHOP_DEV_REST = "/raising_hell/graphics/ui/shop_items/dev/dev_rest.png";
 static const char *PATH_SHOP_DEV_HEALTH = "/raising_hell/graphics/ui/shop_items/dev/dev_health.png";
 static const char *PATH_SHOP_DEV_EVO = "/raising_hell/graphics/ui/shop_items/dev/dev_evo.png";
+static const char *PATH_SHOP_DEV_BAIT = "/raising_hell/graphics/ui/shop_items/dev/dev_bait.png";
+static const char *PATH_SHOP_DEV_BABY = "/raising_hell/graphics/ui/shop_items/dev/dev_baby.png";
 
 static const char *PATH_SHOP_ELD_FOOD = "/raising_hell/graphics/ui/shop_items/eld/eld_food.png";
 static const char *PATH_SHOP_ELD_MOOD = "/raising_hell/graphics/ui/shop_items/eld/eld_mood.png";
 static const char *PATH_SHOP_ELD_REST = "/raising_hell/graphics/ui/shop_items/eld/eld_rest.png";
 static const char *PATH_SHOP_ELD_HEALTH = "/raising_hell/graphics/ui/shop_items/eld/eld_health.png";
 static const char *PATH_SHOP_ELD_EVO = "/raising_hell/graphics/ui/shop_items/eld/eld_evo.png";
+static const char *PATH_SHOP_ELD_BAIT = "/raising_hell/graphics/ui/shop_items/eld/eld_bait.png";
+static const char *PATH_SHOP_ELD_BABY = "/raising_hell/graphics/ui/shop_items/eld/eld_baby.png";
+
+static const char *PATH_SHOP_AL_FOOD = "/raising_hell/graphics/ui/shop_items/al/al_food.png";
+static const char *PATH_SHOP_AL_MOOD = "/raising_hell/graphics/ui/shop_items/al/al_mood.png";
+static const char *PATH_SHOP_AL_REST = "/raising_hell/graphics/ui/shop_items/al/al_rest.png";
+static const char *PATH_SHOP_AL_HEALTH = "/raising_hell/graphics/ui/shop_items/al/al_health.png";
+static const char *PATH_SHOP_AL_EVO = "/raising_hell/graphics/ui/shop_items/al/al_evo.png";
+static const char *PATH_SHOP_AL_BAIT = "/raising_hell/graphics/ui/shop_items/al/al_bait.png";
+static const char *PATH_SHOP_AL_BABY = "/raising_hell/graphics/ui/shop_items/al/al_baby.png";
 
 // ============================================================================
 // Shop / Sleep / Inventory / Feed
@@ -262,30 +274,40 @@ void drawShopScreen()
   const ItemType selType = availableItems[g_shopScreen.selectedIndex].type;
 
   const bool eldTheme = (pet.type == PET_ELDRITCH);
+  const bool alienTheme = (pet.type == PET_ALIEN);
+
+  auto themedPath = [&](const char *devPath, const char *eldPath, const char *alienPath) -> const char *
+  {
+    if (alienTheme)
+      return alienPath;
+    if (eldTheme)
+      return eldPath;
+    return devPath;
+  };
 
   const char *imgPath = nullptr;
   switch (selType)
   {
   case ITEM_SOUL_FOOD:
-    imgPath = eldTheme ? PATH_SHOP_ELD_FOOD : PATH_SHOP_DEV_FOOD;
+    imgPath = themedPath(PATH_SHOP_DEV_FOOD, PATH_SHOP_ELD_FOOD, PATH_SHOP_AL_FOOD);
     break;
   case ITEM_CURSED_RELIC:
-    imgPath = eldTheme ? PATH_SHOP_ELD_MOOD : PATH_SHOP_DEV_MOOD;
+    imgPath = themedPath(PATH_SHOP_DEV_MOOD, PATH_SHOP_ELD_MOOD, PATH_SHOP_AL_MOOD);
     break;
   case ITEM_DEMON_BONE:
-    imgPath = eldTheme ? PATH_SHOP_ELD_REST : PATH_SHOP_DEV_REST;
+    imgPath = themedPath(PATH_SHOP_DEV_REST, PATH_SHOP_ELD_REST, PATH_SHOP_AL_REST);
     break;
   case ITEM_RITUAL_CHALK:
-    imgPath = eldTheme ? PATH_SHOP_ELD_HEALTH : PATH_SHOP_DEV_HEALTH;
+    imgPath = themedPath(PATH_SHOP_DEV_HEALTH, PATH_SHOP_ELD_HEALTH, PATH_SHOP_AL_HEALTH);
     break;
   case ITEM_ELDRITCH_EYE:
-    imgPath = eldTheme ? PATH_SHOP_ELD_EVO : PATH_SHOP_DEV_EVO;
+    imgPath = themedPath(PATH_SHOP_DEV_EVO, PATH_SHOP_ELD_EVO, PATH_SHOP_AL_EVO);
     break;
   case ITEM_FISHING_BAIT:
-    imgPath = eldTheme ? PATH_SHOP_ELD_FOOD : PATH_SHOP_DEV_FOOD;
+    imgPath = themedPath(PATH_SHOP_DEV_BAIT, PATH_SHOP_ELD_BAIT, PATH_SHOP_AL_BAIT);
     break;
   case ITEM_INFERNAL_PACIFIER:
-    imgPath = eldTheme ? PATH_SHOP_ELD_EVO : PATH_SHOP_DEV_EVO;
+    imgPath = themedPath(PATH_SHOP_DEV_BABY, PATH_SHOP_ELD_BABY, PATH_SHOP_AL_BABY);
     break;
   default:
     imgPath = nullptr;

@@ -27,6 +27,27 @@ static const char *itemNameForPet(ItemType type, PetType petType)
 {
   switch (petType)
   {
+  case PET_ALIEN:
+    switch (type)
+    {
+    case ITEM_SOUL_FOOD:
+      return "Nutrient Gel";
+    case ITEM_CURSED_RELIC:
+      return "Psi Relic";
+    case ITEM_DEMON_BONE:
+      return "Calcium Rod";
+    case ITEM_RITUAL_CHALK:
+      return "Bio Seal";
+    case ITEM_ELDRITCH_EYE:
+      return "Growth Spore";
+    case ITEM_FISHING_BAIT:
+      return "Nebula Grub";
+    case ITEM_INFERNAL_PACIFIER:
+      return "Larva Cradle";
+    default:
+      return "";
+    }
+
   case PET_ELDRITCH:
     switch (type)
     {
@@ -41,9 +62,9 @@ static const char *itemNameForPet(ItemType type, PetType petType)
     case ITEM_ELDRITCH_EYE:
       return "Staring Pearl";
     case ITEM_FISHING_BAIT:
-      return "Fishing Bait";
+      return "Abyssal Lure";
     case ITEM_INFERNAL_PACIFIER:
-      return "Infernal Pacifier";
+      return "Cradle Pearl";
     default:
       return "";
     }
@@ -63,7 +84,7 @@ static const char *itemNameForPet(ItemType type, PetType petType)
     case ITEM_ELDRITCH_EYE:
       return "Eldritch Eye";
     case ITEM_FISHING_BAIT:
-      return "Fishing Bait";
+      return "Hellworm Bait";
     case ITEM_INFERNAL_PACIFIER:
       return "Infernal Pacifier";
     default:
@@ -75,29 +96,44 @@ static const char *itemNameForPet(ItemType type, PetType petType)
 static const char *itemDescForPet(ItemType type, PetType petType)
 {
   const bool eld = (petType == PET_ELDRITCH);
+  const bool alien = (petType == PET_ALIEN);
 
   switch (type)
   {
   case ITEM_SOUL_FOOD:
-    return eld ? "Salt-soaked bites that quiet the deep hunger." : "A small meal that restores hunger.";
+    return alien ? "A tube of dense nutrient gel."
+           : eld ? "Salt-soaked bites that quiet the deep hunger."
+                 : "A small meal that restores hunger.";
 
   case ITEM_CURSED_RELIC:
-    return eld ? "An idol dredged from ruins that whispers at night." : "A relic steeped in dark energy.";
+    return alien ? "A strange relic humming with psychic static."
+           : eld ? "An idol dredged from ruins that whispers at night."
+                 : "A relic steeped in dark energy.";
 
   case ITEM_DEMON_BONE:
-    return eld ? "A bone pulled from the abyss—slick with brine." : "A bone fragment radiating infernal heat.";
+    return alien ? "A mineral rod rich in alien calcium."
+           : eld ? "A bone pulled from the abyss, slick with brine."
+                 : "A bone fragment radiating infernal heat.";
 
   case ITEM_RITUAL_CHALK:
-    return eld ? "Inky sigil-chalk for circles drawn in seawater." : "Chalk used to draw ritual circles.";
+    return alien ? "A sterile seal used for bio-containment."
+           : eld ? "Inky sigil-chalk for circles drawn in seawater."
+                 : "Chalk used to draw ritual circles.";
 
   case ITEM_ELDRITCH_EYE:
-    return eld ? "A pearl that stares back—do not blink." : "A forbidden eye artifact. It watches.";
+    return alien ? "A mutagenic spore that forces growth."
+           : eld ? "A pearl that stares back. Do not blink."
+                 : "A forbidden eye artifact. It watches.";
 
   case ITEM_FISHING_BAIT:
-    return "Used to cast a line while fishing.";
+    return alien ? "A glowing grub used to lure strange fish."
+           : eld ? "A deep-sea lure for fishing."
+                 : "A wriggling bait used to cast a line.";
 
   case ITEM_INFERNAL_PACIFIER:
-    return "Returns your pet to baby form.";
+    return alien ? "Returns your pet to its larval form."
+           : eld ? "Returns your pet to its young form."
+                 : "Returns your pet to baby form.";
 
   case ITEM_NONE:
   default:
