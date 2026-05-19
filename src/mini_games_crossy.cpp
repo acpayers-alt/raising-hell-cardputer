@@ -21,7 +21,9 @@
 #include "ui_runtime.h"
 
 bool s_crossyShowIntro = false;
-static const uint16_t kSpriteKey = 0x0841;
+static bool s_crossyIntroDrawnOnce = false;
+static bool s_crossyAssetsPreloaded = false;
+const uint16_t kSpriteKey = 0x0841;
 
 bool crossyIsShowingIntro() { return s_crossyShowIntro; }
 
@@ -649,6 +651,47 @@ static void crossyReset()
   crossyInitStars();
 }
 
+static void crossyPreloadAssetsForIntro()
+{
+  if (s_crossyAssetsPreloaded)
+    return;
+
+  mgmem::logUsage("crossy-deferred-preload-begin");
+
+  freeCrossyZoneSprites();
+  freeCrossyActorSprites();
+
+  s_crossyLava0 = nullptr;
+  s_crossyLava1 = nullptr;
+
+  const bool startOk = ensureCrossyStartZoneSprite();
+  const bool goalOk = ensureCrossyGoalZoneSprite();
+
+  bool lava0 = false;
+  bool lava1 = false;
+  const bool usesLavaSprites = (pet.type != PET_ELDRITCH);
+
+  if (usesLavaSprites)
+  {
+    lava0 = ensureCrossyLavaZoneSprite(0);
+    lava1 = ensureCrossyLavaZoneSprite(1);
+  }
+
+  const bool stoneOk = ensureCrossyStoneSprite();
+  const bool stoneSmOk = ensureCrossyStoneSmallSprite();
+  const bool stoneXsOk = ensureCrossyStoneXSSprite();
+
+  Serial.printf(
+      "[CROSSY] deferred preload start=%d goal=%d lava=%s stone=%d stoneSm=%d stoneXs=%d free=%u largest=%u\n",
+      startOk ? 1 : 0, goalOk ? 1 : 0, usesLavaSprites ? ((lava0 && lava1) ? "ok" : "fail") : "skip", stoneOk ? 1 : 0,
+      stoneSmOk ? 1 : 0, stoneXsOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  s_crossyAssetsPreloaded = true;
+  s_crossyInited = true;
+  requestUIRedraw();
+}
+
 void startCrossyRoad()
 {
   mgPauseReset();
@@ -660,6 +703,8 @@ void startCrossyRoad()
   s_resultShown = false;
 
   s_crossyShowIntro = true;
+  s_crossyIntroDrawnOnce = false;
+  s_crossyAssetsPreloaded = false;
 
   mgClearRewardState();
   mgResetAcceptState();
@@ -677,58 +722,8 @@ void startCrossyRoad()
   miniGameSetReturnUi(retUi, g_app.currentTab);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
-  s_crossyInited = true;
+  s_crossyInited = false;
   crossyReset();
-
-  mgmem::logUsage("crossy-before-asset-free");
-
-  freeCrossyZoneSprites();
-  freeCrossyActorSprites();
-
-  s_crossyLava0 = nullptr;
-  s_crossyLava1 = nullptr;
-
-  mgmem::logUsage("crossy-after-asset-free");
-
-  const bool startOk = ensureCrossyStartZoneSprite();
-  mgmem::logUsage("crossy-after-start-zone");
-
-  const bool goalOk = ensureCrossyGoalZoneSprite();
-  mgmem::logUsage("crossy-after-goal-zone");
-
-  bool lava0 = false;
-  bool lava1 = false;
-  const bool usesLavaSprites = (pet.type != PET_ELDRITCH);
-
-  if (usesLavaSprites)
-  {
-    lava0 = ensureCrossyLavaZoneSprite(0);
-    mgmem::logUsage("crossy-after-lava0");
-
-    lava1 = ensureCrossyLavaZoneSprite(1);
-    mgmem::logUsage("crossy-after-lava1");
-  }
-  else
-  {
-    mgmem::logUsage("crossy-after-lava-skip");
-  }
-
-  const bool stoneOk = ensureCrossyStoneSprite();
-  mgmem::logUsage("crossy-after-stone-lg");
-
-  const bool stoneSmOk = ensureCrossyStoneSmallSprite();
-  mgmem::logUsage("crossy-after-stone-sm");
-
-  const bool stoneXsOk = ensureCrossyStoneXSSprite();
-  mgmem::logUsage("crossy-after-stone-xs");
-
-  const bool impOk = true;
-  mgmem::logUsage("crossy-after-imp");
-
-  Serial.printf("[CROSSY] preload start=%d goal=%d lava=%s stone=%d stoneSm=%d stoneXs=%d imp=%d free=%u largest=%u\n",
-                startOk ? 1 : 0, goalOk ? 1 : 0, usesLavaSprites ? ((lava0 && lava1) ? "ok" : "fail") : "skip",
-                stoneOk ? 1 : 0, stoneSmOk ? 1 : 0, stoneXsOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -842,13 +837,20 @@ void updateCrossyRoad(const InputState &input)
 
   if (s_crossyShowIntro)
   {
+    if (s_crossyIntroDrawnOnce && !s_crossyAssetsPreloaded)
+    {
+      crossyPreloadAssetsForIntro();
+      return;
+    }
+
     if (input.mgQuitOnce && !mgInputLockedOut())
+
     {
       miniGameCancelFromIntro();
       return;
     }
 
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+    const bool startPressed = s_crossyAssetsPreloaded && (enterOnce || input.mgSelectOnce || input.mgUpOnce);
 
     if (startPressed && !mgInputLockedOut())
     {
@@ -988,25 +990,6 @@ void drawCrossyRoad()
   const int gW = (screenW > 0) ? screenW : 240;
   const int gH = (screenH > 0) ? screenH : 135;
 
-  const bool haveGoal = ensureCrossyGoalZoneSprite();
-  const bool haveStart = ensureCrossyStartZoneSprite();
-
-  M5Canvas *goalZoneSpr = nullptr;
-  M5Canvas *startZoneSpr = nullptr;
-
-  if (haveGoal)
-  {
-    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "goal_zone", crossyGoalZonePathForPet(), 8, kSpriteKey, goalZoneSpr);
-  }
-
-  if (haveStart)
-  {
-    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "start_zone", crossyStartZonePathForPet(), 8, kSpriteKey, startZoneSpr);
-  }
-
-  M5Canvas *lavaZoneSpr0 = s_crossyLava0;
-  M5Canvas *lavaZoneSpr1 = s_crossyLava1;
-
   spr.fillSprite(TFT_BLACK);
 
   if (mgRewardShowing())
@@ -1041,9 +1024,27 @@ void drawCrossyRoad()
     }
 
     spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
+    spr.setTextColor(s_crossyAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(s_crossyAssetsPreloaded ? "ENTER to begin" : "Loading...", gW / 2, 120, 2);
+
+    s_crossyIntroDrawnOnce = true;
     return;
+  }
+
+  const bool haveGoal = ensureCrossyGoalZoneSprite();
+  const bool haveStart = ensureCrossyStartZoneSprite();
+
+  M5Canvas *goalZoneSpr = nullptr;
+  M5Canvas *startZoneSpr = nullptr;
+
+  if (haveGoal)
+  {
+    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "goal_zone", crossyGoalZonePathForPet(), 8, kSpriteKey, goalZoneSpr);
+  }
+
+  if (haveStart)
+  {
+    mgmem::ensureSprite(MiniGame::CROSSY_ROAD, "start_zone", crossyStartZonePathForPet(), 8, kSpriteKey, startZoneSpr);
   }
 
   const uint32_t now = millis();

@@ -115,6 +115,8 @@ enum DodgerPhase
 };
 
 static bool s_dodgerShowIntro = true;
+static bool s_dodgerIntroDrawnOnce = false;
+static bool s_dodgerAssetsPreloaded = false;
 bool dodgerIsShowingIntro() { return s_dodgerShowIntro; }
 static uint8_t s_dodgerIntroImpFrame = 0;
 static uint32_t s_dodgerIntroImpAnimMs = 0;
@@ -621,6 +623,39 @@ static inline uint32_t dodgerAliveMsNow(uint32_t now)
   return elapsed;
 }
 
+static void dodgerPreloadAssetsForIntro()
+{
+  if (s_dodgerAssetsPreloaded)
+    return;
+
+  mgmem::logUsage("dodger-deferred-preload-begin");
+
+  freeDodgerBgCache();
+  freeDodgerFireballSprites();
+  freeDodgerCarSprite();
+  freeDodgerGoalFrames();
+  freeDodgerGoreSprite();
+
+  const bool bgOk = ensureDodgerBgCache();
+  const bool fireballOk = ensureDodgerFireballSprites();
+  const bool carOk = ensureDodgerCarSprite(fireballRunCarPathForPet());
+
+  s_dodgerGoreSpr = nullptr;
+
+  const char *goalFrame1Path = dodgerGoalFrame1ResolvedPath();
+  const char *goalFrame2Path = dodgerGoalFrame2ResolvedPath();
+
+  const bool goalOk = (goalFrame1Path && goalFrame2Path) && ensureDodgerGoalFrames(goalFrame1Path, goalFrame2Path);
+
+  Serial.printf("[DODGER] deferred preload bg=%d fireballs=%d car=%d goal=%d free=%u largest=%u\n", bgOk ? 1 : 0,
+                fireballOk ? 1 : 0, carOk ? 1 : 0, goalOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  s_dodgerAssetsPreloaded = true;
+  s_dodgerInited = true;
+  requestUIRedraw();
+}
+
 void startInfernalDodger()
 {
   inputSetTextCapture(false);
@@ -653,47 +688,10 @@ void startInfernalDodger()
   s_dodgerBgScrollY = 0;
   s_dodgerFreezeScroll = false;
 
-  mgmem::logUsage("dodger-before-asset-free");
-
-  freeDodgerBgCache();
-  freeDodgerFireballSprites();
-  freeDodgerCarSprite();
-  freeDodgerGoalFrames();
-  freeDodgerGoreSprite();
-
-  mgmem::logUsage("dodger-after-asset-free");
-
-  const bool bgOk = ensureDodgerBgCache();
-  mgmem::logUsage("dodger-after-bg-ensure");
-
-  const bool fireballOk = ensureDodgerFireballSprites();
-  mgmem::logUsage("dodger-after-fireballs-ensure");
-
-  const bool carOk = ensureDodgerCarSprite(fireballRunCarPathForPet());
-  mgmem::logUsage("dodger-after-car-ensure");
-
-  s_dodgerGoreSpr = nullptr;
-  const char *goalFrame1Path = dodgerGoalFrame1ResolvedPath();
-  const char *goalFrame2Path = dodgerGoalFrame2ResolvedPath();
-  const char *goalGorePath = dodgerGoalGoreResolvedPath();
-
-  const bool goalOk = (goalFrame1Path && goalFrame2Path) && ensureDodgerGoalFrames(goalFrame1Path, goalFrame2Path);
-
-  // Keep gore deferred.
-  const bool goreOk = false;
-
-  mgmem::logUsage("dodger-after-goal-ensure");
-  mgmem::logUsage("dodger-after-gore-defer");
-
-  s_dodgerInited = true;
-  dodgerReset();
-
-  Serial.printf("[DODGER] preload bg=%d fireballs=%d car=%d goal=%d gore=%d free=%u largest=%u\n", bgOk ? 1 : 0,
-                fireballOk ? 1 : 0, carOk ? 1 : 0, goalOk ? 1 : 0, goreOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-
   invalidateBackgroundCache();
   s_dodgerShowIntro = true;
+  s_dodgerIntroDrawnOnce = false;
+  s_dodgerAssetsPreloaded = false;
   s_dodgerIntroImpFrame = 0;
   s_dodgerIntroImpAnimMs = millis();
   requestUIRedraw();
@@ -748,13 +746,19 @@ void updateInfernalDodger(const InputState &input)
       s_dodgerIntroImpFrame ^= 1;
     }
 
+    if (s_dodgerIntroDrawnOnce && !s_dodgerAssetsPreloaded)
+    {
+      dodgerPreloadAssetsForIntro();
+      return;
+    }
+
     if (input.mgQuitOnce && !mgInputLockedOut())
     {
       miniGameCancelFromIntro();
       return;
     }
 
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+    const bool startPressed = s_dodgerAssetsPreloaded && (enterOnce || input.mgSelectOnce || input.mgUpOnce);
 
     if (startPressed && !mgInputLockedOut())
     {
@@ -1162,6 +1166,7 @@ void drawInfernalDodger()
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString(dodgerIntroLine1(), gW / 2, 8, 2);
     spr.drawCentreString(dodgerIntroLine2(), gW / 2, 26, 2);
+
     const int impX = (gW - 48) / 2;
     const int impY = 56;
 
@@ -1174,8 +1179,13 @@ void drawInfernalDodger()
       spr.fillRect(impX, impY, 48, 48, TFT_RED);
 
     spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
+    spr.setTextColor(s_dodgerAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+
+    spr.drawCentreString(s_dodgerAssetsPreloaded ? "ENTER to begin" : "Loading...", gW / 2, 120, 2);
+
+    // Mark that the intro has been shown once so updateInfernalDodger()
+    // can perform the deferred asset preload.
+    s_dodgerIntroDrawnOnce = true;
     return;
   }
 
@@ -1189,7 +1199,11 @@ void drawInfernalDodger()
       const int bx = (int)b.x;
       const int by = (int)b.y;
 
-      M5Canvas *fbFrames[3] = {fbFrame0, fbFrame1, fbFrame2};
+      M5Canvas *fbFrames[3] = {
+          s_dodgerFireball1Spr,
+          s_dodgerFireball2Spr,
+          s_dodgerFireball3Spr,
+      };
 
       if (haveFireballs && fbFrames[0] && fbFrames[1] && fbFrames[2])
       {
@@ -1219,23 +1233,16 @@ void drawInfernalDodger()
     M5Canvas *goal1 = s_dodgerGoalFrame1Spr;
     M5Canvas *goal2 = s_dodgerGoalFrame2Spr;
 
-    // ===== IMP / MERMAN (COAST + GOAL phases) =====
     if (!gorePhase)
     {
       M5Canvas *goalSpr = nullptr;
 
       if (goal1 && goal2)
-      {
         goalSpr = (s_dodgerGoalAnimFrame & 1) ? goal2 : goal1;
-      }
       else if (goal1)
-      {
         goalSpr = goal1;
-      }
       else if (goal2)
-      {
         goalSpr = goal2;
-      }
 
       if (goalSpr && goalSpr->width() > 0 && goalSpr->height() > 0)
       {
@@ -1244,8 +1251,6 @@ void drawInfernalDodger()
         goalSpr->pushSprite(&spr, drawX, drawY, kDodgerKey);
       }
     }
-
-    // ===== GORE (IMPACT phases) =====
     else
     {
       if (s_dodgerGoreSpr && s_dodgerGoreSpr->width() > 0 && s_dodgerGoreSpr->height() > 0)

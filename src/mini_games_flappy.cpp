@@ -46,6 +46,7 @@ static void logMiniGameHeap(const char *tag) { mgAssetsLogHeap(tag); }
 
 void freeFlappyBgCache();
 static bool ensureFlappyBgCache(const char *path);
+static void flappyPreloadAssetsForIntro();
 
 // -----------------------------------------------------------------------------
 // FLAPPY FIREBALL GLOBALS
@@ -53,6 +54,8 @@ static bool ensureFlappyBgCache(const char *path);
 
 // START SCREEN
 bool s_flappyShowIntro = true;
+static bool s_flappyIntroDrawnOnce = false;
+static bool s_flappyAssetsPreloaded = false;
 
 // BACKGROUND
 static bool s_flappyBgReady = false;
@@ -546,6 +549,39 @@ static bool ensureFlappyPipeSprites(const char *bgPath)
   return true;
 }
 
+static void flappyPreloadAssetsForIntro()
+{
+  if (s_flappyAssetsPreloaded)
+    return;
+
+  mgmem::logUsage("flappy-deferred-preload-begin");
+
+  freeFlappyBgCache();
+  mgmem::logUsage("flappy-deferred-after-bg-reset");
+
+  const char *bgPath = flappyBgPathForPet();
+
+  const bool bgOk = ensureFlappyBgCache(bgPath);
+  mgmem::logUsage("flappy-deferred-after-bg-ensure");
+
+  freeFlappyPipeSprites();
+  freeFlappyFireballSprites();
+  mgmem::logUsage("flappy-deferred-after-sprite-free");
+
+  const bool pipeOk = ensureFlappyPipeSprites(bgPath);
+  const bool fireballOk = ensureFlappyFireballSprites(bgPath);
+  const bool impOk = ensureImpWaveSprites();
+
+  mgmem::logUsage("flappy-deferred-after-preload");
+
+  Serial.printf("[FLAPPY] deferred preload bg=%d pipes=%d fireball=%d imp=%d free=%u largest=%u\n", bgOk ? 1 : 0,
+                pipeOk ? 1 : 0, fireballOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+  s_flappyAssetsPreloaded = true;
+  requestUIRedraw();
+}
+
 void startFlappyFireball()
 {
   mgPauseReset();
@@ -579,6 +615,8 @@ void startFlappyFireball()
 
   s_flappyInited = true;
   s_flappyShowIntro = true;
+  s_flappyIntroDrawnOnce = false;
+  s_flappyAssetsPreloaded = false;
   s_impHit = false;
   s_impBurnDone = false;
   s_impFrame = 0;
@@ -587,29 +625,6 @@ void startFlappyFireball()
   s_lastStepMs = millis();
 
   s_flappyBgScrollX = 0;
-
-  mgmem::logUsage("flappy-before-bg-reset");
-  freeFlappyBgCache();
-  mgmem::logUsage("flappy-after-bg-reset");
-
-  const char *bgPath = flappyBgPathForPet();
-
-  const bool bgOk = ensureFlappyBgCache(bgPath);
-  mgmem::logUsage("flappy-after-bg-ensure");
-
-  freeFlappyPipeSprites();
-  freeFlappyFireballSprites();
-  mgmem::logUsage("flappy-after-sprite-free");
-
-  const bool pipeOk = ensureFlappyPipeSprites(bgPath);
-  const bool fireballOk = ensureFlappyFireballSprites(bgPath);
-  const bool impOk = ensureImpWaveSprites();
-
-  mgmem::logUsage("flappy-after-preload");
-
-  Serial.printf("[FLAPPY] preload bg=%d pipes=%d fireball=%d imp=%d free=%u largest=%u\n", bgOk ? 1 : 0, pipeOk ? 1 : 0,
-                fireballOk ? 1 : 0, impOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
-                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -876,6 +891,12 @@ void updateFlappyFireball(const InputState &input)
 
   if (s_flappyShowIntro)
   {
+    if (s_flappyIntroDrawnOnce && !s_flappyAssetsPreloaded)
+    {
+      flappyPreloadAssetsForIntro();
+      return;
+    }
+
     const uint32_t dt = (s_lastStepMs == 0) ? 0 : (now - s_lastStepMs);
     s_lastStepMs = now;
 
@@ -892,7 +913,7 @@ void updateFlappyFireball(const InputState &input)
       return;
     }
 
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+    const bool startPressed = s_flappyAssetsPreloaded && (enterOnce || input.mgSelectOnce || input.mgUpOnce);
 
     if (startPressed && !mgInputLockedOut())
     {
@@ -1119,8 +1140,10 @@ void drawFlappyFireball()
       impSpr->pushSprite(&spr, impX, impY, kSpriteKey);
 
     spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 116, 2);
+    spr.setTextColor(s_flappyAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(s_flappyAssetsPreloaded ? "ENTER to begin" : "Loading...", gW / 2, 116, 2);
+
+    s_flappyIntroDrawnOnce = true;
     return;
   }
 
