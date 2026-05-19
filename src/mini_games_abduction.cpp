@@ -65,7 +65,8 @@ static bool s_abductionIntroDrawnOnce = false;
 static bool s_abductionAssetsPreloaded = false;
 
 static uint32_t s_lastAbductionDrawMs = 0;
-static constexpr uint32_t kAbductionFrameMs = 33; // ~30 FPS
+static constexpr uint32_t kAbductionFrameMs = 42; // ~24 FPS
+static constexpr uint16_t kAbductionSpriteKey = TFT_MAGENTA;
 
 static const int kGroundY = 112;
 
@@ -94,6 +95,45 @@ static const char *MIB_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/mib1.png",
     "/raising_hell/graphics/mini_games/abduct/mib2.png",
 };
+
+struct AbductionSpriteDims
+{
+  int w = 0;
+  int h = 0;
+  bool ready = false;
+};
+
+struct AbductionStar
+{
+  int16_t x;
+  int16_t y;
+  uint8_t phase;
+  uint8_t kind;
+};
+
+static constexpr int kAbductionStarCount = 18;
+static AbductionStar s_abductionStars[kAbductionStarCount];
+
+static AbductionSpriteDims s_cowDims[2];
+static AbductionSpriteDims s_mibDims[2];
+static AbductionSpriteDims s_tankDims[2];
+
+static void cacheAbductionSpriteDims()
+{
+  const char *usePath = nullptr;
+
+  for (uint8_t i = 0; i < 2; ++i)
+  {
+    if (!s_cowDims[i].ready)
+      s_cowDims[i].ready = mgAssetsReadPngDims(COW_FRAMES[i], &s_cowDims[i].w, &s_cowDims[i].h, &usePath);
+
+    if (!s_mibDims[i].ready)
+      s_mibDims[i].ready = mgAssetsReadPngDims(MIB_FRAMES[i], &s_mibDims[i].w, &s_mibDims[i].h, &usePath);
+
+    if (!s_tankDims[i].ready)
+      s_tankDims[i].ready = mgAssetsReadPngDims(TANK_FRAMES[i], &s_tankDims[i].w, &s_tankDims[i].h, &usePath);
+  }
+}
 
 static void resetTargets()
 {
@@ -147,6 +187,65 @@ static void spawnTarget(uint32_t now)
   s_nextSpawnMs = now + 300;
 }
 
+static void initAbductionStars()
+{
+  const int skyBottom = SCREEN_H - 80;
+
+  for (int i = 0; i < kAbductionStarCount; ++i)
+  {
+    s_abductionStars[i].x = (int16_t)random(0, SCREEN_W);
+    s_abductionStars[i].y = (int16_t)random(4, max(8, skyBottom - 4));
+    s_abductionStars[i].phase = (uint8_t)random(0, 64);
+    s_abductionStars[i].kind = (uint8_t)random(0, 4);
+  }
+}
+
+static void drawAbductionStars(uint32_t now)
+{
+  const int skyBottom = SCREEN_H - 80;
+  const uint32_t tick = now / 90U;
+
+  for (int i = 0; i < kAbductionStarCount; ++i)
+  {
+    const AbductionStar &s = s_abductionStars[i];
+
+    if (s.y < 0 || s.y >= skyBottom)
+      continue;
+
+    const uint8_t t = (uint8_t)((tick + s.phase) & 31U);
+    const uint8_t glow = (t < 16U) ? t : (31U - t);
+
+    if (glow < 2)
+      continue;
+
+    uint16_t c;
+    if (glow < 5)
+      c = spr.color565(90, 90, 110);
+    else if (glow < 9)
+      c = spr.color565(150, 150, 185);
+    else
+      c = spr.color565(230, 230, 255);
+
+    spr.drawPixel(s.x, s.y, c);
+
+    if (glow >= 8 && (s.kind == 1 || s.kind == 3))
+    {
+      if (s.x > 0)
+        spr.drawPixel(s.x - 1, s.y, c);
+      if (s.x + 1 < SCREEN_W)
+        spr.drawPixel(s.x + 1, s.y, c);
+    }
+
+    if (glow >= 8 && (s.kind == 2 || s.kind == 3))
+    {
+      if (s.y > 0)
+        spr.drawPixel(s.x, s.y - 1, c);
+      if (s.y + 1 < skyBottom)
+        spr.drawPixel(s.x, s.y + 1, c);
+    }
+  }
+}
+
 static void finishGame(bool won)
 {
   playerWon = won;
@@ -174,7 +273,51 @@ static void resetGame()
   s_lastAbductionDrawMs = 0; // ADD THIS LINE
   s_score = 0;
   s_strikes = 0;
+  initAbductionStars();
   resetTargets();
+}
+
+static bool getAbductionSprite(const char *assetId, const char *path, M5Canvas *&out)
+{
+  return mgmem::ensureSprite(MiniGame::ABDUCTION_BEAM, assetId, path, 8, kAbductionSpriteKey, out);
+}
+
+static void drawCachedSpriteMirroredX(M5Canvas *src, int x, int y)
+{
+  if (!src || src->width() <= 0 || src->height() <= 0)
+    return;
+
+  const int w = src->width();
+  const int h = src->height();
+
+  for (int yy = 0; yy < h; ++yy)
+  {
+    for (int xx = 0; xx < w; ++xx)
+    {
+      const uint16_t c = src->readPixel(xx, yy);
+      if (c == kAbductionSpriteKey)
+        continue;
+
+      spr.drawPixel(x + (w - 1 - xx), y + yy, c);
+    }
+  }
+}
+
+static void preloadAbductionSprites()
+{
+  M5Canvas *unused = nullptr;
+
+  getAbductionSprite("ufo_0", UFO_FRAMES[0], unused);
+  getAbductionSprite("ufo_1", UFO_FRAMES[1], unused);
+
+  getAbductionSprite("cow_0", COW_FRAMES[0], unused);
+  getAbductionSprite("cow_1", COW_FRAMES[1], unused);
+
+  getAbductionSprite("mib_0", MIB_FRAMES[0], unused);
+  getAbductionSprite("mib_1", MIB_FRAMES[1], unused);
+
+  getAbductionSprite("tank_0", TANK_FRAMES[0], unused);
+  getAbductionSprite("tank_1", TANK_FRAMES[1], unused);
 }
 
 static void abductionPreloadAssetsForIntro()
@@ -184,9 +327,7 @@ static void abductionPreloadAssetsForIntro()
 
   mgAssetsLogHeap("abduction-deferred-preload-begin");
 
-  // PNG asset caching will be wired here next.
-  // For now this intentionally does no heavy work, but preserves the same
-  // launch flow used by the other mini-games.
+  preloadAbductionSprites();
 
   s_abductionAssetsPreloaded = true;
   requestUIRedraw();
@@ -206,8 +347,14 @@ static void drawUfo()
   const int drawX = s_ufoX - 24;
   const int drawY = s_ufoY - 16;
 
-  if (g_sdReady && path && path[0] && sprDrawPngFromSD(path, drawX, drawY))
+  M5Canvas *ufo = nullptr;
+  const char *assetId = frame ? "ufo_1" : "ufo_0";
+
+  if (getAbductionSprite(assetId, path, ufo) && ufo)
+  {
+    ufo->pushSprite(&spr, drawX, drawY, kAbductionSpriteKey);
     return;
+  }
 
   // Fallback code-drawn UFO if assets are missing.
   spr.fillEllipse(s_ufoX, s_ufoY, 18, 6, TFT_DARKGREY);
@@ -245,25 +392,22 @@ static void drawTarget(const AbductionTarget &t)
     const uint8_t frame = (millis() / 180) & 1;
     const char *path = COW_FRAMES[frame];
 
-    // Measure the sprite so we can align it to the target's logical bounds.
-    int iw = 0;
-    int ih = 0;
-    const char *usePath = nullptr;
+    M5Canvas *cow = nullptr;
+    const char *assetId = frame ? "cow_1" : "cow_0";
 
-    if (mgAssetsReadPngDims(path, &iw, &ih, &usePath))
+    if (getAbductionSprite(assetId, path, cow) && cow)
     {
-      // Align sprite bottom to the existing target baseline.
       const int drawX = t.x;
-      const int drawY = t.y + t.h - ih;
+      const int drawY = t.y + t.h - cow->height();
 
       if (t.dir < 0)
-        sprDrawPngFromSD(usePath ? usePath : path, drawX, drawY);
+        cow->pushSprite(&spr, drawX, drawY, kAbductionSpriteKey);
       else
-        sprDrawPngFromSDMirroredX(usePath ? usePath : path, drawX, drawY, iw, ih);
+        drawCachedSpriteMirroredX(cow, drawX, drawY);
+
       break;
     }
 
-    // Fallback code-drawn cow if the PNG is missing.
     spr.fillRoundRect(t.x, t.y + 4, t.w, 8, 3, TFT_WHITE);
     spr.fillRect(t.x + 3, t.y + 7, 3, 3, TFT_BLACK);
     spr.fillRect(t.x + 11, t.y + 6, 3, 3, TFT_BLACK);
@@ -277,26 +421,22 @@ static void drawTarget(const AbductionTarget &t)
     const uint8_t frame = (millis() / 180) & 1;
     const char *path = MIB_FRAMES[frame];
 
-    int iw = 0;
-    int ih = 0;
-    const char *usePath = nullptr;
+    M5Canvas *mib = nullptr;
+    const char *assetId = frame ? "mib_1" : "mib_0";
 
-    if (mgAssetsReadPngDims(path, &iw, &ih, &usePath))
+    if (getAbductionSprite(assetId, path, mib) && mib)
     {
       const int drawX = t.x;
-      const int drawY = t.y + t.h - ih;
+      const int drawY = t.y + t.h - mib->height();
 
-      // MIB art faces left by default.
-      // Mirror when moving right.
       if (t.dir < 0)
-        sprDrawPngFromSD(usePath ? usePath : path, drawX, drawY);
+        mib->pushSprite(&spr, drawX, drawY, kAbductionSpriteKey);
       else
-        sprDrawPngFromSDMirroredX(usePath ? usePath : path, drawX, drawY, iw, ih);
+        drawCachedSpriteMirroredX(mib, drawX, drawY);
 
       break;
     }
 
-    // Fallback if MIB art is missing.
     spr.fillCircle(t.x + 7, t.y + 4, 3, TFT_ORANGE);
     spr.fillRect(t.x + 4, t.y + 7, 6, 10, TFT_BLACK);
     spr.drawLine(t.x + 5, t.y + 17, t.x + 3, t.y + 21, TFT_DARKGREY);
@@ -397,6 +537,7 @@ void startAbductionBeam()
 
   graphicsReleaseUiCachesForMiniGame();
   mgAssetsBeginSession(currentMiniGame, "startAbductionBeam");
+  mgmem::beginSession(currentMiniGame, pet.type);
 
   UIState retUi = g_app.uiState;
   if (retUi == UIState::MINI_GAME || retUi == UIState::MG_PAUSE)
@@ -614,12 +755,15 @@ void drawAbductionBeam()
 
   if (g_sdReady)
   {
-    if (!sprDrawPngFromSD("/raising_hell/graphics/mini_games/abduct/al_abd_bg.png", 0, SCREEN_H - kAbductionBgH))
+    if (!sprDrawJpgFromSD("/raising_hell/graphics/mini_games/abduct/al_abd_bg.jpg", 0, SCREEN_H - kAbductionBgH))
     {
       spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
       spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
     }
   }
+
+  // Draw stars after the background so they are visible.
+  drawAbductionStars(now);
 
   drawHud();
   drawBeam();
