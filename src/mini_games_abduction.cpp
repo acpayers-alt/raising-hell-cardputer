@@ -25,7 +25,6 @@ enum TargetKind : uint8_t
 {
   TARGET_COW = 0,
   TARGET_FARMER,
-  TARGET_POLICE,
 };
 
 struct AbductionTarget
@@ -86,11 +85,6 @@ static const char *COW_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/cow2.png",
 };
 
-static const char *TANK_FRAMES[] = {
-    "/raising_hell/graphics/mini_games/abduct/tank1.png",
-    "/raising_hell/graphics/mini_games/abduct/tank2.png",
-};
-
 static const char *MIB_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/mib1.png",
     "/raising_hell/graphics/mini_games/abduct/mib2.png",
@@ -116,7 +110,6 @@ static AbductionStar s_abductionStars[kAbductionStarCount];
 
 static AbductionSpriteDims s_cowDims[2];
 static AbductionSpriteDims s_mibDims[2];
-static AbductionSpriteDims s_tankDims[2];
 
 static void cacheAbductionSpriteDims()
 {
@@ -129,9 +122,6 @@ static void cacheAbductionSpriteDims()
 
     if (!s_mibDims[i].ready)
       s_mibDims[i].ready = mgAssetsReadPngDims(MIB_FRAMES[i], &s_mibDims[i].w, &s_mibDims[i].h, &usePath);
-
-    if (!s_tankDims[i].ready)
-      s_tankDims[i].ready = mgAssetsReadPngDims(TANK_FRAMES[i], &s_tankDims[i].w, &s_tankDims[i].h, &usePath);
   }
 }
 
@@ -151,12 +141,10 @@ static void spawnTarget(uint32_t now)
     AbductionTarget &t = s_targets[i];
 
     const int roll = random(100);
-    if (roll < 70)
+    if (roll < 75)
       t.kind = TARGET_COW;
-    else if (roll < 85)
-      t.kind = TARGET_FARMER;
     else
-      t.kind = TARGET_POLICE;
+      t.kind = TARGET_FARMER;
 
     switch (t.kind)
     {
@@ -167,10 +155,6 @@ static void spawnTarget(uint32_t now)
     case TARGET_FARMER:
       t.w = 14;
       t.h = 22;
-      break;
-    case TARGET_POLICE:
-      t.w = 32;
-      t.h = 14;
       break;
     }
 
@@ -315,9 +299,6 @@ static void preloadAbductionSprites()
 
   getAbductionSprite("mib_0", MIB_FRAMES[0], unused);
   getAbductionSprite("mib_1", MIB_FRAMES[1], unused);
-
-  getAbductionSprite("tank_0", TANK_FRAMES[0], unused);
-  getAbductionSprite("tank_1", TANK_FRAMES[1], unused);
 }
 
 static void abductionPreloadAssetsForIntro()
@@ -678,7 +659,7 @@ void updateAbductionBeam(const InputState &input)
   {
     s_lastStepMs = now;
 
-    const int speed = 1 + min<int>(4, s_score / 6);
+    const int speed = 2 + min<int>(4, s_score / 6);
 
     for (uint8_t i = 0; i < kMaxTargets; ++i)
     {
