@@ -10,6 +10,7 @@
 #include "mini_game_assets.h"
 #include "mini_game_return_ui.h"
 #include "mini_game_runtime.h"
+#include "mini_games_internal.h"
 #include "pet.h"
 #include "save_manager.h"
 #include "sound.h"
@@ -57,6 +58,9 @@ static uint32_t s_beamUntilMs = 0;
 static uint8_t s_score = 0;
 static uint8_t s_strikes = 0;
 static bool s_inited = false;
+static bool s_abductionShowIntro = true;
+static bool s_abductionIntroDrawnOnce = false;
+static bool s_abductionAssetsPreloaded = false;
 
 static const int kGroundY = 112;
 
@@ -128,6 +132,14 @@ static void finishGame(bool won)
 {
   playerWon = won;
   g_app.gameOver = true;
+  s_resultShown = true;
+
+  if (won)
+    soundWin();
+  else
+    soundError();
+
+  requestUIRedraw();
 }
 
 static void resetGame()
@@ -142,6 +154,23 @@ static void resetGame()
   s_score = 0;
   s_strikes = 0;
   resetTargets();
+}
+
+static void abductionPreloadAssetsForIntro()
+{
+  if (s_abductionAssetsPreloaded)
+    return;
+
+  mgAssetsLogHeap("abduction-deferred-preload-begin");
+
+  // PNG asset caching will be wired here next.
+  // For now this intentionally does no heavy work, but preserves the same
+  // launch flow used by the other mini-games.
+
+  s_abductionAssetsPreloaded = true;
+  requestUIRedraw();
+
+  mgAssetsLogHeap("abduction-deferred-preload-complete");
 }
 
 static void drawUfo()
@@ -280,6 +309,8 @@ static void handleBeamHit()
 
 } // namespace
 
+bool abductionBeamIsShowingIntro() { return s_abductionShowIntro; }
+
 void startAbductionBeam()
 {
   inputSetTextCapture(false);
@@ -305,6 +336,9 @@ void startAbductionBeam()
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
 
   s_inited = true;
+  s_abductionShowIntro = true;
+  s_abductionIntroDrawnOnce = false;
+  s_abductionAssetsPreloaded = false;
   resetGame();
 
   invalidateBackgroundCache();
@@ -344,6 +378,36 @@ void updateAbductionBeam(const InputState &input)
   {
     s_inited = true;
     resetGame();
+  }
+
+  if (s_abductionShowIntro)
+  {
+    if (s_abductionIntroDrawnOnce && !s_abductionAssetsPreloaded)
+    {
+      abductionPreloadAssetsForIntro();
+      return;
+    }
+
+    if (input.mgQuitOnce && !mgInputLockedOut())
+    {
+      miniGameCancelFromIntro();
+      return;
+    }
+
+    const bool startPressed = s_abductionAssetsPreloaded && (enterOnce || input.mgSelectOnce || input.mgUpOnce);
+
+    if (startPressed && !mgInputLockedOut())
+    {
+      s_abductionShowIntro = false;
+      resetGame();
+
+      clearInputLatch();
+      inputForceClear();
+      mgBeginInputLockout(120);
+      requestUIRedraw();
+    }
+
+    return;
   }
 
   if (input.mgQuitOnce && !mgInputLockedOut())
@@ -395,9 +459,36 @@ void drawAbductionBeam()
   const int gH = screenH;
 
   if (mgRewardShowing())
+  {
+    miniGameDrawRewardModal(gW, gH);
     return;
+  }
 
   spr.fillSprite(TFT_BLACK);
+
+  if (s_abductionShowIntro)
+  {
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextFont(2);
+    spr.setTextSize(1);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("Soul Beam", SCREEN_W / 2, 14, 2);
+
+    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString("Abduct cows", SCREEN_W / 2, 38, 2);
+    spr.drawCentreString("Avoid humans", SCREEN_W / 2, 56, 2);
+
+    spr.setTextColor(TFT_CYAN, TFT_BLACK);
+    spr.drawCentreString("Move + ENTER", SCREEN_W / 2, 84, 2);
+
+    spr.setTextColor(s_abductionAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(s_abductionAssetsPreloaded ? "ENTER to begin" : "Loading...", SCREEN_W / 2, 116, 2);
+
+    s_abductionIntroDrawnOnce = true;
+    spr.setTextDatum(TL_DATUM);
+    return;
+  }
 
   spr.setTextDatum(CC_DATUM);
   spr.setTextFont(2);

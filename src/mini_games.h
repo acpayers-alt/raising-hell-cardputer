@@ -44,6 +44,7 @@ void drawInfernalDodger();
 void startAbductionBeam();
 void updateAbductionBeam(const InputState &input);
 void drawAbductionBeam();
+bool abductionBeamIsShowingIntro();
 
 // Implemented in menu_actions.cpp (mini_games.cpp calls this)
 void onResurrectionMiniGameResult(bool success);

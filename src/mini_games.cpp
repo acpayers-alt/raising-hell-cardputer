@@ -159,11 +159,11 @@ bool miniGameIsShowingIntro()
   case MiniGame::INFERNAL_DODGER:
     return dodgerIsShowingIntro();
 
-  case MiniGame::ABDUCTION_BEAM:
-    return false;
-
   case MiniGame::RESURRECTION:
     return resRunIsShowingIntro();
+
+  case MiniGame::ABDUCTION_BEAM:
+    return abductionBeamIsShowingIntro();
 
   default:
     return false;
@@ -179,6 +179,7 @@ void miniGameCancelFromIntro()
   case MiniGame::FLAPPY_FIREBALL:
   case MiniGame::CROSSY_ROAD:
   case MiniGame::INFERNAL_DODGER:
+  case MiniGame::ABDUCTION_BEAM:
     refundEnergy = true;
     break;
 
