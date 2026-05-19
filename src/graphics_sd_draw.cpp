@@ -98,6 +98,53 @@ bool sprDrawPngFromSD(const char *path, int x, int y)
   return ok;
 }
 
+bool sprDrawPngFromSDMirroredX(const char *path, int x, int y, int w, int h)
+{
+  if (!g_sdReady || !path || !*path || w <= 0 || h <= 0)
+    return false;
+
+  M5Canvas tmp(&M5.Display);
+  tmp.setColorDepth(8);
+
+  if (!tmp.createSprite(w, h))
+    return false;
+
+  static constexpr uint16_t kMirrorKey = 0xF81F; // magenta transparency key
+  tmp.fillSprite(kMirrorKey);
+
+  fs::File f = SD.open(path, FILE_READ);
+  if (!f)
+  {
+    tmp.deleteSprite();
+    return false;
+  }
+
+  RH_FileDataWrapper dw(f);
+  const bool ok = tmp.drawPng(&dw, 0, 0);
+  dw.close();
+
+  if (!ok)
+  {
+    tmp.deleteSprite();
+    return false;
+  }
+
+  for (int yy = 0; yy < h; ++yy)
+  {
+    for (int xx = 0; xx < w; ++xx)
+    {
+      const uint16_t c = tmp.readPixel(xx, yy);
+      if (c == kMirrorKey)
+        continue;
+
+      spr.drawPixel(x + (w - 1 - xx), y + yy, c);
+    }
+  }
+
+  tmp.deleteSprite();
+  return true;
+}
+
 bool canvasDrawPngFromSD(LGFX_Sprite &canvas, const char *path, int x, int y)
 {
   if (!g_sdReady || !path || !*path)

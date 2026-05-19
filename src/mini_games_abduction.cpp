@@ -26,7 +26,6 @@ enum TargetKind : uint8_t
   TARGET_COW = 0,
   TARGET_FARMER,
   TARGET_POLICE,
-  TARGET_GOLD_COW,
 };
 
 struct AbductionTarget
@@ -69,13 +68,23 @@ static const int kGroundY = 112;
 
 static bool beamActive() { return (int32_t)(millis() - s_beamUntilMs) < 0; }
 
-static bool targetGood(TargetKind k) { return k == TARGET_COW || k == TARGET_GOLD_COW; }
+static bool targetGood(TargetKind k) { return k == TARGET_COW; }
 
-static int targetPoints(TargetKind k) { return k == TARGET_GOLD_COW ? 3 : 1; }
+static int targetPoints(TargetKind k) { return 1; }
 
 static const char *UFO_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/ufo1.png",
     "/raising_hell/graphics/mini_games/abduct/ufo2.png",
+};
+
+static const char *COW_FRAMES[] = {
+    "/raising_hell/graphics/mini_games/abduct/cow1.png",
+    "/raising_hell/graphics/mini_games/abduct/cow2.png",
+};
+
+static const char *TANK_FRAMES[] = {
+    "/raising_hell/graphics/mini_games/abduct/tank1.png",
+    "/raising_hell/graphics/mini_games/abduct/tank2.png",
 };
 
 static void resetTargets()
@@ -94,14 +103,12 @@ static void spawnTarget(uint32_t now)
     AbductionTarget &t = s_targets[i];
 
     const int roll = random(100);
-    if (roll < 62)
+    if (roll < 70)
       t.kind = TARGET_COW;
-    else if (roll < 82)
+    else if (roll < 85)
       t.kind = TARGET_FARMER;
-    else if (roll < 96)
-      t.kind = TARGET_POLICE;
     else
-      t.kind = TARGET_GOLD_COW;
+      t.kind = TARGET_POLICE;
 
     switch (t.kind)
     {
@@ -109,17 +116,13 @@ static void spawnTarget(uint32_t now)
       t.w = 18;
       t.h = 11;
       break;
-    case TARGET_GOLD_COW:
-      t.w = 20;
-      t.h = 12;
-      break;
     case TARGET_FARMER:
       t.w = 10;
       t.h = 15;
       break;
     case TARGET_POLICE:
-      t.w = 22;
-      t.h = 10;
+      t.w = 32;
+      t.h = 14;
       break;
     }
 
@@ -229,19 +232,36 @@ static void drawTarget(const AbductionTarget &t)
   switch (t.kind)
   {
   case TARGET_COW:
+  {
+    const uint8_t frame = (millis() / 180) & 1;
+    const char *path = COW_FRAMES[frame];
+
+    // Measure the sprite so we can align it to the target's logical bounds.
+    int iw = 0;
+    int ih = 0;
+    const char *usePath = nullptr;
+
+    if (mgAssetsReadPngDims(path, &iw, &ih, &usePath))
+    {
+      // Align sprite bottom to the existing target baseline.
+      const int drawX = t.x;
+      const int drawY = t.y + t.h - ih;
+
+      if (t.dir < 0)
+        sprDrawPngFromSD(usePath ? usePath : path, drawX, drawY);
+      else
+        sprDrawPngFromSDMirroredX(usePath ? usePath : path, drawX, drawY, iw, ih);
+      break;
+    }
+
+    // Fallback code-drawn cow if the PNG is missing.
     spr.fillRoundRect(t.x, t.y + 4, t.w, 8, 3, TFT_WHITE);
     spr.fillRect(t.x + 3, t.y + 7, 3, 3, TFT_BLACK);
     spr.fillRect(t.x + 11, t.y + 6, 3, 3, TFT_BLACK);
     spr.fillRect(t.x + 2, t.y + 12, 2, 4, TFT_WHITE);
     spr.fillRect(t.x + 13, t.y + 12, 2, 4, TFT_WHITE);
     break;
-
-  case TARGET_GOLD_COW:
-    spr.fillRoundRect(t.x, t.y + 4, t.w, 8, 3, TFT_YELLOW);
-    spr.drawRoundRect(t.x, t.y + 4, t.w, 8, 3, TFT_WHITE);
-    spr.fillRect(t.x + 2, t.y + 12, 2, 4, TFT_YELLOW);
-    spr.fillRect(t.x + 15, t.y + 12, 2, 4, TFT_YELLOW);
-    break;
+  }
 
   case TARGET_FARMER:
     spr.fillCircle(t.x + 5, t.y + 3, 3, TFT_ORANGE);
@@ -251,11 +271,34 @@ static void drawTarget(const AbductionTarget &t)
     break;
 
   case TARGET_POLICE:
-    spr.fillRoundRect(t.x, t.y + 3, t.w, 8, 2, TFT_BLUE);
-    spr.fillRect(t.x + 5, t.y, 10, 3, TFT_RED);
-    spr.fillCircle(t.x + 5, t.y + 11, 2, TFT_DARKGREY);
-    spr.fillCircle(t.x + 17, t.y + 11, 2, TFT_DARKGREY);
+  {
+    const uint8_t frame = (millis() / 180) & 1;
+    const char *path = TANK_FRAMES[frame];
+
+    int iw = 0;
+    int ih = 0;
+    const char *usePath = nullptr;
+
+    if (mgAssetsReadPngDims(path, &iw, &ih, &usePath))
+    {
+      const int drawX = t.x;
+      const int drawY = t.y + t.h - ih;
+
+      if (t.dir < 0)
+        sprDrawPngFromSD(usePath ? usePath : path, drawX, drawY);
+      else
+        sprDrawPngFromSDMirroredX(usePath ? usePath : path, drawX, drawY, iw, ih);
+
+      break;
+    }
+
+    spr.fillRoundRect(t.x, t.y + 2, t.w, 8, 2, TFT_DARKGREY);
+    spr.fillRect(t.x + 8, t.y - 1, 10, 4, TFT_GREEN);
+    spr.fillCircle(t.x + 6, t.y + 11, 2, TFT_LIGHTGREY);
+    spr.fillCircle(t.x + 16, t.y + 11, 2, TFT_LIGHTGREY);
+    spr.fillCircle(t.x + 26, t.y + 11, 2, TFT_LIGHTGREY);
     break;
+  }
   }
 }
 
