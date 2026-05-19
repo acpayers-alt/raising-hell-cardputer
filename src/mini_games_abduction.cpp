@@ -17,6 +17,8 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 
+extern bool g_sdReady;
+
 namespace
 {
 enum TargetKind : uint8_t
@@ -70,6 +72,11 @@ static bool beamActive() { return (int32_t)(millis() - s_beamUntilMs) < 0; }
 static bool targetGood(TargetKind k) { return k == TARGET_COW || k == TARGET_GOLD_COW; }
 
 static int targetPoints(TargetKind k) { return k == TARGET_GOLD_COW ? 3 : 1; }
+
+static const char *UFO_FRAMES[] = {
+    "/raising_hell/graphics/mini_games/abduct/ufo1.png",
+    "/raising_hell/graphics/mini_games/abduct/ufo2.png",
+};
 
 static void resetTargets()
 {
@@ -177,6 +184,20 @@ static void abductionPreloadAssetsForIntro()
 
 static void drawUfo()
 {
+  const char **frames = UFO_FRAMES;
+
+  const uint8_t frame = (millis() / 160) & 1;
+  const char *path = frames[frame];
+
+  // Center a 48x32-ish UFO sprite on the existing UFO anchor.
+  // Tune these offsets if your PNG dimensions differ.
+  const int drawX = s_ufoX - 24;
+  const int drawY = s_ufoY - 16;
+
+  if (g_sdReady && path && path[0] && sprDrawPngFromSD(path, drawX, drawY))
+    return;
+
+  // Fallback code-drawn UFO if assets are missing.
   spr.fillEllipse(s_ufoX, s_ufoY, 18, 6, TFT_DARKGREY);
   spr.drawEllipse(s_ufoX, s_ufoY, 18, 6, TFT_LIGHTGREY);
   spr.fillRoundRect(s_ufoX - 9, s_ufoY - 9, 18, 8, 5, TFT_DARKCYAN);
