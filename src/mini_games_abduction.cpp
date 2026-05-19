@@ -47,7 +47,7 @@ static constexpr uint8_t kMaxStrikes = 3;
 static AbductionTarget s_targets[kMaxTargets];
 
 static int16_t s_ufoX = 120;
-static int16_t s_ufoY = 18;
+static int16_t s_ufoY = 24;
 static float s_ufoVelX = 0.0f;
 static int16_t s_beamX = 120;
 
@@ -64,8 +64,8 @@ static bool s_abductionIntroDrawnOnce = false;
 static bool s_abductionAssetsPreloaded = false;
 
 static uint32_t s_lastAbductionDrawMs = 0;
-static constexpr uint32_t kAbductionFrameMs = 42; // ~24 FPS
-static constexpr uint16_t kAbductionSpriteKey = TFT_MAGENTA;
+static constexpr uint32_t kAbductionFrameMs = 42;       // ~24 FPS
+static constexpr uint16_t kAbductionSpriteKey = 0x1803; // very dark purple key
 
 static const int kGroundY = 112;
 
@@ -263,7 +263,7 @@ static void resetGame()
 
 static bool getAbductionSprite(const char *assetId, const char *path, M5Canvas *&out)
 {
-  return mgmem::ensureSprite(MiniGame::ABDUCTION_BEAM, assetId, path, 8, kAbductionSpriteKey, out);
+  return mgmem::ensureSprite(MiniGame::ABDUCTION_BEAM, assetId, path, 16, kAbductionSpriteKey, out);
 }
 
 static void drawCachedSpriteMirroredX(M5Canvas *src, int x, int y)
@@ -279,7 +279,14 @@ static void drawCachedSpriteMirroredX(M5Canvas *src, int x, int y)
     for (int xx = 0; xx < w; ++xx)
     {
       const uint16_t c = src->readPixel(xx, yy);
-      if (c == kAbductionSpriteKey)
+
+      const uint8_t r = ((c >> 11) & 0x1F) << 3;
+      const uint8_t g = ((c >> 5) & 0x3F) << 2;
+      const uint8_t b = (c & 0x1F) << 3;
+
+      // Skip only the dark-purple key fringe.
+      // Do NOT skip plain black, or MIB suits disappear.
+      if (c == kAbductionSpriteKey || (r >= 16 && r <= 40 && g <= 12 && b >= 16 && b <= 48))
         continue;
 
       spr.drawPixel(x + (w - 1 - xx), y + yy, c);
@@ -619,9 +626,9 @@ void updateAbductionBeam(const InputState &input)
 
   // Faster movement with light inertia.
   // Velocity is pixels/frame-ish at the current update cadence.
-  static constexpr float kUfoAccel = 0.75f;
-  static constexpr float kUfoFriction = 0.82f;
-  static constexpr float kUfoMaxVel = 5.25f;
+  static constexpr float kUfoAccel = 1.10f;
+  static constexpr float kUfoFriction = 0.86f;
+  static constexpr float kUfoMaxVel = 7.50f;
 
   if (moveDir != 0)
   {
@@ -702,22 +709,31 @@ void drawAbductionBeam()
 
   if (s_abductionShowIntro)
   {
+    spr.fillSprite(TFT_BLACK);
     spr.setTextDatum(CC_DATUM);
     spr.setTextFont(2);
     spr.setTextSize(1);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Soul Beam", SCREEN_W / 2, 14, 2);
+    spr.drawCentreString("Abduct cows", gW / 2, 8, 2);
+    spr.drawCentreString("Avoid MIB", gW / 2, 26, 2);
 
-    spr.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawCentreString("Abduct cows", SCREEN_W / 2, 38, 2);
-    spr.drawCentreString("Avoid humans", SCREEN_W / 2, 56, 2);
+    const uint8_t frame = (millis() / 180) & 1;
+    const char *path = COW_FRAMES[frame];
+    const char *assetId = frame ? "cow_1" : "cow_0";
 
-    spr.setTextColor(TFT_CYAN, TFT_BLACK);
-    spr.drawCentreString("UP/DOWN/ENTER = Beam", SCREEN_W / 2, 84, 2);
+    M5Canvas *cow = nullptr;
+    if (getAbductionSprite(assetId, path, cow) && cow)
+    {
+      const int cowX = (gW - (int)cow->width()) / 2;
+      const int cowY = (gH / 2) - ((int)cow->height() / 2) + 16;
+
+      // Cow art faces left by default; mirror it so the intro cow faces right.
+      drawCachedSpriteMirroredX(cow, cowX, cowY);
+    }
 
     spr.setTextColor(s_abductionAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
-    spr.drawCentreString(s_abductionAssetsPreloaded ? "ENTER to begin" : "Loading...", SCREEN_W / 2, 116, 2);
+    spr.drawCentreString(s_abductionAssetsPreloaded ? "ENTER to begin" : "Loading...", gW / 2, 120, 2);
 
     s_abductionIntroDrawnOnce = true;
     spr.setTextDatum(TL_DATUM);
