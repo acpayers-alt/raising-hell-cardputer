@@ -1114,14 +1114,36 @@ static const char *evoStageToEldritchDescriptor(uint8_t stage)
   }
 }
 
+static const char *evoStageToAlienDescriptor(uint8_t stage)
+{
+  switch (stage)
+  {
+  case 0:
+    return "Specimen";
+  case 1:
+    return "Juvenile";
+  case 2:
+    return "Mature Form";
+  case 3:
+    return "Apex Organism";
+  default:
+    return "Specimen";
+  }
+}
+
 const char *Pet::getEvolutionDescriptor() const
 {
   switch (type)
   {
   case PET_DEVIL:
     return evoStageToDevilDescriptor(evoStage);
+
   case PET_ELDRITCH:
     return evoStageToEldritchDescriptor(evoStage);
+
+  case PET_ALIEN:
+    return evoStageToAlienDescriptor(evoStage);
+
   default:
     return "";
   }
