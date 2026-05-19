@@ -87,6 +87,11 @@ static const char *TANK_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/tank2.png",
 };
 
+static const char *MIB_FRAMES[] = {
+    "/raising_hell/graphics/mini_games/abduct/mib1.png",
+    "/raising_hell/graphics/mini_games/abduct/mib2.png",
+};
+
 static void resetTargets()
 {
   for (uint8_t i = 0; i < kMaxTargets; ++i)
@@ -117,8 +122,8 @@ static void spawnTarget(uint32_t now)
       t.h = 11;
       break;
     case TARGET_FARMER:
-      t.w = 10;
-      t.h = 15;
+      t.w = 14;
+      t.h = 22;
       break;
     case TARGET_POLICE:
       t.w = 32;
@@ -227,6 +232,40 @@ static void drawBeam()
   spr.drawLine(s_beamX + halfTop, topY, s_beamX + halfBot, botY, TFT_CYAN);
 }
 
+static bool drawAbductionHillBgJpgKeyWhite(const char *path, int x, int y, int w, int h)
+{
+  if (!sprDrawJpgFromSD(path, x, y))
+    return false;
+
+  // Replace near-black pixels with pure black so the starfield beneath
+  // remains visually consistent.
+  for (int py = 0; py < h; ++py)
+  {
+    const int sy = y + py;
+    if (sy < 0 || sy >= SCREEN_H)
+      continue;
+
+    for (int px = 0; px < w; ++px)
+    {
+      const int sx = x + px;
+      if (sx < 0 || sx >= SCREEN_W)
+        continue;
+
+      const uint16_t c = spr.readPixel(sx, sy);
+
+      const uint8_t r = ((c >> 11) & 0x1F) << 3;
+      const uint8_t g = ((c >> 5) & 0x3F) << 2;
+      const uint8_t b = (c & 0x1F) << 3;
+
+      // Treat very dark pixels as transparent by restoring the sky color.
+      if (r <= 16 && g <= 16 && b <= 16)
+        spr.drawPixel(sx, sy, TFT_BLACK);
+    }
+  }
+
+  return true;
+}
+
 static void drawTarget(const AbductionTarget &t)
 {
   switch (t.kind)
@@ -264,16 +303,9 @@ static void drawTarget(const AbductionTarget &t)
   }
 
   case TARGET_FARMER:
-    spr.fillCircle(t.x + 5, t.y + 3, 3, TFT_ORANGE);
-    spr.fillRect(t.x + 2, t.y + 6, 7, 8, TFT_RED);
-    spr.drawLine(t.x + 2, t.y + 15, t.x, t.y + 18, TFT_BLUE);
-    spr.drawLine(t.x + 8, t.y + 15, t.x + 10, t.y + 18, TFT_BLUE);
-    break;
-
-  case TARGET_POLICE:
   {
     const uint8_t frame = (millis() / 180) & 1;
-    const char *path = TANK_FRAMES[frame];
+    const char *path = MIB_FRAMES[frame];
 
     int iw = 0;
     int ih = 0;
@@ -284,6 +316,8 @@ static void drawTarget(const AbductionTarget &t)
       const int drawX = t.x;
       const int drawY = t.y + t.h - ih;
 
+      // MIB art faces left by default.
+      // Mirror when moving right.
       if (t.dir < 0)
         sprDrawPngFromSD(usePath ? usePath : path, drawX, drawY);
       else
@@ -292,11 +326,11 @@ static void drawTarget(const AbductionTarget &t)
       break;
     }
 
-    spr.fillRoundRect(t.x, t.y + 2, t.w, 8, 2, TFT_DARKGREY);
-    spr.fillRect(t.x + 8, t.y - 1, 10, 4, TFT_GREEN);
-    spr.fillCircle(t.x + 6, t.y + 11, 2, TFT_LIGHTGREY);
-    spr.fillCircle(t.x + 16, t.y + 11, 2, TFT_LIGHTGREY);
-    spr.fillCircle(t.x + 26, t.y + 11, 2, TFT_LIGHTGREY);
+    // Fallback if MIB art is missing.
+    spr.fillCircle(t.x + 7, t.y + 4, 3, TFT_ORANGE);
+    spr.fillRect(t.x + 4, t.y + 7, 6, 10, TFT_BLACK);
+    spr.drawLine(t.x + 5, t.y + 17, t.x + 3, t.y + 21, TFT_DARKGREY);
+    spr.drawLine(t.x + 9, t.y + 17, t.x + 11, t.y + 21, TFT_DARKGREY);
     break;
   }
   }
@@ -596,7 +630,10 @@ void drawAbductionBeam()
   spr.setTextFont(2);
   spr.setTextSize(1);
 
-  // sky stars
+  // Draw black sky background first.
+  spr.fillSprite(TFT_BLACK);
+
+  // Draw star field in the sky.
   for (int i = 0; i < 18; ++i)
   {
     const int x = (i * 37 + 11) % SCREEN_W;
@@ -604,21 +641,36 @@ void drawAbductionBeam()
     spr.drawPixel(x, y, TFT_DARKGREY);
   }
 
+  // Draw hill background anchored to the bottom of the screen.
+  // JPG contains only the terrain; everything above remains black sky.
+  static constexpr int kAbductionBgW = 240;
+  static constexpr int kAbductionBgH = 80; // set this to the real JPG height
+
+  if (g_sdReady)
+  {
+    const int drawX = 0;
+    const int drawY = SCREEN_H - kAbductionBgH;
+
+    if (!drawAbductionHillBgJpgKeyWhite("/raising_hell/graphics/mini_games/abduct/al_abd_bg.jpg", drawX, drawY,
+                                        kAbductionBgW, kAbductionBgH))
+    {
+      spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
+      spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
+    }
+  }
+  else
+  {
+    spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
+    spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
+  }
+
   drawHud();
   drawBeam();
   drawUfo();
-
-  spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
-  spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
 
   for (uint8_t i = 0; i < kMaxTargets; ++i)
   {
     if (s_targets[i].active)
       drawTarget(s_targets[i]);
   }
-
-  spr.setTextDatum(TC_DATUM);
-  spr.setTextFont(1);
-  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  spr.drawString("ABDUCT COWS. AVOID HUMANS.", SCREEN_W / 2, SCREEN_H - 10);
 }
