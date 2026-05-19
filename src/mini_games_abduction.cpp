@@ -64,6 +64,9 @@ static bool s_abductionShowIntro = true;
 static bool s_abductionIntroDrawnOnce = false;
 static bool s_abductionAssetsPreloaded = false;
 
+static uint32_t s_lastAbductionDrawMs = 0;
+static constexpr uint32_t kAbductionFrameMs = 33; // ~30 FPS
+
 static const int kGroundY = 112;
 
 static bool beamActive() { return (int32_t)(millis() - s_beamUntilMs) < 0; }
@@ -168,6 +171,7 @@ static void resetGame()
   s_lastStepMs = s_startedMs;
   s_nextSpawnMs = s_startedMs + 500;
   s_beamUntilMs = 0;
+  s_lastAbductionDrawMs = 0; // ADD THIS LINE
   s_score = 0;
   s_strikes = 0;
   resetTargets();
@@ -230,40 +234,6 @@ static void drawBeam()
   spr.fillTriangle(s_beamX + halfTop, topY, s_beamX - halfBot, botY, s_beamX + halfBot, botY, TFT_DARKCYAN);
   spr.drawLine(s_beamX - halfTop, topY, s_beamX - halfBot, botY, TFT_CYAN);
   spr.drawLine(s_beamX + halfTop, topY, s_beamX + halfBot, botY, TFT_CYAN);
-}
-
-static bool drawAbductionHillBgJpgKeyWhite(const char *path, int x, int y, int w, int h)
-{
-  if (!sprDrawJpgFromSD(path, x, y))
-    return false;
-
-  // Replace near-black pixels with pure black so the starfield beneath
-  // remains visually consistent.
-  for (int py = 0; py < h; ++py)
-  {
-    const int sy = y + py;
-    if (sy < 0 || sy >= SCREEN_H)
-      continue;
-
-    for (int px = 0; px < w; ++px)
-    {
-      const int sx = x + px;
-      if (sx < 0 || sx >= SCREEN_W)
-        continue;
-
-      const uint16_t c = spr.readPixel(sx, sy);
-
-      const uint8_t r = ((c >> 11) & 0x1F) << 3;
-      const uint8_t g = ((c >> 5) & 0x3F) << 2;
-      const uint8_t b = (c & 0x1F) << 3;
-
-      // Treat very dark pixels as transparent by restoring the sky color.
-      if (r <= 16 && g <= 16 && b <= 16)
-        spr.drawPixel(sx, sy, TFT_BLACK);
-    }
-  }
-
-  return true;
 }
 
 static void drawTarget(const AbductionTarget &t)
@@ -600,6 +570,12 @@ void drawAbductionBeam()
     return;
   }
 
+  const uint32_t now = millis();
+  if ((uint32_t)(now - s_lastAbductionDrawMs) < kAbductionFrameMs)
+    return;
+
+  s_lastAbductionDrawMs = now;
+
   spr.fillSprite(TFT_BLACK);
 
   if (s_abductionShowIntro)
@@ -630,38 +606,19 @@ void drawAbductionBeam()
   spr.setTextFont(2);
   spr.setTextSize(1);
 
-  // Draw black sky background first.
+  // Draw black sky first.
   spr.fillSprite(TFT_BLACK);
 
-  // Draw star field in the sky.
-  for (int i = 0; i < 18; ++i)
-  {
-    const int x = (i * 37 + 11) % SCREEN_W;
-    const int y = 14 + ((i * 19) % 70);
-    spr.drawPixel(x, y, TFT_DARKGREY);
-  }
-
-  // Draw hill background anchored to the bottom of the screen.
-  // JPG contains only the terrain; everything above remains black sky.
-  static constexpr int kAbductionBgW = 240;
-  static constexpr int kAbductionBgH = 80; // set this to the real JPG height
+  // Draw terrain layer with real PNG transparency.
+  static constexpr int kAbductionBgH = 80;
 
   if (g_sdReady)
   {
-    const int drawX = 0;
-    const int drawY = SCREEN_H - kAbductionBgH;
-
-    if (!drawAbductionHillBgJpgKeyWhite("/raising_hell/graphics/mini_games/abduct/al_abd_bg.jpg", drawX, drawY,
-                                        kAbductionBgW, kAbductionBgH))
+    if (!sprDrawPngFromSD("/raising_hell/graphics/mini_games/abduct/al_abd_bg.png", 0, SCREEN_H - kAbductionBgH))
     {
       spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
       spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
     }
-  }
-  else
-  {
-    spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
-    spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
   }
 
   drawHud();
