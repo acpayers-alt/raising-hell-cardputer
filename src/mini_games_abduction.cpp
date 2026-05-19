@@ -38,7 +38,7 @@ struct AbductionTarget
   bool active = false;
 };
 
-static constexpr uint32_t kGameMs = 60000;
+static constexpr uint32_t kGameMs = 30000;
 static constexpr uint32_t kSpawnMinMs = 750;
 static constexpr uint32_t kBeamMs = 220;
 static constexpr uint8_t kMaxTargets = 5;
@@ -48,6 +48,7 @@ static AbductionTarget s_targets[kMaxTargets];
 
 static int16_t s_ufoX = 120;
 static int16_t s_ufoY = 18;
+static float s_ufoVelX = 0.0f;
 static int16_t s_beamX = 120;
 
 static uint32_t s_startedMs = 0;
@@ -146,6 +147,7 @@ static void resetGame()
 {
   s_ufoX = SCREEN_W / 2;
   s_ufoY = 18;
+  s_ufoVelX = 0.0f;
   s_beamX = s_ufoX;
   s_startedMs = millis();
   s_lastStepMs = s_startedMs;
@@ -416,14 +418,50 @@ void updateAbductionBeam(const InputState &input)
     return;
   }
 
-  if (input.leftHeld)
-    s_ufoX -= 3;
-  if (input.rightHeld)
-    s_ufoX += 3;
+  const bool moveLeft = input.mgLeftHeld || input.leftHeld;
+  const bool moveRight = input.mgRightHeld || input.rightHeld;
 
-  s_ufoX = constrain(s_ufoX, 18, SCREEN_W - 18);
+  int moveDir = 0;
+  if (moveLeft && !moveRight)
+    moveDir = -1;
+  else if (moveRight && !moveLeft)
+    moveDir = 1;
 
-  if (enterOnce && !mgInputLockedOut())
+  // Faster movement with light inertia.
+  // Velocity is pixels/frame-ish at the current update cadence.
+  static constexpr float kUfoAccel = 0.75f;
+  static constexpr float kUfoFriction = 0.82f;
+  static constexpr float kUfoMaxVel = 5.25f;
+
+  if (moveDir != 0)
+  {
+    s_ufoVelX += (float)moveDir * kUfoAccel;
+
+    if (s_ufoVelX > kUfoMaxVel)
+      s_ufoVelX = kUfoMaxVel;
+    else if (s_ufoVelX < -kUfoMaxVel)
+      s_ufoVelX = -kUfoMaxVel;
+  }
+  else
+  {
+    s_ufoVelX *= kUfoFriction;
+
+    if (s_ufoVelX > -0.05f && s_ufoVelX < 0.05f)
+      s_ufoVelX = 0.0f;
+  }
+
+  int nextUfoX = s_ufoX + (int)(s_ufoVelX + ((s_ufoVelX >= 0.0f) ? 0.5f : -0.5f));
+  nextUfoX = constrain(nextUfoX, 18, SCREEN_W - 18);
+
+  if (nextUfoX == 18 || nextUfoX == SCREEN_W - 18)
+    s_ufoVelX = 0.0f;
+
+  s_ufoX = nextUfoX;
+
+  const bool beamPressed =
+      enterOnce || input.mgSelectOnce || input.mgUpOnce || input.mgDownOnce || input.upOnce || input.downOnce;
+
+  if (beamPressed && !mgInputLockedOut())
     handleBeamHit();
 
   const uint32_t dt = now - s_lastStepMs;
@@ -450,7 +488,7 @@ void updateAbductionBeam(const InputState &input)
     spawnTarget(now);
 
   if ((now - s_startedMs) >= kGameMs)
-    finishGame(s_score >= 8 && s_strikes < kMaxStrikes);
+    finishGame(s_score >= 6 && s_strikes < kMaxStrikes);
 }
 
 void drawAbductionBeam()
@@ -480,7 +518,7 @@ void drawAbductionBeam()
     spr.drawCentreString("Avoid humans", SCREEN_W / 2, 56, 2);
 
     spr.setTextColor(TFT_CYAN, TFT_BLACK);
-    spr.drawCentreString("Move + ENTER", SCREEN_W / 2, 84, 2);
+    spr.drawCentreString("UP/DOWN/ENTER = Beam", SCREEN_W / 2, 84, 2);
 
     spr.setTextColor(s_abductionAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
     spr.drawCentreString(s_abductionAssetsPreloaded ? "ENTER to begin" : "Loading...", SCREEN_W / 2, 116, 2);
