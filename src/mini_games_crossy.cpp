@@ -33,7 +33,6 @@ static void crossyLogState(const char *tag);
 
 static const char *crossyGoalZonePathForPet();
 static const char *crossyStartZonePathForPet();
-static const char *crossyLavaZonePathForPet(uint8_t frame);
 static const char *crossyStonePathForPet();
 static bool sdExistsTrySlash(const char *path, const char **outUsePath = nullptr);
 
@@ -84,8 +83,6 @@ static const int kCrossyTileH = 19;
 static const int kCrossyOriginX = 0;
 static const int kCrossyOriginY = 1;
 
-static uint8_t s_crossyLavaFrame = 0;
-static uint32_t s_crossyLavaAnimMs = 0;
 static uint8_t s_crossyLandingGraceFrames = 0;
 
 static uint32_t s_crossyWinPoseStart = 0;
@@ -153,9 +150,6 @@ static void crossyLogState(const char *tag)
                 s_crossyShowIntro ? 1 : 0, s_crossyWinPoseActive ? 1 : 0, g_app.gameOver ? 1 : 0,
                 (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
-
-static M5Canvas *s_crossyLava0 = nullptr;
-static M5Canvas *s_crossyLava1 = nullptr;
 
 static const char *crossyStoneSmallPathForPet();
 static const char *crossyStoneXSPathForPet();
@@ -336,11 +330,6 @@ void freeCrossyZoneSprites()
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "goal_zone");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "start_zone");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "intro_goal");
-  mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_0");
-  mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_1");
-
-  s_crossyLava0 = nullptr;
-  s_crossyLava1 = nullptr;
 }
 
 static const char *crossyIntroLine1ForPet() { return "Escape the Moon! Use Arrow Keys"; }
@@ -357,12 +346,6 @@ static const char *crossyStartZonePathForPet()
 static const char *crossyGoalZonePathForPet()
 {
   return "/raising_hell/graphics/mini_games/crossy/eld/eld_goal_zone.png";
-}
-
-static const char *crossyLavaZonePathForPet(uint8_t frame)
-{
-  return (frame & 1) ? "/raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone2.png"
-                     : "/raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone1.png";
 }
 
 void freeCrossyActorSprites()
@@ -547,8 +530,6 @@ static void crossyReset()
   s_crossyFacing = CROSSY_FACE_DOWN;
 
   s_crossyLastLaneMs = millis();
-  s_crossyLavaFrame = 0;
-  s_crossyLavaAnimMs = millis();
   s_crossyLandingGraceFrames = 0;
 
   crossyInitLanes();
@@ -565,13 +546,8 @@ static void crossyPreloadAssetsForIntro()
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
 
-  s_crossyLava0 = nullptr;
-  s_crossyLava1 = nullptr;
-
   const bool startOk = ensureCrossyStartZoneSprite();
   const bool goalOk = ensureCrossyGoalZoneSprite();
-
-  const bool usesLavaSprites = false;
 
   const bool stoneOk = ensureCrossyStoneSprite();
   const bool stoneSmOk = ensureCrossyStoneSmallSprite();
@@ -579,8 +555,8 @@ static void crossyPreloadAssetsForIntro()
 
   Serial.printf(
       "[CROSSY] deferred preload start=%d goal=%d lava=%s stone=%d stoneSm=%d stoneXs=%d free=%u largest=%u\n",
-      startOk ? 1 : 0, goalOk ? 1 : 0, usesLavaSprites ? "ok" : "skip", stoneOk ? 1 : 0, stoneSmOk ? 1 : 0,
-      stoneXsOk ? 1 : 0, (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      startOk ? 1 : 0, goalOk ? 1 : 0, "skip", stoneOk ? 1 : 0, stoneSmOk ? 1 : 0, stoneXsOk ? 1 : 0,
+      (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   s_crossyAssetsPreloaded = true;
   s_crossyInited = true;
