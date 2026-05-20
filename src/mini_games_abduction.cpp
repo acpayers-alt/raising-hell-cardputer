@@ -38,12 +38,13 @@ struct AbductionTarget
   bool active = false;
 };
 
-static constexpr uint32_t kGameMs = 30000;
+static constexpr uint32_t kGameMs = 45000;
 static constexpr uint32_t kSpawnMinMs = 900;
 static constexpr uint32_t kBeamMs = 220;
 static constexpr uint8_t kMaxTargets = 5;
 static constexpr uint8_t kMaxStrikes = 3;
-static constexpr uint8_t kScoreToWin = 12;
+static constexpr uint8_t kScoreToWin = 18;
+static uint8_t s_mibStreak = 0;
 
 static AbductionTarget s_targets[kMaxTargets];
 
@@ -56,6 +57,7 @@ static uint32_t s_startedMs = 0;
 static uint32_t s_lastStepMs = 0;
 static uint32_t s_nextSpawnMs = 0;
 static uint32_t s_beamUntilMs = 0;
+static uint8_t s_spawnCount = 0;
 
 static uint8_t s_score = 0;
 static uint8_t s_strikes = 0;
@@ -76,6 +78,17 @@ static bool targetGood(TargetKind k) { return k == TARGET_COW; }
 
 static int targetPoints(TargetKind k) { return 1; }
 
+static int targetMoveSpeed()
+{
+  if (s_score >= 12)
+    return 7;
+
+  if (s_score >= 6)
+    return 5;
+
+  return 3;
+}
+
 static const char *UFO_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/ufo1.png",
     "/raising_hell/graphics/mini_games/abduct/ufo2.png",
@@ -91,13 +104,6 @@ static const char *MIB_FRAMES[] = {
     "/raising_hell/graphics/mini_games/abduct/mib2.png",
 };
 
-struct AbductionSpriteDims
-{
-  int w = 0;
-  int h = 0;
-  bool ready = false;
-};
-
 struct AbductionStar
 {
   int16_t x;
@@ -108,23 +114,6 @@ struct AbductionStar
 
 static constexpr int kAbductionStarCount = 18;
 static AbductionStar s_abductionStars[kAbductionStarCount];
-
-static AbductionSpriteDims s_cowDims[2];
-static AbductionSpriteDims s_mibDims[2];
-
-static void cacheAbductionSpriteDims()
-{
-  const char *usePath = nullptr;
-
-  for (uint8_t i = 0; i < 2; ++i)
-  {
-    if (!s_cowDims[i].ready)
-      s_cowDims[i].ready = mgAssetsReadPngDims(COW_FRAMES[i], &s_cowDims[i].w, &s_cowDims[i].h, &usePath);
-
-    if (!s_mibDims[i].ready)
-      s_mibDims[i].ready = mgAssetsReadPngDims(MIB_FRAMES[i], &s_mibDims[i].w, &s_mibDims[i].h, &usePath);
-  }
-}
 
 static void resetTargets()
 {
@@ -141,11 +130,35 @@ static void spawnTarget(uint32_t now)
 
     AbductionTarget &t = s_targets[i];
 
-    const int roll = random(100);
-    if (roll < 60)
-      t.kind = TARGET_COW;
-    else
+    if (s_spawnCount == 1)
+    {
+      // Force the second spawned target to be an MIB so the threat appears early.
       t.kind = TARGET_FARMER;
+      s_mibStreak++;
+    }
+    else
+    {
+      const int roll = random(100);
+
+      if (s_mibStreak >= 3)
+      {
+        // Keep the 50/50 feel, but prevent long no-cow droughts.
+        t.kind = TARGET_COW;
+        s_mibStreak = 0;
+      }
+      else if (roll < 50)
+      {
+        t.kind = TARGET_COW;
+        s_mibStreak = 0;
+      }
+      else
+      {
+        t.kind = TARGET_FARMER;
+        s_mibStreak++;
+      }
+    }
+
+    s_spawnCount++;
 
     switch (t.kind)
     {
@@ -153,6 +166,7 @@ static void spawnTarget(uint32_t now)
       t.w = 18;
       t.h = 11;
       break;
+
     case TARGET_FARMER:
       t.w = 14;
       t.h = 22;
@@ -248,16 +262,18 @@ static void finishGame(bool won)
 static void resetGame()
 {
   s_ufoX = SCREEN_W / 2;
-  s_ufoY = 18;
+  s_ufoY = 24;
   s_ufoVelX = 0.0f;
   s_beamX = s_ufoX;
   s_startedMs = millis();
   s_lastStepMs = s_startedMs;
   s_nextSpawnMs = s_startedMs + 500;
   s_beamUntilMs = 0;
-  s_lastAbductionDrawMs = 0; // ADD THIS LINE
+  s_lastAbductionDrawMs = 0;
   s_score = 0;
   s_strikes = 0;
+  s_spawnCount = 0;
+  s_mibStreak = 0;
   initAbductionStars();
   resetTargets();
 }
@@ -510,7 +526,6 @@ static void handleBeamHit()
 
   t.active = false;
 }
-
 } // namespace
 
 bool abductionBeamIsShowingIntro() { return s_abductionShowIntro; }
@@ -672,7 +687,7 @@ void updateAbductionBeam(const InputState &input)
   {
     s_lastStepMs = now;
 
-    const int speed = 3 + min<int>(5, s_score / 5);
+    const int speed = targetMoveSpeed();
 
     for (uint8_t i = 0; i < kMaxTargets; ++i)
     {
@@ -689,8 +704,6 @@ void updateAbductionBeam(const InputState &input)
 
   if ((int32_t)(now - s_nextSpawnMs) >= 0)
     spawnTarget(now);
-
-  static constexpr uint8_t kScoreToWin = 12;
 
   if ((now - s_startedMs) >= kGameMs)
     finishGame(s_score >= kScoreToWin && s_strikes < kMaxStrikes);
@@ -722,10 +735,8 @@ void drawAbductionBeam()
     spr.setTextFont(2);
     spr.setTextSize(1);
 
-    static constexpr uint8_t kScoreToWin = 10;
-
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Abduct 12 cows", gW / 2, 8, 2);
+    spr.drawCentreString("Abduct 18 cows", gW / 2, 8, 2);
     spr.drawCentreString("Avoid MIB", gW / 2, 26, 2);
 
     spr.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -761,7 +772,7 @@ void drawAbductionBeam()
   // Draw black sky first.
   spr.fillSprite(TFT_BLACK);
 
-  // Draw terrain layer with real PNG transparency.
+  // Draw terrain layer anchored to the bottom.
   static constexpr int kAbductionBgH = 80;
 
   if (g_sdReady)
