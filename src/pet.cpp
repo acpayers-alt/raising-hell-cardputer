@@ -1175,7 +1175,17 @@ uint32_t Pet::xpForNextLevel() const
   const uint32_t L = (level < 1) ? 1 : level;
   const uint32_t n = L - 1;
 
-  const uint32_t xp = 120 + 20 * n + 12 * n * n;
+  // Gentle progression curve:
+  // - early levels stay approachable
+  // - higher levels require a little more investment
+  // - passive XP naturally slows down because it is based on this value
+  uint32_t xp = 120 + 24 * n + 14 * n * n;
+
+  if (L > 15)
+    xp += (L - 15) * (L - 15) * 4;
+
+  if (L > 30)
+    xp += (L - 30) * (L - 30) * 8;
 
   return xp;
 }
