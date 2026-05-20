@@ -1978,11 +1978,7 @@ static bool saveSettingsToSD_internal()
   const uint32_t now = millis();
 
   if (now - s_lastSettingsSaveMs < SETTINGS_DEBOUNCE_MS)
-  {
-    if (supportLoggingEnabled())
-      Serial.println("[WIFI SAVE] skipped (debounce)");
     return true;
-  }
 
   s_lastSettingsSaveMs = now;
 
@@ -1997,9 +1993,15 @@ static bool saveSettingsToSD_internal()
   g_settings.soundEnabled = soundEnabled;
   g_settings.wifiEnabled = settingsWifiEnabled() ? 1 : 0;
 
-  if (supportLoggingEnabled())
-    Serial.printf("[WIFI SAVE] setting=%d runtime=%d persisted=%d\n", settingsWifiEnabled() ? 1 : 0,
-                  wifiIsEnabled() ? 1 : 0, g_settings.wifiEnabled ? 1 : 0);
+  const bool pref = settingsWifiEnabled();
+  const bool runtime = wifiIsEnabled();
+  const bool persisted = (g_settings.wifiEnabled != 0);
+
+  if (supportLoggingEnabled() && pref != persisted)
+  {
+    Serial.printf("[WIFI SAVE] mismatch pref=%d runtime=%d persisted=%d\n", pref ? 1 : 0, runtime ? 1 : 0,
+                  persisted ? 1 : 0);
+  }
 
   g_settings.tzIndex = tzIndex;
 
