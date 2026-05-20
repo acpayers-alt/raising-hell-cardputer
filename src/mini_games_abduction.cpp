@@ -684,8 +684,10 @@ void updateAbductionBeam(const InputState &input)
   if ((int32_t)(now - s_nextSpawnMs) >= 0)
     spawnTarget(now);
 
+  static constexpr uint8_t kScoreToWin = 10;
+
   if ((now - s_startedMs) >= kGameMs)
-    finishGame(s_score >= 6 && s_strikes < kMaxStrikes);
+    finishGame(s_score >= kScoreToWin && s_strikes < kMaxStrikes);
 }
 
 void drawAbductionBeam()
@@ -714,9 +716,15 @@ void drawAbductionBeam()
     spr.setTextFont(2);
     spr.setTextSize(1);
 
+    static constexpr uint8_t kScoreToWin = 10;
+
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Abduct cows", gW / 2, 8, 2);
+    spr.drawCentreString("Abduct 10 cows", gW / 2, 8, 2);
     spr.drawCentreString("Avoid MIB", gW / 2, 26, 2);
+
+    spr.setTextColor(TFT_CYAN, TFT_BLACK);
+    spr.drawCentreString("A/D = Left/Right:", gW / 2, 88, 2);
+    spr.drawCentreString("UP or ENTER = Fire Beam", gW / 2, 106, 2);
 
     const uint8_t frame = (millis() / 180) & 1;
     const char *path = COW_FRAMES[frame];
@@ -726,7 +734,7 @@ void drawAbductionBeam()
     if (getAbductionSprite(assetId, path, cow) && cow)
     {
       const int cowX = (gW - (int)cow->width()) / 2;
-      const int cowY = (gH / 2) - ((int)cow->height() / 2) + 16;
+      const int cowY = 60;
 
       // Cow art faces left by default; mirror it so the intro cow faces right.
       drawCachedSpriteMirroredX(cow, cowX, cowY);
