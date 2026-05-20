@@ -8,6 +8,7 @@ namespace
 struct MenuItem
 {
   const char *label;
+  PetType ownerType;
   void (*onSelect)();
 };
 
@@ -20,19 +21,12 @@ static void actCrossy() { startCrossyRoad(); }
 static void actAbduction() { startAbductionBeam(); }
 
 static const MenuItem kItems[] = {
-    {"Flappy Fireball", actFlappy},
-    {"Fireball Run", actDodger},
-    {"Crossy Cosmos", actCrossy},
-    {"Abduction Beam", actAbduction},
+    {"Flappy Fireball", PET_DEVIL, actFlappy},
+    {"Fireball Run", PET_DEVIL, actDodger},
+    {"Crossy Cosmos", PET_ELDRITCH, actCrossy},
+    {"Abduction Beam", PET_ALIEN, actAbduction},
 };
 
-static const char *flappyMenuLabelForPet() { return "Flappy Fireball"; }
-
-static const char *dodgerMenuLabelForPet() { return "Fireball Run"; }
-
-static const char *crossyMenuLabelForPet() { return "Crossy Cosmos"; }
-
-static const char *abductionMenuLabelForPet() { return "Abduction Beam"; }
 } // namespace
 
 int uiPlayMenuCount() { return (int)(sizeof(kItems) / sizeof(kItems[0])); }
@@ -42,19 +36,15 @@ const char *uiPlayMenuLabel(int idx)
   if (idx < 0 || idx >= uiPlayMenuCount())
     return "";
 
-  switch (idx)
-  {
-  case 0:
-    return flappyMenuLabelForPet();
-  case 1:
-    return dodgerMenuLabelForPet();
-  case 2:
-    return crossyMenuLabelForPet();
-  case 3:
-    return abductionMenuLabelForPet();
-  default:
-    return kItems[idx].label;
-  }
+  return kItems[idx].label;
+}
+
+PetType uiPlayMenuOwnerPetType(int idx)
+{
+  if (idx < 0 || idx >= uiPlayMenuCount())
+    return PET_DEVIL;
+
+  return kItems[idx].ownerType;
 }
 
 bool uiPlayMenuActivate(int idx)
