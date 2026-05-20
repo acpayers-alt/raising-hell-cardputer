@@ -39,10 +39,11 @@ struct AbductionTarget
 };
 
 static constexpr uint32_t kGameMs = 30000;
-static constexpr uint32_t kSpawnMinMs = 750;
+static constexpr uint32_t kSpawnMinMs = 900;
 static constexpr uint32_t kBeamMs = 220;
 static constexpr uint8_t kMaxTargets = 5;
 static constexpr uint8_t kMaxStrikes = 3;
+static constexpr uint8_t kScoreToWin = 12;
 
 static AbductionTarget s_targets[kMaxTargets];
 
@@ -163,8 +164,8 @@ static void spawnTarget(uint32_t now)
     t.y = kGroundY - t.h;
     t.active = true;
 
-    const uint32_t faster = min<uint32_t>(450, (uint32_t)s_score * 18);
-    s_nextSpawnMs = now + max<uint32_t>(kSpawnMinMs - faster, 360);
+    const uint32_t faster = min<uint32_t>(420, (uint32_t)s_score * 15);
+    s_nextSpawnMs = now + max<uint32_t>(kSpawnMinMs - faster, 450);
     return;
   }
 
@@ -439,14 +440,16 @@ static void drawHud()
   const uint32_t elapsed = millis() - s_startedMs;
   const int remain = (elapsed >= kGameMs) ? 0 : (int)((kGameMs - elapsed + 999) / 1000);
 
-  char hud[48];
-  snprintf(hud, sizeof(hud), "S:%u  X:%u/%u  T:%d", s_score, s_strikes, kMaxStrikes, remain);
+  char bottom[64];
+  snprintf(bottom, sizeof(bottom), "Cows:%u/%u  X:%u/%u  T:%d", s_score, kScoreToWin, s_strikes, kMaxStrikes, remain);
 
-  spr.setTextDatum(TL_DATUM);
+  spr.setTextDatum(BC_DATUM);
   spr.setTextFont(1);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString(hud, 4, 4);
+  spr.drawString(bottom, SCREEN_W / 2, SCREEN_H - 2);
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 static void handleBeamHit()
@@ -490,6 +493,9 @@ static void handleBeamHit()
   {
     s_score = min<int>(255, s_score + targetPoints(t.kind));
     soundConfirm();
+
+    if (s_score >= kScoreToWin)
+      finishGame(true);
   }
   else
   {
@@ -666,7 +672,7 @@ void updateAbductionBeam(const InputState &input)
   {
     s_lastStepMs = now;
 
-    const int speed = 2 + min<int>(4, s_score / 6);
+    const int speed = 3 + min<int>(5, s_score / 5);
 
     for (uint8_t i = 0; i < kMaxTargets; ++i)
     {
@@ -684,7 +690,7 @@ void updateAbductionBeam(const InputState &input)
   if ((int32_t)(now - s_nextSpawnMs) >= 0)
     spawnTarget(now);
 
-  static constexpr uint8_t kScoreToWin = 10;
+  static constexpr uint8_t kScoreToWin = 12;
 
   if ((now - s_startedMs) >= kGameMs)
     finishGame(s_score >= kScoreToWin && s_strikes < kMaxStrikes);
@@ -719,7 +725,7 @@ void drawAbductionBeam()
     static constexpr uint8_t kScoreToWin = 10;
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("Abduct 10 cows", gW / 2, 8, 2);
+    spr.drawCentreString("Abduct 12 cows", gW / 2, 8, 2);
     spr.drawCentreString("Avoid MIB", gW / 2, 26, 2);
 
     spr.setTextColor(TFT_CYAN, TFT_BLACK);

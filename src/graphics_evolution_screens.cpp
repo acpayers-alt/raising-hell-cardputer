@@ -47,6 +47,9 @@ static AnimId evoHappyClipFor(PetType type, uint8_t stage)
     default:
       return ANIM_ELD_ELDER_HAPPY_PASS;
     }
+
+  case PET_ALIEN:
+    return ANIM_ALIEN_BABY_HAPPY;
   }
 
   return ANIM_DEV_BABY_HAPPY_BALL;
@@ -62,8 +65,7 @@ void drawEvolutionScreen()
     return;
   }
 
-  const uint8_t stageShown = (g_app.flow.evo.phase >= 2) ? g_app.flow.evo.toStage
-                                                         : g_app.flow.evo.fromStage;
+  const uint8_t stageShown = (g_app.flow.evo.phase >= 2) ? g_app.flow.evo.toStage : g_app.flow.evo.fromStage;
 
   const AnimId id = evoHappyClipFor(pet.type, stageShown);
   const AnimClip *clip = animGetClip(id);

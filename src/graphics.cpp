@@ -82,15 +82,15 @@
 #include "graphics_pet_bg_paths.h"
 #include "graphics_pet_presentation.h"
 #include "graphics_render_utils.h"
+#include "graphics_screen_dispatch.h"
 #include "graphics_sd_draw.h"
 #include "graphics_set_time_screens.h"
 #include "graphics_settings_screens.h"
 #include "graphics_shared_utils.h"
 #include "graphics_sleep_frame_cache.h"
 #include "graphics_special_screens.h"
-#include "graphics_screen_dispatch.h"
-#include "graphics_tab_screens.h"
 #include "graphics_tab_menus.h"
+#include "graphics_tab_screens.h"
 #include "graphics_ui_common.h"
 #include "graphics_wifi_screens.h"
 
@@ -197,6 +197,9 @@ static const char *pendingEggClosedPng()
 {
   if (g_pendingPetType == PET_ELDRITCH)
     return "/raising_hell/graphics/pet/egg/eld_egg.png";
+
+  if (g_pendingPetType == PET_ALIEN)
+    return "/raising_hell/graphics/pet/egg/al_egg.png";
 
   return "/raising_hell/graphics/pet/egg/dev_egg.png";
 }
@@ -486,13 +489,13 @@ void renderUI()
   if (!isScreenOn())
     return;
 
-    if (g_bootSplashActive)
-    {
-      drawSplashScreen(true);
-      spr.pushSprite(0, 0);
-      displayFinishWakeBlackoutAfterFrame();
-      return;
-    }
+  if (g_bootSplashActive)
+  {
+    drawSplashScreen(true);
+    spr.pushSprite(0, 0);
+    displayFinishWakeBlackoutAfterFrame();
+    return;
+  }
 
   if ((g_bootUiBlockedForAssetProvision || g_bootAssetProvisionActive) && g_app.uiState != UIState::CONSOLE &&
       !uiIsBootWifiOnboardingState(g_app.uiState))
@@ -579,7 +582,7 @@ void renderUI()
   const bool redrawBg = (!bgDrawnForState) || bgInvalid || petMotionActive;
 
   drawCurrentScreen(redrawBg);
-  
+
   if (g_app.uiState == UIState::POWER_MENU)
   {
     drawPowerMenu();
@@ -593,7 +596,7 @@ void renderUI()
   uiDrawAlertScreenFlashOverlay();
   uiDrawToastOverlay();
   anomalyDrawOverlay();
-  
+
   spr.pushSprite(0, 0);
   displayFinishWakeBlackoutAfterFrame();
 
@@ -671,6 +674,9 @@ AnimId deathTransitionStaticClipForPet()
     default:
       return ANIM_ELD_ELDER_SICK_SNEEZE;
     }
+
+  case PET_ALIEN:
+    return ANIM_ALIEN_BABY_SICK_MOAN;
 
   default:
     return ANIM_NONE;
