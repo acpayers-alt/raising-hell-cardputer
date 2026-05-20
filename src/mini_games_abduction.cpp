@@ -142,7 +142,7 @@ static void spawnTarget(uint32_t now)
     AbductionTarget &t = s_targets[i];
 
     const int roll = random(100);
-    if (roll < 75)
+    if (roll < 60)
       t.kind = TARGET_COW;
     else
       t.kind = TARGET_FARMER;
