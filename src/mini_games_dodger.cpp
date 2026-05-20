@@ -56,29 +56,9 @@ static bool sdExistsTrySlash(const char *path, const char **outUsePath)
   return false;
 }
 
-static const char *dodgerBgLeftPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgl.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgl.png";
-  }
-}
+static const char *dodgerBgLeftPathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgl.png"; }
 
-static const char *dodgerBgRightPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgr.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgr.png";
-  }
-}
+static const char *dodgerBgRightPathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgr.png"; }
 
 static void dodgerLogState(const char *tag);
 
@@ -195,28 +175,9 @@ static M5Canvas *s_dodgerBgRightSpr = nullptr;
 static int s_dodgerBgHalfW = 0;
 static int s_dodgerBgHalfH = 0;
 
-static const char *dodgerIntroLine1()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Arrow keys or A/L to dodge";
-  default:
-    return "Arrow keys or A/L to dodge";
-  }
-}
+static const char *dodgerIntroLine1() { return "Arrow keys or A/L to dodge"; }
 
-static const char *dodgerIntroLine2()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Pilot the sub, smash the Merman!!";
-  case PET_DEVIL:
-  default:
-    return "Stay on the road, smash the Imp!";
-  }
-}
+static const char *dodgerIntroLine2() { return "Stay on the road, smash the Imp!"; }
 
 void freeDodgerGoalFrames()
 {
@@ -244,133 +205,25 @@ void freeDodgerSprites()
   freeDodgerGoreSprite();
 }
 
-static const char *dodgerGoalFrame1PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/mertaunt1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png";
-  }
-}
+static const char *dodgerGoalFrame1PathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png"; }
 
-static const char *dodgerGoalFrame2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/mertaunt2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png";
-  }
-}
+static const char *dodgerGoalFrame2PathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png"; }
 
-static const char *dodgerGoalGorePathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/mer_gore.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
-  }
-}
+static const char *dodgerGoalGorePathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png"; }
 
-static const char *dodgerProjectile1PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/trident1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/fireball1.png";
-  }
-}
+static const char *dodgerProjectile1PathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/fireball1.png"; }
 
-static const char *dodgerProjectile2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/trident2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/fireball2.png";
-  }
-}
+static const char *dodgerProjectile2PathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/fireball2.png"; }
 
-static const char *dodgerProjectile3PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/trident3.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/fireball3.png";
-  }
-}
+static const char *dodgerProjectile3PathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/fireball3.png"; }
 
-static const char *dodgerGoalFrame1ResolvedPath()
-{
-  const char *usePath = nullptr;
-  const char *petPath = dodgerGoalFrame1PathForPet();
-  if (sdExistsTrySlash(petPath, &usePath))
-    return usePath ? usePath : petPath;
+static const char *fireballRunCarPathForPet() { return "/raising_hell/graphics/mini_games/fbrun/dev/car.png"; }
 
-  const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack1.png";
-  if (sdExistsTrySlash(fallback, &usePath))
-    return usePath ? usePath : fallback;
+static const char *dodgerGoalFrame1ResolvedPath() { return dodgerGoalFrame1PathForPet(); }
 
-  return nullptr;
-}
+static const char *dodgerGoalFrame2ResolvedPath() { return dodgerGoalFrame2PathForPet(); }
 
-static const char *dodgerGoalFrame2ResolvedPath()
-{
-  const char *usePath = nullptr;
-  const char *petPath = dodgerGoalFrame2PathForPet();
-  if (sdExistsTrySlash(petPath, &usePath))
-    return usePath ? usePath : petPath;
-
-  const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_stack2.png";
-  if (sdExistsTrySlash(fallback, &usePath))
-    return usePath ? usePath : fallback;
-
-  return nullptr;
-}
-
-static const char *dodgerGoalGoreResolvedPath()
-{
-  const char *usePath = nullptr;
-  const char *petPath = dodgerGoalGorePathForPet();
-
-  if (sdExistsTrySlash(petPath, &usePath))
-    return usePath ? usePath : petPath;
-
-  const char *fallback = "/raising_hell/graphics/mini_games/fbrun/dev/imp_gore.png";
-
-  if (sdExistsTrySlash(fallback, &usePath))
-    return usePath ? usePath : fallback;
-
-  return nullptr;
-}
-
-static const char *fireballRunCarPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/sub_sprite.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/fbrun/dev/car.png";
-  }
-}
+static const char *dodgerGoalGoreResolvedPath() { return dodgerGoalGorePathForPet(); }
 
 static bool ensureDodgerGoalFrames(const char *path0, const char *path1)
 {

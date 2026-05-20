@@ -1,7 +1,6 @@
 #include "ui_play_menu.h"
 
 #include "mini_games.h" // startFlappyFireball(), startInfernalDodger(), startCrossyRoad()
-#include "pet.h"
 
 namespace
 {
@@ -23,59 +22,17 @@ static void actAbduction() { startAbductionBeam(); }
 static const MenuItem kItems[] = {
     {"Flappy Fireball", actFlappy},
     {"Fireball Run", actDodger},
-    {"Crossy Hell", actCrossy},
+    {"Crossy Cosmos", actCrossy},
     {"Abduction Beam", actAbduction},
 };
 
-static const char *flappyMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Flappy Curse";
-  case PET_DEVIL:
-  default:
-    return "Flappy Fireball";
-  }
-}
+static const char *flappyMenuLabelForPet() { return "Flappy Fireball"; }
 
-static const char *dodgerMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Submarine Run";
-  case PET_DEVIL:
-  default:
-    return "Fireball Run";
-  }
-}
+static const char *dodgerMenuLabelForPet() { return "Fireball Run"; }
 
-static const char *crossyMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Crossy Cosmos";
-  case PET_DEVIL:
-  default:
-    return "Crossy Hell";
-  }
-}
+static const char *crossyMenuLabelForPet() { return "Crossy Cosmos"; }
 
-static const char *abductionMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Harvest Beam";
-
-  case PET_DEVIL:
-  default:
-    return "Soul Beam";
-  }
-}
-
+static const char *abductionMenuLabelForPet() { return "Abduction Beam"; }
 } // namespace
 
 int uiPlayMenuCount() { return (int)(sizeof(kItems) / sizeof(kItems[0])); }
