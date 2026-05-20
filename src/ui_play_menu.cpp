@@ -1,6 +1,7 @@
 #include "ui_play_menu.h"
 
 #include "mini_games.h" // startFlappyFireball(), startInfernalDodger(), startCrossyRoad()
+#include "pet.h"
 
 namespace
 {
@@ -31,29 +32,63 @@ static const MenuItem kItems[] = {
 
 int uiPlayMenuCount() { return (int)(sizeof(kItems) / sizeof(kItems[0])); }
 
+static int uiPlayMenuPhysicalIndexForDisplayIndex(int displayIdx)
+{
+  if (displayIdx < 0 || displayIdx >= uiPlayMenuCount())
+    return -1;
+
+  const PetType current = pet.type;
+  int n = 0;
+
+  for (int i = 0; i < uiPlayMenuCount(); ++i)
+  {
+    if (kItems[i].ownerType == current)
+    {
+      if (n == displayIdx)
+        return i;
+      ++n;
+    }
+  }
+
+  for (int i = 0; i < uiPlayMenuCount(); ++i)
+  {
+    if (kItems[i].ownerType != current)
+    {
+      if (n == displayIdx)
+        return i;
+      ++n;
+    }
+  }
+
+  return -1;
+}
+
 const char *uiPlayMenuLabel(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount())
+  const int physicalIdx = uiPlayMenuPhysicalIndexForDisplayIndex(idx);
+  if (physicalIdx < 0)
     return "";
 
-  return kItems[idx].label;
+  return kItems[physicalIdx].label;
 }
 
 PetType uiPlayMenuOwnerPetType(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount())
+  const int physicalIdx = uiPlayMenuPhysicalIndexForDisplayIndex(idx);
+  if (physicalIdx < 0)
     return PET_DEVIL;
 
-  return kItems[idx].ownerType;
+  return kItems[physicalIdx].ownerType;
 }
 
 bool uiPlayMenuActivate(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount())
+  const int physicalIdx = uiPlayMenuPhysicalIndexForDisplayIndex(idx);
+  if (physicalIdx < 0)
     return false;
-  if (!kItems[idx].onSelect)
+  if (!kItems[physicalIdx].onSelect)
     return false;
 
-  kItems[idx].onSelect();
+  kItems[physicalIdx].onSelect();
   return true;
 }
