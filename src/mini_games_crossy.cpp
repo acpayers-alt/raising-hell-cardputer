@@ -33,7 +33,6 @@ static void crossyLogState(const char *tag);
 
 static const char *crossyGoalZonePathForPet();
 static const char *crossyStartZonePathForPet();
-static const char *crossyLavaZonePathForPet(uint8_t frame);
 static const char *crossyStonePathForPet();
 static bool sdExistsTrySlash(const char *path, const char **outUsePath = nullptr);
 
@@ -73,7 +72,7 @@ static bool sdExistsTrySlash(const char *path, const char **outUsePath)
 }
 
 // -----------------------------------------------------------------------------
-// CROSSY HELL GLOBALS (Frogger-style)
+// CROSSY COSMOS GLOBALS (Frogger-style)
 // -----------------------------------------------------------------------------
 static const int kCrossyCols = 15;
 static const int kCrossyRows = 7;
@@ -84,8 +83,6 @@ static const int kCrossyTileH = 19;
 static const int kCrossyOriginX = 0;
 static const int kCrossyOriginY = 1;
 
-static uint8_t s_crossyLavaFrame = 0;
-static uint32_t s_crossyLavaAnimMs = 0;
 static uint8_t s_crossyLandingGraceFrames = 0;
 
 static uint32_t s_crossyWinPoseStart = 0;
@@ -153,9 +150,6 @@ static void crossyLogState(const char *tag)
                 s_crossyShowIntro ? 1 : 0, s_crossyWinPoseActive ? 1 : 0, g_app.gameOver ? 1 : 0,
                 (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
-
-static M5Canvas *s_crossyLava0 = nullptr;
-static M5Canvas *s_crossyLava1 = nullptr;
 
 static const char *crossyStoneSmallPathForPet();
 static const char *crossyStoneXSPathForPet();
@@ -233,14 +227,8 @@ static bool ensureCrossyStartZoneSprite()
 
 static bool ensureCrossyLavaZoneSprite(uint8_t frame)
 {
-  if (pet.type == PET_ELDRITCH)
-    return false;
-
-  const uint8_t i = frame & 1;
-  const char *assetId = (i == 0) ? "lava_zone_0" : "lava_zone_1";
-
-  M5Canvas *&target = (i == 0) ? s_crossyLava0 : s_crossyLava1;
-  return mgmem::ensureSprite(MiniGame::CROSSY_ROAD, assetId, crossyLavaZonePathForPet(i), 16, TFT_BLACK, target);
+  (void)frame;
+  return false;
 }
 
 static void crossyInitStars()
@@ -342,77 +330,22 @@ void freeCrossyZoneSprites()
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "goal_zone");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "start_zone");
   mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "intro_goal");
-  mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_0");
-  mgmem::releaseSprite(MiniGame::CROSSY_ROAD, "lava_zone_1");
-
-  s_crossyLava0 = nullptr;
-  s_crossyLava1 = nullptr;
 }
 
-static const char *crossyIntroLine1ForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Escape the Moon! Use Arrow Keys";
-  case PET_DEVIL:
-  default:
-    return "Escape Hell! Use Arrow Keys";
-  }
-}
+static const char *crossyIntroLine1ForPet() { return "Escape the Moon! Use Arrow Keys"; }
 
-static const char *crossyIntroLine2ForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Cross the cosmos, enter the portal!";
-  case PET_DEVIL:
-  default:
-    return "Avoid Lava, Exit between Torches!";
-  }
-}
+static const char *crossyIntroLine2ForPet() { return "Cross the cosmos, enter the portal!"; }
 
-static const char *crossyIntroGoalPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/intro_goal.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/intro_goal.png";
-  }
-}
+static const char *crossyIntroGoalPathForPet() { return "/raising_hell/graphics/mini_games/crossy/eld/intro_goal.png"; }
 
 static const char *crossyStartZonePathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/eld_start_zone.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/dev_start_zone.png";
-  }
+  return "/raising_hell/graphics/mini_games/crossy/eld/eld_start_zone.png";
 }
 
 static const char *crossyGoalZonePathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/eld_goal_zone.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/dev_goal_zone.png";
-  }
-}
-
-static const char *crossyLavaZonePathForPet(uint8_t frame)
-{
-  return (frame & 1) ? "/raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone2.png"
-                     : "/raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone1.png";
+  return "/raising_hell/graphics/mini_games/crossy/eld/eld_goal_zone.png";
 }
 
 void freeCrossyActorSprites()
@@ -442,77 +375,31 @@ static bool ensureCrossyStoneXSSprite()
 
 static const char *crossyImpPathForPet(CrossyFacing facing)
 {
-  switch (pet.type)
+  switch (facing)
   {
-  case PET_ELDRITCH:
-    switch (facing)
-    {
-    case CROSSY_FACE_UP:
-      return "/raising_hell/graphics/mini_games/crossy/eld/cult_up.png";
-    case CROSSY_FACE_LEFT:
-      return "/raising_hell/graphics/mini_games/crossy/eld/cult_left.png";
-    case CROSSY_FACE_RIGHT:
-      return "/raising_hell/graphics/mini_games/crossy/eld/cult_right.png";
-    case CROSSY_FACE_DOWN:
-    default:
-      return "/raising_hell/graphics/mini_games/crossy/eld/cult_down.png";
-    }
-
-  case PET_DEVIL:
+  case CROSSY_FACE_UP:
+    return "/raising_hell/graphics/mini_games/crossy/eld/cult_up.png";
+  case CROSSY_FACE_LEFT:
+    return "/raising_hell/graphics/mini_games/crossy/eld/cult_left.png";
+  case CROSSY_FACE_RIGHT:
+    return "/raising_hell/graphics/mini_games/crossy/eld/cult_right.png";
+  case CROSSY_FACE_DOWN:
   default:
-    switch (facing)
-    {
-    case CROSSY_FACE_UP:
-      return "/raising_hell/graphics/mini_games/crossy/dev/imp_up.png";
-    case CROSSY_FACE_LEFT:
-      return "/raising_hell/graphics/mini_games/crossy/dev/imp_left.png";
-    case CROSSY_FACE_RIGHT:
-      return "/raising_hell/graphics/mini_games/crossy/dev/imp_right.png";
-    case CROSSY_FACE_DOWN:
-    default:
-      return "/raising_hell/graphics/mini_games/crossy/dev/imp_down.png";
-    }
+    return "/raising_hell/graphics/mini_games/crossy/eld/cult_down.png";
   }
 }
 
 static const char *crossyStoneSmallPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk_sm.png";
-
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/stone_chunk_sm.png";
-  }
+  return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk_sm.png";
 }
 
 static const char *crossyStoneXSPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk_xs.png";
-
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/stone_chunk_xs.png";
-  }
+  return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk_xs.png";
 }
 
-static const char *crossyStonePathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk.png";
-
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/crossy/dev/stone_chunk.png";
-  }
-}
+static const char *crossyStonePathForPet() { return "/raising_hell/graphics/mini_games/crossy/eld/stone_chunk.png"; }
 
 static void drawCrossyEldritchStarsForRow(int y, int rowH, uint32_t now)
 {
@@ -643,8 +530,6 @@ static void crossyReset()
   s_crossyFacing = CROSSY_FACE_DOWN;
 
   s_crossyLastLaneMs = millis();
-  s_crossyLavaFrame = 0;
-  s_crossyLavaAnimMs = millis();
   s_crossyLandingGraceFrames = 0;
 
   crossyInitLanes();
@@ -661,21 +546,8 @@ static void crossyPreloadAssetsForIntro()
   freeCrossyZoneSprites();
   freeCrossyActorSprites();
 
-  s_crossyLava0 = nullptr;
-  s_crossyLava1 = nullptr;
-
   const bool startOk = ensureCrossyStartZoneSprite();
   const bool goalOk = ensureCrossyGoalZoneSprite();
-
-  bool lava0 = false;
-  bool lava1 = false;
-  const bool usesLavaSprites = (pet.type != PET_ELDRITCH);
-
-  if (usesLavaSprites)
-  {
-    lava0 = ensureCrossyLavaZoneSprite(0);
-    lava1 = ensureCrossyLavaZoneSprite(1);
-  }
 
   const bool stoneOk = ensureCrossyStoneSprite();
   const bool stoneSmOk = ensureCrossyStoneSmallSprite();
@@ -683,9 +555,8 @@ static void crossyPreloadAssetsForIntro()
 
   Serial.printf(
       "[CROSSY] deferred preload start=%d goal=%d lava=%s stone=%d stoneSm=%d stoneXs=%d free=%u largest=%u\n",
-      startOk ? 1 : 0, goalOk ? 1 : 0, usesLavaSprites ? ((lava0 && lava1) ? "ok" : "fail") : "skip", stoneOk ? 1 : 0,
-      stoneSmOk ? 1 : 0, stoneXsOk ? 1 : 0, (unsigned)ESP.getFreeHeap(),
-      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      startOk ? 1 : 0, goalOk ? 1 : 0, "skip", stoneOk ? 1 : 0, stoneSmOk ? 1 : 0, stoneXsOk ? 1 : 0,
+      (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
   s_crossyAssetsPreloaded = true;
   s_crossyInited = true;
@@ -797,15 +668,6 @@ void updateCrossyRoad(const InputState &input)
 {
   const bool enterOnce = miniGameEnterOnce(input);
   const uint32_t now = millis();
-
-  if (pet.type != PET_ELDRITCH)
-  {
-    if ((uint32_t)(now - s_crossyLavaAnimMs) >= 180)
-    {
-      s_crossyLavaAnimMs = now;
-      s_crossyLavaFrame ^= 1;
-    }
-  }
 
   if (mgRewardShowing())
   {
@@ -1078,29 +940,8 @@ void drawCrossyRoad()
 
     case CROSSY_LANE_WATER:
     {
-      if (pet.type == PET_ELDRITCH)
-      {
-        spr.fillRect(0, y, gW, kCrossyTileH, TFT_BLACK);
-        drawCrossyEldritchStarsForRow(y, kCrossyTileH, millis());
-      }
-      else
-      {
-        M5Canvas *bgSpr = nullptr;
-        const uint8_t lavaFrame = (s_crossyLavaFrame + row) & 1;
-        bgSpr = (lavaFrame == 0) ? s_crossyLava0 : s_crossyLava1;
-
-        if (bgSpr && bgSpr->width() > 0 && bgSpr->height() > 0)
-        {
-          const int tileW = (int)bgSpr->width();
-          for (int x = 0; x < gW; x += tileW)
-            bgSpr->pushSprite(&spr, x, y);
-        }
-        else
-        {
-          spr.fillRect(0, y, gW, kCrossyTileH, TFT_BLACK);
-        }
-      }
-
+      spr.fillRect(0, y, gW, kCrossyTileH, TFT_BLACK);
+      drawCrossyEldritchStarsForRow(y, kCrossyTileH, millis());
       break;
     }
     }

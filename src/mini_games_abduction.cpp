@@ -5,6 +5,7 @@
 #include "app_state.h"
 #include "display.h"
 #include "graphics.h"
+#include "graphics_sd_draw.h"
 #include "input.h"
 #include "mg_pause_core.h"
 #include "mini_game_assets.h"
@@ -741,7 +742,7 @@ void drawAbductionBeam()
 
     spr.setTextColor(TFT_CYAN, TFT_BLACK);
     spr.drawCentreString("A/D = Left/Right:", gW / 2, 88, 2);
-    spr.drawCentreString("UP or ENTER = Fire Beam", gW / 2, 106, 2);
+    spr.drawCentreString("UP or ENTER = Fire Beam", gW / 2, 104, 2);
 
     const uint8_t frame = (millis() / 180) & 1;
     const char *path = COW_FRAMES[frame];
@@ -777,7 +778,7 @@ void drawAbductionBeam()
 
   if (g_sdReady)
   {
-    if (!sprDrawJpgFromSD("/raising_hell/graphics/mini_games/abduct/al_abd_bg.jpg", 0, SCREEN_H - kAbductionBgH))
+    if (!sprDrawPngFromSD("/raising_hell/graphics/mini_games/abduct/al_abd_bg.png", 0, SCREEN_H - kAbductionBgH))
     {
       spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
       spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);

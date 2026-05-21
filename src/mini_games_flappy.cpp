@@ -89,159 +89,50 @@ static const char *const kDevBurnFrames[] = {
     "/raising_hell/graphics/mini_games/flappy/dev/imp_burn5.png",
 };
 
-static const char *const kEldBurnFrames[] = {
-    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse1.png",
-    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse2.png",
-    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse3.png",
-    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse4.png",
-    "/raising_hell/graphics/mini_games/flappy/eld/mer_curse5.png",
-};
+static const char *miniGameFlappyNameForPet() { return "Flappy Fireball"; }
 
-static const char *miniGameFlappyNameForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Flappy Curse";
-  case PET_DEVIL:
-  default:
-    return "Flappy Fireball";
-  }
-}
-
-static const char *const *flappyBurnFramesForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return kEldBurnFrames;
-  case PET_DEVIL:
-  default:
-    return kDevBurnFrames;
-  }
-}
+static const char *const *flappyBurnFramesForPet() { return kDevBurnFrames; }
 
 static const char *fireballRunBgLeftPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgl.png";
-  case PET_DEVIL:
-  default:
-    // Prep for future devil split; safe to point both halves at the old asset for now.
-    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgl.png";
-  }
+  return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgl.png";
 }
 
 static const char *fireballRunBgRightPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgr.png";
-  case PET_DEVIL:
-  default:
-    // Prep for future devil split; safe to point both halves at the old asset for now.
-    return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgr.png";
-  }
+  return "/raising_hell/graphics/mini_games/fbrun/dev/dev_fbrun_bgr.png";
 }
 
-static const char *flappyImpWave1PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/mer_taunt1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png";
-  }
-}
+static const char *flappyImpWave1PathForPet() { return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave1.png"; }
 
-static const char *flappyImpWave2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/mer_taunt2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png";
-  }
-}
+static const char *flappyImpWave2PathForPet() { return "/raising_hell/graphics/mini_games/flappy/dev/imp_wave2.png"; }
 
 static const char *flappyProjectile1PathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/starfish1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/fireball1.png";
-  }
+  return "/raising_hell/graphics/mini_games/flappy/dev/fireball1.png";
 }
 
 static const char *flappyProjectile2PathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/starfish2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/fireball2.png";
-  }
+  return "/raising_hell/graphics/mini_games/flappy/dev/fireball2.png";
 }
 
 static const char *flappyProjectile3PathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/starfish3.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/fireball3.png";
-  }
+  return "/raising_hell/graphics/mini_games/flappy/dev/fireball3.png";
 }
 
 static const char *flappyObstacleUpPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/column_up.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/rock_spike_up.png";
-  }
+  return "/raising_hell/graphics/mini_games/flappy/dev/rock_spike_up.png";
 }
 
 static const char *flappyObstacleDownPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/column_down.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/rock_spike_down.png";
-  }
+  return "/raising_hell/graphics/mini_games/flappy/dev/rock_spike_down.png";
 }
 
-static const char *flappyIntroTargetTextForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Curse the Merman!";
-  case PET_DEVIL:
-  default:
-    return "Torch the Imp!";
-  }
-}
+static const char *flappyIntroTargetTextForPet() { return "Torch the Imp!"; }
 
 static M5Canvas *s_flappyFireball1Spr = nullptr;
 static M5Canvas *s_flappyFireball2Spr = nullptr;
@@ -1032,17 +923,7 @@ void updateFlappyFireball(const InputState &input)
 // -----------------------------------------------------------------------------
 // Flappy scrolling background (cached RGB565 + per-pet theme)
 // -----------------------------------------------------------------------------
-static const char *flappyBgPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.jpg";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.jpg";
-  }
-}
+static const char *flappyBgPathForPet() { return "/raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.jpg"; }
 
 void freeFlappyBgCache()
 {

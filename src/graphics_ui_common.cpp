@@ -13,7 +13,7 @@ uint16_t uiPillOutline(PetType t)
     return 0x07E0;
 
   case PET_ELDRITCH:
-    return 0x001F;
+    return 0x0010;
 
   case PET_DEVIL:
   default:
@@ -25,15 +25,14 @@ uint16_t uiPillFillSelected(PetType t)
 {
   switch (t)
   {
-  case PET_ALIEN:
-    return 0x0200;
+  case PET_DEVIL:
+    return 0x2000; // dark red tint
 
   case PET_ELDRITCH:
-    return 0x0018;
+    return 0x0008; // dark blue tint
 
-  case PET_DEVIL:
-  default:
-    return 0x2104;
+  case PET_ALIEN:
+    return 0x0200; // dark green tint
   }
 }
 

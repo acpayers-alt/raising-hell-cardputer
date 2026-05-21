@@ -289,8 +289,10 @@ void drawPlayTab(bool redrawBg)
     int y = startY + row * (itemH + gap);
     bool sel = (index == selectedIndex);
 
-    uint16_t outline = sel ? uiPillOutline(pet.type) : TFT_DARKGREY;
-    uint16_t fill = sel ? uiPillFillSelected(pet.type) : TFT_BLACK;
+    const PetType ownerType = uiPlayMenuOwnerPetType(index);
+
+    uint16_t outline = uiPillOutline(ownerType);
+    uint16_t fill = uiPillFillSelected(ownerType);
     uint16_t textCol = sel ? TFT_WHITE : TFT_LIGHTGREY;
 
     spr.fillRoundRect(boxX, y, boxW, itemH, radius, fill);

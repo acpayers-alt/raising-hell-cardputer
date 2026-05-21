@@ -9,6 +9,7 @@ namespace
 struct MenuItem
 {
   const char *label;
+  PetType ownerType;
   void (*onSelect)();
 };
 
@@ -21,92 +22,73 @@ static void actCrossy() { startCrossyRoad(); }
 static void actAbduction() { startAbductionBeam(); }
 
 static const MenuItem kItems[] = {
-    {"Flappy Fireball", actFlappy},
-    {"Fireball Run", actDodger},
-    {"Crossy Hell", actCrossy},
-    {"Abduction Beam", actAbduction},
+    {"Flappy Fireball", PET_DEVIL, actFlappy},
+    {"Fireball Run", PET_DEVIL, actDodger},
+    {"Crossy Cosmos", PET_ELDRITCH, actCrossy},
+    {"Abduction Beam", PET_ALIEN, actAbduction},
 };
-
-static const char *flappyMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Flappy Curse";
-  case PET_DEVIL:
-  default:
-    return "Flappy Fireball";
-  }
-}
-
-static const char *dodgerMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Submarine Run";
-  case PET_DEVIL:
-  default:
-    return "Fireball Run";
-  }
-}
-
-static const char *crossyMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Crossy Cosmos";
-  case PET_DEVIL:
-  default:
-    return "Crossy Hell";
-  }
-}
-
-static const char *abductionMenuLabelForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Harvest Beam";
-
-  case PET_DEVIL:
-  default:
-    return "Soul Beam";
-  }
-}
 
 } // namespace
 
 int uiPlayMenuCount() { return (int)(sizeof(kItems) / sizeof(kItems[0])); }
 
+static int uiPlayMenuPhysicalIndexForDisplayIndex(int displayIdx)
+{
+  if (displayIdx < 0 || displayIdx >= uiPlayMenuCount())
+    return -1;
+
+  const PetType current = pet.type;
+  int n = 0;
+
+  for (int i = 0; i < uiPlayMenuCount(); ++i)
+  {
+    if (kItems[i].ownerType == current)
+    {
+      if (n == displayIdx)
+        return i;
+      ++n;
+    }
+  }
+
+  for (int i = 0; i < uiPlayMenuCount(); ++i)
+  {
+    if (kItems[i].ownerType != current)
+    {
+      if (n == displayIdx)
+        return i;
+      ++n;
+    }
+  }
+
+  return -1;
+}
+
 const char *uiPlayMenuLabel(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount())
+  const int physicalIdx = uiPlayMenuPhysicalIndexForDisplayIndex(idx);
+  if (physicalIdx < 0)
     return "";
 
-  switch (idx)
-  {
-  case 0:
-    return flappyMenuLabelForPet();
-  case 1:
-    return dodgerMenuLabelForPet();
-  case 2:
-    return crossyMenuLabelForPet();
-  case 3:
-    return abductionMenuLabelForPet();
-  default:
-    return kItems[idx].label;
-  }
+  return kItems[physicalIdx].label;
+}
+
+PetType uiPlayMenuOwnerPetType(int idx)
+{
+  const int physicalIdx = uiPlayMenuPhysicalIndexForDisplayIndex(idx);
+  if (physicalIdx < 0)
+    return PET_DEVIL;
+
+  return kItems[physicalIdx].ownerType;
 }
 
 bool uiPlayMenuActivate(int idx)
 {
-  if (idx < 0 || idx >= uiPlayMenuCount())
+  const int physicalIdx = uiPlayMenuPhysicalIndexForDisplayIndex(idx);
+  if (physicalIdx < 0)
     return false;
-  if (!kItems[idx].onSelect)
+  if (!kItems[physicalIdx].onSelect)
     return false;
 
-  kItems[idx].onSelect();
+  kItems[physicalIdx].onSelect();
   return true;
 }
