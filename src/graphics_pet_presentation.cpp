@@ -870,10 +870,9 @@ void tickPetWander()
     return;
 
   const bool wanderAllowed = (mood == MOOD_HAPPY || mood == MOOD_BORED);
-  if (!wanderAllowed && !wanderActive)
+  if (!wanderAllowed)
   {
-    s_petScreenX = s_petHomeX;
-    s_petScreenY = s_petHomeY;
+    resetPetWanderToHome();
     return;
   }
 
