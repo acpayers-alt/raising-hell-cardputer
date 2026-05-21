@@ -571,6 +571,19 @@ static const char *kAlienBabyTiredHold[] = {
     "/raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay3.png",
 };
 
+static const char *kAlienTeenHappySway[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_sway1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_sway2.png",
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_sway3.png",
+};
+
+static const char *kAlienTeenHappyFlick[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick2.png",
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick3.png",
+    "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick4.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -646,6 +659,9 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_BABY_ANGRY_POUNCE, kAlienBabyAngryPounce, 6, 90, false},
     {ANIM_ALIEN_BABY_TIRED_LAY, kAlienBabyTiredLay, 2, 850, true},
     {ANIM_ALIEN_BABY_TIRED_HOLD, kAlienBabyTiredHold, 1, 3500, false},
+
+    {ANIM_ALIEN_TEEN_HAPPY_SWAY, kAlienTeenHappySway, 3, 220, true},
+    {ANIM_ALIEN_TEEN_HAPPY_FLICK, kAlienTeenHappyFlick, 4, 120, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -682,6 +698,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien baby sick: moan loop; sneeze triggers occasionally.
     {ANIM_ALIEN_BABY_SICK_MOAN, ANIM_ALIEN_BABY_SICK_SNEEZE, 4500UL, 9000UL},
+
+    // Alien teen happy: sway loops; hair/hand flick triggers occasionally.
+    {ANIM_ALIEN_TEEN_HAPPY_SWAY, ANIM_ALIEN_TEEN_HAPPY_FLICK, 4500UL, 9000UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -916,11 +935,20 @@ static AnimId alienBabyClipForMood(PetMood mood)
 
 static AnimId alienClipForMood(uint8_t stage, PetMood mood)
 {
-  // Alien only has baby clips for now.
-  // Keep the stage switch in place so teen/adult/elder can be filled in cleanly later.
   switch (stage)
   {
   case 0:
+    return alienBabyClipForMood(mood);
+
+  case 1:
+    if (mood == MOOD_HAPPY)
+      return ANIM_ALIEN_TEEN_HAPPY_SWAY;
+
+    // Temporary fallback until Alien teen non-happy moods exist.
+    return alienBabyClipForMood(mood);
+
+  case 2:
+  case 3:
   default:
     return alienBabyClipForMood(mood);
   }

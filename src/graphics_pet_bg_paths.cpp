@@ -2,17 +2,18 @@
 
 static const char *PATH_BG_PET = "/raising_hell/graphics/bg/hell_bg.jpg";
 
-static const char *PATH_BG_DEVIL_BABY  = "/raising_hell/graphics/background/dev/hell_bg.jpg";
-static const char *PATH_BG_DEVIL_TEEN  = "/raising_hell/graphics/background/dev/dev_teen_bg.jpg";
+static const char *PATH_BG_DEVIL_BABY = "/raising_hell/graphics/background/dev/hell_bg.jpg";
+static const char *PATH_BG_DEVIL_TEEN = "/raising_hell/graphics/background/dev/dev_teen_bg.jpg";
 static const char *PATH_BG_DEVIL_ADULT = "/raising_hell/graphics/background/dev/dev_ad_bg.jpg";
 static const char *PATH_BG_DEVIL_ELDER = "/raising_hell/graphics/background/dev/dev_el_bg.jpg";
 
-static const char *PATH_BG_ELDRITCH_BABY  = "/raising_hell/graphics/background/eld/eld_bg.jpg";
-static const char *PATH_BG_ELDRITCH_TEEN  = "/raising_hell/graphics/background/eld/eld_teen_bg.jpg";
+static const char *PATH_BG_ELDRITCH_BABY = "/raising_hell/graphics/background/eld/eld_bg.jpg";
+static const char *PATH_BG_ELDRITCH_TEEN = "/raising_hell/graphics/background/eld/eld_teen_bg.jpg";
 static const char *PATH_BG_ELDRITCH_ADULT = "/raising_hell/graphics/background/eld/eld_ad_bg.jpg";
 static const char *PATH_BG_ELDRITCH_ELDER = "/raising_hell/graphics/background/eld/eld_el_bg.jpg";
 
 static const char *PATH_BG_ALIEN_BABY = "/raising_hell/graphics/background/al/al_bb_bg.jpg";
+static const char *PATH_BG_ALIEN_TEEN = "/raising_hell/graphics/background/al/al_tn_bg.jpg";
 
 const char *bgPathForPet(PetType t)
 {
@@ -56,6 +57,9 @@ const char *bgPathForPetWithStage(PetType t, int evoStage)
 
   if (t == PET_ALIEN)
   {
+    if (evoStage >= 1)
+      return PATH_BG_ALIEN_TEEN;
+
     return PATH_BG_ALIEN_BABY;
   }
 

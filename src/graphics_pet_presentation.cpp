@@ -385,6 +385,13 @@ static const char *PATH_AL_BB_BORED_TP[] = {
     "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele6.png",
     "/raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele7.png",
 };
+
+// Teen
+static const char *PATH_AL_TN_WALK1 = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walk1.png";
+static const char *PATH_AL_TN_WALK2 = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walk2.png";
+static const char *PATH_AL_TN_WALK1_L = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft1.png";
+static const char *PATH_AL_TN_WALK2_L = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft2.png";
+
 // ============================================================================
 // WANDER SYSTEM
 // ============================================================================
@@ -1071,12 +1078,11 @@ static int getWalkBaselineAdjustForPet()
     {
     case 0:
       return -5;
+    case 1:
+      return -14;
     default:
-      return -5;
+      return -14;
     }
-
-  default:
-    return -2;
   }
 }
 
@@ -1184,13 +1190,20 @@ bool drawIntroWalkingPetOverride()
         else
           path = frame ? PATH_AL_BB_WALK2 : PATH_AL_BB_WALK1;
       }
+      else if (pet.evoStage == 1)
+      {
+        if (facingLeft)
+          path = frame ? PATH_AL_TN_WALK2_L : PATH_AL_TN_WALK1_L;
+        else
+          path = frame ? PATH_AL_TN_WALK2 : PATH_AL_TN_WALK1;
+      }
       else
       {
-        // Temporary fallback until Alien teen/adult/elder walk frames exist.
+        // Temporary fallback until Alien adult/elder walk frames exist.
         if (facingLeft)
-          path = frame ? PATH_AL_BB_WALK2_L : PATH_AL_BB_WALK1_L;
+          path = frame ? PATH_AL_TN_WALK2_L : PATH_AL_TN_WALK1_L;
         else
-          path = frame ? PATH_AL_BB_WALK2 : PATH_AL_BB_WALK1;
+          path = frame ? PATH_AL_TN_WALK2 : PATH_AL_TN_WALK1;
       }
     }
   }
