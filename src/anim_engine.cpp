@@ -367,6 +367,20 @@ static uint32_t randRangeInclusive(uint32_t lo, uint32_t hi)
   return (uint32_t)random((long)lo, (long)(hi + 1));
 }
 
+static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
+{
+  if (id == ANIM_ALIEN_TEEN_BORED_STOMP)
+  {
+    // Stomp frames 1/2 are quick; frame 3 holds for about 3 seconds.
+    if (idx == 2)
+      return 3000;
+
+    return 180;
+  }
+
+  return fallbackMs;
+}
+
 static void markFrameChanged()
 {
   s_frameChanged = true;
@@ -380,6 +394,7 @@ static void resetBaseTo(AnimId id, uint32_t now)
 
   const AnimClip *clip = animGetClip(s_baseId);
   uint16_t ms = clip ? clip->frameMs : 1000;
+  ms = frameMsForAnimFrame(s_baseId, s_baseIdx, ms);
   if (ms < 40)
     ms = 40;
 
@@ -584,7 +599,17 @@ void animTick()
     return;
   }
 
-  uint16_t ms = base->frameMs;
+  uint8_t nextIdx = s_baseIdx;
+
+  if (base->frameCount > 1)
+  {
+    if (base->loop)
+      nextIdx = (uint8_t)((s_baseIdx + 1) % base->frameCount);
+    else if (s_baseIdx + 1 < base->frameCount)
+      nextIdx = s_baseIdx + 1;
+  }
+
+  uint16_t ms = frameMsForAnimFrame(s_baseId, nextIdx, base->frameMs);
   if (ms < 40)
     ms = 40;
   s_baseNextMs = now + ms;

@@ -55,6 +55,15 @@ static bool s_petFacingLeft = false;
 static bool ensurePetLayer();
 static bool alienBabyBoredTeleportActive();
 static void cancelAlienBabyBoredTeleport();
+static void cancelAlienTeenBoredFly();
+
+static bool s_alienTeenBoredFlyActive = false;
+static uint32_t s_alienTeenBoredFlyStartMs = 0;
+static uint32_t s_alienTeenBoredFlyNextAllowedMs = 0;
+
+static constexpr uint32_t kAlienTeenBoredFlyMs = 10000;
+static constexpr uint32_t kAlienTeenBoredFlyMinCooldownMs = 14000;
+static constexpr uint32_t kAlienTeenBoredFlyMaxCooldownMs = 24000;
 
 // UI / rendering hooks
 void requestUIRedraw();
@@ -391,6 +400,14 @@ static const char *PATH_AL_TN_WALK1 = "/raising_hell/graphics/pet/anim/al/tn/wlk
 static const char *PATH_AL_TN_WALK2 = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walk2.png";
 static const char *PATH_AL_TN_WALK1_L = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft1.png";
 static const char *PATH_AL_TN_WALK2_L = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft2.png";
+static const char *PATH_AL_TN_BORED_FLY[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly2.png",
+};
+static const char *PATH_AL_TN_BORED_RCUFO[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_rcufo1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_rcufo2.png",
+};
 
 // ============================================================================
 // WANDER SYSTEM
@@ -544,6 +561,7 @@ void resetPetScreenPositionToHome()
   s_petIntroArriveTurnActive = false;
   s_petIntroStandHoldActive = false;
   s_petIntroHandoffActive = false;
+  cancelAlienTeenBoredFly();
   cancelAlienBabyBoredTeleport();
 }
 
@@ -557,6 +575,60 @@ static void scheduleNextPetWander()
   const uint32_t span = (kPetWanderMaxIdleMs - kPetWanderMinIdleMs);
 
   s_petWanderUntilMs = now + kPetWanderMinIdleMs + (span ? (uint32_t)random((long)span) : 0);
+}
+
+static void cancelAlienTeenBoredFly()
+{
+  s_alienTeenBoredFlyActive = false;
+  s_alienTeenBoredFlyStartMs = 0;
+  s_alienTeenBoredFlyNextAllowedMs = 0;
+}
+
+static bool alienTeenBoredFlyEligible(PetMood mood)
+{
+  return pet.type == PET_ALIEN && pet.evoStage == 1 && mood == MOOD_BORED && !pet.isSleeping &&
+         g_app.uiState != UIState::CLOCK_MODE && !s_petIntroWalkActive && !s_petIntroArriveTurnActive &&
+         !s_petIntroStandHoldActive && !s_petIntroHandoffActive;
+}
+
+static void scheduleNextAlienTeenBoredFly(uint32_t now)
+{
+  const uint32_t span = kAlienTeenBoredFlyMaxCooldownMs - kAlienTeenBoredFlyMinCooldownMs;
+  s_alienTeenBoredFlyNextAllowedMs = now + kAlienTeenBoredFlyMinCooldownMs + (span ? (uint32_t)random((long)span) : 0);
+}
+
+static bool tickAlienTeenBoredFly(uint32_t now, PetMood mood)
+{
+  if (!alienTeenBoredFlyEligible(mood))
+  {
+    cancelAlienTeenBoredFly();
+    return false;
+  }
+
+  if (s_alienTeenBoredFlyActive)
+  {
+    if ((uint32_t)(now - s_alienTeenBoredFlyStartMs) >= kAlienTeenBoredFlyMs)
+    {
+      s_alienTeenBoredFlyActive = false;
+      scheduleNextAlienTeenBoredFly(now);
+      requestUIRedraw();
+      return false;
+    }
+
+    requestUIRedraw();
+    return true;
+  }
+
+  if (s_alienTeenBoredFlyNextAllowedMs == 0)
+    scheduleNextAlienTeenBoredFly(now);
+
+  if ((int32_t)(now - s_alienTeenBoredFlyNextAllowedMs) < 0)
+    return false;
+
+  s_alienTeenBoredFlyActive = true;
+  s_alienTeenBoredFlyStartMs = now;
+  requestUIRedraw();
+  return true;
 }
 
 static bool alienBabyBoredTeleportEligible(PetMood mood)
@@ -719,6 +791,8 @@ void resetPetWanderToHome()
   s_petWanderLastStepMs = 0;
 
   s_petWalkFrame = 0;
+
+  cancelAlienTeenBoredFly();
   cancelAlienBabyBoredTeleport();
   scheduleNextPetWander();
 }
@@ -748,6 +822,7 @@ void resetClockModePetPresentation()
   s_petWanderLastStepMs = 0;
   s_petWalkFrame = 0;
 
+  cancelAlienTeenBoredFly();
   cancelAlienBabyBoredTeleport();
   scheduleNextPetWander();
 }
@@ -870,6 +945,7 @@ void tickPetWander()
 
   const uint32_t now = millis();
   const PetMood mood = petResolveMood(pet);
+  (void)tickAlienTeenBoredFly(now, mood);
 
   if (tickAlienBabyBoredTeleport(now, mood))
     return;
@@ -1291,6 +1367,63 @@ static void drawStepCounterBadge()
   spr.drawString(buf, x + 15, y + 3);
 }
 
+static bool drawAlienTeenBoredFlyOverride()
+{
+  if (!s_alienTeenBoredFlyActive)
+    return false;
+
+  const uint32_t now = millis();
+  const uint32_t elapsed = now - s_alienTeenBoredFlyStartMs;
+
+  const uint8_t flyFrame = (now / 180U) & 1U;
+  const uint8_t ufoFrame = (now / 140U) & 1U;
+
+  const char *flyPath = PATH_AL_TN_BORED_FLY[flyFrame];
+  const char *ufoPath = PATH_AL_TN_BORED_RCUFO[ufoFrame];
+
+  if (flyPath && flyPath[0])
+  {
+    int w = PET_SPR_W;
+    int h = PET_SPR_H;
+    (void)getPngWH(flyPath, w, h);
+
+    const int drawX = s_petScreenX - (w / 2);
+    const int drawY = s_petScreenY - h - 12;
+    sprDrawPngFromSD(flyPath, drawX, drawY);
+  }
+
+  if (ufoPath && ufoPath[0])
+  {
+    int w = 24;
+    int h = 16;
+    (void)getPngWH(ufoPath, w, h);
+
+    int ufoX = -w;
+
+    if (elapsed < 1200)
+    {
+      ufoX = map((long)elapsed, 0, 1200, -w, 36);
+    }
+    else if (elapsed > kAlienTeenBoredFlyMs - 1200)
+    {
+      const uint32_t outT = elapsed - (kAlienTeenBoredFlyMs - 1200);
+      ufoX = map((long)outT, 0, 1200, SCREEN_W - 44, SCREEN_W + w);
+    }
+    else
+    {
+      const uint32_t cruiseT = elapsed - 1200;
+      ufoX = 36 + (int)((cruiseT / 70U) % (SCREEN_W - 72));
+    }
+
+    const int bob = (int)((elapsed / 160U) % 7U) - 3;
+    const int ufoY = PET_AREA_Y + 16 + bob;
+
+    sprDrawPngFromSD(ufoPath, ufoX, ufoY);
+  }
+
+  return true;
+}
+
 static void drawPetScreenImpl(bool redrawBg)
 {
   if (!isScreenOn())
@@ -1348,7 +1481,11 @@ static void drawPetScreenImpl(bool redrawBg)
 
   const bool animReady = animEnsurePetScreenReady();
 
-  if (drawAlienBabyBoredTeleportOverride())
+  if (drawAlienTeenBoredFlyOverride())
+  {
+    // Alien teen bored fly drew pet + remote UFO.
+  }
+  else if (drawAlienBabyBoredTeleportOverride())
   {
     // Special Alien bored teleport drew a frame, or intentionally left the pet hidden.
   }

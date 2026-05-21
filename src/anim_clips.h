@@ -96,6 +96,8 @@ enum AnimId : uint16_t
   // Alien (teen)
   ANIM_ALIEN_TEEN_HAPPY_SWAY,
   ANIM_ALIEN_TEEN_HAPPY_FLICK,
+  ANIM_ALIEN_TEEN_BORED_STOMP,
+  ANIM_ALIEN_TEEN_BORED_FLY,
 };
 
 struct AnimClip

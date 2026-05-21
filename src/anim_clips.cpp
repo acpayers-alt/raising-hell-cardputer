@@ -584,6 +584,17 @@ static const char *kAlienTeenHappyFlick[] = {
     "/raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick4.png",
 };
 
+static const char *kAlienTeenBoredStomp[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_stomp1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_stomp2.png",
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_stomp3.png",
+};
+
+static const char *kAlienTeenBoredFly[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly2.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -662,6 +673,9 @@ static const AnimClip kClips[] = {
 
     {ANIM_ALIEN_TEEN_HAPPY_SWAY, kAlienTeenHappySway, 3, 220, true},
     {ANIM_ALIEN_TEEN_HAPPY_FLICK, kAlienTeenHappyFlick, 4, 120, false},
+
+    {ANIM_ALIEN_TEEN_BORED_STOMP, kAlienTeenBoredStomp, 3, 1000, true},
+    {ANIM_ALIEN_TEEN_BORED_FLY, kAlienTeenBoredFly, 2, 180, true},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -943,6 +957,9 @@ static AnimId alienClipForMood(uint8_t stage, PetMood mood)
   case 1:
     if (mood == MOOD_HAPPY)
       return ANIM_ALIEN_TEEN_HAPPY_SWAY;
+
+    if (mood == MOOD_BORED)
+      return ANIM_ALIEN_TEEN_BORED_STOMP;
 
     // Temporary fallback until Alien teen non-happy moods exist.
     return alienBabyClipForMood(mood);
