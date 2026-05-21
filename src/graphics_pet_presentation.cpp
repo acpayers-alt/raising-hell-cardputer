@@ -490,7 +490,13 @@ bool petPresentationAnimating()
          s_petWanderState == PetWanderState::RETURNING_HOME;
 }
 
-bool petWalkOverrideActive() { return petPresentationAnimating(); }
+bool petWalkOverrideActive()
+{
+  if (s_alienTeenBoredFlyActive)
+    return false;
+
+  return petPresentationAnimating();
+}
 
 bool petPresentationFacingLeft() { return s_petFacingLeft; }
 
@@ -945,7 +951,11 @@ void tickPetWander()
 
   const uint32_t now = millis();
   const PetMood mood = petResolveMood(pet);
+
   (void)tickAlienTeenBoredFly(now, mood);
+
+  if (s_alienTeenBoredFlyActive)
+    return;
 
   if (tickAlienBabyBoredTeleport(now, mood))
     return;
