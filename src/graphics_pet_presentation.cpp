@@ -803,8 +803,7 @@ void tickPetIntroWalk()
     return;
   }
 
-  const bool freeRoamState = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
-                              (g_app.uiState == UIState::CLOCK_MODE));
+  const bool freeRoamState = (g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE);
 
   if (!freeRoamState)
     return;
@@ -851,13 +850,13 @@ void tickPetWander()
 
   const bool wanderActive = (s_petWanderState != PetWanderState::HOME_IDLE);
 
-  const bool freeRoamState = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
-                              (g_app.uiState == UIState::CLOCK_MODE));
+  const bool freeRoamState = (g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE);
 
   if (!freeRoamState)
   {
-    if (!wanderActive)
-      resetPetWanderToHome();
+    // Keep wander state intact while browsing other tabs.
+    // The pet should continue from the same path when returning to the pet tab,
+    // not snap home or restart its route.
     return;
   }
 
@@ -865,8 +864,7 @@ void tickPetWander()
 
   if (pet.isSleeping)
   {
-    if (!wanderActive)
-      resetPetWanderToHome();
+    resetPetWanderToHome();
     return;
   }
 

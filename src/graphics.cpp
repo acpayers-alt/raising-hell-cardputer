@@ -536,8 +536,7 @@ void renderUI()
   tickPetWander();
 
   const bool redrawRequested = consumeUIRedrawRequest();
-  const bool petFreeRoamScreen = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
-                                  (g_app.uiState == UIState::CLOCK_MODE));
+  const bool petFreeRoamScreen = (g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE);
 
   const bool petAnimating = petFreeRoamScreen && (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive() ||
                                                   petPresentationAnimating());
@@ -557,8 +556,7 @@ void renderUI()
 
   lastTab = tabNow;
 
-  const bool petScreenNow = ((g_app.uiState == UIState::PET_SCREEN && g_app.currentTab == Tab::TAB_PET) ||
-                             (g_app.uiState == UIState::CLOCK_MODE));
+  const bool petScreenNow = (g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE);
 
   const bool petScreenJustEntered = petScreenNow && !s_petScreenWasActiveLastFrame;
   s_petScreenWasActiveLastFrame = petScreenNow;
