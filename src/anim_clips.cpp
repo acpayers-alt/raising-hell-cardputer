@@ -595,6 +595,18 @@ static const char *kAlienTeenBoredFly[] = {
     "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly2.png",
 };
 
+static const char *kAlienTeenAngryJump[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_jump1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_jump2.png",
+};
+
+static const char *kAlienTeenAngrySaber[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber2.png",
+    "/raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber3.png",
+    "/raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber4.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -676,6 +688,8 @@ static const AnimClip kClips[] = {
 
     {ANIM_ALIEN_TEEN_BORED_STOMP, kAlienTeenBoredStomp, 3, 1000, true},
     {ANIM_ALIEN_TEEN_BORED_FLY, kAlienTeenBoredFly, 2, 180, true},
+    {ANIM_ALIEN_TEEN_ANGRY_JUMP, kAlienTeenAngryJump, 2, 160, true},
+    {ANIM_ALIEN_TEEN_ANGRY_SABER, kAlienTeenAngrySaber, 4, 120, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -715,6 +729,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien teen happy: sway loops; hair/hand flick triggers occasionally.
     {ANIM_ALIEN_TEEN_HAPPY_SWAY, ANIM_ALIEN_TEEN_HAPPY_FLICK, 4500UL, 9000UL},
+
+    // Alien teen angry: jump loops; saber triggers occasionally.
+    {ANIM_ALIEN_TEEN_ANGRY_JUMP, ANIM_ALIEN_TEEN_ANGRY_SABER, 4500UL, 9000UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -960,6 +977,9 @@ static AnimId alienClipForMood(uint8_t stage, PetMood mood)
 
     if (mood == MOOD_BORED)
       return ANIM_ALIEN_TEEN_BORED_STOMP;
+
+    if (mood == MOOD_MAD)
+      return ANIM_ALIEN_TEEN_ANGRY_JUMP;
 
     // Temporary fallback until Alien teen non-happy moods exist.
     return alienBabyClipForMood(mood);

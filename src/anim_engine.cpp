@@ -371,11 +371,20 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
 {
   if (id == ANIM_ALIEN_TEEN_BORED_STOMP)
   {
-    // Stomp frames 1/2 are quick; frame 3 holds for about 3 seconds.
+    // Hold stomp landing frame.
     if (idx == 2)
       return 3000;
 
     return 180;
+  }
+
+  if (id == ANIM_ALIEN_TEEN_ANGRY_SABER)
+  {
+    // Hold final saber pose dramatically.
+    if (idx == 3)
+      return 3000;
+
+    return 120;
   }
 
   return fallbackMs;
@@ -443,6 +452,7 @@ static void startOverride(AnimId id, uint32_t now)
 
   const AnimClip *clip = animGetClip(s_overrideId);
   uint16_t ms = clip ? clip->frameMs : 90;
+  ms = frameMsForAnimFrame(s_overrideId, s_overrideIdx, ms);
   if (ms < 40)
     ms = 40;
 
@@ -562,19 +572,20 @@ void animTick()
       return;
     }
 
-    uint16_t ms = clip->frameMs;
-    if (ms < 40)
-      ms = 40;
-    s_overrideNextMs = now + ms;
-
     if (s_overrideIdx + 1 < clip->frameCount)
     {
       s_overrideIdx++;
+
+      uint16_t ms = frameMsForAnimFrame(s_overrideId, s_overrideIdx, clip->frameMs);
+      if (ms < 40)
+        ms = 40;
+
+      s_overrideNextMs = now + ms;
       markFrameChanged();
     }
     else
     {
-      // one-shot done
+      // one-shot done after the current frame's duration has elapsed.
       stopOverrideAndScheduleNext(now);
     }
 
