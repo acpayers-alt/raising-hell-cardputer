@@ -20,6 +20,8 @@ const PetPerfStats &petPerfStats() { return s_petPerfStats; }
 
 static bool s_frameChanged = false;
 
+static void applyThoughtBubbleOffset(AnimId id, bool healthBubble, bool restBubble, int &bubbleX, int &bubbleY);
+
 void petPerfResetStats()
 {
   s_petPerfStats.petFrameMs = 0;
@@ -87,6 +89,14 @@ static bool drawPngPathAnim(const char *path, int x, int y)
   return ok;
 }
 
+static const char *kThoughtRestFrames[] = {
+    "/raising_hell/graphics/ui/thought_bubbles/thought_rest1.png",
+    "/raising_hell/graphics/ui/thought_bubbles/thought_rest2.png",
+};
+
+static uint8_t s_restThoughtFrame = 0;
+static uint32_t s_restThoughtNextMs = 0;
+
 static const char *kThoughtBurgerFrames[] = {
     "/raising_hell/graphics/ui/thought_bubbles/thought_burger1.png",
     "/raising_hell/graphics/ui/thought_bubbles/thought_burger2.png",
@@ -94,6 +104,15 @@ static const char *kThoughtBurgerFrames[] = {
 
 static uint8_t s_burgerThoughtFrame = 0;
 static uint32_t s_burgerThoughtNextMs = 0;
+
+static bool animUsesRestThought(AnimId id)
+{
+  return id == ANIM_DEV_BABY_SLEEPY_NOD || id == ANIM_DEV_TEEN_SLEEPY_BOB || id == ANIM_DEV_ADULT_TIRED_CHAIR_IDLE ||
+         id == ANIM_DEV_ADULT_TIRED_CHAIR_BLINK || id == ANIM_DEV_ELDER_TIRED_SIT || id == ANIM_ELD_BABY_SLEEPY_YAWN ||
+         id == ANIM_ELD_TEEN_TIRED_NOD || id == ANIM_ELD_ADULT_SLEEPY_DRINK || id == ANIM_ELD_ELDER_SLEEPY_HOLD ||
+         id == ANIM_ALIEN_BABY_TIRED_LAY || id == ANIM_ALIEN_BABY_TIRED_HOLD || id == ANIM_ALIEN_TEEN_TIRED_SNORE ||
+         id == ANIM_ALIEN_TEEN_TIRED_BLINK;
+}
 
 static bool animUsesBurgerThought(AnimId id)
 {
@@ -109,6 +128,48 @@ static bool animUsesHealthThought(AnimId id)
          id == ANIM_DEV_ELDER_SICK_COUGH || id == ANIM_ELD_BABY_SICK_BOB || id == ANIM_ELD_TEEN_SICK_SNEEZE ||
          id == ANIM_ELD_ADULT_SICK_HUNCH || id == ANIM_ELD_ELDER_SICK_SNEEZE || id == ANIM_ALIEN_BABY_SICK_MOAN ||
          id == ANIM_ALIEN_BABY_SICK_SNEEZE || id == ANIM_ALIEN_TEEN_SICK_LOOP;
+}
+
+static void resetRestThought()
+{
+  s_restThoughtFrame = 0;
+  s_restThoughtNextMs = 0;
+}
+
+static uint8_t tickRestThoughtFrame()
+{
+  const uint32_t now = millis();
+
+  if (s_restThoughtNextMs == 0)
+  {
+    s_restThoughtFrame = 0;
+    s_restThoughtNextMs = now + 260;
+    return s_restThoughtFrame;
+  }
+
+  if ((int32_t)(now - s_restThoughtNextMs) < 0)
+    return s_restThoughtFrame;
+
+  s_restThoughtFrame ^= 1;
+  s_restThoughtNextMs = now + 260;
+
+  return s_restThoughtFrame;
+}
+
+static void drawRestThoughtBubbleForTiredPet(int petDrawX, int petDrawY, int petW, AnimId id)
+{
+  const uint8_t frame = tickRestThoughtFrame();
+  const char *path = kThoughtRestFrames[frame];
+
+  if (!path || !path[0])
+    return;
+
+  int bubbleX = petDrawX + petW - 10;
+  int bubbleY = petDrawY - 4;
+
+  applyThoughtBubbleOffset(id, false, true, bubbleX, bubbleY); // burger
+
+  (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
 
 static void resetBurgerThought()
@@ -137,12 +198,53 @@ static uint8_t tickBurgerThoughtFrame()
   return s_burgerThoughtFrame;
 }
 
-static void applyThoughtBubbleOffset(AnimId id, bool healthBubble, int &bubbleX, int &bubbleY)
+static void applyThoughtBubbleOffset(AnimId id, bool healthBubble, bool restBubble, int &bubbleX, int &bubbleY)
 {
   if (healthBubble && id == ANIM_ALIEN_TEEN_SICK_LOOP)
   {
     bubbleX -= 80;
     bubbleY -= 30;
+    return;
+  }
+
+  if (restBubble)
+  {
+    if (id == ANIM_DEV_TEEN_SLEEPY_BOB)
+    {
+      bubbleX -= 8;
+      return;
+    }
+
+    if (id == ANIM_DEV_ELDER_TIRED_SIT)
+    {
+      bubbleX -= 8;
+      return;
+    }
+
+    if (id == ANIM_ELD_BABY_SLEEPY_YAWN)
+    {
+      bubbleX -= 16;
+      return;
+    }
+
+    if (id == ANIM_ELD_TEEN_TIRED_NOD)
+    {
+      bubbleX -= 8;
+      return;
+    }
+
+    if (id == ANIM_ELD_ADULT_SLEEPY_DRINK)
+    {
+      bubbleX -= 16;
+      return;
+    }
+
+    if (id == ANIM_ELD_ELDER_SLEEPY_HOLD)
+    {
+      bubbleX -= 12;
+      return;
+    }
+
     return;
   }
 
@@ -225,7 +327,7 @@ static void drawBurgerThoughtBubbleForHungryAlienBaby(int petDrawX, int petDrawY
   int bubbleX = petDrawX + petW - 10;
   int bubbleY = petDrawY - 4;
 
-  applyThoughtBubbleOffset(id, false, bubbleX, bubbleY);
+  applyThoughtBubbleOffset(id, false, false, bubbleX, bubbleY);
 
   (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
@@ -359,7 +461,7 @@ static void drawHealthThoughtBubbleForSickAlienBaby(int petDrawX, int petDrawY, 
   int bubbleX = petDrawX + petW - 10;
   int bubbleY = petDrawY - 4;
 
-  applyThoughtBubbleOffset(id, true, bubbleX, bubbleY);
+  applyThoughtBubbleOffset(id, true, false, bubbleX, bubbleY);
 
   (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
@@ -536,6 +638,9 @@ void animTick()
 
   if (!animUsesHealthThought(desired))
     resetHealthThought();
+
+  if (!animUsesRestThought(desired))
+    resetRestThought();
 
   // Leaving pet tab/screen => ANIM_NONE
   if (desired == ANIM_NONE)
@@ -905,6 +1010,9 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
 
     const int drawY = bottomY - h;
     (void)drawPngPathAnim(path, drawX, drawY);
+
+    if (animUsesRestThought(id))
+      drawRestThoughtBubbleForTiredPet(drawX, drawY, w, id);
 
     if (animUsesBurgerThought(id))
       drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w, id);
