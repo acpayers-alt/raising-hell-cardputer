@@ -97,12 +97,18 @@ static uint32_t s_burgerThoughtNextMs = 0;
 
 static bool animUsesBurgerThought(AnimId id)
 {
-  return id == ANIM_ALIEN_BABY_HUNGRY_STAND || id == ANIM_ALIEN_TEEN_HUNGRY_FORK;
+  return id == ANIM_DEV_BABY_HUNGRY_RUB || id == ANIM_DEV_TEEN_HUNGRY_RUB || id == ANIM_DEV_ADULT_HUNGRY_BEND ||
+         id == ANIM_DEV_ELDER_HUNGRY_RUB || id == ANIM_ELD_BABY_HUNGRY_RUB || id == ANIM_ELD_TEEN_HUNGRY_BITE ||
+         id == ANIM_ELD_ADULT_HUNGRY_SHAKE || id == ANIM_ELD_ELDER_HUNGRY_EAT || id == ANIM_ALIEN_BABY_HUNGRY_STAND ||
+         id == ANIM_ALIEN_TEEN_HUNGRY_FORK;
 }
 
 static bool animUsesHealthThought(AnimId id)
 {
-  return id == ANIM_ALIEN_BABY_SICK_MOAN || id == ANIM_ALIEN_BABY_SICK_SNEEZE || id == ANIM_ALIEN_TEEN_SICK_LOOP;
+  return id == ANIM_DEV_BABY_SICK_CRAWL || id == ANIM_DEV_TEEN_SICK_BOB || id == ANIM_DEV_ADULT_SICK_LAY ||
+         id == ANIM_DEV_ELDER_SICK_COUGH || id == ANIM_ELD_BABY_SICK_BOB || id == ANIM_ELD_TEEN_SICK_SNEEZE ||
+         id == ANIM_ELD_ADULT_SICK_HUNCH || id == ANIM_ELD_ELDER_SICK_SNEEZE || id == ANIM_ALIEN_BABY_SICK_MOAN ||
+         id == ANIM_ALIEN_BABY_SICK_SNEEZE || id == ANIM_ALIEN_TEEN_SICK_LOOP;
 }
 
 static void resetBurgerThought()
@@ -131,7 +137,83 @@ static uint8_t tickBurgerThoughtFrame()
   return s_burgerThoughtFrame;
 }
 
-static void drawBurgerThoughtBubbleForHungryAlienBaby(int petDrawX, int petDrawY, int petW)
+static void applyThoughtBubbleOffset(AnimId id, bool healthBubble, int &bubbleX, int &bubbleY)
+{
+  if (healthBubble && id == ANIM_ALIEN_TEEN_SICK_LOOP)
+  {
+    bubbleX -= 80;
+    bubbleY -= 30;
+    return;
+  }
+
+  if (healthBubble)
+  {
+    if (id == ANIM_DEV_BABY_SICK_CRAWL)
+    {
+      bubbleX -= 72;
+      bubbleY -= 8;
+      return;
+    }
+    if (id == ANIM_DEV_ADULT_SICK_LAY)
+    {
+      bubbleX -= 14;
+      bubbleY -= 4;
+      return;
+    }
+    if (id == ANIM_DEV_ELDER_SICK_COUGH)
+    {
+      bubbleX -= 14;
+      bubbleY -= 4;
+      return;
+    }
+    if (id == ANIM_ELD_ADULT_SICK_HUNCH)
+    {
+      bubbleX -= 10;
+      return;
+    }
+
+    if (id == ANIM_ELD_ELDER_SICK_SNEEZE)
+    {
+      bubbleX -= 10;
+      return;
+    }
+  }
+
+  if (!healthBubble)
+  {
+    if (id == ANIM_DEV_TEEN_HUNGRY_RUB)
+    {
+      bubbleX -= 8;
+      return;
+    }
+
+    if (id == ANIM_ELD_TEEN_HUNGRY_BITE)
+    {
+      bubbleX -= 8;
+      return;
+    }
+
+    if (id == ANIM_ELD_ADULT_HUNGRY_SHAKE)
+    {
+      bubbleY += 10;
+      return;
+    }
+
+    if (id == ANIM_ELD_ELDER_HUNGRY_EAT)
+    {
+      bubbleX -= 6;
+      return;
+    }
+
+    if (id == ANIM_DEV_ADULT_HUNGRY_BEND || id == ANIM_DEV_ELDER_HUNGRY_RUB)
+    {
+      bubbleX -= 18;
+      return;
+    }
+  }
+}
+
+static void drawBurgerThoughtBubbleForHungryAlienBaby(int petDrawX, int petDrawY, int petW, AnimId id)
 {
   const uint8_t frame = tickBurgerThoughtFrame();
   const char *path = kThoughtBurgerFrames[frame];
@@ -142,6 +224,8 @@ static void drawBurgerThoughtBubbleForHungryAlienBaby(int petDrawX, int petDrawY
   // Position relative to the sprite so this can be reused/tuned later.
   int bubbleX = petDrawX + petW - 10;
   int bubbleY = petDrawY - 4;
+
+  applyThoughtBubbleOffset(id, false, bubbleX, bubbleY);
 
   (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
@@ -237,8 +321,6 @@ static const char *kThoughtHealthFrames[] = {
 
 static uint8_t s_healthThoughtFrame = 0;
 static uint32_t s_healthThoughtNextMs = 0;
-static uint32_t s_healthThoughtHoldUntilMs = 0;
-static bool s_healthThoughtHolding = false;
 
 static void resetHealthThought()
 {
@@ -277,12 +359,7 @@ static void drawHealthThoughtBubbleForSickAlienBaby(int petDrawX, int petDrawY, 
   int bubbleX = petDrawX + petW - 10;
   int bubbleY = petDrawY - 4;
 
-  // Alien teen sick lies down horizontally, so reposition the bubble.
-  if (id == ANIM_ALIEN_TEEN_SICK_LOOP)
-  {
-    bubbleX -= 80;
-    bubbleY -= 30;
-  }
+  applyThoughtBubbleOffset(id, true, bubbleX, bubbleY);
 
   (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
@@ -830,7 +907,7 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
     (void)drawPngPathAnim(path, drawX, drawY);
 
     if (animUsesBurgerThought(id))
-      drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w);
+      drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w, id);
 
     if (animUsesHealthThought(id))
       drawHealthThoughtBubbleForSickAlienBaby(drawX, drawY, w, id);
