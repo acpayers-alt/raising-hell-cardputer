@@ -612,6 +612,18 @@ static const char *kAlienTeenHungryFork[] = {
     "/raising_hell/graphics/pet/anim/al/tn/hgy/al_tn_hgy_fork2.png",
 };
 
+static const char *kAlienTeenTiredSnore[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore2.png",
+};
+
+static const char *kAlienTeenTiredBlink[] = {
+    "/raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore1.png",
+    "/raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore3.png",
+    "/raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore2.png",
+    "/raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore3.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -697,6 +709,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_TEEN_ANGRY_SABER, kAlienTeenAngrySaber, 4, 120, false},
 
     {ANIM_ALIEN_TEEN_HUNGRY_FORK, kAlienTeenHungryFork, 2, 180, true},
+    {ANIM_ALIEN_TEEN_TIRED_SNORE, kAlienTeenTiredSnore, 2, 650, true},
+    {ANIM_ALIEN_TEEN_TIRED_BLINK, kAlienTeenTiredBlink, 4, 140, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -739,6 +753,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien teen angry: jump loops; saber triggers occasionally.
     {ANIM_ALIEN_TEEN_ANGRY_JUMP, ANIM_ALIEN_TEEN_ANGRY_SABER, 4500UL, 9000UL},
+
+    // Alien teen tired: snore loops; blink sequence triggers occasionally.
+    {ANIM_ALIEN_TEEN_TIRED_SNORE, ANIM_ALIEN_TEEN_TIRED_BLINK, 6000UL, 12000UL},
 };
 
 const AnimBehavior *animGetBehavior(AnimId baseId)
@@ -990,6 +1007,9 @@ static AnimId alienClipForMood(uint8_t stage, PetMood mood)
 
     if (mood == MOOD_HUNGRY)
       return ANIM_ALIEN_TEEN_HUNGRY_FORK;
+
+    if (mood == MOOD_TIRED)
+      return ANIM_ALIEN_TEEN_TIRED_SNORE;
 
     return alienBabyClipForMood(mood);
 
