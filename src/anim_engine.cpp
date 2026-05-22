@@ -374,6 +374,22 @@ static uint32_t randRangeInclusive(uint32_t lo, uint32_t hi)
 
 static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
 {
+  if (id == ANIM_ALIEN_TEEN_SICK_LOOP)
+  {
+    // Sick animation pacing:
+    // frame 1 = quick motion
+    // frame 2 = weak pause
+    // frame 3 = long exhausted hold
+
+    if (idx == 1)
+      return 2000;
+
+    if (idx == 2)
+      return 5000;
+
+    return 180;
+  }
+
   if (id == ANIM_ALIEN_TEEN_BORED_STOMP)
   {
     // Hold stomp landing frame.
@@ -863,12 +879,15 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
   {
     int drawX = centerX - (w / 2);
 
-    // Nudge only the Alien baby tired animations slightly left.
+    // Nudge only specific oversized/offset Alien animations.
     if (id == ANIM_ALIEN_BABY_TIRED_LAY || id == ANIM_ALIEN_BABY_TIRED_HOLD)
     {
-      // Pet screen needs a slight left nudge, but Clock Mode already parks
-      // the sprite near the left edge. Move it back right there so it stays on-screen.
       drawX += (g_app.uiState == UIState::CLOCK_MODE) ? 12 : -8;
+    }
+
+    if (id == ANIM_ALIEN_TEEN_SICK_LOOP)
+    {
+      drawX += (g_app.uiState == UIState::CLOCK_MODE) ? 5 : -15;
     }
 
     const int drawY = bottomY - h;
