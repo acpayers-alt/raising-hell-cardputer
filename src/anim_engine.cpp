@@ -90,15 +90,10 @@ static bool drawPngPathAnim(const char *path, int x, int y)
 static const char *kThoughtBurgerFrames[] = {
     "/raising_hell/graphics/ui/thought_bubbles/thought_burger1.png",
     "/raising_hell/graphics/ui/thought_bubbles/thought_burger2.png",
-    "/raising_hell/graphics/ui/thought_bubbles/thought_burger3.png",
-    "/raising_hell/graphics/ui/thought_bubbles/thought_burger4.png",
-    "/raising_hell/graphics/ui/thought_bubbles/thought_burger5.png",
 };
 
 static uint8_t s_burgerThoughtFrame = 0;
 static uint32_t s_burgerThoughtNextMs = 0;
-static uint32_t s_burgerThoughtHoldUntilMs = 0;
-static bool s_burgerThoughtHolding = false;
 
 static bool animUsesBurgerThought(AnimId id)
 {
@@ -114,8 +109,6 @@ static void resetBurgerThought()
 {
   s_burgerThoughtFrame = 0;
   s_burgerThoughtNextMs = 0;
-  s_burgerThoughtHoldUntilMs = 0;
-  s_burgerThoughtHolding = false;
 }
 
 static uint8_t tickBurgerThoughtFrame()
@@ -125,49 +118,16 @@ static uint8_t tickBurgerThoughtFrame()
   if (s_burgerThoughtNextMs == 0)
   {
     s_burgerThoughtFrame = 0;
-    s_burgerThoughtNextMs = now + 180;
-    s_burgerThoughtHolding = false;
-    s_burgerThoughtHoldUntilMs = 0;
+    s_burgerThoughtNextMs = now + 260;
     return s_burgerThoughtFrame;
   }
 
   if ((int32_t)(now - s_burgerThoughtNextMs) < 0)
     return s_burgerThoughtFrame;
 
-  if (s_burgerThoughtHolding)
-  {
-    // During the hold, loop 4 -> 5 -> 4 -> 5 for several seconds.
-    s_burgerThoughtFrame = (s_burgerThoughtFrame == 3) ? 4 : 3;
-    s_burgerThoughtNextMs = now + 220;
+  s_burgerThoughtFrame ^= 1;
+  s_burgerThoughtNextMs = now + 260;
 
-    if ((int32_t)(now - s_burgerThoughtHoldUntilMs) >= 0)
-    {
-      s_burgerThoughtFrame = 0;
-      s_burgerThoughtHolding = false;
-      s_burgerThoughtHoldUntilMs = 0;
-      s_burgerThoughtNextMs = now + 180;
-    }
-
-    return s_burgerThoughtFrame;
-  }
-
-  if (s_burgerThoughtFrame < 3)
-  {
-    // Intro: 1 -> 2 -> 3 -> 4
-    ++s_burgerThoughtFrame;
-    s_burgerThoughtNextMs = now + 180;
-
-    if (s_burgerThoughtFrame == 3)
-    {
-      s_burgerThoughtHolding = true;
-      s_burgerThoughtHoldUntilMs = now + 5000UL;
-    }
-
-    return s_burgerThoughtFrame;
-  }
-
-  s_burgerThoughtFrame = 0;
-  s_burgerThoughtNextMs = now + 180;
   return s_burgerThoughtFrame;
 }
 
@@ -273,9 +233,6 @@ static bool pngReadWHCached(const char *path, int *outW, int *outH)
 static const char *kThoughtHealthFrames[] = {
     "/raising_hell/graphics/ui/thought_bubbles/thought_health1.png",
     "/raising_hell/graphics/ui/thought_bubbles/thought_health2.png",
-    "/raising_hell/graphics/ui/thought_bubbles/thought_health3.png",
-    "/raising_hell/graphics/ui/thought_bubbles/thought_health4.png",
-    "/raising_hell/graphics/ui/thought_bubbles/thought_health5.png",
 };
 
 static uint8_t s_healthThoughtFrame = 0;
@@ -287,8 +244,6 @@ static void resetHealthThought()
 {
   s_healthThoughtFrame = 0;
   s_healthThoughtNextMs = 0;
-  s_healthThoughtHoldUntilMs = 0;
-  s_healthThoughtHolding = false;
 }
 
 static uint8_t tickHealthThoughtFrame()
@@ -298,47 +253,16 @@ static uint8_t tickHealthThoughtFrame()
   if (s_healthThoughtNextMs == 0)
   {
     s_healthThoughtFrame = 0;
-    s_healthThoughtNextMs = now + 180;
-    s_healthThoughtHolding = false;
-    s_healthThoughtHoldUntilMs = 0;
+    s_healthThoughtNextMs = now + 260;
     return s_healthThoughtFrame;
   }
 
   if ((int32_t)(now - s_healthThoughtNextMs) < 0)
     return s_healthThoughtFrame;
 
-  if (s_healthThoughtHolding)
-  {
-    s_healthThoughtFrame = (s_healthThoughtFrame == 3) ? 4 : 3;
-    s_healthThoughtNextMs = now + 220;
+  s_healthThoughtFrame ^= 1;
+  s_healthThoughtNextMs = now + 260;
 
-    if ((int32_t)(now - s_healthThoughtHoldUntilMs) >= 0)
-    {
-      s_healthThoughtFrame = 0;
-      s_healthThoughtHolding = false;
-      s_healthThoughtHoldUntilMs = 0;
-      s_healthThoughtNextMs = now + 180;
-    }
-
-    return s_healthThoughtFrame;
-  }
-
-  if (s_healthThoughtFrame < 3)
-  {
-    ++s_healthThoughtFrame;
-    s_healthThoughtNextMs = now + 180;
-
-    if (s_healthThoughtFrame == 3)
-    {
-      s_healthThoughtHolding = true;
-      s_healthThoughtHoldUntilMs = now + 5000UL;
-    }
-
-    return s_healthThoughtFrame;
-  }
-
-  s_healthThoughtFrame = 0;
-  s_healthThoughtNextMs = now + 180;
   return s_healthThoughtFrame;
 }
 
