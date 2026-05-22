@@ -100,6 +100,11 @@ static uint32_t s_burgerThoughtNextMs = 0;
 static uint32_t s_burgerThoughtHoldUntilMs = 0;
 static bool s_burgerThoughtHolding = false;
 
+static bool animUsesBurgerThought(AnimId id)
+{
+  return id == ANIM_ALIEN_BABY_HUNGRY_STAND || id == ANIM_ALIEN_TEEN_HUNGRY_FORK;
+}
+
 static void resetBurgerThought()
 {
   s_burgerThoughtFrame = 0;
@@ -497,7 +502,7 @@ void animTick()
   // Choose base clip for the pet screen
   const AnimId desired = animSelectPetScreen();
 
-  if (desired != ANIM_ALIEN_BABY_HUNGRY_STAND)
+  if (!animUsesBurgerThought(desired))
     resetBurgerThought();
 
   if (desired != ANIM_ALIEN_BABY_SICK_MOAN)
@@ -869,7 +874,7 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
     const int drawY = bottomY - h;
     (void)drawPngPathAnim(path, drawX, drawY);
 
-    if (id == ANIM_ALIEN_BABY_HUNGRY_STAND)
+    if (animUsesBurgerThought(id))
       drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w);
 
     if (id == ANIM_ALIEN_BABY_SICK_MOAN || id == ANIM_ALIEN_BABY_SICK_SNEEZE)
