@@ -105,6 +105,11 @@ static bool animUsesBurgerThought(AnimId id)
   return id == ANIM_ALIEN_BABY_HUNGRY_STAND || id == ANIM_ALIEN_TEEN_HUNGRY_FORK;
 }
 
+static bool animUsesHealthThought(AnimId id)
+{
+  return id == ANIM_ALIEN_BABY_SICK_MOAN || id == ANIM_ALIEN_BABY_SICK_SNEEZE || id == ANIM_ALIEN_TEEN_SICK_LOOP;
+}
+
 static void resetBurgerThought()
 {
   s_burgerThoughtFrame = 0;
@@ -175,8 +180,8 @@ static void drawBurgerThoughtBubbleForHungryAlienBaby(int petDrawX, int petDrawY
     return;
 
   // Position relative to the sprite so this can be reused/tuned later.
-  const int bubbleX = petDrawX + petW - 10;
-  const int bubbleY = petDrawY - 4;
+  int bubbleX = petDrawX + petW - 10;
+  int bubbleY = petDrawY - 4;
 
   (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
@@ -337,7 +342,7 @@ static uint8_t tickHealthThoughtFrame()
   return s_healthThoughtFrame;
 }
 
-static void drawHealthThoughtBubbleForSickAlienBaby(int petDrawX, int petDrawY, int petW)
+static void drawHealthThoughtBubbleForSickAlienBaby(int petDrawX, int petDrawY, int petW, AnimId id)
 {
   const uint8_t frame = tickHealthThoughtFrame();
   const char *path = kThoughtHealthFrames[frame];
@@ -345,8 +350,15 @@ static void drawHealthThoughtBubbleForSickAlienBaby(int petDrawX, int petDrawY, 
   if (!path || !path[0])
     return;
 
-  const int bubbleX = petDrawX + petW - 10;
-  const int bubbleY = petDrawY - 4;
+  int bubbleX = petDrawX + petW - 10;
+  int bubbleY = petDrawY - 4;
+
+  // Alien teen sick lies down horizontally, so reposition the bubble.
+  if (id == ANIM_ALIEN_TEEN_SICK_LOOP)
+  {
+    bubbleX -= 80;
+    bubbleY -= 30;
+  }
 
   (void)drawPngPathAnim(path, bubbleX, bubbleY);
 }
@@ -521,7 +533,7 @@ void animTick()
   if (!animUsesBurgerThought(desired))
     resetBurgerThought();
 
-  if (desired != ANIM_ALIEN_BABY_SICK_MOAN)
+  if (!animUsesHealthThought(desired))
     resetHealthThought();
 
   // Leaving pet tab/screen => ANIM_NONE
@@ -896,8 +908,8 @@ void animDrawPetFrameAnchoredBottom(int centerX, int bottomY)
     if (animUsesBurgerThought(id))
       drawBurgerThoughtBubbleForHungryAlienBaby(drawX, drawY, w);
 
-    if (id == ANIM_ALIEN_BABY_SICK_MOAN || id == ANIM_ALIEN_BABY_SICK_SNEEZE)
-      drawHealthThoughtBubbleForSickAlienBaby(drawX, drawY, w);
+    if (animUsesHealthThought(id))
+      drawHealthThoughtBubbleForSickAlienBaby(drawX, drawY, w, id);
   }
   else
   {
