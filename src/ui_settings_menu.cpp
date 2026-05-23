@@ -859,7 +859,7 @@ static MenuItem kPetItems[] = {
 };
 
 static MenuItem kGameItems[] = {
-    {"Decay Mode", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
+    {"Pace", actGame_DecayModeSelect, actGame_DecayModeLeft, actGame_DecayModeRight, nullptr},
     {"Passive XP", actGame_TogglePassiveXp, nullptr, nullptr, nullptr},
     {"Step Counter", actGame_ToggleStepCounter, nullptr, nullptr, nullptr},
     {"Pet Death", actGame_ToggleDeath, nullptr, nullptr, nullptr},
@@ -1198,7 +1198,7 @@ bool Handle(InputState &input, int move)
 
       // Box/store already removes the live save when storeFirst is true.
       // Otherwise saveManagerDeletePetOnly() handled removal above.
-      
+
       UiSettingsPages::HideGameNewPetConfirm();
       playBeep();
 
