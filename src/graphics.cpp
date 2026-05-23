@@ -261,7 +261,46 @@ static void drawSplashScreen(bool forceRedraw)
   if (!ok)
   {
     spr.fillRect(0, 0, SCREEN_W, SCREEN_H, TFT_BLACK);
+    return;
   }
+
+  spr.setTextDatum(MC_DATUM);
+  spr.setTextFont(2);
+  spr.setTextSize(2);
+
+  const char *msg = "Loading Game";
+
+  const int textX = SCREEN_W / 2;
+  const int textY = SCREEN_H - 34;
+
+  const int textW = spr.textWidth(msg);
+  const int textH = spr.fontHeight();
+
+  const int padX = 8;
+  const int padY = 6;
+
+  const int boxX = textX - (textW / 2) - padX;
+  const int boxY = textY - (textH / 2) - padY;
+  const int boxW = textW + (padX * 2);
+  const int boxH = textH + (padY * 2);
+
+  // Dither backdrop
+  for (int y = boxY; y < boxY + boxH; ++y)
+  {
+    for (int x = boxX; x < boxX + boxW; ++x)
+    {
+      if (((x + y) & 1) == 0)
+        spr.drawPixel(x, y, TFT_BLACK);
+    }
+  }
+
+  spr.setTextColor(TFT_BLACK);
+  spr.drawString(msg, textX + 2, textY + 2);
+
+  spr.setTextColor(TFT_YELLOW);
+  spr.drawString(msg, textX, textY);
+
+  spr.setTextDatum(TL_DATUM);
 }
 
 // -----------------------------------------------------------------------------
