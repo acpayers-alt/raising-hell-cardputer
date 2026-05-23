@@ -584,7 +584,7 @@ static void drawFishingBottomBar()
 
   if (s_state == FishingState::IDLE)
   {
-    snprintf(buf, sizeof(buf), "Press Enter to cast");
+    snprintf(buf, sizeof(buf), "Press Enter to cast, ESC to exit");
   }
   else if (s_state == FishingState::LINE_OUT)
   {
