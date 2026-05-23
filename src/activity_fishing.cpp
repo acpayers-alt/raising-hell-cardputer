@@ -78,7 +78,7 @@ static uint8_t s_reelTapsNeeded = 6;
 static constexpr uint8_t kReelTapsMin = 4;
 static constexpr uint8_t kReelTapsMax = 10;
 
-static constexpr uint32_t kReelWindowMs = 3600;
+static constexpr uint32_t kReelWindowMs = 4800;
 
 static uint32_t s_inputLockedUntilMs = 0;
 static constexpr uint32_t kPostCatchInputLockMs = 1000;
