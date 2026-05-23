@@ -97,18 +97,18 @@ static const char *fishingPetFrameForState()
     switch (s_state)
     {
     case FishingState::CASTING:
-      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim4.png";
+      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim4.png";
     case FishingState::LINE_OUT:
     case FishingState::BITE:
-      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim2.png";
+      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png";
     case FishingState::REELING:
-      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim3.png";
+      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim3.png";
     case FishingState::POST_CATCH:
-      return s_showCatchPose ? "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim5.png"
-                             : "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim1.png";
+      return s_showCatchPose ? "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png"
+                             : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
     case FishingState::IDLE:
     default:
-      return "/raising_hell/graphics/activities/fishing/al_bb_fsh_anim1.png";
+      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
     }
   }
 
@@ -213,12 +213,12 @@ static const char *fishingBgForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/activities/fishing/eld_bb_fsh_bg.jpg";
+    return "/raising_hell/graphics/activities/fishing/eld/bb/eld_bb_fsh_bg.jpg";
   case PET_ALIEN:
-    return "/raising_hell/graphics/activities/fishing/al_bb_fsh_bg.jpg";
+    return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_bg.jpg";
   case PET_DEVIL:
   default:
-    return "/raising_hell/graphics/activities/fishing/dev_bb_fsh_bg.jpg";
+    return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_bg.jpg";
   }
 }
 
