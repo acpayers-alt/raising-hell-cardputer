@@ -20,8 +20,8 @@ static constexpr uint16_t MINI_STAT_ICON_TRANSPARENT = 0xF81F;
 static M5Canvas s_miniStatLifeIcon(&spr);
 static bool s_miniStatLifeIconReady = false;
 
-static M5Canvas s_miniStatCoinIcon(&spr);
-static bool s_miniStatCoinIconReady = false;
+static M5Canvas s_miniStatInfIcon(&spr);
+static bool s_miniStatInfIconReady = false;
 
 // ----------------------------------------------------------------------------
 // Internal helpers
@@ -42,7 +42,8 @@ static bool ensureMiniStatIconCache(M5Canvas &canvas, bool &ready, const char *p
       return false;
   }
 
-  canvas.fillSprite(MINI_STAT_ICON_TRANSPARENT);
+  const bool infIcon = (path == INF_ICON_PATH || path == INF_ICON_LARGE_PATH);
+  canvas.fillSprite(infIcon ? TFT_BLACK : MINI_STAT_ICON_TRANSPARENT);
 
   if (!canvasDrawPngFromSD(canvas, path, 1, 1))
   {
@@ -59,21 +60,27 @@ static bool drawMiniStatIconCached(const char *path, int x, int y)
 {
   M5Canvas *canvas = nullptr;
   bool *ready = nullptr;
+  bool useColorKey = true;
 
   if (path == LIFE_ICON_PATH)
   {
     canvas = &s_miniStatLifeIcon;
     ready = &s_miniStatLifeIconReady;
   }
-  else if (path == INF_COIN_ICON_PATH)
+  else if (path == INF_ICON_PATH || path == INF_ICON_LARGE_PATH)
   {
-    canvas = &s_miniStatCoinIcon;
-    ready = &s_miniStatCoinIconReady;
+    canvas = &s_miniStatInfIcon;
+    ready = &s_miniStatInfIconReady;
+    useColorKey = false;
   }
 
   if (canvas && ready && ensureMiniStatIconCache(*canvas, *ready, path))
   {
-    canvas->pushSprite(x, y, MINI_STAT_ICON_TRANSPARENT);
+    if (useColorKey)
+      canvas->pushSprite(x, y, MINI_STAT_ICON_TRANSPARENT);
+    else
+      canvas->pushSprite(x, y);
+
     return true;
   }
 
@@ -152,7 +159,7 @@ static void drawMiniStatPreviewAt(int x0, bool showCoin)
     // Large INF icon is 10x14. Give it a larger black backing so it fully
     // blends into the mini-stats panel.
     const int iconDrawX = coinIconX + 9;
-    const int iconDrawY = headerIconY + 2; // nudge down 2 pixels
+    const int iconDrawY = headerIconY + 1; // nudge down 2 pixels
 
     spr.fillRect(iconDrawX - 2, iconDrawY - 1, 14, 15, TFT_BLACK);
     drawMiniStatIconCached(INF_ICON_LARGE_PATH, iconDrawX, iconDrawY);
@@ -270,6 +277,6 @@ void graphicsReleaseMiniStatCaches()
   s_miniStatLifeIcon.deleteSprite();
   s_miniStatLifeIconReady = false;
 
-  s_miniStatCoinIcon.deleteSprite();
-  s_miniStatCoinIconReady = false;
+  s_miniStatInfIcon.deleteSprite();
+  s_miniStatInfIconReady = false;
 }

@@ -8,7 +8,6 @@
 #define INF_ICON_LARGE_W 10
 #define INF_ICON_LARGE_H 14
 
-#define INF_COIN_ICON_PATH "/raising_hell/graphics/ui/icons/inf_coin.png"
 #define LIFE_ICON_PATH "/raising_hell/graphics/ui/icons/life_icon.png"
 
 #define HUD_HEADER_ICON_W 12

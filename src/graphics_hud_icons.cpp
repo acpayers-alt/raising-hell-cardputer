@@ -9,8 +9,8 @@ static constexpr uint16_t HUD_ICON_TRANSPARENT = 0xF81F;
 
 static M5Canvas s_hudLifeIconSmall(&spr);
 static bool s_hudLifeIconSmallReady = false;
-static M5Canvas s_hudCoinIconSmall(&spr);
-static bool s_hudCoinIconSmallReady = false;
+static M5Canvas s_hudInfIconSmall(&spr);
+static bool s_hudInfIconSmallReady = false;
 static M5Canvas s_hudInfTopBarIcon(&spr);
 static bool s_hudInfTopBarIconReady = false;
 static M5Canvas s_hudInfLargeIcon(&spr);
@@ -60,13 +60,6 @@ bool drawHudIconCached(const char *path, int x, int y)
     w = HUD_HEADER_ICON_W;
     h = HUD_HEADER_ICON_H;
   }
-  else if (path == INF_COIN_ICON_PATH)
-  {
-    canvas = &s_hudCoinIconSmall;
-    ready = &s_hudCoinIconSmallReady;
-    w = HUD_HEADER_ICON_W;
-    h = HUD_HEADER_ICON_H;
-  }
   else if (path == INF_ICON_PATH)
   {
     canvas = &s_hudInfTopBarIcon;
@@ -107,9 +100,6 @@ void graphicsReleaseHudIconCaches()
 {
   s_hudLifeIconSmall.deleteSprite();
   s_hudLifeIconSmallReady = false;
-
-  s_hudCoinIconSmall.deleteSprite();
-  s_hudCoinIconSmallReady = false;
 
   s_hudInfTopBarIcon.deleteSprite();
   s_hudInfTopBarIconReady = false;
