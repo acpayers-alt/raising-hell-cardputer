@@ -92,23 +92,38 @@ static constexpr uint32_t kPostCatchReadyMs = 900;
 
 static const char *fishingPetFrameForState()
 {
-  if (pet.type == PET_ALIEN && pet.evoStage == 0)
+  const bool alienBaby = (pet.type == PET_ALIEN && pet.evoStage == 0);
+  const bool alienTeen = (pet.type == PET_ALIEN && pet.evoStage == 1);
+
+  if (alienBaby || alienTeen)
   {
     switch (s_state)
     {
     case FishingState::CASTING:
-      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim4.png";
+      return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim4.png"
+                       : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim4.png";
+
     case FishingState::LINE_OUT:
     case FishingState::BITE:
-      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png";
+      return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim2.png"
+                       : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png";
+
     case FishingState::REELING:
-      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim3.png";
+      return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim3.png"
+                       : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim3.png";
+
     case FishingState::POST_CATCH:
-      return s_showCatchPose ? "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png"
-                             : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
+      if (s_showCatchPose)
+        return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim5.png"
+                         : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png";
+
+      return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim1.png"
+                       : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
+
     case FishingState::IDLE:
     default:
-      return "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
+      return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim1.png"
+                       : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
     }
   }
 
@@ -140,12 +155,51 @@ static void scheduleNextBite(uint32_t now)
   s_nextBiteAtMs = now + random((long)kMinBiteDelayMs, (long)kMaxBiteDelayMs + 1L);
 }
 
+struct FishingLineOrigin
+{
+  int x;
+  int y;
+};
+
+static FishingLineOrigin fishingLineOriginForPet()
+{
+  FishingLineOrigin origin = {
+      (s_state == FishingState::REELING) ? kReelRodTipX : kRodTipX,
+      (s_state == FishingState::REELING) ? kReelRodTipY : kRodTipY,
+  };
+
+  // -----------------------------------------------------------------------
+  // Alien Teen
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_ALIEN && pet.evoStage == 1)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 18;
+      origin.y -= 3;
+      break;
+
+    case FishingState::CASTING:
+      origin.x -= 28;
+      origin.y += 2;
+      break;
+
+    default:
+      origin.x -= 12;
+      origin.y -= 1;
+      break;
+    }
+  }
+
+  return origin;
+}
+
 static void drawFishingLine()
 {
-  const int rodX = (s_state == FishingState::REELING) ? kReelRodTipX : kRodTipX;
-  const int rodY = (s_state == FishingState::REELING) ? kReelRodTipY : kRodTipY;
+  const FishingLineOrigin origin = fishingLineOriginForPet();
 
-  spr.drawLine(rodX, rodY, kBobberX, kBobberY, TFT_WHITE);
+  spr.drawLine(origin.x, origin.y, kBobberX, kBobberY, TFT_WHITE);
 }
 
 static void drawBobber(bool visible)
