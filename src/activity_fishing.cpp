@@ -97,12 +97,16 @@ static const char *fishingPetFrameForState()
   const bool devilBaby = (pet.type == PET_DEVIL && pet.evoStage == 0);
   const bool devilTeen = (pet.type == PET_DEVIL && pet.evoStage == 1);
   const bool devilAdult = (pet.type == PET_DEVIL && pet.evoStage == 2);
+  const bool devilElder = (pet.type == PET_DEVIL && pet.evoStage == 3);
 
-  if (alienBaby || alienTeen || devilBaby || devilTeen || devilAdult)
+  if (alienBaby || alienTeen || devilBaby || devilTeen || devilAdult || devilElder)
   {
     switch (s_state)
     {
     case FishingState::CASTING:
+      if (devilElder)
+        return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim4.png";
+
       if (devilAdult)
         return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim4.png";
 
@@ -117,6 +121,9 @@ static const char *fishingPetFrameForState()
 
     case FishingState::LINE_OUT:
     case FishingState::BITE:
+      if (devilElder)
+        return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim2.png";
+
       if (devilAdult)
         return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim2.png";
 
@@ -130,6 +137,9 @@ static const char *fishingPetFrameForState()
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png";
 
     case FishingState::REELING:
+      if (devilElder)
+        return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim3.png";
+
       if (devilAdult)
         return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim3.png";
 
@@ -145,6 +155,9 @@ static const char *fishingPetFrameForState()
     case FishingState::POST_CATCH:
       if (s_showCatchPose)
       {
+        if (devilElder)
+          return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim5.png";
+
         if (devilAdult)
           return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim5.png";
 
@@ -157,6 +170,9 @@ static const char *fishingPetFrameForState()
         return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim5.png"
                          : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png";
       }
+
+      if (devilElder)
+        return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim1.png";
 
       if (devilAdult)
         return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim1.png";
@@ -172,6 +188,9 @@ static const char *fishingPetFrameForState()
 
     case FishingState::IDLE:
     default:
+      if (devilElder)
+        return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim1.png";
+
       if (devilAdult)
         return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim1.png";
 
@@ -203,8 +222,14 @@ static void drawFishingPet()
   int h = 64;
   (void)getPngWH(path, w, h);
 
-  const int drawX = kFishingPetAnchorX - (w / 2);
-  const int drawY = kFishingPetAnchorBottomY - h;
+  int drawX = kFishingPetAnchorX - (w / 2);
+  int drawY = kFishingPetAnchorBottomY - h;
+
+  if (pet.type == PET_DEVIL && (pet.evoStage == 2 || pet.evoStage == 3))
+  {
+    drawX -= 15;
+    drawY += 5;
+  }
 
   sprDrawPngFromSD(path, drawX, drawY);
 }
@@ -307,7 +332,7 @@ static FishingLineOrigin fishingLineOriginForPet()
     switch (s_state)
     {
     case FishingState::REELING:
-      origin.x -= 6;
+      origin.x -= 20;
       origin.y -= 35;
       break;
 
@@ -317,8 +342,32 @@ static FishingLineOrigin fishingLineOriginForPet()
       break;
 
     default:
-      origin.x += 9;
+      origin.x -= 3;
       origin.y -= 9;
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Devil Elder
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_DEVIL && pet.evoStage == 3)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 16;
+      origin.y -= 40;
+      break;
+
+    case FishingState::CASTING:
+      origin.x -= 10;
+      origin.y -= 18;
+      break;
+
+    default:
+      origin.x -= 10;
+      origin.y -= 18;
       break;
     }
   }
