@@ -96,12 +96,16 @@ static const char *fishingPetFrameForState()
   const bool alienTeen = (pet.type == PET_ALIEN && pet.evoStage == 1);
   const bool devilBaby = (pet.type == PET_DEVIL && pet.evoStage == 0);
   const bool devilTeen = (pet.type == PET_DEVIL && pet.evoStage == 1);
+  const bool devilAdult = (pet.type == PET_DEVIL && pet.evoStage == 2);
 
-  if (alienBaby || alienTeen || devilBaby || devilTeen)
+  if (alienBaby || alienTeen || devilBaby || devilTeen || devilAdult)
   {
     switch (s_state)
     {
     case FishingState::CASTING:
+      if (devilAdult)
+        return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim4.png";
+
       if (devilTeen)
         return "/raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim4.png";
 
@@ -113,6 +117,9 @@ static const char *fishingPetFrameForState()
 
     case FishingState::LINE_OUT:
     case FishingState::BITE:
+      if (devilAdult)
+        return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim2.png";
+
       if (devilTeen)
         return "/raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim2.png";
 
@@ -123,6 +130,9 @@ static const char *fishingPetFrameForState()
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png";
 
     case FishingState::REELING:
+      if (devilAdult)
+        return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim3.png";
+
       if (devilTeen)
         return "/raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim3.png";
 
@@ -135,6 +145,9 @@ static const char *fishingPetFrameForState()
     case FishingState::POST_CATCH:
       if (s_showCatchPose)
       {
+        if (devilAdult)
+          return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim5.png";
+
         if (devilTeen)
           return "/raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim5.png";
 
@@ -144,6 +157,9 @@ static const char *fishingPetFrameForState()
         return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim5.png"
                          : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png";
       }
+
+      if (devilAdult)
+        return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim1.png";
 
       if (devilTeen)
         return "/raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim1.png";
@@ -156,6 +172,9 @@ static const char *fishingPetFrameForState()
 
     case FishingState::IDLE:
     default:
+      if (devilAdult)
+        return "/raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim1.png";
+
       if (devilTeen)
         return "/raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim1.png";
 
@@ -276,6 +295,30 @@ static FishingLineOrigin fishingLineOriginForPet()
     default:
       origin.x += 5;
       origin.y += 24;
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Devil Adult
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_DEVIL && pet.evoStage == 2)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 6;
+      origin.y -= 35;
+      break;
+
+    case FishingState::CASTING:
+      origin.x += 8;
+      origin.y -= 8;
+      break;
+
+    default:
+      origin.x += 9;
+      origin.y -= 9;
       break;
     }
   }
