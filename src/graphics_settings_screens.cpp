@@ -426,8 +426,8 @@ static void drawGameOptionsMenu()
   const int contentY = TOP_BAR_H;
   const int contentH = SCREEN_H - TOP_BAR_H;
 
-  char decayLine[32];
-  snprintf(decayLine, sizeof(decayLine), "Decay Mode: %s", decayModeToText(saveManagerGetDecayMode()));
+  char difficultyLine[32];
+  snprintf(difficultyLine, sizeof(difficultyLine), "Pace: %s", decayModeToText(saveManagerGetDecayMode()));
 
   char passiveXpLine[32];
   snprintf(passiveXpLine, sizeof(passiveXpLine), "Passive XP: %s", passiveXpEnabled ? "ON" : "OFF");
@@ -441,7 +441,7 @@ static void drawGameOptionsMenu()
   char ledLine[32];
   snprintf(ledLine, sizeof(ledLine), "LED Alerts: %s", ledAlertsEnabled ? "ON" : "OFF");
 
-  const char *labels[] = {decayLine, passiveXpLine, stepCounterLine, deathLine, ledLine};
+  const char *labels[] = {difficultyLine, passiveXpLine, stepCounterLine, deathLine, ledLine};
   const int totalItems = 5;
 
   g_app.gameOptionsIndex = clampi(g_app.gameOptionsIndex, 0, totalItems - 1);
@@ -572,7 +572,7 @@ static void drawDecayModePickerMenu()
   spr.setTextFont(2);
   spr.setTextSize(1);
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.drawString("Decay Mode", SCREEN_W / 2, contentY + 10);
+  spr.drawString("Pace", SCREEN_W / 2, contentY + 10);
 
   static const char *modes[] = {"SUPER SLOW", "SLOW", "NORMAL", "FAST", "SUPER FAST", "INSANE"};
   const int totalItems = 6;
@@ -1005,7 +1005,7 @@ static void drawCreditsScreen()
   const int panelY = yAaron - panelPadY;
   const int panelW = SCREEN_W - (panelPadX * 2);
   const int panelH = SCREEN_H - panelY;
-  
+
   for (int yy = panelY; yy < panelY + panelH; ++yy)
   {
     const int xStart = panelX + ((yy & 1) ? 1 : 0);
@@ -1018,7 +1018,7 @@ static void drawCreditsScreen()
   spr.setTextColor(TFT_WHITE);
   spr.drawString("By Aaron & Finley Ayers", SCREEN_W / 2, yAaron);
   spr.drawString("FoxKyong - QA/Testing", SCREEN_W / 2, yFox);
-  
+
   uint16_t versionCol = TFT_DARKGREY;
 #if defined(PUBLIC_BUILD) && PUBLIC_BUILD
   versionCol = TFT_GREEN;

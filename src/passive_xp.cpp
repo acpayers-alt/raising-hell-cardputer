@@ -4,15 +4,13 @@
 #include "asset_ota.h"
 #include "game_options_state.h"
 #include "pet.h"
+#include "save_manager.h"
 
 static constexpr uint32_t kPassiveXpIntervalMs = 5UL * 60UL * 1000UL;
 
 static uint32_t s_lastPassiveXpMs = 0;
 
-void passiveXpResetTimer(uint32_t nowMs)
-{
-  s_lastPassiveXpMs = nowMs;
-}
+void passiveXpResetTimer(uint32_t nowMs) { s_lastPassiveXpMs = nowMs; }
 
 static bool passiveXpUiEligible(UIState s)
 {
@@ -54,13 +52,34 @@ static uint16_t passiveXpMoodMultiplierPct(PetMood mood)
   }
 }
 
+static uint16_t passiveXpDifficultyMultiplierPct()
+{
+  switch (saveManagerGetDecayMode())
+  {
+  case 0: // Super Slow
+    return 25;
+
+  case 1: // Slow
+    return 50;
+
+  default:
+  case 2: // Normal
+    return 100;
+
+  case 3: // Fast
+    return 200;
+
+  case 4: // Super Fast
+    return 400;
+
+  case 5: // Insane
+    return 3200;
+  }
+}
+
 static bool passiveXpHasPerfectCareBonus()
 {
-  return pet.health >= 80 &&
-         pet.hunger >= 80 &&
-         pet.happiness >= 80 &&
-         pet.energy >= 60 &&
-         pet.getMood() == MOOD_HAPPY;
+  return pet.health >= 80 && pet.hunger >= 80 && pet.happiness >= 80 && pet.energy >= 60 && pet.getMood() == MOOD_HAPPY;
 }
 
 static bool passiveXpEligible()
@@ -70,14 +89,12 @@ static bool passiveXpEligible()
 
   if (!passiveXpUiEligible(g_app.uiState))
     return false;
-    
+
   if (pet.health <= 0)
     return false;
 
   const AssetOtaStatus ota = assetOtaStatus();
-  if (ota == AssetOtaStatus::CHECKING ||
-      ota == AssetOtaStatus::DOWNLOADING ||
-      ota == AssetOtaStatus::INSTALLING)
+  if (ota == AssetOtaStatus::CHECKING || ota == AssetOtaStatus::DOWNLOADING || ota == AssetOtaStatus::INSTALLING)
   {
     return false;
   }
@@ -104,6 +121,8 @@ static uint32_t passiveXpComputeAward()
     multPct += 25;
 
   uint32_t award = (base * multPct) / 100UL;
+  award = (award * passiveXpDifficultyMultiplierPct()) / 100UL;
+
   if (award < 1)
     award = 1;
 
@@ -135,13 +154,7 @@ void passiveXpTick(uint32_t nowMs)
 
   pet.addXP(award);
 
-  Serial.printf("[XP] passive +%lu lvl=%u mood=%u next=%lu hp=%d hunger=%d happy=%d energy=%d\n",
-                (unsigned long)award,
-                (unsigned)pet.level,
-                (unsigned)mood,
-                (unsigned long)pet.xpForNextLevel(),
-                pet.health,
-                pet.hunger,
-                pet.happiness,
-                pet.energy);
+  Serial.printf("[XP] passive +%lu lvl=%u mood=%u next=%lu hp=%d hunger=%d happy=%d energy=%d\n", (unsigned long)award,
+                (unsigned)pet.level, (unsigned)mood, (unsigned long)pet.xpForNextLevel(), pet.health, pet.hunger,
+                pet.happiness, pet.energy);
 }
