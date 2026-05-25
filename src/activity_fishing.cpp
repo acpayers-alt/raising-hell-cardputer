@@ -95,12 +95,13 @@ static const char *fishingPetFrameForState()
   const bool alienBaby = (pet.type == PET_ALIEN && pet.evoStage == 0);
   const bool alienTeen = (pet.type == PET_ALIEN && pet.evoStage == 1);
   const bool eldritchBaby = (pet.type == PET_ELDRITCH && pet.evoStage == 0);
+  const bool eldritchTeen = (pet.type == PET_ELDRITCH && pet.evoStage == 1);
   const bool devilBaby = (pet.type == PET_DEVIL && pet.evoStage == 0);
   const bool devilTeen = (pet.type == PET_DEVIL && pet.evoStage == 1);
   const bool devilAdult = (pet.type == PET_DEVIL && pet.evoStage == 2);
   const bool devilElder = (pet.type == PET_DEVIL && pet.evoStage == 3);
 
-  if (alienBaby || alienTeen || eldritchBaby || devilBaby || devilTeen || devilAdult || devilElder)
+  if (alienBaby || alienTeen || eldritchBaby || eldritchTeen || devilBaby || devilTeen || devilAdult || devilElder)
   {
     switch (s_state)
     {
@@ -116,6 +117,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim4.png";
+
+      if (eldritchTeen)
+        return "/raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim4.png";
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim4.png";
@@ -137,6 +141,9 @@ static const char *fishingPetFrameForState()
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim2.png";
 
+      if (eldritchTeen)
+        return "/raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim2.png";
+
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim2.png";
 
@@ -155,6 +162,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim3.png";
+
+      if (eldritchTeen)
+        return "/raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim3.png";
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim3.png";
@@ -177,6 +187,9 @@ static const char *fishingPetFrameForState()
         if (devilBaby)
           return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim5.png";
 
+        if (eldritchTeen)
+          return "/raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim5.png";
+
         if (eldritchBaby)
           return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim5.png";
 
@@ -195,6 +208,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim1.png";
+
+      if (eldritchTeen)
+        return "/raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim1.png";
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png";
@@ -215,6 +231,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim1.png";
+
+      if (eldritchTeen)
+        return "/raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim1.png";
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png";
@@ -411,6 +430,30 @@ static FishingLineOrigin fishingLineOriginForPet()
     default:
       origin.x -= 8;
       origin.y -= 13;
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Eldritch Teen
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_ELDRITCH && pet.evoStage == 1)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 5;
+      origin.y -= 15;
+      break;
+
+    case FishingState::CASTING:
+      origin.x += 8;
+      origin.y -= 16;
+      break;
+
+    default:
+      origin.x += 5;
+      origin.y -= 12;
       break;
     }
   }
