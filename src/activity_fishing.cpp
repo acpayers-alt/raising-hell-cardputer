@@ -391,6 +391,30 @@ static FishingLineOrigin fishingLineOriginForPet()
     }
   }
 
+  // -----------------------------------------------------------------------
+  // Eldritch Baby
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_ELDRITCH && pet.evoStage == 0)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 15;
+      origin.y -= 34;
+      break;
+
+    case FishingState::CASTING:
+      origin.x -= 8;
+      origin.y -= 12;
+      break;
+
+    default:
+      origin.x -= 8;
+      origin.y -= 13;
+      break;
+    }
+  }
+
   return origin;
 }
 
@@ -466,7 +490,7 @@ static const char *fishingBgForPet()
   switch (pet.type)
   {
   case PET_ELDRITCH:
-    return "/raising_hell/graphics/activities/fishing/eld/eld_fsh_bg.jpg";
+    return "/raising_hell/graphics/activities/fishing/ed/eld_fsh_bg.jpg";
   case PET_ALIEN:
     return "/raising_hell/graphics/activities/fishing/al/al_fsh_bg.jpg";
   case PET_DEVIL:
