@@ -523,6 +523,16 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
     return 120;
   }
 
+  if (id == ANIM_ALIEN_ADULT_HAPPY_STANCE)
+  {
+    // Adult alien happy stance:
+    // frame 1 holds as the main pose, then frames 2/3 animate normally.
+    if (idx == 0)
+      return 3000;
+
+    return 220;
+  }
+
   return fallbackMs;
 }
 

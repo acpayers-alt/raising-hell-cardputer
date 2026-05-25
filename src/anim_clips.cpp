@@ -630,6 +630,19 @@ static const char *kAlienTeenSickLoop[] = {
     "/raising_hell/graphics/pet/anim/al/tn/sck/al_tn_sick3.png",
 };
 
+static const char *kAlienAdultHappyStance[] = {
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_stance1.png",
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_stance2.png",
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_stance3.png",
+};
+
+static const char *kAlienAdultHappyFlick[] = {
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick1.png",
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick2.png",
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick3.png",
+    "/raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick2.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -718,6 +731,9 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_TEEN_TIRED_SNORE, kAlienTeenTiredSnore, 2, 650, true},
     {ANIM_ALIEN_TEEN_TIRED_BLINK, kAlienTeenTiredBlink, 4, 140, false},
     {ANIM_ALIEN_TEEN_SICK_LOOP, kAlienTeenSickLoop, 3, 180, true},
+
+    {ANIM_ALIEN_ADULT_HAPPY_STANCE, kAlienAdultHappyStance, 3, 220, true},
+    {ANIM_ALIEN_ADULT_HAPPY_FLICK, kAlienAdultHappyFlick, 4, 120, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -757,6 +773,9 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien teen happy: sway loops; hair/hand flick triggers occasionally.
     {ANIM_ALIEN_TEEN_HAPPY_SWAY, ANIM_ALIEN_TEEN_HAPPY_FLICK, 4500UL, 9000UL},
+
+    // Alien adult happy: stance loops with a long frame-1 hold; hair flick triggers occasionally.
+    {ANIM_ALIEN_ADULT_HAPPY_STANCE, ANIM_ALIEN_ADULT_HAPPY_FLICK, 6500UL, 13000UL},
 
     // Alien teen angry: jump loops; saber triggers occasionally.
     {ANIM_ALIEN_TEEN_ANGRY_JUMP, ANIM_ALIEN_TEEN_ANGRY_SABER, 4500UL, 9000UL},
@@ -1024,6 +1043,11 @@ static AnimId alienClipForMood(uint8_t stage, PetMood mood)
     return alienBabyClipForMood(mood);
 
   case 2:
+    if (mood == MOOD_HAPPY)
+      return ANIM_ALIEN_ADULT_HAPPY_STANCE;
+
+    return alienBabyClipForMood(mood);
+
   case 3:
   default:
     return alienBabyClipForMood(mood);

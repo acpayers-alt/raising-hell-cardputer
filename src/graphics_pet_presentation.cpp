@@ -400,6 +400,13 @@ static const char *PATH_AL_TN_WALK1 = "/raising_hell/graphics/pet/anim/al/tn/wlk
 static const char *PATH_AL_TN_WALK2 = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walk2.png";
 static const char *PATH_AL_TN_WALK1_L = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft1.png";
 static const char *PATH_AL_TN_WALK2_L = "/raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft2.png";
+
+// Adult
+static const char *PATH_AL_AD_WALK1 = "/raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walk1.png";
+static const char *PATH_AL_AD_WALK2 = "/raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walk2.png";
+static const char *PATH_AL_AD_WALK1_L = "/raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walkleft1.png";
+static const char *PATH_AL_AD_WALK2_L = "/raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walkleft2.png";
+
 static const char *PATH_AL_TN_BORED_FLY[] = {
     "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly1.png",
     "/raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly2.png",
@@ -1164,6 +1171,10 @@ static int getWalkBaselineAdjustForPet()
       return -5;
     case 1:
       return -14;
+    case 2:
+      return -19;
+    case 3:
+      return -14;
     default:
       return -14;
     }
@@ -1281,13 +1292,20 @@ bool drawIntroWalkingPetOverride()
         else
           path = frame ? PATH_AL_TN_WALK2 : PATH_AL_TN_WALK1;
       }
+      else if (pet.evoStage == 2)
+      {
+        if (facingLeft)
+          path = frame ? PATH_AL_AD_WALK2_L : PATH_AL_AD_WALK1_L;
+        else
+          path = frame ? PATH_AL_AD_WALK2 : PATH_AL_AD_WALK1;
+      }
       else
       {
-        // Temporary fallback until Alien adult/elder walk frames exist.
+        // Temporary elder fallback until Alien elder walk frames exist.
         if (facingLeft)
-          path = frame ? PATH_AL_TN_WALK2_L : PATH_AL_TN_WALK1_L;
+          path = frame ? PATH_AL_AD_WALK2_L : PATH_AL_AD_WALK1_L;
         else
-          path = frame ? PATH_AL_TN_WALK2 : PATH_AL_TN_WALK1;
+          path = frame ? PATH_AL_AD_WALK2 : PATH_AL_AD_WALK1;
       }
     }
   }
