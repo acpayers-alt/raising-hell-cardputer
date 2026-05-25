@@ -97,13 +97,14 @@ static const char *fishingPetFrameForState()
   const bool eldritchBaby = (pet.type == PET_ELDRITCH && pet.evoStage == 0);
   const bool eldritchTeen = (pet.type == PET_ELDRITCH && pet.evoStage == 1);
   const bool eldritchAdult = (pet.type == PET_ELDRITCH && pet.evoStage == 2);
+  const bool eldritchElder = (pet.type == PET_ELDRITCH && pet.evoStage == 3);
   const bool devilBaby = (pet.type == PET_DEVIL && pet.evoStage == 0);
   const bool devilTeen = (pet.type == PET_DEVIL && pet.evoStage == 1);
   const bool devilAdult = (pet.type == PET_DEVIL && pet.evoStage == 2);
   const bool devilElder = (pet.type == PET_DEVIL && pet.evoStage == 3);
 
-  if (alienBaby || alienTeen || eldritchBaby || eldritchTeen || eldritchAdult || devilBaby || devilTeen || devilAdult ||
-      devilElder)
+  if (alienBaby || alienTeen || eldritchBaby || eldritchTeen || eldritchAdult || eldritchElder || devilBaby ||
+      devilTeen || devilAdult || devilElder)
   {
     switch (s_state)
     {
@@ -119,6 +120,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim4.png";
+
+      if (eldritchElder)
+        return "/raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim4.png";
 
       if (eldritchAdult)
         return "/raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim4.png";
@@ -146,6 +150,9 @@ static const char *fishingPetFrameForState()
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim2.png";
 
+      if (eldritchElder)
+        return "/raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim2.png";
+
       if (eldritchAdult)
         return "/raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim2.png";
 
@@ -170,6 +177,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim3.png";
+
+      if (eldritchElder)
+        return "/raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim3.png";
 
       if (eldritchAdult)
         return "/raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim3.png";
@@ -198,6 +208,9 @@ static const char *fishingPetFrameForState()
         if (devilBaby)
           return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim5.png";
 
+        if (eldritchElder)
+          return "/raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim5.png";
+
         if (eldritchAdult)
           return "/raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim5.png";
 
@@ -222,6 +235,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim1.png";
+
+      if (eldritchElder)
+        return "/raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim1.png";
 
       if (eldritchAdult)
         return "/raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim1.png";
@@ -248,6 +264,9 @@ static const char *fishingPetFrameForState()
 
       if (devilBaby)
         return "/raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim1.png";
+
+      if (eldritchElder)
+        return "/raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim1.png";
 
       if (eldritchAdult)
         return "/raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim1.png";
@@ -498,6 +517,30 @@ static FishingLineOrigin fishingLineOriginForPet()
     default:
       origin.x += 7;
       origin.y -= 9;
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Eldritch Elder
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_ELDRITCH && pet.evoStage == 3)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 1;
+      origin.y -= 19;
+      break;
+
+    case FishingState::CASTING:
+      origin.x += 8;
+      origin.y -= 20;
+      break;
+
+    default:
+      origin.x += 3;
+      origin.y -= 10;
       break;
     }
   }
