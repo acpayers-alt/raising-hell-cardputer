@@ -127,7 +127,7 @@ static bool animUsesHealthThought(AnimId id)
   return id == ANIM_DEV_BABY_SICK_CRAWL || id == ANIM_DEV_TEEN_SICK_BOB || id == ANIM_DEV_ADULT_SICK_LAY ||
          id == ANIM_DEV_ELDER_SICK_COUGH || id == ANIM_ELD_BABY_SICK_BOB || id == ANIM_ELD_TEEN_SICK_SNEEZE ||
          id == ANIM_ELD_ADULT_SICK_HUNCH || id == ANIM_ELD_ELDER_SICK_SNEEZE || id == ANIM_ALIEN_BABY_SICK_MOAN ||
-         id == ANIM_ALIEN_BABY_SICK_SNEEZE || id == ANIM_ALIEN_TEEN_SICK_LOOP;
+         id == ANIM_ALIEN_BABY_SICK_SNEEZE || id == ANIM_ALIEN_TEEN_SICK_LOOP || id == ANIM_ALIEN_ADULT_SICK_HEAVE;
 }
 
 static void resetRestThought()
