@@ -650,6 +650,18 @@ static const char *kAlienAdultBoredSigh[] = {
     "/raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_sigh2.png",
 };
 
+static const char *kAlienAdultAngryShoot[] = {
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot1.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot2.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot3.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot4.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot3.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot4.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot3.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot4.png",
+    "/raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot2.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -742,6 +754,7 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_ADULT_HAPPY_STANCE, kAlienAdultHappyStance, 3, 220, true},
     {ANIM_ALIEN_ADULT_HAPPY_FLICK, kAlienAdultHappyFlick, 4, 120, false},
     {ANIM_ALIEN_ADULT_BORED_SIGH, kAlienAdultBoredSigh, 4, 220, true},
+    {ANIM_ALIEN_ADULT_ANGRY_SHOOT, kAlienAdultAngryShoot, 9, 120, true},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -1056,6 +1069,9 @@ static AnimId alienClipForMood(uint8_t stage, PetMood mood)
 
     if (mood == MOOD_BORED)
       return ANIM_ALIEN_ADULT_BORED_SIGH;
+
+    if (mood == MOOD_MAD)
+      return ANIM_ALIEN_ADULT_ANGRY_SHOOT;
 
     return alienBabyClipForMood(mood);
 

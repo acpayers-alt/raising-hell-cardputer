@@ -26,6 +26,8 @@ int petPresentationY();
 bool petPresentationHasIntroHandoff();
 void clearPetPresentationIntroHandoff();
 
+void drawAlienAdultAngryShootLaserAt(int anchorCenterX, int anchorBottomY);
+
 bool petPresentationScriptedIntroActive();
 bool petPresentationAnimating();
 bool petWalkOverrideActive();

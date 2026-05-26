@@ -78,7 +78,9 @@ void resetPetWanderToHome();
 
 // Animation
 bool animConsumeFrameChanged();
+bool animCurrentFrame(AnimId &outId, uint8_t &outIdx);
 void animDrawPetFrameAnchoredBottom(int anchorCenterX, int anchorBottomY);
+void drawAlienAdultAngryShootLaserAt(int anchorCenterX, int anchorBottomY);
 
 // Assets
 bool getPngWH(const char *path, int &w, int &h);
@@ -1591,6 +1593,55 @@ static bool drawAlienTeenBoredFlyOverride()
   return true;
 }
 
+static bool alienAdultAngryShootLaserActive()
+{
+  AnimId id = ANIM_NONE;
+  uint8_t idx = 0;
+
+  if (!animCurrentFrame(id, idx))
+    return false;
+
+  if (id != ANIM_ALIEN_ADULT_ANGRY_SHOOT)
+    return false;
+
+  // Expanded angry shoot sequence:
+  // 1, 2, 3, 4, 3, 4, 3, 4, 2
+  // Source frame 4 is expanded indices 3, 5, and 7.
+  return idx == 3 || idx == 5 || idx == 7;
+}
+
+void drawAlienAdultAngryShootLaserAt(int anchorCenterX, int anchorBottomY)
+{
+  if (!alienAdultAngryShootLaserActive())
+    return;
+
+  // Relative to the same bottom-center anchor used by animDrawPetFrameAnchoredBottom().
+  const int muzzleX = anchorCenterX + 28;
+  const int muzzleY = anchorBottomY - 76;
+
+  if (muzzleX >= SCREEN_W)
+    return;
+
+  const int x0 = clampi(muzzleX, 0, SCREEN_W - 1);
+  const int w = SCREEN_W - x0;
+
+  const uint16_t glowDark = spr.color565(0, 90, 0);
+  const uint16_t glow = spr.color565(0, 220, 40);
+  const uint16_t core = spr.color565(220, 255, 150);
+
+  spr.drawFastHLine(x0, muzzleY - 2, w, glowDark);
+  spr.drawFastHLine(x0, muzzleY + 2, w, glowDark);
+  spr.drawFastHLine(x0, muzzleY - 1, w, glow);
+
+  spr.drawFastHLine(x0, muzzleY, w, core);
+  spr.drawFastHLine(x0, muzzleY + 1, w, glow);
+
+  spr.fillCircle(x0, muzzleY, 3, core);
+  spr.drawCircle(x0, muzzleY, 5, glow);
+}
+
+static void drawAlienAdultAngryShootLaser() { drawAlienAdultAngryShootLaserAt(s_petScreenX, s_petScreenY); }
+
 static void drawPetScreenImpl(bool redrawBg)
 {
   if (!isScreenOn())
@@ -1669,6 +1720,8 @@ static void drawPetScreenImpl(bool redrawBg)
   {
     animDrawPetFrameAnchoredBottom(s_petScreenX, s_petScreenY);
   }
+
+  drawAlienAdultAngryShootLaser();
 
   drawMiniStatPreview();
   drawStepCounterBadge();

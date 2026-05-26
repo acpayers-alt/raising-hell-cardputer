@@ -152,17 +152,31 @@ void drawClockModeScreen(bool redrawBg)
 
   // Clock Mode uses its own horizontal placement, but the vertical anchor and
   // motion ownership now live in the presentation module.
+  int drawnPetX = clockHomeX;
+  int drawnPetY = clockHomeY;
+  bool drewPet = false;
+
   if (wanderAllowed && petWalkOverrideActive())
   {
+    drawnPetX = petPresentationX();
+    drawnPetY = petPresentationY();
+
     if (!drawIntroWalkingPetOverride())
-      animDrawPetFrameAnchoredBottom(petPresentationX(), petPresentationY());
+      animDrawPetFrameAnchoredBottom(drawnPetX, drawnPetY);
+
+    drewPet = true;
   }
   else
   {
-    const int drawX = wanderAllowed ? petPresentationX() : clockHomeX;
-    const int drawY = wanderAllowed ? petPresentationY() : clockHomeY;
-    animDrawPetFrameAnchoredBottom(drawX, drawY);
+    drawnPetX = wanderAllowed ? petPresentationX() : clockHomeX;
+    drawnPetY = wanderAllowed ? petPresentationY() : clockHomeY;
+
+    animDrawPetFrameAnchoredBottom(drawnPetX, drawnPetY);
+    drewPet = true;
   }
+
+  if (drewPet)
+    drawAlienAdultAngryShootLaserAt(drawnPetX, drawnPetY);
 
   // Draw the full clock/date overlay last so the time always appears
   // in front of the pet sprite, matching the sleep clock screen behavior.

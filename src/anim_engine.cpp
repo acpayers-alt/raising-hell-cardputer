@@ -543,7 +543,18 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
     return 220;
   }
 
-  return fallbackMs;
+  if (id == ANIM_ALIEN_ADULT_ANGRY_SHOOT)
+  {
+    // Adult alien angry shoot:
+    // 1 hold -> 2 -> 3 hold -> 4 -> 3 hold -> 4 -> 3 hold -> 4 -> 2 -> repeat.
+    if (idx == 0)
+      return 3000;
+
+    if (idx == 2 || idx == 4 || idx == 6)
+      return 1000;
+
+    return 120;
+  }
 }
 
 static void markFrameChanged()
@@ -873,6 +884,31 @@ bool animConsumeFrameChanged()
   s_frameChanged = false;
   return v;
 }
+
+bool animCurrentFrame(AnimId &outId, uint8_t &outIdx)
+{
+  outId = s_baseId;
+  outIdx = s_baseIdx;
+
+  if (s_overridePlaying)
+  {
+    outId = s_overrideId;
+    outIdx = s_overrideIdx;
+  }
+
+  const AnimClip *clip = animGetClip(outId);
+  if (!clip || clip->frameCount == 0)
+    return false;
+
+  if (outIdx >= clip->frameCount)
+    outIdx = 0;
+
+  return outId != ANIM_NONE;
+}
+
+// Returns the currently visible animation frame.
+// outIdx is the expanded clip index, not the source PNG number.
+bool animCurrentFrame(AnimId &outId, uint8_t &outIdx);
 
 void animDrawPetFrame(int x, int y)
 {
