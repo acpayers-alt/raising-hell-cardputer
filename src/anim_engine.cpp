@@ -119,7 +119,7 @@ static bool animUsesBurgerThought(AnimId id)
   return id == ANIM_DEV_BABY_HUNGRY_RUB || id == ANIM_DEV_TEEN_HUNGRY_RUB || id == ANIM_DEV_ADULT_HUNGRY_BEND ||
          id == ANIM_DEV_ELDER_HUNGRY_RUB || id == ANIM_ELD_BABY_HUNGRY_RUB || id == ANIM_ELD_TEEN_HUNGRY_BITE ||
          id == ANIM_ELD_ADULT_HUNGRY_SHAKE || id == ANIM_ELD_ELDER_HUNGRY_EAT || id == ANIM_ALIEN_BABY_HUNGRY_STAND ||
-         id == ANIM_ALIEN_TEEN_HUNGRY_FORK;
+         id == ANIM_ALIEN_TEEN_HUNGRY_FORK || id == ANIM_ALIEN_ADULT_HUNGRY_BEND;
 }
 
 static bool animUsesHealthThought(AnimId id)
@@ -555,6 +555,21 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
 
     return 120;
   }
+
+  if (id == ANIM_ALIEN_ADULT_HUNGRY_BEND)
+  {
+    // Adult alien hungry bend:
+    // frame 1 = 1 second, frame 2 = 3 seconds.
+    if (idx == 0)
+      return 1000;
+
+    if (idx == 1)
+      return 3000;
+
+    return fallbackMs;
+  }
+
+  return fallbackMs;
 }
 
 static void markFrameChanged()
@@ -905,10 +920,6 @@ bool animCurrentFrame(AnimId &outId, uint8_t &outIdx)
 
   return outId != ANIM_NONE;
 }
-
-// Returns the currently visible animation frame.
-// outIdx is the expanded clip index, not the source PNG number.
-bool animCurrentFrame(AnimId &outId, uint8_t &outIdx);
 
 void animDrawPetFrame(int x, int y)
 {
