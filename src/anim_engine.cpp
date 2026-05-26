@@ -533,6 +533,16 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
     return 220;
   }
 
+  if (id == ANIM_ALIEN_ADULT_BORED_SIGH)
+  {
+    // Adult alien bored sigh:
+    // 1 -> 2 -> 3, hold frame 3, then 2 -> repeat.
+    if (idx == 2)
+      return 2000;
+
+    return 220;
+  }
+
   return fallbackMs;
 }
 
