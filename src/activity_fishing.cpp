@@ -94,6 +94,7 @@ static const char *fishingPetFrameForState()
 {
   const bool alienBaby = (pet.type == PET_ALIEN && pet.evoStage == 0);
   const bool alienTeen = (pet.type == PET_ALIEN && pet.evoStage == 1);
+  const bool alienAdult = (pet.type == PET_ALIEN && pet.evoStage == 2);
   const bool eldritchBaby = (pet.type == PET_ELDRITCH && pet.evoStage == 0);
   const bool eldritchTeen = (pet.type == PET_ELDRITCH && pet.evoStage == 1);
   const bool eldritchAdult = (pet.type == PET_ELDRITCH && pet.evoStage == 2);
@@ -103,8 +104,8 @@ static const char *fishingPetFrameForState()
   const bool devilAdult = (pet.type == PET_DEVIL && pet.evoStage == 2);
   const bool devilElder = (pet.type == PET_DEVIL && pet.evoStage == 3);
 
-  if (alienBaby || alienTeen || eldritchBaby || eldritchTeen || eldritchAdult || eldritchElder || devilBaby ||
-      devilTeen || devilAdult || devilElder)
+  if (alienBaby || alienTeen || alienAdult || eldritchBaby || eldritchTeen || eldritchAdult || eldritchElder ||
+      devilBaby || devilTeen || devilAdult || devilElder)
   {
     switch (s_state)
     {
@@ -132,6 +133,9 @@ static const char *fishingPetFrameForState()
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim4.png";
+
+      if (alienAdult)
+        return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim4.png";
 
       return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim4.png"
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim4.png";
@@ -162,6 +166,9 @@ static const char *fishingPetFrameForState()
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim2.png";
 
+      if (alienAdult)
+        return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim2.png";
+
       return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim2.png"
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png";
 
@@ -189,6 +196,9 @@ static const char *fishingPetFrameForState()
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim3.png";
+
+      if (alienAdult)
+        return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim3.png";
 
       return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim3.png"
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim3.png";
@@ -220,6 +230,9 @@ static const char *fishingPetFrameForState()
         if (eldritchBaby)
           return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim5.png";
 
+        if (alienAdult)
+          return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim5.png";
+
         return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim5.png"
                          : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png";
       }
@@ -247,6 +260,9 @@ static const char *fishingPetFrameForState()
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png";
+
+      if (alienAdult)
+        return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim1.png";
 
       return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim1.png"
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
@@ -277,6 +293,9 @@ static const char *fishingPetFrameForState()
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png";
 
+      if (alienAdult)
+        return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim1.png";
+
       return alienTeen ? "/raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim1.png"
                        : "/raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png";
     }
@@ -306,6 +325,12 @@ static void drawFishingPet()
   {
     drawX -= 15;
     drawY += 5;
+  }
+
+  if (pet.type == PET_ALIEN && pet.evoStage == 2)
+  {
+    drawX -= 8;
+    drawY += 4;
   }
 
   sprDrawPngFromSD(path, drawX, drawY);
@@ -349,6 +374,30 @@ static FishingLineOrigin fishingLineOriginForPet()
     default:
       origin.x -= 12;
       origin.y -= 1;
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Alien Adult
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_ALIEN && pet.evoStage == 2)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 8;
+      origin.y -= 16;
+      break;
+
+    case FishingState::CASTING:
+      origin.x -= 2;
+      origin.y -= 10;
+      break;
+
+    default:
+      origin.x -= 9;
+      origin.y -= 2;
       break;
     }
   }
