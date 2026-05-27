@@ -653,6 +653,26 @@ static void startOverride(AnimId id, uint32_t now)
   markFrameChanged();
 }
 
+void animRequestPetGesture(AnimId id)
+{
+  if (!g_sdReady || id == ANIM_NONE)
+    return;
+
+  const uint32_t now = millis();
+  const AnimId desired = animSelectPetScreen();
+
+  if (desired == ANIM_NONE)
+    return;
+
+  if (desired != s_baseId)
+    resetBaseTo(desired, now);
+
+  if (s_overridePlaying)
+    return;
+
+  startOverride(id, now);
+}
+
 static void stopOverrideAndScheduleNext(uint32_t now)
 {
   s_overridePlaying = false;
@@ -742,6 +762,7 @@ void animTick()
     if (!s_overridePlaying && s_nextTriggerMs != 0 && (int32_t)(now - s_nextTriggerMs) >= 0)
     {
       startOverride(beh->triggerId, now);
+
       const uint16_t sample = (uint16_t)(millis() - animStartMs);
       s_petPerfStats.animStepMs = smoothPerfMs(s_petPerfStats.animStepMs, sample);
       return;

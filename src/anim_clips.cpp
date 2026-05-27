@@ -686,6 +686,24 @@ static const char *kAlienElderHappySmile[] = {
     "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile2.png",
 };
 
+static const char *kAlienElderHappyCan[] = {
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can2.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can2.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can2.png",
+};
+
+static const char *kAlienElderHappyCanLeft[] = {
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft2.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft2.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft2.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -784,6 +802,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_ADULT_SICK_HEAVE, kAlienAdultSickHeave, 2, 320, true},
 
     {ANIM_ALIEN_ELDER_HAPPY_SMILE, kAlienElderHappySmile, 4, 500, true},
+    {ANIM_ALIEN_ELDER_HAPPY_CAN, kAlienElderHappyCan, 6, 500, false},
+    {ANIM_ALIEN_ELDER_HAPPY_CAN_LEFT, kAlienElderHappyCanLeft, 6, 500, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -826,6 +846,10 @@ static const AnimBehavior kBehaviors[] = {
 
     // Alien adult happy: stance loops with a long frame-1 hold; hair flick triggers occasionally.
     {ANIM_ALIEN_ADULT_HAPPY_STANCE, ANIM_ALIEN_ADULT_HAPPY_FLICK, 6500UL, 13000UL},
+
+    // Alien elder happy: smile loop; watering-can gesture triggers occasionally.
+    // Direction is resolved at trigger time based on the pet's last wander facing.
+    {ANIM_ALIEN_ELDER_HAPPY_SMILE, ANIM_ALIEN_ELDER_HAPPY_CAN, 6500UL, 13000UL},
 
     // Alien teen angry: jump loops; saber triggers occasionally.
     {ANIM_ALIEN_TEEN_ANGRY_JUMP, ANIM_ALIEN_TEEN_ANGRY_SABER, 4500UL, 9000UL},

@@ -1,6 +1,6 @@
 #pragma once
-#include <stdint.h>
 #include "anim_clips.h"
+#include <stdint.h>
 
 struct PetPerfStats
 {
@@ -22,6 +22,7 @@ bool animConsumeFrameChanged();
 void animDrawPetFrame(int x, int y);
 
 void animForceStop();
+void animRequestPetGesture(AnimId id);
 
 // Draw frame anchored so the sprite's bottom touches bottomY.
 // centerX is the horizontal center point for the sprite.

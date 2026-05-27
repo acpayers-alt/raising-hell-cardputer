@@ -1050,6 +1050,22 @@ void tickPetIntroWalk()
   }
 }
 
+static void maybeTriggerAlienElderHappyCanOnWalkStop(bool facingLeft)
+{
+  if (pet.type != PET_ALIEN || pet.evoStage != 3)
+    return;
+
+  if (pet.isSleeping)
+    return;
+
+  if (petResolveMood(pet) != MOOD_HAPPY)
+    return;
+
+  s_petFacingLeft = facingLeft;
+
+  animRequestPetGesture(facingLeft ? ANIM_ALIEN_ELDER_HAPPY_CAN_LEFT : ANIM_ALIEN_ELDER_HAPPY_CAN);
+}
+
 void tickPetWander()
 {
   if (s_petIntroWalkActive || s_petIntroArriveTurnActive || s_petIntroStandHoldActive)
@@ -1170,9 +1186,13 @@ void tickPetWander()
 
     if (abs(s_petScreenX - s_petWanderTargetX) <= kPetWanderStepPx)
     {
+      const bool facingLeft = (s_petWanderTargetX < s_petScreenX);
+
       s_petScreenX = s_petWanderTargetX;
       s_petWanderState = PetWanderState::PAUSE_AWAY_1;
       s_petWanderUntilMs = now + kPetWanderPauseAwayMs;
+
+      maybeTriggerAlienElderHappyCanOnWalkStop(facingLeft);
       return;
     }
 
@@ -1203,9 +1223,13 @@ void tickPetWander()
 
     if (abs(s_petScreenX - s_petWanderTargetX) <= kPetWanderStepPx)
     {
+      const bool facingLeft = (s_petWanderTargetX < s_petScreenX);
+
       s_petScreenX = s_petWanderTargetX;
       s_petWanderState = PetWanderState::PAUSE_AWAY_2;
       s_petWanderUntilMs = now + kPetWanderPauseAwayMs;
+
+      maybeTriggerAlienElderHappyCanOnWalkStop(facingLeft);
       return;
     }
 
@@ -1237,10 +1261,14 @@ void tickPetWander()
 
     if (abs(dx) <= kPetWanderStepPx)
     {
+      const bool facingLeft = (s_petHomeX < s_petScreenX);
+
       s_petScreenX = s_petHomeX;
       s_petScreenY = s_petHomeY;
       s_petWanderState = PetWanderState::HOME_IDLE;
       s_petWanderUntilMs = now + random(kPetWanderMinIdleMs, kPetWanderMaxIdleMs);
+
+      maybeTriggerAlienElderHappyCanOnWalkStop(facingLeft);
       return;
     }
 
