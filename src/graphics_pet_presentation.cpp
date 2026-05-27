@@ -411,6 +411,12 @@ static const char *PATH_AL_AD_WALK2 = "/raising_hell/graphics/pet/anim/al/ad/wlk
 static const char *PATH_AL_AD_WALK1_L = "/raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walkleft1.png";
 static const char *PATH_AL_AD_WALK2_L = "/raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walkleft2.png";
 
+// Elder
+static const char *PATH_AL_EL_WALK1 = "/raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walk1.png";
+static const char *PATH_AL_EL_WALK2 = "/raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walk2.png";
+static const char *PATH_AL_EL_WALK1_L = "/raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walkleft1.png";
+static const char *PATH_AL_EL_WALK2_L = "/raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walkleft2.png";
+
 static const char *PATH_AL_AD_BORED_TP[] = {
     "/raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele1.png",
     "/raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele2.png",
@@ -1417,11 +1423,10 @@ bool drawIntroWalkingPetOverride()
       }
       else
       {
-        // Temporary elder fallback until Alien elder walk frames exist.
         if (facingLeft)
-          path = frame ? PATH_AL_AD_WALK2_L : PATH_AL_AD_WALK1_L;
+          path = frame ? PATH_AL_EL_WALK2_L : PATH_AL_EL_WALK1_L;
         else
-          path = frame ? PATH_AL_AD_WALK2 : PATH_AL_AD_WALK1;
+          path = frame ? PATH_AL_EL_WALK2 : PATH_AL_EL_WALK1;
       }
     }
   }
