@@ -113,6 +113,9 @@ enum AnimId : uint16_t
   ANIM_ALIEN_ADULT_HUNGRY_BEND,
   ANIM_ALIEN_ADULT_TIRED_NOD,
   ANIM_ALIEN_ADULT_SICK_HEAVE,
+
+  // Alien (elder)
+  ANIM_ALIEN_ELDER_HAPPY_SMILE,
 };
 
 struct AnimClip

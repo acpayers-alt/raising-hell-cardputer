@@ -569,6 +569,16 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
     return fallbackMs;
   }
 
+  if (id == ANIM_ALIEN_ELDER_HAPPY_SMILE)
+  {
+    // Elder alien happy smile:
+    // 1 hold -> 2 -> 3 -> 2 -> repeat.
+    if (idx == 0)
+      return 2000;
+
+    return fallbackMs;
+  }
+
   return fallbackMs;
 }
 

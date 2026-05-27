@@ -679,6 +679,13 @@ static const char *kAlienAdultSickHeave[] = {
     "/raising_hell/graphics/pet/anim/al/ad/sck/aln_ad_sck_heave2.png",
 };
 
+static const char *kAlienElderHappySmile[] = {
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile2.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile3.png",
+    "/raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile2.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -775,6 +782,8 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_ADULT_HUNGRY_BEND, kAlienAdultHungryBend, 2, 1000, true},
     {ANIM_ALIEN_ADULT_TIRED_NOD, kAlienAdultTiredNod, 4, 260, true},
     {ANIM_ALIEN_ADULT_SICK_HEAVE, kAlienAdultSickHeave, 2, 320, true},
+
+    {ANIM_ALIEN_ELDER_HAPPY_SMILE, kAlienElderHappySmile, 4, 500, true},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -1105,6 +1114,9 @@ static AnimId alienClipForMood(uint8_t stage, PetMood mood)
     return alienBabyClipForMood(mood);
 
   case 3:
+    if (mood == MOOD_HAPPY)
+      return ANIM_ALIEN_ELDER_HAPPY_SMILE;
+
   default:
     return alienBabyClipForMood(mood);
   }
