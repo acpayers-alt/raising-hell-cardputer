@@ -569,6 +569,16 @@ static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
     return 120;
   }
 
+  if (id == ANIM_ALIEN_ELDER_ANGRY_SHAKE)
+  {
+    // Elder alien angry shake:
+    // 1 hold -> 2 -> 3 -> 2 -> 3 -> 2 -> 3 -> repeat.
+    if (idx == 0)
+      return 3000;
+
+    return fallbackMs;
+  }
+
   if (id == ANIM_ALIEN_ADULT_HUNGRY_BEND)
   {
     // Adult alien hungry bend:
