@@ -711,6 +711,17 @@ static const char *kAlienElderBoredBlink[] = {
     "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_blink4.png",
 };
 
+static const char *kAlienElderBoredBeam[] = {
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam1.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam2.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam3.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam4.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam5.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam6.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam7.png",
+    "/raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam8.png",
+};
+
 // ---------------------------
 // Clip table
 // ---------------------------
@@ -812,7 +823,7 @@ static const AnimClip kClips[] = {
     {ANIM_ALIEN_ELDER_HAPPY_CAN, kAlienElderHappyCan, 6, 500, false},
     {ANIM_ALIEN_ELDER_HAPPY_CAN_LEFT, kAlienElderHappyCanLeft, 6, 500, false},
     {ANIM_ALIEN_ELDER_BORED_BLINK, kAlienElderBoredBlink, 4, 500, true},
-
+    {ANIM_ALIEN_ELDER_BORED_BEAM, kAlienElderBoredBeam, 8, 220, false},
 };
 
 const AnimClip *animGetClip(AnimId id)
@@ -856,9 +867,8 @@ static const AnimBehavior kBehaviors[] = {
     // Alien adult happy: stance loops with a long frame-1 hold; hair flick triggers occasionally.
     {ANIM_ALIEN_ADULT_HAPPY_STANCE, ANIM_ALIEN_ADULT_HAPPY_FLICK, 6500UL, 13000UL},
 
-    // Alien elder happy: smile loop; watering-can gesture triggers occasionally.
-    // Direction is resolved at trigger time based on the pet's last wander facing.
-    {ANIM_ALIEN_ELDER_HAPPY_SMILE, ANIM_ALIEN_ELDER_HAPPY_CAN, 6500UL, 13000UL},
+    // Alien elder bored: blink loop; beam-up gesture triggers rarely.
+    {ANIM_ALIEN_ELDER_BORED_BLINK, ANIM_ALIEN_ELDER_BORED_BEAM, 45000UL, 90000UL},
 
     // Alien teen angry: jump loops; saber triggers occasionally.
     {ANIM_ALIEN_TEEN_ANGRY_JUMP, ANIM_ALIEN_TEEN_ANGRY_SABER, 4500UL, 9000UL},

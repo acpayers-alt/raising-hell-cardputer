@@ -978,6 +978,7 @@ void startPetIntroWalkFromLeft()
   s_petIntroWalkLastStepMs = millis();
 
   s_petWanderState = PetWanderState::HOME_IDLE;
+  scheduleNextPetWander();
 }
 
 void tickPetIntroWalk()

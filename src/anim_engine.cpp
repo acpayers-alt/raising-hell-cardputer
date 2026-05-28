@@ -10,6 +10,7 @@
 #include "app_state.h"
 #include "display.h"
 #include "graphics.h"
+#include "graphics_pet_presentation.h"
 #include "runtime_flags_state.h"
 #include "sdcard.h"
 #include "ui_invalidate.h"
@@ -487,6 +488,18 @@ static uint32_t randRangeInclusive(uint32_t lo, uint32_t hi)
   return (uint32_t)random((long)lo, (long)(hi + 1));
 }
 
+static bool canStartTriggerOverride(AnimId baseId, AnimId triggerId)
+{
+  if (baseId == ANIM_ALIEN_ELDER_BORED_BLINK && triggerId == ANIM_ALIEN_ELDER_BORED_BEAM)
+  {
+    // Do not let the beam animation run invisibly behind wander/intro walking.
+    // If it does, the completion hook still fires and causes a random walk-on.
+    return !petPresentationAnimating();
+  }
+
+  return true;
+}
+
 static uint16_t frameMsForAnimFrame(AnimId id, uint8_t idx, uint16_t fallbackMs)
 {
   if (id == ANIM_ALIEN_TEEN_SICK_LOOP)
@@ -675,6 +688,8 @@ void animRequestPetGesture(AnimId id)
 
 static void stopOverrideAndScheduleNext(uint32_t now)
 {
+  const AnimId completedOverrideId = s_overrideId;
+
   s_overridePlaying = false;
   s_overrideId = ANIM_NONE;
   s_overrideIdx = 0;
@@ -688,6 +703,11 @@ static void stopOverrideAndScheduleNext(uint32_t now)
   else
   {
     s_nextTriggerMs = 0;
+  }
+
+  if (completedOverrideId == ANIM_ALIEN_ELDER_BORED_BEAM)
+  {
+    startPetIntroWalkFromLeft();
   }
 
   markFrameChanged();
@@ -761,11 +781,20 @@ void animTick()
   {
     if (!s_overridePlaying && s_nextTriggerMs != 0 && (int32_t)(now - s_nextTriggerMs) >= 0)
     {
-      startOverride(beh->triggerId, now);
+      if (!canStartTriggerOverride(s_baseId, beh->triggerId))
+      {
+        // Do not queue the beam to fire immediately after walking ends.
+        // Reschedule it into the normal rare window instead.
+        s_nextTriggerMs = now + randRangeInclusive(beh->triggerMinMs, beh->triggerMaxMs);
+      }
+      else
+      {
+        startOverride(beh->triggerId, now);
 
-      const uint16_t sample = (uint16_t)(millis() - animStartMs);
-      s_petPerfStats.animStepMs = smoothPerfMs(s_petPerfStats.animStepMs, sample);
-      return;
+        const uint16_t sample = (uint16_t)(millis() - animStartMs);
+        s_petPerfStats.animStepMs = smoothPerfMs(s_petPerfStats.animStepMs, sample);
+        return;
+      }
     }
   }
 
