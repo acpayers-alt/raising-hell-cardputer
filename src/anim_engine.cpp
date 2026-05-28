@@ -112,7 +112,7 @@ static bool animUsesRestThought(AnimId id)
          id == ANIM_DEV_ADULT_TIRED_CHAIR_BLINK || id == ANIM_DEV_ELDER_TIRED_SIT || id == ANIM_ELD_BABY_SLEEPY_YAWN ||
          id == ANIM_ELD_TEEN_TIRED_NOD || id == ANIM_ELD_ADULT_SLEEPY_DRINK || id == ANIM_ELD_ELDER_SLEEPY_HOLD ||
          id == ANIM_ALIEN_BABY_TIRED_LAY || id == ANIM_ALIEN_BABY_TIRED_HOLD || id == ANIM_ALIEN_TEEN_TIRED_SNORE ||
-         id == ANIM_ALIEN_TEEN_TIRED_BLINK || id == ANIM_ALIEN_ADULT_TIRED_NOD;
+         id == ANIM_ALIEN_TEEN_TIRED_BLINK || id == ANIM_ALIEN_ADULT_TIRED_NOD || id == ANIM_ALIEN_ELDER_TIRED_ROCK;
 }
 
 static bool animUsesBurgerThought(AnimId id)
@@ -243,6 +243,13 @@ static void applyThoughtBubbleOffset(AnimId id, bool healthBubble, bool restBubb
     if (id == ANIM_ELD_ELDER_SLEEPY_HOLD)
     {
       bubbleX -= 12;
+      return;
+    }
+
+    if (id == ANIM_ALIEN_ELDER_TIRED_ROCK)
+    {
+      bubbleX -= 18;
+      bubbleY -= 6;
       return;
     }
 
