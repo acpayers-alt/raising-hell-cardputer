@@ -120,7 +120,7 @@ static bool animUsesBurgerThought(AnimId id)
   return id == ANIM_DEV_BABY_HUNGRY_RUB || id == ANIM_DEV_TEEN_HUNGRY_RUB || id == ANIM_DEV_ADULT_HUNGRY_BEND ||
          id == ANIM_DEV_ELDER_HUNGRY_RUB || id == ANIM_ELD_BABY_HUNGRY_RUB || id == ANIM_ELD_TEEN_HUNGRY_BITE ||
          id == ANIM_ELD_ADULT_HUNGRY_SHAKE || id == ANIM_ELD_ELDER_HUNGRY_EAT || id == ANIM_ALIEN_BABY_HUNGRY_STAND ||
-         id == ANIM_ALIEN_TEEN_HUNGRY_FORK || id == ANIM_ALIEN_ADULT_HUNGRY_BEND;
+         id == ANIM_ALIEN_TEEN_HUNGRY_FORK || id == ANIM_ALIEN_ADULT_HUNGRY_BEND || id == ANIM_ALIEN_ELDER_HUNGRY_BEND;
 }
 
 static bool animUsesHealthThought(AnimId id)
