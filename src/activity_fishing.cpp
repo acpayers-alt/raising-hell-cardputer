@@ -95,6 +95,7 @@ static const char *fishingPetFrameForState()
   const bool alienBaby = (pet.type == PET_ALIEN && pet.evoStage == 0);
   const bool alienTeen = (pet.type == PET_ALIEN && pet.evoStage == 1);
   const bool alienAdult = (pet.type == PET_ALIEN && pet.evoStage == 2);
+  const bool alienElder = (pet.type == PET_ALIEN && pet.evoStage == 3);
   const bool eldritchBaby = (pet.type == PET_ELDRITCH && pet.evoStage == 0);
   const bool eldritchTeen = (pet.type == PET_ELDRITCH && pet.evoStage == 1);
   const bool eldritchAdult = (pet.type == PET_ELDRITCH && pet.evoStage == 2);
@@ -104,12 +105,15 @@ static const char *fishingPetFrameForState()
   const bool devilAdult = (pet.type == PET_DEVIL && pet.evoStage == 2);
   const bool devilElder = (pet.type == PET_DEVIL && pet.evoStage == 3);
 
-  if (alienBaby || alienTeen || alienAdult || eldritchBaby || eldritchTeen || eldritchAdult || eldritchElder ||
-      devilBaby || devilTeen || devilAdult || devilElder)
+  if (alienBaby || alienTeen || alienAdult || alienElder || eldritchBaby || eldritchTeen || eldritchAdult ||
+      eldritchElder || devilBaby || devilTeen || devilAdult || devilElder)
   {
     switch (s_state)
     {
     case FishingState::CASTING:
+      if (alienElder)
+        return "/raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim4.png";
+
       if (devilElder)
         return "/raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim4.png";
 
@@ -166,6 +170,9 @@ static const char *fishingPetFrameForState()
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim2.png";
 
+      if (alienElder)
+        return "/raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim2.png";
+
       if (alienAdult)
         return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim2.png";
 
@@ -196,6 +203,9 @@ static const char *fishingPetFrameForState()
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim3.png";
+
+      if (alienElder)
+        return "/raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim3.png";
 
       if (alienAdult)
         return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim3.png";
@@ -230,6 +240,9 @@ static const char *fishingPetFrameForState()
         if (eldritchBaby)
           return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim5.png";
 
+        if (alienElder)
+          return "/raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim5.png";
+
         if (alienAdult)
           return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim5.png";
 
@@ -260,6 +273,9 @@ static const char *fishingPetFrameForState()
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png";
+
+      if (alienElder)
+        return "/raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim1.png";
 
       if (alienAdult)
         return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim1.png";
@@ -292,6 +308,9 @@ static const char *fishingPetFrameForState()
 
       if (eldritchBaby)
         return "/raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png";
+
+      if (alienElder)
+        return "/raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim1.png";
 
       if (alienAdult)
         return "/raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim1.png";
@@ -327,7 +346,7 @@ static void drawFishingPet()
     drawY += 5;
   }
 
-  if (pet.type == PET_ALIEN && pet.evoStage == 2)
+  if (pet.type == PET_ALIEN && pet.evoStage == 3)
   {
     drawX -= 8;
     drawY += 4;
@@ -388,6 +407,30 @@ static FishingLineOrigin fishingLineOriginForPet()
     case FishingState::REELING:
       origin.x -= 8;
       origin.y -= 16;
+      break;
+
+    case FishingState::CASTING:
+      origin.x -= 2;
+      origin.y -= 10;
+      break;
+
+    default:
+      origin.x -= 9;
+      origin.y -= 2;
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Alien Elder
+  // -----------------------------------------------------------------------
+  if (pet.type == PET_ALIEN && pet.evoStage == 3)
+  {
+    switch (s_state)
+    {
+    case FishingState::REELING:
+      origin.x -= 19;
+      origin.y -= 17;
       break;
 
     case FishingState::CASTING:
