@@ -822,7 +822,7 @@ void appMainLoopTick()
 
       requestUIRedraw();
 
-      if (consumeUIRedrawRequest())
+      if (g_app.uiNeedsRedraw)
         renderUI();
 
       // Keep background systems ticking, but DO NOT process gameplay/input
@@ -833,7 +833,7 @@ void appMainLoopTick()
     // No dismiss yet — just keep it visible
     requestUIRedraw();
 
-    if (consumeUIRedrawRequest())
+    if (g_app.uiNeedsRedraw)
       renderUI();
 
     finishBlockingUiFrame(now, true);
@@ -867,7 +867,7 @@ void appMainLoopTick()
     {
       requestUIRedraw();
     }
-    if (consumeUIRedrawRequest())
+    if (g_app.uiNeedsRedraw)
     {
       renderUI();
     }
@@ -1323,7 +1323,7 @@ void appMainLoopTick()
     if (isScreenOn())
       requestUIRedraw();
 
-    if (consumeUIRedrawRequest())
+    if (g_app.uiNeedsRedraw)
     {
       renderUI();
     }
@@ -1341,7 +1341,7 @@ void appMainLoopTick()
     if (isScreenOn())
       requestUIRedraw();
 
-    if (consumeUIRedrawRequest())
+    if (g_app.uiNeedsRedraw)
     {
       renderUI();
     }
@@ -1453,7 +1453,7 @@ void appMainLoopTick()
       (g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE) &&
       (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive() || petPresentationAnimating());
 
-  if (consumeUIRedrawRequest() || petPresentationRenderNeeded)
+  if (g_app.uiNeedsRedraw || petPresentationRenderNeeded)
   {
     renderUI();
   }

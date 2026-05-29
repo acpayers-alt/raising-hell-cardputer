@@ -626,6 +626,7 @@ static bool applyItemEffect_NoUi(ItemType type)
     return true;
 
   case ITEM_ELDRITCH_EYE:
+    return false;
 
   case ITEM_INFERNAL_PACIFIER:
     if (pet.evoStage == 0)

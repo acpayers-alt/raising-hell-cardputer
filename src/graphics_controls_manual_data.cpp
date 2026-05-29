@@ -101,7 +101,8 @@ const HelpLine kControlsManual[] = {
     {HelpLineType::GAP, nullptr},
     {HelpLineType::BODY, "Enable Step Counter in Game"},
     {HelpLineType::BODY, "Options to view daily steps."},
-    {HelpLineType::BODY, "Steps reset at midnight."},
+    {HelpLineType::BODY, "You can reset the counter"},
+    {HelpLineType::BODY, "manually from Game Options."},
     {HelpLineType::GAP, nullptr},
 
     {HelpLineType::SECTION, "Sleep"},
