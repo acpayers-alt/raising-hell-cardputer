@@ -69,14 +69,12 @@ void finalizeNewPetFromName(InputState &in)
 
   g_app.newPetFlowActive = false;
 
-  // Immediately arm AND start the fade BEFORE state change
-  // Enter PET screen first
+  // Enter PET_SCREEN, then start the scripted intro walk and fade.
+
   uiActionEnterState(UIState::PET_SCREEN, Tab::TAB_PET, true);
 
   startPetIntroWalkFromLeft();
-
-  // Arm fade to begin on next frame
-  g_app.petScreenIntroFadePending = true;
+  startPetScreenIntroFadeNow();
 
   requestFullUIRedraw();
   invalidateBackgroundCache();

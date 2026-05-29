@@ -317,8 +317,8 @@ static uint32_t s_petIntroWalkLastStepMs = 0;
 static uint32_t s_petIntroArriveTurnStartMs = 0;
 static uint32_t s_petIntroStandHoldStartMs = 0;
 
-static constexpr int kPetIntroWalkStepPx = 3;
-static constexpr uint32_t kPetIntroWalkStepMs = 40;
+static constexpr int kPetIntroWalkStepPx = 4;
+static constexpr uint32_t kPetIntroWalkStepMs = 30;
 static constexpr uint32_t kPetIntroArriveTurnMs = 180;
 static constexpr uint32_t kPetIntroStandHoldMs = 300;
 static constexpr uint32_t kPetIntroWalkFrameMs = 45;
@@ -967,7 +967,7 @@ void startPetIntroWalkFromLeft()
 {
   getPetHomeScreenPosition(s_petHomeX, s_petHomeY);
 
-  s_petScreenX = -PET_SPR_W;
+  s_petScreenX = -(PET_SPR_W / 2);
   s_petScreenY = s_petHomeY;
 
   s_petScreenPosInitialized = true;

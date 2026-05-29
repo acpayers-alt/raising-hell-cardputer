@@ -35,6 +35,7 @@
 #include "display.h"
 #include "display_state.h"
 #include "graphics.h"
+#include "graphics_pet_presentation.h"
 #include "menu_actions.h"
 #include "photo_capture.h"
 #include "settings_flow_state.h"
@@ -1448,7 +1449,11 @@ void appMainLoopTick()
     tickDeathTransition(millis());
   }
 
-  if (consumeUIRedrawRequest())
+  const bool petPresentationRenderNeeded =
+      (g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE) &&
+      (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive() || petPresentationAnimating());
+
+  if (consumeUIRedrawRequest() || petPresentationRenderNeeded)
   {
     renderUI();
   }

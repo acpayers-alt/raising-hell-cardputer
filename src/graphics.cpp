@@ -467,8 +467,12 @@ void graphicsReleaseUiCachesForMiniGame()
 // ============================================================================
 void startPetScreenIntroFadeNow()
 {
+  g_app.petScreenIntroFadePending = false;
   s_petScreenIntroFadeActive = true;
   s_petScreenIntroFadeStartMs = millis();
+
+  forceBacklightDuringFade(0);
+  requestUIRedraw();
 }
 
 static void tickPetScreenIntroFade()
@@ -638,7 +642,16 @@ void renderUI()
   displayFinishWakeBlackoutAfterFrame();
 
   bgDrawnForState = true;
-  lastDrawnState = g_app.uiState;
+
+  // Keep the render loop alive while the hatch intro fade / scripted pet
+  // presentation is active. The fade ticker may request a redraw before
+  // renderUI() consumes the redraw flag, so leave a fresh request behind for
+  // the next app loop pass.
+  if ((g_app.uiState == UIState::PET_SCREEN || g_app.uiState == UIState::CLOCK_MODE) &&
+      (g_app.petScreenIntroFadePending || isPetScreenIntroFadeActive() || petPresentationAnimating()))
+  {
+    requestUIRedraw();
+  }
 }
 
 // ============================================================================
