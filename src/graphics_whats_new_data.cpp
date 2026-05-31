@@ -10,6 +10,8 @@ const HelpLine kWhatsNew[] = {
     {HelpLineType::SECTION, "New Features"},
     {HelpLineType::BODY, "- Alien Pet Type"},
     {HelpLineType::BODY, "- Abduction Mini Game"},
+    {HelpLineType::BODY, "- Unique Resurrection Games"},
+    {HelpLineType::BODY, "for each pet"},
     {HelpLineType::BODY, "- Fishing Activity"},
     {HelpLineType::BODY, "- New Shop Items"},
     {HelpLineType::BODY, "- 24 hour time option"},

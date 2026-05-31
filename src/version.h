@@ -5,7 +5,7 @@
 #define RH_VERSION_PATCH 0
 
 #define RH_VERSION_LABEL "alien"
-#define RH_VERSION_STRING "3.0.0-test-alien1"
+#define RH_VERSION_STRING "3.0.0-test-alien2"
 
 #ifndef PUBLIC_BUILD
 #define PUBLIC_BUILD 0
