@@ -27,6 +27,11 @@ static int s_sigPlayerY = 0;
 static int s_sigHp = 3;
 static int s_sigSignal = 0;
 
+static uint8_t s_sigPhaseIndex = 0;
+static uint8_t s_sigPhaseSignals = 0;
+static bool s_sigPhaseIntroActive = false;
+static uint32_t s_sigPhaseIntroUntilMs = 0;
+
 static uint32_t s_sigStartedMs = 0;
 static uint32_t s_sigNextEnemyMs = 0;
 static uint32_t s_sigNextFragmentMs = 0;
@@ -36,7 +41,10 @@ static uint8_t s_sigStarPhase = 0;
 
 static constexpr int kSigGoal = 100;
 static constexpr int kSigMaxHp = 3;
-static constexpr uint32_t kSigMaxRunMs = 45000;
+static constexpr uint8_t kSigPhaseCount = 3;
+static constexpr uint8_t kSigSignalsPerPhase = 6;
+static constexpr uint32_t kSigPhaseIntroMs = 1100;
+static constexpr uint32_t kSigMaxRunMs = 60000;
 
 static constexpr int kSigPlayerX = 24;
 static constexpr int kSigPlayerW = 22;
@@ -68,6 +76,96 @@ struct SigFragment
 static SigBullet s_bullets[5];
 static SigEnemy s_enemies[7];
 static SigFragment s_fragments[5];
+
+static uint16_t sigEnemySpeedMinForPhase()
+{
+  switch (s_sigPhaseIndex)
+  {
+  case 0:
+    return 45;
+  case 1:
+    return 60;
+  case 2:
+  default:
+    return 80;
+  }
+}
+
+static uint16_t sigEnemySpeedMaxForPhase()
+{
+  switch (s_sigPhaseIndex)
+  {
+  case 0:
+    return 85;
+  case 1:
+    return 105;
+  case 2:
+  default:
+    return 135;
+  }
+}
+
+static uint32_t sigEnemySpawnMinMsForPhase()
+{
+  switch (s_sigPhaseIndex)
+  {
+  case 0:
+    return 760;
+  case 1:
+    return 520;
+  case 2:
+  default:
+    return 380;
+  }
+}
+
+static uint32_t sigEnemySpawnMaxMsForPhase()
+{
+  switch (s_sigPhaseIndex)
+  {
+  case 0:
+    return 1050;
+  case 1:
+    return 850;
+  case 2:
+  default:
+    return 650;
+  }
+}
+
+static uint32_t sigFragmentSpawnMinMsForPhase()
+{
+  switch (s_sigPhaseIndex)
+  {
+  case 0:
+    return 1000;
+  case 1:
+    return 900;
+  case 2:
+  default:
+    return 760;
+  }
+}
+
+static uint32_t sigFragmentSpawnMaxMsForPhase()
+{
+  switch (s_sigPhaseIndex)
+  {
+  case 0:
+    return 1600;
+  case 1:
+    return 1500;
+  case 2:
+  default:
+    return 1300;
+  }
+}
+
+static void sigBeginPhaseIntro(uint32_t now)
+{
+  s_sigPhaseIntroActive = true;
+  s_sigPhaseIntroUntilMs = now + kSigPhaseIntroMs;
+}
 
 bool signalRecoveryIsShowingIntro() { return s_sigShowIntro; }
 
@@ -107,7 +205,7 @@ static void sigSpawnEnemy()
     e.x = gW + 8;
     e.y = random(22, gH - 24);
     e.r = random(5, 9);
-    e.speed = random(60, 105);
+    e.speed = random((long)sigEnemySpeedMinForPhase(), (long)sigEnemySpeedMaxForPhase() + 1L);
     return;
   }
 }
@@ -181,17 +279,22 @@ static void sigReset()
   s_sigPlayerY = (gH / 2) - (kSigPlayerH / 2);
   s_sigHp = kSigMaxHp;
   s_sigSignal = 0;
+  s_sigPhaseIndex = 0;
+  s_sigPhaseSignals = 0;
+  s_sigPhaseIntroActive = false;
+  s_sigPhaseIntroUntilMs = 0;
 
   const uint32_t now = millis();
   s_signalRecoveryLastMs = now;
   s_sigStartedMs = now;
   s_sigNextEnemyMs = now + 700;
-  s_sigNextFragmentMs = now + 1600;
+  s_sigNextFragmentMs = now + 1100;
   s_sigFireCooldownMs = 0;
   s_sigAnimMs = now;
   s_sigStarPhase = 0;
 
   sigClearObjects();
+  sigBeginPhaseIntro(now);
 }
 
 void startSignalRecovery()
@@ -274,6 +377,20 @@ void updateSignalRecovery(const InputState &input)
   if (s_sigGameOver)
     return;
 
+  if (s_sigPhaseIntroActive)
+  {
+    if ((int32_t)(now - s_sigPhaseIntroUntilMs) >= 0)
+    {
+      s_sigPhaseIntroActive = false;
+      s_signalRecoveryLastMs = now;
+      s_sigNextEnemyMs = now + 450;
+      s_sigNextFragmentMs = now + 650;
+      requestUIRedraw();
+    }
+
+    return;
+  }
+
   if ((uint32_t)(now - s_sigAnimMs) >= 180)
   {
     s_sigAnimMs = now;
@@ -306,13 +423,14 @@ void updateSignalRecovery(const InputState &input)
   if ((int32_t)(now - s_sigNextEnemyMs) >= 0)
   {
     sigSpawnEnemy();
-    s_sigNextEnemyMs = now + random(520, 850);
+    s_sigNextEnemyMs = now + random((long)sigEnemySpawnMinMsForPhase(), (long)sigEnemySpawnMaxMsForPhase() + 1L);
   }
 
   if ((int32_t)(now - s_sigNextFragmentMs) >= 0)
   {
     sigSpawnDriftingFragment();
-    s_sigNextFragmentMs = now + random(1300, 2100);
+    s_sigNextFragmentMs =
+        now + random((long)sigFragmentSpawnMinMsForPhase(), (long)sigFragmentSpawnMaxMsForPhase() + 1L);
   }
 
   for (auto &b : s_bullets)
@@ -353,14 +471,9 @@ void updateSignalRecovery(const InputState &input)
         b.active = false;
         e.active = false;
 
-        s_sigSignal = constrain(s_sigSignal + 5, 0, kSigGoal);
-        if (random(3) != 0)
-          sigSpawnFragment(e.x, e.y);
-
+        // Shooting asteroids is defensive only. Signal must be collected
+        // directly by flying into signal fragments.
         soundConfirm();
-
-        if (s_sigSignal >= kSigGoal)
-          sigFinish(true);
 
         break;
       }
@@ -396,15 +509,33 @@ void updateSignalRecovery(const InputState &input)
       continue;
     }
 
-    if (sigAabb(kSigPlayerX, s_sigPlayerY, kSigPlayerW, kSigPlayerH, f.x - 3, f.y - 3, 7, 7))
+    if (sigAabb(kSigPlayerX, s_sigPlayerY, kSigPlayerW, kSigPlayerH, f.x - 5, f.y - 5, 11, 11))
     {
       f.active = false;
-      s_sigSignal = constrain(s_sigSignal + 12, 0, kSigGoal);
       soundConfirm();
 
-      if (s_sigSignal >= kSigGoal)
+      if (s_sigPhaseSignals < 255)
+        s_sigPhaseSignals++;
+
+      const int totalSignalsNeeded = (int)kSigPhaseCount * (int)kSigSignalsPerPhase;
+      const int collectedSignals = ((int)s_sigPhaseIndex * (int)kSigSignalsPerPhase) + (int)s_sigPhaseSignals;
+      s_sigSignal = constrain((collectedSignals * kSigGoal) / totalSignalsNeeded, 0, kSigGoal);
+
+      if (s_sigPhaseSignals >= kSigSignalsPerPhase)
       {
-        sigFinish(true);
+        s_sigPhaseSignals = 0;
+
+        if (s_sigPhaseIndex + 1 >= kSigPhaseCount)
+        {
+          s_sigSignal = kSigGoal;
+          sigFinish(true);
+          return;
+        }
+
+        s_sigPhaseIndex++;
+        sigClearObjects();
+        sigBeginPhaseIntro(now);
+        requestUIRedraw();
         return;
       }
     }
@@ -497,8 +628,8 @@ void drawSignalRecovery()
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
     spr.drawCentreString("UP/DOWN to move", gW / 2, 38, 2);
-    spr.drawCentreString("ENTER/G to fire", gW / 2, 56, 2);
-    spr.drawCentreString("Recover the life signal", gW / 2, 80, 2);
+    spr.drawCentreString("ENTER/G to shoot rocks", gW / 2, 56, 2);
+    spr.drawCentreString("Touch signals to recover", gW / 2, 80, 2);
 
     sigDrawPlayer();
 
@@ -510,13 +641,40 @@ void drawSignalRecovery()
 
   sigDrawHud(gW);
 
+  if (s_sigPhaseIntroActive)
+  {
+    char phaseBuf[24];
+    snprintf(phaseBuf, sizeof(phaseBuf), "PHASE %u", (unsigned)(s_sigPhaseIndex + 1));
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(TFT_GREEN, TFT_BLACK);
+    spr.drawCentreString(phaseBuf, gW / 2, 44, 4);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("COLLECT 6 SIGNALS", gW / 2, 78, 2);
+
+    if (s_sigPhaseIndex == 0)
+      spr.drawCentreString("ASTEROIDS APPROACH", gW / 2, 98, 1);
+    else if (s_sigPhaseIndex == 1)
+      spr.drawCentreString("SIGNAL DECAY RISING", gW / 2, 98, 1);
+    else
+      spr.drawCentreString("FINAL LOCK REQUIRED", gW / 2, 98, 1);
+
+    spr.setTextDatum(TL_DATUM);
+    return;
+  }
+
   for (const auto &f : s_fragments)
   {
     if (!f.active)
       continue;
 
-    spr.fillCircle(f.x, f.y, 3, TFT_GREEN);
-    spr.drawCircle(f.x, f.y, 4, TFT_WHITE);
+    // Recoverable life signal
+    spr.drawCircle(f.x, f.y, 5, TFT_GREEN);
+    spr.drawCircle(f.x, f.y, 3, TFT_WHITE);
+    spr.drawPixel(f.x, f.y, TFT_GREEN);
+    spr.drawFastHLine(f.x - 6, f.y, 3, TFT_DARKGREEN);
+    spr.drawFastHLine(f.x + 4, f.y, 3, TFT_DARKGREEN);
   }
 
   for (const auto &b : s_bullets)
@@ -533,19 +691,26 @@ void drawSignalRecovery()
     if (!e.active)
       continue;
 
-    spr.fillCircle(e.x, e.y, e.r, spr.color565(90, 0, 130));
-    spr.drawCircle(e.x, e.y, e.r, TFT_MAGENTA);
-    spr.drawPixel(e.x - 2, e.y - 1, TFT_WHITE);
-    spr.drawPixel(e.x + 2, e.y + 1, TFT_WHITE);
+    // Asteroid hazard
+    const uint16_t rockDark = spr.color565(85, 76, 72);
+    const uint16_t rockMid = spr.color565(135, 122, 110);
+    const uint16_t rockLight = spr.color565(190, 176, 150);
+
+    spr.fillCircle(e.x, e.y, e.r, rockMid);
+    spr.drawCircle(e.x, e.y, e.r, rockLight);
+    spr.drawPixel(e.x - 3, e.y - 2, rockDark);
+    spr.drawPixel(e.x + 2, e.y + 1, rockDark);
+    spr.drawFastHLine(e.x - 4, e.y + 3, 5, rockDark);
+
+    if (e.r > 6)
+      spr.drawCircle(e.x - 2, e.y - 1, 2, rockDark);
   }
 
   sigDrawPlayer();
 
-  const uint32_t elapsed = millis() - s_sigStartedMs;
-  const int remaining = (elapsed >= kSigMaxRunMs) ? 0 : (int)((kSigMaxRunMs - elapsed) / 1000UL);
-
-  char buf[20];
-  snprintf(buf, sizeof(buf), "%ds", remaining);
+  char buf[28];
+  snprintf(buf, sizeof(buf), "PHASE %u/%u  %u/%u", (unsigned)(s_sigPhaseIndex + 1), (unsigned)kSigPhaseCount,
+           (unsigned)s_sigPhaseSignals, (unsigned)kSigSignalsPerPhase);
 
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
