@@ -169,6 +169,9 @@ bool miniGameIsShowingIntro()
   case MiniGame::SIGNAL_RECOVERY:
     return signalRecoveryIsShowingIntro();
 
+  case MiniGame::VOID_RITUAL:
+    return voidRitualIsShowingIntro();
+
   case MiniGame::ABDUCTION_BEAM:
     return abductionBeamIsShowingIntro();
 
@@ -192,6 +195,7 @@ void miniGameCancelFromIntro()
 
   case MiniGame::RESURRECTION:
   case MiniGame::SIGNAL_RECOVERY:
+  case MiniGame::VOID_RITUAL:
   default:
     refundEnergy = false;
     break;

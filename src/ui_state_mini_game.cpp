@@ -21,7 +21,7 @@ void uiMiniGameHandle(InputState &in)
 
   // ESC during a mini-game intro cancels the mini-game instead of pausing.
   if (miniGameIsShowingIntro() && currentMiniGame != MiniGame::RESURRECTION &&
-      currentMiniGame != MiniGame::SIGNAL_RECOVERY && in.mgQuitOnce)
+      currentMiniGame != MiniGame::SIGNAL_RECOVERY && currentMiniGame != MiniGame::VOID_RITUAL && in.mgQuitOnce)
   {
     miniGameCancelFromIntro();
     requestFullUIRedraw();

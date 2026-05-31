@@ -7,6 +7,7 @@ enum class MiniGame
   FLAPPY_FIREBALL,
   RESURRECTION,
   SIGNAL_RECOVERY,
+  VOID_RITUAL,
   CROSSY_ROAD,
   INFERNAL_DODGER,
   ABDUCTION_BEAM,
@@ -37,6 +38,13 @@ void updateSignalRecovery(const InputState &input);
 void drawSignalRecovery();
 bool signalRecoveryIsShowingIntro();
 void freeSignalRecoverySprites();
+
+// Void Ritual — Eldritch resurrection timing game
+void startVoidRitual();
+void updateVoidRitual(const InputState &input);
+void drawVoidRitual();
+bool voidRitualIsShowingIntro();
+void freeVoidRitualSprites();
 
 // Flappy Fireball
 void startFlappyFireball();

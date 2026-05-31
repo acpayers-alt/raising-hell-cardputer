@@ -58,6 +58,10 @@ extern void updateSignalRecovery(const InputState &input);
 extern void drawSignalRecovery();
 extern void freeSignalRecoverySprites();
 
+extern void updateVoidRitual(const InputState &input);
+extern void drawVoidRitual();
+extern void freeVoidRitualSprites();
+
 // timers owned by mini_games.cpp, synced on pause/resume
 extern uint32_t s_lastStepMs;
 extern uint32_t s_dodgerLastStepMs;
@@ -65,6 +69,7 @@ extern uint32_t s_dodgerMoveLastMs;
 extern uint32_t s_crossyLastLaneMs;
 extern uint32_t rr_lastMs;
 extern uint32_t s_signalRecoveryLastMs;
+extern uint32_t s_voidRitualLastMs;
 
 static constexpr uint32_t POST_GAME_PASSOUT_GRACE_MS = 5UL * 60UL * 1000UL;
 
@@ -306,6 +311,8 @@ static const char *mgGameName(MiniGame game)
     return "Resurrection Run";
   case MiniGame::SIGNAL_RECOVERY:
     return "Signal Recovery";
+  case MiniGame::VOID_RITUAL:
+    return "Void Ritual";
   default:
     return "Unknown";
   }
@@ -380,7 +387,8 @@ static bool mgApplyRepeatGameBoredom(MiniGame completedGame, uint8_t *outStreak,
 
 void mgApplyResultAndShowReward(bool won)
 {
-  if (currentMiniGame == MiniGame::RESURRECTION || currentMiniGame == MiniGame::SIGNAL_RECOVERY)
+  if (currentMiniGame == MiniGame::RESURRECTION || currentMiniGame == MiniGame::SIGNAL_RECOVERY ||
+      currentMiniGame == MiniGame::VOID_RITUAL)
   {
     if (won)
     {
@@ -388,9 +396,9 @@ void mgApplyResultAndShowReward(bool won)
       {
         snprintf(s_rewardMsg, sizeof(s_rewardMsg), "Signal recovered\nYou may return to life");
       }
-      else if (pet.type == PET_ELDRITCH)
+      else if (currentMiniGame == MiniGame::VOID_RITUAL || pet.type == PET_ELDRITCH)
       {
-        snprintf(s_rewardMsg, sizeof(s_rewardMsg), "The darkness has returned\nYou may return to life");
+        snprintf(s_rewardMsg, sizeof(s_rewardMsg), "The veil has opened\nYou may return to life");
       }
       else
       {
@@ -514,6 +522,7 @@ void miniGameExitToReturnUi(bool beginLockout)
 
   freeResRunSprites();
   freeSignalRecoverySprites();
+  freeVoidRitualSprites();
 
   invalidateBackgroundCache();
   requestFullUIRedraw();
@@ -558,6 +567,10 @@ void mgSyncGameTimebases(uint32_t now)
 
   case MiniGame::SIGNAL_RECOVERY:
     s_signalRecoveryLastMs = now;
+    break;
+
+  case MiniGame::VOID_RITUAL:
+    s_voidRitualLastMs = now;
     break;
 
   default:
@@ -628,6 +641,10 @@ void updateMiniGame(const InputState &input)
     updateSignalRecovery(input);
     break;
 
+  case MiniGame::VOID_RITUAL:
+    updateVoidRitual(input);
+    break;
+
   default:
     break;
   }
@@ -671,6 +688,10 @@ void drawMiniGame()
 
   case MiniGame::SIGNAL_RECOVERY:
     drawSignalRecovery();
+    break;
+
+  case MiniGame::VOID_RITUAL:
+    drawVoidRitual();
     break;
 
   default:

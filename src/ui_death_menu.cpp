@@ -35,6 +35,8 @@ static void actResurrect(InputState &in)
 
   if (pet.type == PET_ALIEN)
     startSignalRecovery();
+  else if (pet.type == PET_ELDRITCH)
+    startVoidRitual();
   else
     startResurrectionRun();
 
