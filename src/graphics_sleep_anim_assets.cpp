@@ -144,6 +144,19 @@ static const char *AL_ADULT_SLEEP_SNORE_FRAMES[3] = {
     "/raising_hell/graphics/pet/anim/al/ad/sleep/al_ad_sleep_snore3.jpg",
 };
 
+// -----------------------------------------------------------------------------
+// ALIEN ELDER sleep animation
+// Snore loop: 1 -> 2 -> 3 -> 2 -> repeat
+// -----------------------------------------------------------------------------
+static constexpr uint32_t AL_ELDER_SLEEP_SNORE_FRAME_MS = 700;
+
+static const char *AL_ELDER_SLEEP_SNORE_FRAMES[4] = {
+    "/raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore1.jpg",
+    "/raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore2.jpg",
+    "/raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore3.jpg",
+    "/raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore2.jpg",
+};
+
 SleepAnimSelection selectSleepAnimForPet(PetType type, int evoStage)
 {
   SleepAnimSelection out = {};
@@ -245,6 +258,13 @@ SleepAnimSelection selectSleepAnimForPet(PetType type, int evoStage)
       out.frames = AL_ADULT_SLEEP_SNORE_FRAMES;
       out.frameCount = sizeof(AL_ADULT_SLEEP_SNORE_FRAMES) / sizeof(AL_ADULT_SLEEP_SNORE_FRAMES[0]);
       out.frameMs = AL_ADULT_SLEEP_SNORE_FRAME_MS;
+      return out;
+
+    case 3:
+      out.mode = 12;
+      out.frames = AL_ELDER_SLEEP_SNORE_FRAMES;
+      out.frameCount = sizeof(AL_ELDER_SLEEP_SNORE_FRAMES) / sizeof(AL_ELDER_SLEEP_SNORE_FRAMES[0]);
+      out.frameMs = AL_ELDER_SLEEP_SNORE_FRAME_MS;
       return out;
 
     default:
