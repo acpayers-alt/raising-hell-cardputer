@@ -78,6 +78,10 @@ static void releaseMiniGameAssetsFor(MiniGame game)
     freeResRunSprites();
     break;
 
+  case MiniGame::SIGNAL_RECOVERY:
+    freeSignalRecoverySprites();
+    break;
+
   default:
     break;
   }
@@ -162,6 +166,9 @@ bool miniGameIsShowingIntro()
   case MiniGame::RESURRECTION:
     return resRunIsShowingIntro();
 
+  case MiniGame::SIGNAL_RECOVERY:
+    return signalRecoveryIsShowingIntro();
+
   case MiniGame::ABDUCTION_BEAM:
     return abductionBeamIsShowingIntro();
 
@@ -184,6 +191,7 @@ void miniGameCancelFromIntro()
     break;
 
   case MiniGame::RESURRECTION:
+  case MiniGame::SIGNAL_RECOVERY:
   default:
     refundEnergy = false;
     break;

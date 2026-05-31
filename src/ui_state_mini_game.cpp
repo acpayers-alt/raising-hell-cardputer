@@ -10,7 +10,7 @@
 #include "ui_actions.h"
 #include "ui_runtime.h"
 
-void uiMiniGameHandle(InputState& in)
+void uiMiniGameHandle(InputState &in)
 {
   if (!g_app.inMiniGame)
   {
@@ -20,14 +20,13 @@ void uiMiniGameHandle(InputState& in)
   }
 
   // ESC during a mini-game intro cancels the mini-game instead of pausing.
-  if (miniGameIsShowingIntro() &&
-  currentMiniGame != MiniGame::RESURRECTION &&
-  in.mgQuitOnce)
-{
-miniGameCancelFromIntro();
-requestFullUIRedraw();
-return;
-}
+  if (miniGameIsShowingIntro() && currentMiniGame != MiniGame::RESURRECTION &&
+      currentMiniGame != MiniGame::SIGNAL_RECOVERY && in.mgQuitOnce)
+  {
+    miniGameCancelFromIntro();
+    requestFullUIRedraw();
+    return;
+  }
 
   // Pause-gate handles ESC toggle and pause menu interaction.
   const MgPauseGateResult gate = mgPauseGateHandle(in);
@@ -51,8 +50,8 @@ return;
 
   updateMiniGame(in);
   // drawMiniGame();  // Do not draw directly here.
-                    // updateMiniGame() requests redraw; renderUI() owns drawing.
-                    
+  // updateMiniGame() requests redraw; renderUI() owns drawing.
+
   if (mgPauseIsPaused())
   {
     uiActionEnterStateClean(UIState::MG_PAUSE, g_app.currentTab, false, in, 150);

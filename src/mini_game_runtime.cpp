@@ -54,12 +54,17 @@ extern void drawAbductionBeam();
 extern void updateResurrectionRun(const InputState &input);
 extern void drawResurrectionRun();
 
+extern void updateSignalRecovery(const InputState &input);
+extern void drawSignalRecovery();
+extern void freeSignalRecoverySprites();
+
 // timers owned by mini_games.cpp, synced on pause/resume
 extern uint32_t s_lastStepMs;
 extern uint32_t s_dodgerLastStepMs;
 extern uint32_t s_dodgerMoveLastMs;
 extern uint32_t s_crossyLastLaneMs;
 extern uint32_t rr_lastMs;
+extern uint32_t s_signalRecoveryLastMs;
 
 static constexpr uint32_t POST_GAME_PASSOUT_GRACE_MS = 5UL * 60UL * 1000UL;
 
@@ -299,6 +304,8 @@ static const char *mgGameName(MiniGame game)
     return "Abduction Beam";
   case MiniGame::RESURRECTION:
     return "Resurrection Run";
+  case MiniGame::SIGNAL_RECOVERY:
+    return "Signal Recovery";
   default:
     return "Unknown";
   }
@@ -373,11 +380,15 @@ static bool mgApplyRepeatGameBoredom(MiniGame completedGame, uint8_t *outStreak,
 
 void mgApplyResultAndShowReward(bool won)
 {
-  if (currentMiniGame == MiniGame::RESURRECTION)
+  if (currentMiniGame == MiniGame::RESURRECTION || currentMiniGame == MiniGame::SIGNAL_RECOVERY)
   {
     if (won)
     {
-      if (pet.type == PET_ELDRITCH)
+      if (currentMiniGame == MiniGame::SIGNAL_RECOVERY || pet.type == PET_ALIEN)
+      {
+        snprintf(s_rewardMsg, sizeof(s_rewardMsg), "Signal recovered\nYou may return to life");
+      }
+      else if (pet.type == PET_ELDRITCH)
       {
         snprintf(s_rewardMsg, sizeof(s_rewardMsg), "The darkness has returned\nYou may return to life");
       }
@@ -502,6 +513,7 @@ void miniGameExitToReturnUi(bool beginLockout)
   freeCrossyActorSprites();
 
   freeResRunSprites();
+  freeSignalRecoverySprites();
 
   invalidateBackgroundCache();
   requestFullUIRedraw();
@@ -542,6 +554,10 @@ void mgSyncGameTimebases(uint32_t now)
 
   case MiniGame::RESURRECTION:
     rr_lastMs = now;
+    break;
+
+  case MiniGame::SIGNAL_RECOVERY:
+    s_signalRecoveryLastMs = now;
     break;
 
   default:
@@ -608,6 +624,10 @@ void updateMiniGame(const InputState &input)
     updateResurrectionRun(input);
     break;
 
+  case MiniGame::SIGNAL_RECOVERY:
+    updateSignalRecovery(input);
+    break;
+
   default:
     break;
   }
@@ -647,6 +667,10 @@ void drawMiniGame()
 
   case MiniGame::RESURRECTION:
     drawResurrectionRun();
+    break;
+
+  case MiniGame::SIGNAL_RECOVERY:
+    drawSignalRecovery();
     break;
 
   default:

@@ -6,6 +6,7 @@ enum class MiniGame
   NONE = 0,
   FLAPPY_FIREBALL,
   RESURRECTION,
+  SIGNAL_RECOVERY,
   CROSSY_ROAD,
   INFERNAL_DODGER,
   ABDUCTION_BEAM,
@@ -29,6 +30,13 @@ extern bool playerWon;
 void startResurrectionRun();
 void updateResurrectionRun(const InputState &input);
 void drawResurrectionRun();
+
+// Signal Recovery — Alien resurrection shooter
+void startSignalRecovery();
+void updateSignalRecovery(const InputState &input);
+void drawSignalRecovery();
+bool signalRecoveryIsShowingIntro();
+void freeSignalRecoverySprites();
 
 // Flappy Fireball
 void startFlappyFireball();
