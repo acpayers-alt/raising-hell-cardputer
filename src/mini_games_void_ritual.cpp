@@ -8,6 +8,7 @@
 #include "input.h"
 #include "menu_actions.h"
 #include "mg_pause_core.h"
+#include "mini_game_assets.h"
 #include "mini_game_return_ui.h"
 #include "mini_game_runtime.h"
 #include "mini_games_internal.h"
@@ -18,6 +19,8 @@
 #include "ui_runtime.h"
 
 static bool s_voidShowIntro = true;
+static bool s_voidIntroDrawnOnce = false;
+static bool s_voidAssetsPreloaded = false;
 static bool s_voidGameOver = false;
 static bool s_voidWon = false;
 
@@ -48,6 +51,22 @@ static constexpr uint8_t kVoidPhaseCount = 3;
 static constexpr uint8_t kVoidMatchesPerPhase = 6;
 static constexpr uint32_t kVoidPhaseIntroMs = 1100;
 
+static constexpr int kVoidRuneSpriteW = 24;
+static constexpr int kVoidRuneSpriteH = 24;
+static constexpr uint16_t kVoidRuneSpriteKey = 0x0001; // near-black cache fill / transparency key
+
+static const char *kVoidRunePaths[3] = {
+    "/raising_hell/graphics/mini_games/voidrite/rune1.png",
+    "/raising_hell/graphics/mini_games/voidrite/rune2.png",
+    "/raising_hell/graphics/mini_games/voidrite/rune3.png",
+};
+
+static M5Canvas *s_voidRuneSprites[3] = {
+    nullptr,
+    nullptr,
+    nullptr,
+};
+
 static constexpr uint32_t kVoidRoundWindowMsByPhase[kVoidPhaseCount] = {
     5200, // Phase 1: slower
     4200, // Phase 2: current timing
@@ -69,9 +88,49 @@ static void voidBeginPhaseIntro(uint32_t now)
 
 bool voidRitualIsShowingIntro() { return s_voidShowIntro; }
 
+static bool voidEnsureRuneCache()
+{
+  const bool r1 = mgmem::ensureSprite(MiniGame::VOID_RITUAL, "rune1", kVoidRunePaths[0], 16, kVoidRuneSpriteKey,
+                                      s_voidRuneSprites[0]);
+
+  const bool r2 = mgmem::ensureSprite(MiniGame::VOID_RITUAL, "rune2", kVoidRunePaths[1], 16, kVoidRuneSpriteKey,
+                                      s_voidRuneSprites[1]);
+
+  const bool r3 = mgmem::ensureSprite(MiniGame::VOID_RITUAL, "rune3", kVoidRunePaths[2], 16, kVoidRuneSpriteKey,
+                                      s_voidRuneSprites[2]);
+
+  return r1 && r2 && r3;
+}
+
+static void voidPreloadAssetsForIntro()
+{
+  if (s_voidAssetsPreloaded)
+    return;
+
+  mgmem::logUsage("void-deferred-preload-begin");
+
+  freeVoidRitualSprites();
+
+  const bool ok = voidEnsureRuneCache();
+
+  Serial.printf("[VOID] deferred preload runes=%d free=%u largest=%u\n", ok ? 1 : 0, (unsigned)mgmem::freeBytes(),
+                (unsigned)mgmem::largestBlock());
+
+  s_voidAssetsPreloaded = true;
+  requestUIRedraw();
+
+  mgmem::logUsage("void-deferred-preload-complete");
+}
+
 void freeVoidRitualSprites()
 {
-  // Primitive first pass. No cached sprites yet.
+  mgmem::releaseSprite(MiniGame::VOID_RITUAL, "rune1");
+  mgmem::releaseSprite(MiniGame::VOID_RITUAL, "rune2");
+  mgmem::releaseSprite(MiniGame::VOID_RITUAL, "rune3");
+
+  s_voidRuneSprites[0] = nullptr;
+  s_voidRuneSprites[1] = nullptr;
+  s_voidRuneSprites[2] = nullptr;
 }
 
 static int voidLaneX(int lane, int gW)
@@ -168,6 +227,8 @@ static void voidHit()
 static void voidReset()
 {
   s_voidShowIntro = true;
+  s_voidIntroDrawnOnce = false;
+  s_voidAssetsPreloaded = false;
   s_voidGameOver = false;
   s_voidWon = false;
 
@@ -203,6 +264,7 @@ void startVoidRitual()
 
   currentMiniGame = MiniGame::VOID_RITUAL;
   graphicsReleaseUiCachesForMiniGame();
+  mgmem::beginSession(currentMiniGame, pet.type);
 
   miniGameSetReturnUi(UIState::DEATH, Tab::TAB_PET);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
@@ -256,7 +318,13 @@ void updateVoidRitual(const InputState &input)
 
   if (s_voidShowIntro)
   {
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+    if (s_voidIntroDrawnOnce && !s_voidAssetsPreloaded)
+    {
+      voidPreloadAssetsForIntro();
+      return;
+    }
+
+    const bool startPressed = s_voidAssetsPreloaded && (enterOnce || input.mgSelectOnce || input.mgUpOnce);
 
     if (startPressed && !mgInputLockedOut())
     {
@@ -412,13 +480,23 @@ static void voidDrawRift(int x, int y, bool active)
 
 static void voidDrawGlyph(int x, int y, uint8_t glyph, uint16_t col, bool selected)
 {
+  const uint8_t idx = glyph % 3;
+
   if (selected)
   {
     spr.drawRoundRect(x - 17, y - 17, 34, 34, 6, TFT_WHITE);
     spr.drawRoundRect(x - 15, y - 15, 30, 30, 5, col);
   }
 
-  switch (glyph % 3)
+  if (s_voidRuneSprites[idx])
+  {
+    const int drawX = x - (kVoidRuneSpriteW / 2);
+    const int drawY = y - (kVoidRuneSpriteH / 2);
+    s_voidRuneSprites[idx]->pushSprite(&spr, drawX, drawY, kVoidRuneSpriteKey);
+    return;
+  }
+
+  switch (idx)
   {
   case 0:
     // Eye glyph
@@ -475,24 +553,38 @@ void drawVoidRitual()
   if (s_voidShowIntro)
   {
     spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(spr.color565(190, 100, 255), TFT_BLACK);
-    spr.drawCentreString("VOID RITUAL", gW / 2, 14, 2);
+    spr.setTextFont(2);
+    spr.setTextSize(1);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("LEFT/RIGHT to choose", gW / 2, 38, 2);
-    spr.drawCentreString("ENTER/G to match", gW / 2, 56, 2);
-    spr.drawCentreString("Bind the correct rune", gW / 2, 80, 2);
+    spr.drawCentreString("Match the runes", gW / 2, 8, 2);
+    spr.drawCentreString("Complete the ritual", gW / 2, 26, 2);
 
-    voidDrawRift(gW / 2, 104, true);
+    if (s_voidAssetsPreloaded)
+    {
+      voidDrawGlyph(gW / 2 - 34, 62, 0, spr.color565(190, 100, 255), false);
+      voidDrawGlyph(gW / 2, 62, 1, spr.color565(190, 100, 255), false);
+      voidDrawGlyph(gW / 2 + 34, 62, 2, spr.color565(190, 100, 255), false);
+    }
+    else
+    {
+      voidDrawRift(gW / 2, 62, true);
+    }
 
     spr.setTextColor(spr.color565(190, 100, 255), TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 120, 2);
+    spr.drawCentreString("LEFT/RIGHT = Choose", gW / 2, 88, 2);
+    spr.drawCentreString("ENTER/G = Match", gW / 2, 104, 2);
 
+    spr.setTextColor(s_voidAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(s_voidAssetsPreloaded ? "ENTER to begin" : "Loading...", gW / 2, 120, 2);
+
+    s_voidIntroDrawnOnce = true;
     spr.setTextDatum(TL_DATUM);
     return;
   }
 
   voidDrawHud(gW);
+  voidEnsureRuneCache();
 
   if (s_voidPhaseIntroActive)
   {

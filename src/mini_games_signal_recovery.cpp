@@ -19,6 +19,8 @@
 #include "ui_runtime.h"
 
 static bool s_sigShowIntro = true;
+static bool s_sigIntroDrawnOnce = false;
+static bool s_sigAssetsPreloaded = false;
 static bool s_sigGameOver = false;
 static bool s_sigWon = false;
 
@@ -191,11 +193,38 @@ static void sigBeginPhaseIntro(uint32_t now)
 
 bool signalRecoveryIsShowingIntro() { return s_sigShowIntro; }
 
-static void sigEnsureSpriteCache()
+static bool sigEnsureSpriteCache()
 {
-  mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "ship", kSigShipPath, 16, kSigSpriteKey, s_sigShipSpr);
-  mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "signal", kSigSignalPath, 16, kSigSpriteKey, s_sigSignalSpr);
-  mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "asteroid", kSigAsteroidPath, 16, kSigSpriteKey, s_sigAsteroidSpr);
+  const bool shipOk =
+      mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "ship", kSigShipPath, 16, kSigSpriteKey, s_sigShipSpr);
+
+  const bool signalOk =
+      mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "signal", kSigSignalPath, 16, kSigSpriteKey, s_sigSignalSpr);
+
+  const bool asteroidOk =
+      mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "asteroid", kSigAsteroidPath, 16, kSigSpriteKey, s_sigAsteroidSpr);
+
+  return shipOk && signalOk && asteroidOk;
+}
+
+static void sigPreloadAssetsForIntro()
+{
+  if (s_sigAssetsPreloaded)
+    return;
+
+  mgmem::logUsage("signal-deferred-preload-begin");
+
+  freeSignalRecoverySprites();
+
+  const bool ok = sigEnsureSpriteCache();
+
+  Serial.printf("[SIGNAL] deferred preload sprites=%d free=%u largest=%u\n", ok ? 1 : 0, (unsigned)mgmem::freeBytes(),
+                (unsigned)mgmem::largestBlock());
+
+  s_sigAssetsPreloaded = true;
+  requestUIRedraw();
+
+  mgmem::logUsage("signal-deferred-preload-complete");
 }
 
 void freeSignalRecoverySprites()
@@ -308,6 +337,8 @@ static void sigReset()
   const int gH = (screenH > 0) ? screenH : 135;
 
   s_sigShowIntro = true;
+  s_sigIntroDrawnOnce = false;
+  s_sigAssetsPreloaded = false;
   s_sigGameOver = false;
   s_sigWon = false;
 
@@ -358,7 +389,6 @@ void startSignalRecovery()
   mgBeginInputLockout(220);
 
   sigReset();
-  sigEnsureSpriteCache();
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -395,7 +425,13 @@ void updateSignalRecovery(const InputState &input)
 
   if (s_sigShowIntro)
   {
-    const bool startPressed = enterOnce || input.mgSelectOnce || input.mgUpOnce;
+    if (s_sigIntroDrawnOnce && !s_sigAssetsPreloaded)
+    {
+      sigPreloadAssetsForIntro();
+      return;
+    }
+
+    const bool startPressed = s_sigAssetsPreloaded && (enterOnce || input.mgSelectOnce || input.mgUpOnce);
 
     if (startPressed && !mgInputLockedOut())
     {
@@ -668,19 +704,69 @@ void drawSignalRecovery()
 
   if (s_sigShowIntro)
   {
+    spr.fillSprite(TFT_BLACK);
+
     spr.setTextDatum(CC_DATUM);
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("SIGNAL RECOVERY", gW / 2, 14, 2);
+    spr.setTextFont(2);
+    spr.setTextSize(1);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("UP/DOWN to move", gW / 2, 38, 2);
-    spr.drawCentreString("ENTER/G to shoot rocks", gW / 2, 56, 2);
-    spr.drawCentreString("Touch signals to recover", gW / 2, 80, 2);
+    spr.drawCentreString("Collect lost signals", gW / 2, 8, 2);
+    spr.drawCentreString("Shoot asteroids", gW / 2, 26, 2);
 
-    sigDrawPlayer();
+    // Center the ship + signal preview as a pair.
+    const int previewY = 65;
+    const int previewGap = 10;
+    const int previewGroupW = kSigShipSpriteW + previewGap + kSigSignalSpriteW;
+    const int groupLeftX = (gW - previewGroupW) / 2;
 
-    spr.setTextColor(TFT_GREEN, TFT_BLACK);
-    spr.drawCentreString("ENTER to begin", gW / 2, 118, 2);
+    const int shipDrawX = groupLeftX;
+    const int shipDrawY = previewY - (kSigShipSpriteH / 2);
+
+    const int signalDrawX = groupLeftX + kSigShipSpriteW + previewGap;
+    const int signalDrawY = previewY - (kSigSignalSpriteH / 2);
+
+    if (s_sigAssetsPreloaded && s_sigShipSpr)
+    {
+      s_sigShipSpr->pushSprite(&spr, shipDrawX, shipDrawY, kSigSpriteKey);
+    }
+    else
+    {
+      // Fallback primitive ship preview
+      const int x = shipDrawX + 4;
+      const int y = shipDrawY + 2;
+
+      spr.fillTriangle(x, y + 1, x, y + kSigPlayerH - 1, x + kSigPlayerW, y + (kSigPlayerH / 2),
+                       spr.color565(120, 220, 160));
+      spr.drawTriangle(x, y + 1, x, y + kSigPlayerH - 1, x + kSigPlayerW, y + (kSigPlayerH / 2), TFT_WHITE);
+      spr.drawFastHLine(x - 4, y + (kSigPlayerH / 2), 4, TFT_GREEN);
+    }
+
+    if (s_sigAssetsPreloaded && s_sigSignalSpr)
+    {
+      s_sigSignalSpr->pushSprite(&spr, signalDrawX, signalDrawY, kSigSpriteKey);
+    }
+    else
+    {
+      // Fallback primitive signal preview
+      const int cx = signalDrawX + (kSigSignalSpriteW / 2);
+      const int cy = signalDrawY + (kSigSignalSpriteH / 2);
+
+      spr.drawCircle(cx, cy, 5, TFT_MAGENTA);
+      spr.drawCircle(cx, cy, 3, TFT_WHITE);
+      spr.drawPixel(cx, cy, TFT_MAGENTA);
+      spr.drawFastHLine(cx - 6, cy, 3, TFT_PURPLE);
+      spr.drawFastHLine(cx + 4, cy, 3, TFT_PURPLE);
+    }
+
+    spr.setTextColor(TFT_CYAN, TFT_BLACK);
+    spr.drawCentreString("UP/DOWN = Move", gW / 2, 88, 2);
+    spr.drawCentreString("ENTER/G = Fire", gW / 2, 104, 2);
+
+    spr.setTextColor(s_sigAssetsPreloaded ? TFT_GREEN : TFT_LIGHTGREY, TFT_BLACK);
+    spr.drawCentreString(s_sigAssetsPreloaded ? "ENTER to begin" : "Loading...", gW / 2, 120, 2);
+
+    s_sigIntroDrawnOnce = true;
     spr.setTextDatum(TL_DATUM);
     return;
   }
