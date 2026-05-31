@@ -58,10 +58,11 @@ static AnimId evoHappyClipFor(PetType type, uint8_t stage)
       return ANIM_ALIEN_TEEN_HAPPY_SWAY;
 
     case 2:
+      return ANIM_ALIEN_ADULT_HAPPY_STANCE;
+
     case 3:
     default:
-      // Temporary fallback until Alien adult/elder happy evolution clips exist.
-      return ANIM_ALIEN_TEEN_HAPPY_SWAY;
+      return ANIM_ALIEN_ELDER_HAPPY_SMILE;
     }
   }
 
