@@ -726,7 +726,18 @@ AnimId deathTransitionStaticClipForPet()
     }
 
   case PET_ALIEN:
-    return ANIM_ALIEN_BABY_SICK_MOAN;
+    switch (pet.evoStage)
+    {
+    case 0:
+      return ANIM_ALIEN_BABY_SICK_MOAN;
+    case 1:
+      return ANIM_ALIEN_TEEN_SICK_LOOP;
+    case 2:
+      return ANIM_ALIEN_ADULT_SICK_HEAVE;
+    case 3:
+    default:
+      return ANIM_ALIEN_ELDER_SICK_LAY;
+    }
 
   default:
     return ANIM_NONE;
