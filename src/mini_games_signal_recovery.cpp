@@ -8,6 +8,7 @@
 #include "input.h"
 #include "menu_actions.h"
 #include "mg_pause_core.h"
+#include "mini_game_assets.h"
 #include "mini_game_return_ui.h"
 #include "mini_game_runtime.h"
 #include "mini_games_internal.h"
@@ -47,8 +48,29 @@ static constexpr uint32_t kSigPhaseIntroMs = 1100;
 static constexpr uint32_t kSigMaxRunMs = 60000;
 
 static constexpr int kSigPlayerX = 24;
-static constexpr int kSigPlayerW = 22;
-static constexpr int kSigPlayerH = 14;
+
+// Visual sprite size. Keep collision a little smaller so it feels fair.
+static constexpr int kSigShipSpriteW = 32;
+static constexpr int kSigShipSpriteH = 16;
+
+static constexpr int kSigSignalSpriteW = 16;
+static constexpr int kSigSignalSpriteH = 16;
+
+static constexpr int kSigAsteroidSpriteW = 16;
+static constexpr int kSigAsteroidSpriteH = 16;
+
+static constexpr int kSigPlayerW = 24;
+static constexpr int kSigPlayerH = 12;
+
+static const char *kSigShipPath = "/raising_hell/graphics/mini_games/signal/ship.png";
+static const char *kSigSignalPath = "/raising_hell/graphics/mini_games/signal/signal.png";
+static const char *kSigAsteroidPath = "/raising_hell/graphics/mini_games/signal/asteroid.png";
+
+static constexpr uint16_t kSigSpriteKey = 0x0001; // near-black cache fill / transparency key
+
+static M5Canvas *s_sigShipSpr = nullptr;
+static M5Canvas *s_sigSignalSpr = nullptr;
+static M5Canvas *s_sigAsteroidSpr = nullptr;
 
 struct SigBullet
 {
@@ -169,9 +191,22 @@ static void sigBeginPhaseIntro(uint32_t now)
 
 bool signalRecoveryIsShowingIntro() { return s_sigShowIntro; }
 
+static void sigEnsureSpriteCache()
+{
+  mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "ship", kSigShipPath, 16, kSigSpriteKey, s_sigShipSpr);
+  mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "signal", kSigSignalPath, 16, kSigSpriteKey, s_sigSignalSpr);
+  mgmem::ensureSprite(MiniGame::SIGNAL_RECOVERY, "asteroid", kSigAsteroidPath, 16, kSigSpriteKey, s_sigAsteroidSpr);
+}
+
 void freeSignalRecoverySprites()
 {
-  // Primitive first pass. No cached sprites yet.
+  mgmem::releaseSprite(MiniGame::SIGNAL_RECOVERY, "ship");
+  mgmem::releaseSprite(MiniGame::SIGNAL_RECOVERY, "signal");
+  mgmem::releaseSprite(MiniGame::SIGNAL_RECOVERY, "asteroid");
+
+  s_sigShipSpr = nullptr;
+  s_sigSignalSpr = nullptr;
+  s_sigAsteroidSpr = nullptr;
 }
 
 static bool sigAabb(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh)
@@ -252,7 +287,7 @@ static void sigFire()
       continue;
 
     b.active = true;
-    b.x = kSigPlayerX + kSigPlayerW - 2;
+    b.x = kSigPlayerX + kSigShipSpriteW - 4;
     b.y = s_sigPlayerY + (kSigPlayerH / 2);
     soundClick();
     return;
@@ -305,6 +340,7 @@ void startSignalRecovery()
 
   currentMiniGame = MiniGame::SIGNAL_RECOVERY;
   graphicsReleaseUiCachesForMiniGame();
+  mgmem::beginSession(currentMiniGame, pet.type);
 
   miniGameSetReturnUi(UIState::DEATH, Tab::TAB_PET);
   uiActionEnterState(UIState::MINI_GAME, g_app.currentTab, false);
@@ -322,6 +358,7 @@ void startSignalRecovery()
   mgBeginInputLockout(220);
 
   sigReset();
+  sigEnsureSpriteCache();
 
   invalidateBackgroundCache();
   requestUIRedraw();
@@ -503,7 +540,7 @@ void updateSignalRecovery(const InputState &input)
 
     f.x -= (int)((70.0f * dtMs) / 1000.0f) + 1;
 
-    if (f.x < -8)
+    if (f.x < -(kSigSignalSpriteW / 2))
     {
       f.active = false;
       continue;
@@ -568,15 +605,24 @@ static void sigDrawStars(int gW, int gH)
 
 static void sigDrawPlayer()
 {
+  // Draw the sprite slightly larger than the collision box, centered on it.
+  const int drawX = kSigPlayerX - 4;
+  const int drawY = s_sigPlayerY - 2;
+
+  if (s_sigShipSpr)
+  {
+    s_sigShipSpr->pushSprite(&spr, drawX, drawY, kSigSpriteKey);
+    return;
+  }
+
+  // Fallback primitive ship if the asset is missing.
   const int x = kSigPlayerX;
   const int y = s_sigPlayerY;
 
-  spr.fillEllipse(x + 11, y + 7, 11, 5, spr.color565(80, 210, 120));
-  spr.drawEllipse(x + 11, y + 7, 11, 5, TFT_BLACK);
-  spr.fillCircle(x + 12, y + 4, 5, spr.color565(150, 255, 180));
-  spr.drawCircle(x + 12, y + 4, 5, TFT_BLACK);
-
-  spr.drawFastHLine(x - 4, y + 7, 5, TFT_GREEN);
+  spr.fillTriangle(x, y + 1, x, y + kSigPlayerH - 1, x + kSigPlayerW, y + (kSigPlayerH / 2),
+                   spr.color565(120, 220, 160));
+  spr.drawTriangle(x, y + 1, x, y + kSigPlayerH - 1, x + kSigPlayerW, y + (kSigPlayerH / 2), TFT_WHITE);
+  spr.drawFastHLine(x - 4, y + (kSigPlayerH / 2), 4, TFT_GREEN);
 }
 
 static void sigDrawHud(int gW)
@@ -669,12 +715,23 @@ void drawSignalRecovery()
     if (!f.active)
       continue;
 
-    // Recoverable life signal
-    spr.drawCircle(f.x, f.y, 5, TFT_GREEN);
-    spr.drawCircle(f.x, f.y, 3, TFT_WHITE);
-    spr.drawPixel(f.x, f.y, TFT_GREEN);
-    spr.drawFastHLine(f.x - 6, f.y, 3, TFT_DARKGREEN);
-    spr.drawFastHLine(f.x + 4, f.y, 3, TFT_DARKGREEN);
+    // Recoverable life signal. f.x/f.y is the signal center.
+    const int drawX = f.x - (kSigSignalSpriteW / 2);
+    const int drawY = f.y - (kSigSignalSpriteH / 2);
+
+    if (s_sigSignalSpr)
+    {
+      s_sigSignalSpr->pushSprite(&spr, drawX, drawY, kSigSpriteKey);
+    }
+    else
+    {
+      // Fallback primitive signal if the asset is missing.
+      spr.drawCircle(f.x, f.y, 5, TFT_MAGENTA);
+      spr.drawCircle(f.x, f.y, 3, TFT_WHITE);
+      spr.drawPixel(f.x, f.y, TFT_MAGENTA);
+      spr.drawFastHLine(f.x - 6, f.y, 3, TFT_PURPLE);
+      spr.drawFastHLine(f.x + 4, f.y, 3, TFT_PURPLE);
+    }
   }
 
   for (const auto &b : s_bullets)
@@ -691,19 +748,29 @@ void drawSignalRecovery()
     if (!e.active)
       continue;
 
-    // Asteroid hazard
-    const uint16_t rockDark = spr.color565(85, 76, 72);
-    const uint16_t rockMid = spr.color565(135, 122, 110);
-    const uint16_t rockLight = spr.color565(190, 176, 150);
+    const int drawX = e.x - (kSigAsteroidSpriteW / 2);
+    const int drawY = e.y - (kSigAsteroidSpriteH / 2);
 
-    spr.fillCircle(e.x, e.y, e.r, rockMid);
-    spr.drawCircle(e.x, e.y, e.r, rockLight);
-    spr.drawPixel(e.x - 3, e.y - 2, rockDark);
-    spr.drawPixel(e.x + 2, e.y + 1, rockDark);
-    spr.drawFastHLine(e.x - 4, e.y + 3, 5, rockDark);
+    if (s_sigAsteroidSpr)
+    {
+      s_sigAsteroidSpr->pushSprite(&spr, drawX, drawY, kSigSpriteKey);
+    }
+    else
+    {
+      // Fallback primitive asteroid if the asset is missing.
+      const uint16_t rockDark = spr.color565(85, 76, 72);
+      const uint16_t rockMid = spr.color565(135, 122, 110);
+      const uint16_t rockLight = spr.color565(190, 176, 150);
 
-    if (e.r > 6)
-      spr.drawCircle(e.x - 2, e.y - 1, 2, rockDark);
+      spr.fillCircle(e.x, e.y, e.r, rockMid);
+      spr.drawCircle(e.x, e.y, e.r, rockLight);
+      spr.drawPixel(e.x - 3, e.y - 2, rockDark);
+      spr.drawPixel(e.x + 2, e.y + 1, rockDark);
+      spr.drawFastHLine(e.x - 4, e.y + 3, 5, rockDark);
+
+      if (e.r > 6)
+        spr.drawCircle(e.x - 2, e.y - 1, 2, rockDark);
+    }
   }
 
   sigDrawPlayer();
