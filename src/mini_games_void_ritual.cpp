@@ -552,6 +552,9 @@ void drawVoidRitual()
 
   if (s_voidShowIntro)
   {
+    // Keep the intro clean: no starfield, no ritual geometry, no primitive preview.
+    spr.fillSprite(TFT_BLACK);
+
     spr.setTextDatum(CC_DATUM);
     spr.setTextFont(2);
     spr.setTextSize(1);
@@ -562,13 +565,11 @@ void drawVoidRitual()
 
     if (s_voidAssetsPreloaded)
     {
-      voidDrawGlyph(gW / 2 - 34, 62, 0, spr.color565(190, 100, 255), false);
-      voidDrawGlyph(gW / 2, 62, 1, spr.color565(190, 100, 255), false);
-      voidDrawGlyph(gW / 2 + 34, 62, 2, spr.color565(190, 100, 255), false);
-    }
-    else
-    {
-      voidDrawRift(gW / 2, 62, true);
+      const int runeY = 68;
+
+      voidDrawGlyph(gW / 2 - 34, runeY, 0, spr.color565(190, 100, 255), false);
+      voidDrawGlyph(gW / 2, runeY, 1, spr.color565(190, 100, 255), false);
+      voidDrawGlyph(gW / 2 + 34, runeY, 2, spr.color565(190, 100, 255), false);
     }
 
     spr.setTextColor(spr.color565(190, 100, 255), TFT_BLACK);

@@ -39,12 +39,21 @@ static bool rr_onGround = true;
 static int rr_distance = 0;
 uint32_t rr_lastMs = 0;
 
+static bool s_rrPhaseIntroActive = false;
+static uint32_t s_rrPhaseIntroUntilMs = 0;
+static uint8_t s_rrPhaseIntroNumber = 1;
+static uint8_t s_rrCurrentEnemyPhase = 0;
+
+static constexpr uint32_t kRrPhaseIntroMs = 1100;
+static constexpr int kRrEnemyPhase2Dist = 2600;
+static constexpr int kRrEnemyPhase3Dist = 5200;
+
 static bool rr_boosting = false;
 static uint32_t rr_boostEndMs = 0;
 static uint32_t rr_boostCooldownEndMs = 0;
 
-static constexpr int kRrBaseSpeed = 290;
-static constexpr int kRrBoostSpeed = 430;
+static constexpr int kRrBaseSpeed = 310;
+static constexpr int kRrBoostSpeed = 455;
 static constexpr uint32_t kRrBoostMs = 180;
 static constexpr uint32_t kRrBoostCooldownMs = 600;
 
@@ -85,17 +94,6 @@ static inline void rrExitMiniGameToReturnUi(bool beginLockout = true)
   miniGameExitToReturnUi(beginLockout);
 }
 
-struct RrStar
-{
-  int16_t x;
-  int16_t y;
-  uint8_t phase;
-  uint8_t kind;
-};
-
-static constexpr int kRrStarCount = 18;
-static RrStar s_rrStars[kRrStarCount];
-
 enum RRPhase : uint8_t
 {
   RR_PHASE_RUN = 0,
@@ -114,7 +112,7 @@ static bool s_rrHandTouched = false;
 static int s_rrHandX = 0;
 static int s_rrHandY = 0;
 
-static constexpr int kRrHandTriggerDist = 7200;
+static constexpr int kRrHandTriggerDist = 7900;
 static constexpr int kRrHandEnterSpeed = 2;
 static constexpr int kRrHandExitSpeed = 3;
 static constexpr uint32_t kRrHandHoldMs = 250;
@@ -128,53 +126,42 @@ static void resRunLogState(const char *tag)
                 (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 
+static void rrBeginPhaseIntro(uint8_t phaseNumber, uint32_t now)
+{
+  s_rrPhaseIntroActive = true;
+  s_rrPhaseIntroUntilMs = now + kRrPhaseIntroMs;
+  s_rrPhaseIntroNumber = phaseNumber;
+  requestUIRedraw();
+}
+
+static void rrMaybeStartEnemyPhaseIntro(uint32_t now)
+{
+  uint8_t wantedPhase = 0;
+
+  if (rr_distance >= kRrEnemyPhase3Dist)
+    wantedPhase = 2;
+  else if (rr_distance >= kRrEnemyPhase2Dist)
+    wantedPhase = 1;
+  else
+    wantedPhase = 0;
+
+  if (wantedPhase != s_rrCurrentEnemyPhase)
+  {
+    s_rrCurrentEnemyPhase = wantedPhase;
+    rrBeginPhaseIntro((uint8_t)(s_rrCurrentEnemyPhase + 1), now);
+  }
+}
+
 static const char *resRunSnakeCrouchPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/worm_crouch.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/snake_crouch.png";
-  }
+  return "/raising_hell/graphics/mini_games/resrun/dev/snake_crouch.png";
 }
 
-static const char *resRunSnakeJumpPathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/worm_jump.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/snake_jump.png";
-  }
-}
+static const char *resRunSnakeJumpPathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/snake_jump.png"; }
 
-static const char *resRunIntroLine1ForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Up/Down to Jump/Duck G to boost";
-  case PET_DEVIL:
-  default:
-    return "Up/Down to Jump/Duck G to boost";
-  }
-}
+static const char *resRunIntroLine1ForPet() { return "Up/Down to Jump/Duck G to boost"; }
 
-static const char *resRunIntroLine2ForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "Deliver the tome to the cult";
-  case PET_DEVIL:
-  default:
-    return "Deliver the apple to our ally";
-  }
-}
+static const char *resRunIntroLine2ForPet() { return "Deliver the apple to our ally"; }
 
 struct RRObs
 {
@@ -289,124 +276,36 @@ static uint8_t s_rrAnimFrame = 0;
 static int s_rrPlayerGoalOffsetX = 0;
 static constexpr int kRrGoalWalkSpeed = 2;
 
-static const char *resRunHand1PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/cult_hand1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/hand_1.png";
-  }
-}
+static const char *resRunHand1PathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/hand_1.png"; }
 
-static const char *resRunHand2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/cult_hand2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/hand_2.png";
-  }
-}
+static const char *resRunHand2PathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/hand_2.png"; }
 
 static const char *resRunLadybugGroundPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/rat_ground.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_ground.png";
-  }
+  return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_ground.png";
 }
 
 static const char *resRunLadybugFly1PathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/bat_fly1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly1.png";
-  }
+  return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly1.png";
 }
 
 static const char *resRunLadybugFly2PathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/bat_fly2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly2.png";
-  }
+  return "/raising_hell/graphics/mini_games/resrun/dev/ladybug_fly2.png";
 }
 
-static const char *resRunSnakeRun1PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/worm_run1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/snake_run1.png";
-  }
-}
+static const char *resRunSnakeRun1PathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/snake_run1.png"; }
 
-static const char *resRunSnakeRun2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/worm_run2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/snake_run2.png";
-  }
-}
+static const char *resRunSnakeRun2PathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/snake_run2.png"; }
 
-static const char *resRunSnakeWin1PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/worm_win1.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/snake_win1.png";
-  }
-}
+static const char *resRunSnakeWin1PathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/snake_win1.png"; }
 
-static const char *resRunSnakeWin2PathForPet()
-{
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/worm_win2.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/snake_win2.png";
-  }
-}
+static const char *resRunSnakeWin2PathForPet() { return "/raising_hell/graphics/mini_games/resrun/dev/snake_win2.png"; }
 
 static const char *resRunBranchGroundPathForPet()
 {
-  switch (pet.type)
-  {
-  case PET_ELDRITCH:
-    return "/raising_hell/graphics/mini_games/resrun/eld/dock_ground.png";
-  case PET_DEVIL:
-  default:
-    return "/raising_hell/graphics/mini_games/resrun/dev/branch_ground.png";
-  }
+  return "/raising_hell/graphics/mini_games/resrun/dev/branch_ground.png";
 }
 
 static bool ensureResRunHandSprites()
@@ -576,11 +475,16 @@ static void rrResetRunState()
   rr_distance = 0;
   rr_lastMs = millis();
 
+  s_rrPhaseIntroActive = false;
+  s_rrPhaseIntroUntilMs = 0;
+  s_rrPhaseIntroNumber = 1;
+  s_rrCurrentEnemyPhase = 0;
+
   rr_y = 0.0f;
   rr_vy = 0.0f;
   rr_onGround = true;
 
-  rr_courseLen = 7800;
+  rr_courseLen = 8200;
   rrResetObstacles();
   rr_nextSpawn = 0;
 
@@ -596,8 +500,6 @@ static void rrResetRunState()
   s_rrHandX = (screenW > 0) ? screenW : 240;
   s_rrHandY = ((screenH > 0) ? screenH : 135) - kRrGroundH - s_rrHandH + 8;
   s_rrPlayerGoalOffsetX = 0;
-
-  rrInitStars();
 }
 
 static void rrFinishRun(bool won)
@@ -612,7 +514,7 @@ static void rrFinishRun(bool won)
   g_app.gameOver = true;
   playerWon = won;
   if (won)
-  soundWin();
+    soundWin();
   s_resultShown = true;
 
   if (!won)
@@ -676,93 +578,6 @@ static void rrResetObstacles()
 {
   for (auto &o : rr_obs)
     o = {0, 0, 0, 0, false, false};
-}
-
-static void rrInitStars()
-{
-  const int gW = (screenW > 0) ? screenW : 240;
-  const int gH = (screenH > 0) ? screenH : 135;
-  const int groundY = gH - kRrGroundH;
-
-  for (int i = 0; i < kRrStarCount; ++i)
-  {
-    s_rrStars[i].x = (int16_t)random(0, gW);
-    s_rrStars[i].y = (int16_t)random(4, groundY - 6);
-    s_rrStars[i].phase = (uint8_t)random(0, 64);
-    s_rrStars[i].kind = (uint8_t)random(0, 4);
-  }
-}
-
-static void rrDrawEldritchStars(int groundY, uint32_t now)
-{
-  if (pet.type != PET_ELDRITCH)
-    return;
-
-  const uint32_t tick = now / 90U;
-
-  for (int i = 0; i < kRrStarCount; ++i)
-  {
-    const RrStar &s = s_rrStars[i];
-
-    if (s.y < 0 || s.y >= groundY)
-      continue;
-
-    const uint8_t t = (uint8_t)((tick + s.phase) & 31U);
-    const uint8_t glow = (t < 16U) ? t : (31U - t);
-
-    if (glow < 2)
-      continue;
-
-    uint16_t c;
-    if (glow < 5)
-      c = spr.color565(90, 90, 110);
-    else if (glow < 9)
-      c = spr.color565(150, 150, 185);
-    else
-      c = spr.color565(230, 230, 255);
-
-    if (s.kind == 0)
-    {
-      spr.drawPixel(s.x, s.y, c);
-    }
-    else if (s.kind == 1)
-    {
-      spr.drawPixel(s.x, s.y, c);
-      if (glow >= 8)
-      {
-        if (s.x > 0)
-          spr.drawPixel(s.x - 1, s.y, c);
-        if (s.x + 1 < ((screenW > 0) ? screenW : 240))
-          spr.drawPixel(s.x + 1, s.y, c);
-      }
-    }
-    else if (s.kind == 2)
-    {
-      spr.drawPixel(s.x, s.y, c);
-      if (glow >= 8)
-      {
-        if (s.y > 0)
-          spr.drawPixel(s.x, s.y - 1, c);
-        if (s.y + 1 < groundY)
-          spr.drawPixel(s.x, s.y + 1, c);
-      }
-    }
-    else
-    {
-      spr.drawPixel(s.x, s.y, c);
-      if (glow >= 10)
-      {
-        if (s.x > 0)
-          spr.drawPixel(s.x - 1, s.y, c);
-        if (s.x + 1 < ((screenW > 0) ? screenW : 240))
-          spr.drawPixel(s.x + 1, s.y, c);
-        if (s.y > 0)
-          spr.drawPixel(s.x, s.y - 1, c);
-        if (s.y + 1 < groundY)
-          spr.drawPixel(s.x, s.y + 1, c);
-      }
-    }
-  }
 }
 
 static bool rrAabb(int ax, int ay, int aw, int ah, int bx, int by, int bw, int bh)
@@ -900,7 +715,6 @@ void updateResurrectionRun(const InputState &input)
       rr_lastMs = now;
 
       resRunLogState("intro-dismissed");
-
       clearInputLatch();
       inputForceClear();
       mgBeginInputLockout(120);
@@ -963,7 +777,19 @@ void updateResurrectionRun(const InputState &input)
     py = groundY - ph + (int)rr_y;
 
   if (scrollWorld)
+  {
+    const int beforeDist = rr_distance;
     rr_distance += (int)(speed * dt);
+
+    if (s_rrPhase == RR_PHASE_RUN && rr_distance != beforeDist)
+      rrMaybeStartEnemyPhaseIntro(now);
+  }
+
+  if (s_rrPhaseIntroActive && (int32_t)(now - s_rrPhaseIntroUntilMs) >= 0)
+  {
+    s_rrPhaseIntroActive = false;
+    requestUIRedraw();
+  }
 
   if (s_rrPhase == RR_PHASE_RUN)
   {
@@ -1230,26 +1056,7 @@ void drawResurrectionRun()
     return;
   }
 
-  uint16_t skyColor = TFT_CYAN;
-
-  if (pet.type == PET_ELDRITCH)
-  {
-    skyColor = spr.color565(12, 0, 20);
-    spr.fillRect(0, 0, gW, groundY, skyColor);
-
-    for (int y = 0; y < groundY; y += 4)
-    {
-      uint8_t shade = 8 + (y / 8);
-      uint16_t c = spr.color565(shade, 0, shade * 2);
-      spr.drawFastHLine(0, y, gW, c);
-    }
-
-    rrDrawEldritchStars(groundY, millis());
-  }
-  else
-  {
-    spr.fillRect(0, 0, gW, groundY, skyColor);
-  }
+  spr.fillRect(0, 0, gW, groundY, TFT_CYAN);
 
   if (groundSpr && groundSpr->width() > 0 && groundSpr->height() > 0)
   {
@@ -1364,5 +1171,26 @@ void drawResurrectionRun()
     {
       spr.fillRoundRect(ox, o.y, o.w, o.h, 4, TFT_GREEN);
     }
+  }
+
+  if (s_rrPhaseIntroActive)
+  {
+    char phaseBuf[24];
+    snprintf(phaseBuf, sizeof(phaseBuf), "PHASE %u", (unsigned)s_rrPhaseIntroNumber);
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextFont(2);
+    spr.setTextSize(1);
+
+    const uint16_t phaseRed = spr.color565(255, 0, 0);
+
+    // Draw a tiny dark shadow first for readability, then explicit red text.
+    spr.setTextColor(TFT_BLACK);
+    spr.drawCentreString(phaseBuf, (gW / 2) + 1, 18, 2);
+
+    spr.setTextColor(phaseRed);
+    spr.drawCentreString(phaseBuf, gW / 2, 17, 2);
+
+    spr.setTextDatum(TL_DATUM);
   }
 }
