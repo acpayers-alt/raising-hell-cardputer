@@ -26,6 +26,10 @@ uint32_t s_voidRitualLastMs = 0;
 static int s_voidFocusLane = 1;
 static int s_voidRitual = 0;
 static int s_voidStability = 4;
+static uint8_t s_voidPhaseIndex = 0;
+static uint8_t s_voidPhaseMatches = 0;
+static bool s_voidPhaseIntroActive = false;
+static uint32_t s_voidPhaseIntroUntilMs = 0;
 
 static uint32_t s_voidStartedMs = 0;
 static uint32_t s_voidNextRiftMs = 0;
@@ -33,13 +37,35 @@ static uint32_t s_voidRiftExpiresMs = 0;
 static uint32_t s_voidAnimMs = 0;
 static uint8_t s_voidPhase = 0;
 
-static int s_voidActiveLane = -1;
-static bool s_voidRiftOpen = false;
+static uint8_t s_voidSelectedLane = 1;
+static uint8_t s_voidTargetGlyph = 0;
+static uint8_t s_voidLaneGlyphs[3] = {0, 1, 2};
+static uint32_t s_voidRoundExpiresMs = 0;
 
 static constexpr int kVoidGoal = 100;
 static constexpr int kVoidMaxStability = 4;
-static constexpr uint32_t kVoidMaxRunMs = 45000;
-static constexpr uint32_t kVoidRiftWindowMs = 1250;
+static constexpr uint8_t kVoidPhaseCount = 3;
+static constexpr uint8_t kVoidMatchesPerPhase = 6;
+static constexpr uint32_t kVoidPhaseIntroMs = 1100;
+
+static constexpr uint32_t kVoidRoundWindowMsByPhase[kVoidPhaseCount] = {
+    5200, // Phase 1: slower
+    4200, // Phase 2: current timing
+    3200, // Phase 3: faster
+};
+
+static uint32_t voidCurrentRoundWindowMs()
+{
+  const uint8_t idx = (s_voidPhaseIndex < kVoidPhaseCount) ? s_voidPhaseIndex : (kVoidPhaseCount - 1);
+  return kVoidRoundWindowMsByPhase[idx];
+}
+
+static void voidBeginPhaseIntro(uint32_t now)
+{
+  s_voidPhaseIntroActive = true;
+  s_voidPhaseIntroUntilMs = now + kVoidPhaseIntroMs;
+  s_voidRoundExpiresMs = 0;
+}
 
 bool voidRitualIsShowingIntro() { return s_voidShowIntro; }
 
@@ -75,16 +101,25 @@ static void voidFinish(bool won)
   requestUIRedraw();
 }
 
-static void voidOpenRift(uint32_t now)
+static void voidStartRound(uint32_t now)
 {
-  int nextLane = random(0, 3);
+  s_voidLaneGlyphs[0] = 0;
+  s_voidLaneGlyphs[1] = 1;
+  s_voidLaneGlyphs[2] = 2;
 
-  if (nextLane == s_voidActiveLane)
-    nextLane = (nextLane + 1 + random(0, 2)) % 3;
+  // Shuffle glyph placement so the match moves around.
+  for (int i = 0; i < 3; ++i)
+  {
+    const int j = random(0, 3);
+    const uint8_t tmp = s_voidLaneGlyphs[i];
+    s_voidLaneGlyphs[i] = s_voidLaneGlyphs[j];
+    s_voidLaneGlyphs[j] = tmp;
+  }
 
-  s_voidActiveLane = nextLane;
-  s_voidRiftOpen = true;
-  s_voidRiftExpiresMs = now + kVoidRiftWindowMs;
+  s_voidTargetGlyph = random(0, 3);
+  s_voidSelectedLane = 1;
+  s_voidFocusLane = 1;
+  s_voidRoundExpiresMs = now + voidCurrentRoundWindowMs();
 }
 
 static void voidMiss()
@@ -100,16 +135,34 @@ static void voidMiss()
 
 static void voidHit()
 {
-  s_voidRitual = constrain(s_voidRitual + 18, 0, kVoidGoal);
-
   soundConfirm();
 
-  s_voidRiftOpen = false;
-  s_voidActiveLane = -1;
-  s_voidNextRiftMs = millis() + random(500, 900);
+  if (s_voidPhaseMatches < 255)
+    s_voidPhaseMatches++;
 
-  if (s_voidRitual >= kVoidGoal)
-    voidFinish(true);
+  const int totalMatchesNeeded = (int)kVoidPhaseCount * (int)kVoidMatchesPerPhase;
+  const int completedMatches = ((int)s_voidPhaseIndex * (int)kVoidMatchesPerPhase) + (int)s_voidPhaseMatches;
+  s_voidRitual = constrain((completedMatches * kVoidGoal) / totalMatchesNeeded, 0, kVoidGoal);
+
+  const uint32_t now = millis();
+
+  if (s_voidPhaseMatches >= kVoidMatchesPerPhase)
+  {
+    s_voidPhaseMatches = 0;
+
+    if (s_voidPhaseIndex + 1 >= kVoidPhaseCount)
+    {
+      s_voidRitual = kVoidGoal;
+      voidFinish(true);
+      return;
+    }
+
+    s_voidPhaseIndex++;
+    voidBeginPhaseIntro(now);
+    return;
+  }
+
+  voidStartRound(now);
 }
 
 static void voidReset()
@@ -119,18 +172,27 @@ static void voidReset()
   s_voidWon = false;
 
   s_voidFocusLane = 1;
+  s_voidSelectedLane = 1;
   s_voidRitual = 0;
   s_voidStability = kVoidMaxStability;
-  s_voidActiveLane = -1;
-  s_voidRiftOpen = false;
+  s_voidPhaseIndex = 0;
+  s_voidPhaseMatches = 0;
+  s_voidPhaseIntroActive = false;
+  s_voidPhaseIntroUntilMs = 0;
+  s_voidTargetGlyph = 0;
+  s_voidLaneGlyphs[0] = 0;
+  s_voidLaneGlyphs[1] = 1;
+  s_voidLaneGlyphs[2] = 2;
+  s_voidRoundExpiresMs = 0;
 
   const uint32_t now = millis();
   s_voidRitualLastMs = now;
   s_voidStartedMs = now;
   s_voidNextRiftMs = now + 900;
-  s_voidRiftExpiresMs = 0;
+  s_voidRoundExpiresMs = 0;
   s_voidAnimMs = now;
   s_voidPhase = 0;
+  voidBeginPhaseIntro(now);
 }
 
 void startVoidRitual()
@@ -213,6 +275,18 @@ void updateVoidRitual(const InputState &input)
   if (s_voidGameOver)
     return;
 
+  if (s_voidPhaseIntroActive)
+  {
+    if ((int32_t)(now - s_voidPhaseIntroUntilMs) >= 0)
+    {
+      s_voidPhaseIntroActive = false;
+      voidStartRound(now);
+      requestUIRedraw();
+    }
+
+    return;
+  }
+
   if ((uint32_t)(now - s_voidAnimMs) >= 120)
   {
     s_voidAnimMs = now;
@@ -221,39 +295,40 @@ void updateVoidRitual(const InputState &input)
 
   s_voidRitualLastMs = now;
 
-  if (input.mgLeftOnce && s_voidFocusLane > 0)
+  if (input.mgLeftOnce && s_voidSelectedLane > 0)
   {
-    s_voidFocusLane--;
+    s_voidSelectedLane--;
+    s_voidFocusLane = s_voidSelectedLane;
     soundClick();
   }
 
-  if (input.mgRightOnce && s_voidFocusLane < 2)
+  if (input.mgRightOnce && s_voidSelectedLane < 2)
   {
-    s_voidFocusLane++;
+    s_voidSelectedLane++;
+    s_voidFocusLane = s_voidSelectedLane;
     soundClick();
   }
 
-  if (s_voidRiftOpen && (int32_t)(now - s_voidRiftExpiresMs) >= 0)
+  if ((int32_t)(now - s_voidRoundExpiresMs) >= 0)
   {
-    s_voidRiftOpen = false;
-    s_voidActiveLane = -1;
-    s_voidNextRiftMs = now + random(450, 850);
     voidMiss();
 
     if (s_voidGameOver)
       return;
-  }
 
-  if (!s_voidRiftOpen && (int32_t)(now - s_voidNextRiftMs) >= 0)
-  {
-    voidOpenRift(now);
+    voidStartRound(now);
   }
 
   if ((enterOnce || input.mgSelectOnce) && !mgInputLockedOut())
   {
-    if (s_voidRiftOpen && s_voidFocusLane == s_voidActiveLane)
+    const bool match = (s_voidLaneGlyphs[s_voidSelectedLane] == s_voidTargetGlyph);
+
+    if (match)
     {
       voidHit();
+
+      if (s_voidGameOver)
+        return;
     }
     else
     {
@@ -261,13 +336,9 @@ void updateVoidRitual(const InputState &input)
 
       if (s_voidGameOver)
         return;
-    }
-  }
 
-  if ((uint32_t)(now - s_voidStartedMs) >= kVoidMaxRunMs)
-  {
-    voidFinish(false);
-    return;
+      voidStartRound(now);
+    }
   }
 }
 
@@ -339,6 +410,43 @@ static void voidDrawRift(int x, int y, bool active)
   }
 }
 
+static void voidDrawGlyph(int x, int y, uint8_t glyph, uint16_t col, bool selected)
+{
+  if (selected)
+  {
+    spr.drawRoundRect(x - 17, y - 17, 34, 34, 6, TFT_WHITE);
+    spr.drawRoundRect(x - 15, y - 15, 30, 30, 5, col);
+  }
+
+  switch (glyph % 3)
+  {
+  case 0:
+    // Eye glyph
+    spr.drawEllipse(x, y, 13, 7, col);
+    spr.fillCircle(x, y, 3, col);
+    spr.drawPixel(x - 5, y - 1, TFT_WHITE);
+    break;
+
+  case 1:
+    // Spiral / ring glyph
+    spr.drawCircle(x, y, 12, col);
+    spr.drawCircle(x, y, 7, col);
+    spr.drawLine(x, y, x + 10, y - 5, col);
+    spr.drawPixel(x + 3, y - 2, TFT_WHITE);
+    break;
+
+  case 2:
+  default:
+    // Rune fork glyph
+    spr.drawFastVLine(x, y - 12, 24, col);
+    spr.drawLine(x, y - 4, x - 10, y - 12, col);
+    spr.drawLine(x, y - 4, x + 10, y - 12, col);
+    spr.drawLine(x, y + 4, x - 8, y + 12, col);
+    spr.drawLine(x, y + 4, x + 8, y + 12, col);
+    break;
+  }
+}
+
 static void voidDrawFocus(int x, int y)
 {
   const uint16_t col = spr.color565(190, 120, 255);
@@ -371,9 +479,9 @@ void drawVoidRitual()
     spr.drawCentreString("VOID RITUAL", gW / 2, 14, 2);
 
     spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    spr.drawCentreString("LEFT/RIGHT to align", gW / 2, 38, 2);
-    spr.drawCentreString("ENTER/G to bind rifts", gW / 2, 56, 2);
-    spr.drawCentreString("Pull the soul back", gW / 2, 80, 2);
+    spr.drawCentreString("LEFT/RIGHT to choose", gW / 2, 38, 2);
+    spr.drawCentreString("ENTER/G to match", gW / 2, 56, 2);
+    spr.drawCentreString("Bind the correct rune", gW / 2, 80, 2);
 
     voidDrawRift(gW / 2, 104, true);
 
@@ -386,39 +494,59 @@ void drawVoidRitual()
 
   voidDrawHud(gW);
 
-  const int riftY = voidRiftY(gH);
-  const int focusY = voidFocusY(gH);
+  if (s_voidPhaseIntroActive)
+  {
+    char phaseBuf[24];
+    snprintf(phaseBuf, sizeof(phaseBuf), "PHASE %u", (unsigned)(s_voidPhaseIndex + 1));
+
+    spr.setTextDatum(CC_DATUM);
+    spr.setTextColor(spr.color565(190, 100, 255), TFT_BLACK);
+    spr.drawCentreString(phaseBuf, gW / 2, 48, 4);
+
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawCentreString("MATCH 6 RUNES", gW / 2, 82, 2);
+
+    spr.setTextDatum(TL_DATUM);
+    return;
+  }
+
+  const int glyphY = 52;
+  const int targetY = 96;
+
+  spr.setTextDatum(CC_DATUM);
+  spr.setTextColor(TFT_WHITE, TFT_BLACK);
+  spr.drawCentreString("MATCH THE RUNE", gW / 2, 22, 2);
 
   for (int lane = 0; lane < 3; ++lane)
   {
     const int x = voidLaneX(lane, gW);
-    const bool active = s_voidRiftOpen && lane == s_voidActiveLane;
+    const bool selected = ((uint8_t)lane == s_voidSelectedLane);
 
-    voidDrawRift(x, riftY, active);
-
-    spr.drawFastVLine(x, riftY + 18, focusY - riftY - 36, spr.color565(32, 12, 55));
+    voidDrawGlyph(x, glyphY, s_voidLaneGlyphs[lane], spr.color565(190, 100, 255), selected);
   }
 
-  voidDrawFocus(voidLaneX(s_voidFocusLane, gW), focusY);
+  spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  spr.drawCentreString("YOUR RUNE", gW / 2, 75, 1);
 
-  if (s_voidRiftOpen)
+  voidDrawGlyph(gW / 2, targetY, s_voidTargetGlyph, TFT_WHITE, false);
+
+  if (s_voidRoundExpiresMs != 0)
   {
     const uint32_t now = millis();
-    const uint32_t remainingMs = (now >= s_voidRiftExpiresMs) ? 0 : (s_voidRiftExpiresMs - now);
-    const int barW = 42;
-    const int fillW = (int)((remainingMs * (uint32_t)barW) / kVoidRiftWindowMs);
-    const int x = voidLaneX(s_voidActiveLane, gW) - (barW / 2);
-    const int y = riftY + 20;
+    const uint32_t remainingMs = (now >= s_voidRoundExpiresMs) ? 0 : (s_voidRoundExpiresMs - now);
 
-    spr.drawRect(x, y, barW, 4, TFT_DARKGREY);
-    spr.fillRect(x + 1, y + 1, constrain(fillW, 0, barW - 2), 2, TFT_WHITE);
+    const int barW = 92;
+    const int barX = (gW - barW) / 2;
+    const int barY = gH - 20;
+    const int fillW = (int)((remainingMs * (uint32_t)barW) / voidCurrentRoundWindowMs());
+
+    spr.drawRect(barX, barY, barW, 5, TFT_DARKGREY);
+    spr.fillRect(barX + 1, barY + 1, constrain(fillW, 0, barW - 2), 3, TFT_WHITE);
   }
 
-  const uint32_t elapsed = millis() - s_voidStartedMs;
-  const int remaining = (elapsed >= kVoidMaxRunMs) ? 0 : (int)((kVoidMaxRunMs - elapsed) / 1000UL);
-
-  char buf[20];
-  snprintf(buf, sizeof(buf), "%ds", remaining);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "PHASE %u/%u  %u/%u", (unsigned)(s_voidPhaseIndex + 1), (unsigned)kVoidPhaseCount,
+           (unsigned)s_voidPhaseMatches, (unsigned)kVoidMatchesPerPhase);
 
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(TFT_DARKGREY, TFT_BLACK);
