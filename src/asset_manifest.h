@@ -14,7 +14,11 @@ void assetManifestBuildDiff(const AssetManifestData &localManifest, const AssetM
 bool assetManifestDownloadDiffOnly(const char *url, const AssetManifestData &localManifest, String *outPackVersion,
                                    std::vector<AssetManifestFile> &outChangedFiles);
 
-bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersion, uint16_t *outChangedCount);
+typedef void (*AssetManifestDownloadProgressCb)(uint32_t bytesCurrent, uint32_t bytesTotal, void *ctx);
+
+bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersion, uint16_t *outChangedCount,
+                                          AssetManifestDownloadProgressCb progressCb = nullptr,
+                                          void *progressCtx = nullptr);
 
 bool assetManifestLoadLocalPackVersion(String *outPackVersion);
 

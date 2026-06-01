@@ -626,8 +626,13 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
       if (fillW > 0)
         d.fillRect(13, 73, fillW, 12, TFT_GREEN);
 
-      char prog[40];
-      snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
+      char prog[48];
+
+      if (strcmp(stage, "manifest") == 0)
+        snprintf(prog, sizeof(prog), "Manifest %u%%", (unsigned)cur);
+      else
+        snprintf(prog, sizeof(prog), "File %u / %u", (unsigned)cur, (unsigned)total);
+
       d.setTextColor(TFT_WHITE, TFT_BLACK);
       d.drawString(prog, 12, 94);
     }
@@ -641,18 +646,17 @@ void drawBootAssetProvisionScreen(const char *line1, const char *line2)
 
     d.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
 
-    snprintf(progDetail, sizeof(progDetail), "st: %s", stage);
-    d.drawString(progDetail, 12, 112);
-
-    if (p.bytesTotal > 0)
-      snprintf(progDetail, sizeof(progDetail), "cur: %.1f KB", (double)p.bytesTotal / 1024.0);
+    if (strcmp(stage, "manifest") == 0 && p.bytesTotal > 0)
+    {
+      snprintf(progDetail, sizeof(progDetail), "%.1f / %.1f KB", (double)p.bytesCurrent / 1024.0,
+               (double)p.bytesTotal / 1024.0);
+      d.drawString(progDetail, 12, 112);
+    }
     else
-      snprintf(progDetail, sizeof(progDetail), "cur: %u", (unsigned)cur);
-
-    d.drawString(progDetail, 12, 124);
-
-    snprintf(progDetail, sizeof(progDetail), "total: %u", (unsigned)total);
-    d.drawString(progDetail, 12, 136);
+    {
+      snprintf(progDetail, sizeof(progDetail), "st: %s", stage);
+      d.drawString(progDetail, 12, 112);
+    }
   };
 
   if (assetOtaDidReleaseGraphics())

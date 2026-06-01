@@ -217,7 +217,8 @@ static bool assetManifestSelfCheckWorklist(uint16_t expectedCount, uint16_t *out
   return true;
 }
 
-bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersion, uint16_t *outChangedCount)
+bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersion, uint16_t *outChangedCount,
+                                          AssetManifestDownloadProgressCb progressCb, void *progressCtx)
 {
   Serial.printf("[OTA WL] begin url=%s free=%u largest=%u\n", url ? url : "(null)", (unsigned)ESP.getFreeHeap(),
                 (unsigned)ESP.getMaxAllocHeap());
@@ -284,6 +285,9 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
 
   const int contentLen = http.getSize();
   Serial.printf("[OTA WL] contentLen=%d\n", contentLen);
+
+  if (progressCb)
+    progressCb(0, (contentLen > 0) ? (uint32_t)contentLen : 0, progressCtx);
 
   File out = SD.open(tmpManifestPath, FILE_WRITE);
   if (!out)
@@ -362,6 +366,10 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
     }
 
     total += n;
+
+    if (progressCb)
+      progressCb((uint32_t)total, (contentLen > 0) ? (uint32_t)contentLen : 0, progressCtx);
+
     if (kLogOtaProgress && (total % 8192) == 0)
     {
       Serial.printf("[OTA WL] download progress=%u/%u\n", (unsigned)total,
@@ -375,6 +383,9 @@ bool assetManifestBuildWorklistFromRemote(const char *url, String *outPackVersio
 
   Serial.printf("[OTA WL] temp saved bytes=%u expected=%u\n", (unsigned)total,
                 (unsigned)((contentLen > 0) ? contentLen : 0));
+
+  if (progressCb)
+    progressCb((uint32_t)total, (contentLen > 0) ? (uint32_t)contentLen : (uint32_t)total, progressCtx);
 
   if (contentLen > 0 && total != (size_t)contentLen)
   {

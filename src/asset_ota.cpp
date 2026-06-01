@@ -511,6 +511,55 @@ static void otaRedrawProvisionScreen(const char *line1, const char *line2)
   delay(1);
 }
 
+static void otaSetFileProgress(const char *stage, uint16_t current, uint16_t total)
+{
+  s_progress.stage = stage ? stage : "-";
+  s_progress.current = current;
+  s_progress.total = total;
+  s_progress.bytesCurrent = 0;
+  s_progress.bytesTotal = 0;
+}
+
+static void otaSetManifestByteProgress(uint32_t bytesCurrent, uint32_t bytesTotal)
+{
+  s_progress.stage = "manifest";
+  s_progress.bytesCurrent = bytesCurrent;
+  s_progress.bytesTotal = bytesTotal;
+
+  if (bytesTotal > 0)
+  {
+    uint32_t pct = (bytesCurrent * 100UL) / bytesTotal;
+    if (pct > 100)
+      pct = 100;
+
+    s_progress.current = (uint16_t)pct;
+    s_progress.total = 100;
+  }
+  else
+  {
+    s_progress.current = 0;
+    s_progress.total = 100;
+  }
+}
+
+static void otaManifestProgressCb(uint32_t bytesCurrent, uint32_t bytesTotal, void *ctx)
+{
+  (void)ctx;
+
+  static uint32_t s_lastManifestProgressDrawMs = 0;
+
+  otaSetManifestByteProgress(bytesCurrent, bytesTotal);
+
+  const uint32_t now = millis();
+  const bool done = (bytesTotal > 0 && bytesCurrent >= bytesTotal);
+
+  if (done || s_lastManifestProgressDrawMs == 0 || (uint32_t)(now - s_lastManifestProgressDrawMs) >= 120)
+  {
+    s_lastManifestProgressDrawMs = now;
+    otaRedrawProvisionScreen("Checking assets...", "Downloading manifest...");
+  }
+}
+
 static void setFailure(AssetOtaError err)
 {
   s_lastErr = err;
@@ -837,6 +886,7 @@ bool assetOtaCheckNow(String *outMessage)
   s_state.totalFileCount = 0;
   s_state.targetPackVersion[0] = '\0';
   assetOtaStateSave(s_state);
+  otaSetManifestByteProgress(0, 0);
   otaRedrawProvisionScreen("Checking assets...", "Downloading manifest...");
 
   const AssetOtaChannel ch = (AssetOtaChannel)s_cfg.channel;
@@ -869,14 +919,19 @@ bool assetOtaCheckNow(String *outMessage)
   String remotePackVersion;
   uint16_t changedCount = 0;
 
-  bool manifestOk = assetManifestBuildWorklistFromRemote(manifestUrl, &remotePackVersion, &changedCount);
+  bool manifestOk =
+      assetManifestBuildWorklistFromRemote(manifestUrl, &remotePackVersion, &changedCount, otaManifestProgressCb);
 
   if (!manifestOk && fallbackManifestUrl && fallbackManifestUrl[0])
   {
     Serial.printf("[OTA] primary manifest failed; trying fallback: %s\n", fallbackManifestUrl);
     remotePackVersion = "";
     changedCount = 0;
-    manifestOk = assetManifestBuildWorklistFromRemote(fallbackManifestUrl, &remotePackVersion, &changedCount);
+    otaSetManifestByteProgress(0, 0);
+    otaRedrawProvisionScreen("Checking assets...", "Downloading fallback manifest...");
+
+    manifestOk = assetManifestBuildWorklistFromRemote(fallbackManifestUrl, &remotePackVersion, &changedCount,
+                                                      otaManifestProgressCb);
   }
 
   if (!manifestOk)
@@ -900,9 +955,7 @@ bool assetOtaCheckNow(String *outMessage)
   Serial.printf("[OTA] plan result: pack=%s changed=%u worklist=%s\n", remotePackVersion.c_str(),
                 (unsigned)changedCount, assetOtaWorklistPath());
 
-  s_progress.total = (changedCount > 0) ? changedCount : 1;
-  s_progress.current = 0;
-  s_progress.stage = (changedCount > 0) ? "planning" : "up-to-date";
+  otaSetFileProgress((changedCount > 0) ? "planning" : "up-to-date", 0, (changedCount > 0) ? changedCount : 1);
 
   strncpy(s_state.targetPackVersion, remotePackVersion.c_str(), sizeof(s_state.targetPackVersion) - 1);
   s_state.targetPackVersion[sizeof(s_state.targetPackVersion) - 1] = '\0';
@@ -1067,12 +1120,10 @@ bool assetOtaCheckNow(String *outMessage)
     {
       const AssetManifestFile &f = worklistBatch[batchIdx];
       const uint16_t idx = processedCount;
-      s_progress.current = idx + 1;
-      s_progress.bytesCurrent = 0;
+      otaSetFileProgress("downloading", idx + 1, (changedCount > 0) ? changedCount : 1);
       s_progress.bytesTotal = f.size;
-      
+
       s_status = AssetOtaStatus::DOWNLOADING;
-      s_progress.stage = "downloading";
 
       s_state.status = (uint8_t)s_status;
       s_state.currentFileIndex = (uint16_t)(idx + 1);
