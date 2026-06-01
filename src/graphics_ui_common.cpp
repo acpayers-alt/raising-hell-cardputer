@@ -13,7 +13,7 @@ uint16_t uiPillOutline(PetType t)
     return 0x07E0;
 
   case PET_ELDRITCH:
-    return 0x0010;
+    return 0x001F; // bright blue, matches Eldritch modal outline
 
   case PET_DEVIL:
   default:
