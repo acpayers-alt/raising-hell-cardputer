@@ -378,15 +378,17 @@ static void drawBeam()
   if (!beamActive())
     return;
 
+  const int beamX = s_ufoX;
+
   const int topY = s_ufoY + 7;
   const int botY = kGroundY;
   const int halfTop = 4;
   const int halfBot = 18;
 
-  spr.fillTriangle(s_beamX - halfTop, topY, s_beamX + halfTop, topY, s_beamX - halfBot, botY, TFT_DARKCYAN);
-  spr.fillTriangle(s_beamX + halfTop, topY, s_beamX - halfBot, botY, s_beamX + halfBot, botY, TFT_DARKCYAN);
-  spr.drawLine(s_beamX - halfTop, topY, s_beamX - halfBot, botY, TFT_CYAN);
-  spr.drawLine(s_beamX + halfTop, topY, s_beamX + halfBot, botY, TFT_CYAN);
+  spr.fillTriangle(beamX - halfTop, topY, beamX + halfTop, topY, beamX - halfBot, botY, TFT_DARKCYAN);
+  spr.fillTriangle(beamX + halfTop, topY, beamX - halfBot, botY, beamX + halfBot, botY, TFT_DARKCYAN);
+  spr.drawLine(beamX - halfTop, topY, beamX - halfBot, botY, TFT_CYAN);
+  spr.drawLine(beamX + halfTop, topY, beamX + halfBot, botY, TFT_CYAN);
 }
 
 static void drawTarget(const AbductionTarget &t)
