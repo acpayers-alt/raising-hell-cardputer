@@ -528,7 +528,7 @@ static void otaSetManifestByteProgress(uint32_t bytesCurrent, uint32_t bytesTota
 
   if (bytesTotal > 0)
   {
-    uint32_t pct = (bytesCurrent * 100UL) / bytesTotal;
+    uint32_t pct = (uint32_t)(((uint64_t)bytesCurrent * 100ULL) / bytesTotal);
     if (pct > 100)
       pct = 100;
 

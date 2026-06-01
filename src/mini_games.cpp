@@ -82,6 +82,10 @@ static void releaseMiniGameAssetsFor(MiniGame game)
     freeSignalRecoverySprites();
     break;
 
+  case MiniGame::VOID_RITUAL:
+    freeVoidRitualSprites();
+    break;
+
   default:
     break;
   }

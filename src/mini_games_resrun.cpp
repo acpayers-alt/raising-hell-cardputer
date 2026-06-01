@@ -78,7 +78,6 @@ static M5Canvas *s_rrLadybugGroundSpr = nullptr;
 static M5Canvas *s_rrLadybugFly1Spr = nullptr;
 static M5Canvas *s_rrLadybugFly2Spr = nullptr;
 
-static void rrInitStars();
 static void rrResetObstacles();
 
 static inline void rrExitMiniGameToReturnUi(bool beginLockout = true)

@@ -360,7 +360,8 @@ static void sigReset()
   s_sigStarPhase = 0;
 
   sigClearObjects();
-  sigBeginPhaseIntro(now);
+  s_sigPhaseIntroActive = false;
+  s_sigPhaseIntroUntilMs = 0;
 }
 
 void startSignalRecovery()

@@ -331,6 +331,8 @@ void updateVoidRitual(const InputState &input)
       s_voidShowIntro = false;
       s_voidRitualLastMs = now;
 
+      voidBeginPhaseIntro(now);
+
       clearInputLatch();
       inputForceClear();
       mgBeginInputLockout(120);
