@@ -710,6 +710,55 @@ void updateAbductionBeam(const InputState &input)
     finishGame(s_score >= kScoreToWin && s_strikes < kMaxStrikes);
 }
 
+static void drawAbductionTerrain()
+{
+  const uint16_t farHill = spr.color565(8, 58, 42);
+  const uint16_t midHill = spr.color565(10, 82, 48);
+  const uint16_t nearHill = spr.color565(8, 104, 54);
+  const uint16_t ground = spr.color565(5, 66, 38);
+  const uint16_t grass = spr.color565(28, 130, 65);
+  const uint16_t grassDim = spr.color565(12, 88, 48);
+
+  // Base fills prevent black gaps under the curved hills.
+  spr.fillRect(0, 76, SCREEN_W, 28, farHill);
+  spr.fillRect(0, 88, SCREEN_W, 28, midHill);
+
+  // Distant rounded hills.
+  spr.fillEllipse(42, 82, 62, 24, farHill);
+  spr.fillEllipse(126, 80, 72, 28, farHill);
+  spr.fillEllipse(210, 83, 66, 25, farHill);
+
+  // Middle rounded hills.
+  spr.fillEllipse(34, 98, 58, 25, midHill);
+  spr.fillEllipse(110, 94, 72, 30, midHill);
+  spr.fillEllipse(194, 97, 70, 27, midHill);
+
+  // Foreground meadow.
+  spr.fillRect(0, kGroundY - 18, SCREEN_W, SCREEN_H - (kGroundY - 18), ground);
+
+  // Closer rounded hills blended into the meadow.
+  spr.fillEllipse(54, kGroundY - 9, 68, 22, nearHill);
+  spr.fillEllipse(144, kGroundY - 10, 76, 24, nearHill);
+  spr.fillEllipse(222, kGroundY - 8, 62, 21, nearHill);
+
+  // Ground line and cheap grass texture.
+  spr.drawFastHLine(0, kGroundY, SCREEN_W, grass);
+
+  for (int x = 6; x < SCREEN_W; x += 17)
+  {
+    const int y = kGroundY + 5 + ((x * 7) % 14);
+    spr.drawPixel(x, y, grassDim);
+    spr.drawPixel(x + 1, y - 1, grass);
+  }
+
+  for (int x = 18; x < SCREEN_W; x += 31)
+  {
+    const int y = kGroundY + 12 + ((x * 5) % 10);
+    spr.drawFastVLine(x, y - 2, 3, grassDim);
+    spr.drawPixel(x + 1, y - 1, grass);
+  }
+}
+
 void drawAbductionBeam()
 {
   const int gW = screenW;
@@ -773,20 +822,8 @@ void drawAbductionBeam()
   // Draw black sky first.
   spr.fillSprite(TFT_BLACK);
 
-  // Draw terrain layer anchored to the bottom.
-  static constexpr int kAbductionBgH = 80;
-
-  if (g_sdReady)
-  {
-    if (!sprDrawPngFromSD("/raising_hell/graphics/mini_games/abduct/al_abd_bg.png", 0, SCREEN_H - kAbductionBgH))
-    {
-      spr.fillRect(0, kGroundY, SCREEN_W, SCREEN_H - kGroundY, TFT_DARKGREEN);
-      spr.drawLine(0, kGroundY, SCREEN_W, kGroundY, TFT_GREEN);
-    }
-  }
-
-  // Draw stars after the background so they are visible.
   drawAbductionStars(now);
+  drawAbductionTerrain();
 
   drawHud();
   drawBeam();
