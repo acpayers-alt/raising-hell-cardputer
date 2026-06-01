@@ -1,10 +1,345 @@
 {
-  "packVersion": "1.1.10",
-  "pack_version": "1.1.10",
+  "packVersion": "1.1.13",
+  "pack_version": "1.1.13",
   "channel": "public",
-  "generatedAt": "2026-05-01T21:59:20.835168+00:00",
-  "fileCount": 436,
+  "generatedAt": "2026-06-01T18:00:02.452852+00:00",
+  "fileCount": 663,
   "files": [
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim1.png",
+      "size": 9616,
+      "sha256": "e97797a23f00ec4155b34456caf410944a35e7d2ccbb218e13f1d456d9a6c37c"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim2.png",
+      "size": 9616,
+      "sha256": "847ef249aeb535b5198077b92df8c9ce5cf72210b72b3b43709bdb7385261396"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim3.png",
+      "size": 10718,
+      "sha256": "aff0099b4132d90e65420616f22768d63ec7578da27b42783bf3f4ad464fbc15"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim4.png",
+      "size": 11003,
+      "sha256": "efaac541330c8f8b5a514ad0568345a099759bea97b1f7494b550bb90a15bb51"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ad/al_ad_fsh_anim5.png",
+      "size": 14760,
+      "sha256": "fa6d5799aebd2039200dd744a0e67a45ba1afd41847329bcbbb94365526cbc35"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/al_fsh_bg.jpg",
+      "size": 17246,
+      "sha256": "ebf14f79c57a5d6d59adcf60021b5978329d20beb63048221f7ca8928abe17e0"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim1.png",
+      "size": 9663,
+      "sha256": "27c8cfd4ebf6d7c5114da7ee386cafb01905590d13e141bca0e64515f4c0df53"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim2.png",
+      "size": 10016,
+      "sha256": "6012f632c48c612feb11208d134367adf5f3c1d37534b8224dd7b9590a89553a"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim3.png",
+      "size": 10041,
+      "sha256": "6063ced75b78053cf83daace60572f3fba6a382318704d51ba9fcd0bd8bda688"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim4.png",
+      "size": 9248,
+      "sha256": "e94ff38fc14230a2eb4a3e758da3f48537d0ad3bb0394f8a07e6071cd7ed7107"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/bb/al_bb_fsh_anim5.png",
+      "size": 10801,
+      "sha256": "93875fd3dbbca3a98b083af101f13f1eb0990b9c7244c9c2c05c46afc437e2fd"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim1.png",
+      "size": 8318,
+      "sha256": "edcf5ed20369982b9d9e9647f1175bb266ac005609fea00d8a7371e11db4bd32"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim2.png",
+      "size": 8318,
+      "sha256": "edcf5ed20369982b9d9e9647f1175bb266ac005609fea00d8a7371e11db4bd32"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim3.png",
+      "size": 8989,
+      "sha256": "13b9730e7d507d2eb7d6ea94858043fe24a34f6d3b76e9bae0bd7f539979ba17"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim4.png",
+      "size": 10529,
+      "sha256": "735c42e30f96a2920de9cdddc101d1ac1afd1fcb59f65a24df0e9b37899c50ec"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/ed/al_ed_fsh_anim5.png",
+      "size": 16055,
+      "sha256": "fba1e0aaa7c996be48bf6ccf60bc51bbe4876405eb834398d37812d8825c5212"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim1.png",
+      "size": 7865,
+      "sha256": "23a8aea20917fb63ea62aa5cb50c37140ddf35502b30269813d30746b3802568"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim2.png",
+      "size": 7858,
+      "sha256": "c145336e49e2b538fb275bb322e06f183b978fdf3f64b486de812dbe98c2556a"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim3.png",
+      "size": 7852,
+      "sha256": "90a04bec52dedef847c72f2836486de9b373b0bc75b9333b1eb0c54eab3bda49"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim4.png",
+      "size": 8688,
+      "sha256": "a24d4229c2db751bebb29d3d264aec0adccca00f4892af74b30c40da9d6f26f8"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/al/tn/al_tn_fsh_anim5.png",
+      "size": 11925,
+      "sha256": "82ce16540e65ba5e5014607f616d64a05bbc67d28f5e6e3c156a030ce66da3f0"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim1.png",
+      "size": 9545,
+      "sha256": "e579802be6c0db2d2a10dd444768e468423d4359b518dcd17d883f6c9510df93"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim2.png",
+      "size": 9545,
+      "sha256": "e579802be6c0db2d2a10dd444768e468423d4359b518dcd17d883f6c9510df93"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim3.png",
+      "size": 10064,
+      "sha256": "988e97cc13006b36406c9a1a9d4c99ad2e3a9bbbd7ef32a949bb021fddd22ad8"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim4.png",
+      "size": 11397,
+      "sha256": "66429487c54342d3f9632fcd8953f2301db87f548a23bd2b598f495393cc10ab"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ad/dev_ad_fsh_anim5.png",
+      "size": 12604,
+      "sha256": "415fbb5ee7ea41c39fe41a033aa22dbbad2f9594ed38eae3eff54d5b034c019b"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim1.png",
+      "size": 8155,
+      "sha256": "71ab36ae21ce717816f57986b650a479ffe0bcd774f94ec6c4b1d4d3f2aa67d5"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim2.png",
+      "size": 8155,
+      "sha256": "71ab36ae21ce717816f57986b650a479ffe0bcd774f94ec6c4b1d4d3f2aa67d5"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim3.png",
+      "size": 8756,
+      "sha256": "a462af29ed4766748c4f123d012e082a74cca88441abb7999d9bdeae0ce1ff92"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim4.png",
+      "size": 8377,
+      "sha256": "124ccf82bd8d97c4c40c58ef196d79a60c3c954951b1a625540e38537a69cccb"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/bb/dev_bb_fsh_anim5.png",
+      "size": 10640,
+      "sha256": "a28847908edca628fbcd8003d4027616b1ddccc7375e7ca1a6e3ec09fb0796f3"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/dev_fsh_bg.jpg",
+      "size": 19836,
+      "sha256": "4029338511ec4613c5295a11b336f6b32bdafbb225e3dd5557d9700e702fefee"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim1.png",
+      "size": 15000,
+      "sha256": "91590fbcbcc06c5d03e1b749d37deafe9d662c854718d4f593da76736b37a8cc"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim2.png",
+      "size": 15000,
+      "sha256": "91590fbcbcc06c5d03e1b749d37deafe9d662c854718d4f593da76736b37a8cc"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim3.png",
+      "size": 13907,
+      "sha256": "d0b174bdaa2e34b419400d013807e1f51d200045c5ab0722ed16fe89440d8e6c"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim4.png",
+      "size": 14810,
+      "sha256": "8c8edba3e64a1772282f17042eba38785c3c662b4a4fc724cc6e873036307568"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/ed/dev_eld_fsh_anim5.png",
+      "size": 18853,
+      "sha256": "06b981160e907cba43045dcd1900143c22b98a665546041c90bc251eec8bc9c1"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim1.png",
+      "size": 9504,
+      "sha256": "e881356670ab381d65ba103cc3149d278062ea3ea6bc9a2f0690de1d8299ca91"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim2.png",
+      "size": 9506,
+      "sha256": "096a0eca4273515773dca119beacad7988ab9a9245e9a94e08cfd687ceeb0682"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim3.png",
+      "size": 9693,
+      "sha256": "925c9d8d2ba3f68fa33d8e8ecf44cbf25e7760b58653c061ba9503abc7bc39b0"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim4.png",
+      "size": 11879,
+      "sha256": "fba092c4d39b42b8f41c97390eed1359511a1e76f6a9b18b44a1b7b139c5988c"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/dev/tn/dev_tn_fsh_anim5.png",
+      "size": 13721,
+      "sha256": "590185b90770c90d1efe698a257d0280b5d6b364d90bca7feb3368c9399e15e1"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim1.png",
+      "size": 12759,
+      "sha256": "114de43b2f7227a631654ea8ad9b9ed864292b57dc072e756c0b0698703e95f8"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim2.png",
+      "size": 12759,
+      "sha256": "114de43b2f7227a631654ea8ad9b9ed864292b57dc072e756c0b0698703e95f8"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim3.png",
+      "size": 13606,
+      "sha256": "60e7e48b5f85fdeeb001810634142b2b1c8855ec4a7ff908a40ab395de990dd8"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim4.png",
+      "size": 14853,
+      "sha256": "cf0afa8148266a8fe7ad4e30ea8f730f5563d8888981a6029a3b069f2b925635"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ad/eld_ad_fsh_anim5.png",
+      "size": 17008,
+      "sha256": "b3cf16038cffe4ea6dab185f5a92bc51e2820020e3a68e961159f15bae47ec87"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim1.png",
+      "size": 11125,
+      "sha256": "d40430fb5a7eb997ed3b8c47b30f105ade3254a09cd05a262ef3ac38d0f8447e"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim2.png",
+      "size": 11123,
+      "sha256": "71c0656b2fd875184fa0d861e299cc7ae2fe62ec5876df0777770145d909da5b"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim3.png",
+      "size": 12082,
+      "sha256": "1038fd8b5786a1c46ea1de451ad3ee0f95176567b4c5bf7410c791927aaa0e38"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim4.png",
+      "size": 12110,
+      "sha256": "0b417b2a39c14e1b839f8d088b89fe08e5b5f1d1ba2599d2d82e61f544ba1684"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/bb/eld_bb_fsh_anim5.png",
+      "size": 12441,
+      "sha256": "6e14a9d2dee0e7131e39453d2ea3a87b9352f1cd8c2553db017b5d1c31171405"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim1.png",
+      "size": 15124,
+      "sha256": "c5ffe325d55f63c14a11143856e3a051ce4b244c9453ec05dea660d8c8f8b024"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim2.png",
+      "size": 15124,
+      "sha256": "c5ffe325d55f63c14a11143856e3a051ce4b244c9453ec05dea660d8c8f8b024"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim3.png",
+      "size": 14733,
+      "sha256": "308b01fd783453b8624f3a1f43436cd9300f680494914bb20c1329b0235b9d61"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim4.png",
+      "size": 14594,
+      "sha256": "ab6a40fa0f2d0a390aed0e57cda6ef7a7e80f4e3493abd11dab37ff1a98f035b"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/ed/eld_ed_fsh_anim5.png",
+      "size": 16615,
+      "sha256": "9d78a4df8245fc79446d5a736d707f150947b40cfef1d004d38f546072f5bd08"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/eld_fsh_bg.jpg",
+      "size": 12840,
+      "sha256": "cdad39b38573aed68aa6f914c52d8a4a47ce6ca4f829fff0a816ba61ac0c7493"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim1.png",
+      "size": 14053,
+      "sha256": "6d0570b0d73ac2cf9871fef8416af7a0b09eb1ca59a107a06f3be936d7807383"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim2.png",
+      "size": 14053,
+      "sha256": "6d0570b0d73ac2cf9871fef8416af7a0b09eb1ca59a107a06f3be936d7807383"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim3.png",
+      "size": 13584,
+      "sha256": "257b54078104f172fa6dfe1d3a4f46933035161c73366da79ea600752c622002"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim4.png",
+      "size": 13941,
+      "sha256": "f2a3bf0ea5b56f84643cfe024649dc2a285c21482390b360850729d8a1904c23"
+    },
+    {
+      "path": "raising_hell/graphics/activities/fishing/ed/tn/eld_tn_fsh_anim5.png",
+      "size": 17395,
+      "sha256": "77b4b99cad25ea7e392bc28780a7422a0f48927752de849840f3f32139fe857f"
+    },
+    {
+      "path": "raising_hell/graphics/background/al/al_ad_bg.jpg",
+      "size": 16926,
+      "sha256": "562921140d765d1d27162a89512271c94b67970cacde94c3ac4b83a4df131aec"
+    },
+    {
+      "path": "raising_hell/graphics/background/al/al_bb_bg.jpg",
+      "size": 21817,
+      "sha256": "6fda7c74d0da10035569a35e62f53e2ee210ae0d89f29f961c2e458e67d55f23"
+    },
+    {
+      "path": "raising_hell/graphics/background/al/al_ed_bg.jpg",
+      "size": 15714,
+      "sha256": "3a2029a01ca0d39ab1ad5d8588c9d0365574c23b16c5c6d60ff6b346de9d6736"
+    },
+    {
+      "path": "raising_hell/graphics/background/al/al_tn_bg.jpg",
+      "size": 21530,
+      "sha256": "7b9ae91ae34a2c01041ba6fa11b3349bcfafd9f9fab11fba9bfb37d3cf83a6b0"
+    },
     {
       "path": "raising_hell/graphics/background/dev/dev_ad_bg.jpg",
       "size": 17452,
@@ -56,6 +391,11 @@
       "sha256": "ef48c2e011f02aaae601942a4e82d8cd07e72d39763a54f4381d0b786d0f49f3"
     },
     {
+      "path": "raising_hell/graphics/background/flow/al_tab_bg.png",
+      "size": 8162,
+      "sha256": "821762cf961fda65e04b6d48b20a692faee52d73f79c4c8b17f5b584bc1e67ed"
+    },
+    {
       "path": "raising_hell/graphics/background/flow/dev_tab_bg.png",
       "size": 6410,
       "sha256": "ef62e59b3bdb398cc13292cf827b3cf8e066efa129a95f060a8106c8bddd9195"
@@ -76,64 +416,44 @@
       "sha256": "700020149a8ad4a63a878252137cd0bd73a92cb6a6c972f1c901c01b2c7bb19d"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/dev_goal_zone.png",
-      "size": 15473,
-      "sha256": "f66a4bc7eab1b105851cdcf3c0cf43f452154a82cbbe6ebc1ae91714700a7808"
+      "path": "raising_hell/graphics/mini_games/abduct/cow1.png",
+      "size": 2221,
+      "sha256": "1adff2e15f3997ccb347ccaf0f5367831ebf3ade7acfd1f2a9c6324d55010745"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone1.png",
-      "size": 2369,
-      "sha256": "8bd489063edbdb5722e27ffebace9310d54c31327d2fb618e2cf8d121e6c26c5"
+      "path": "raising_hell/graphics/mini_games/abduct/cow2.png",
+      "size": 2175,
+      "sha256": "a27775cdd13c4745395e60b8732c886c1c9258d0b30584a705755b3b6922f492"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/dev_lava_zone2.png",
-      "size": 2336,
-      "sha256": "05b5c7b01ebcc35ad6ac7685315062dd6e23de4f1869a459a56a263210c88718"
+      "path": "raising_hell/graphics/mini_games/abduct/mib1.png",
+      "size": 1719,
+      "sha256": "f44142389e832e1ada7f3e333160e50356a6cc19ee0092c9656241e6caf4a048"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/dev_start_zone.png",
-      "size": 13643,
-      "sha256": "47295fdd49682a0c06ca85930357b9d22f910039a92711c7f00dba5c15ed563c"
+      "path": "raising_hell/graphics/mini_games/abduct/mib2.png",
+      "size": 1228,
+      "sha256": "d532c938ba4d2293de197e26a69b233fef0045be56d5e3c7394d941e4a8f56e4"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/imp_down.png",
-      "size": 1896,
-      "sha256": "2768d6eca037e06964e8a09e904a1eea7cfd05d51a9254ff0a98d1eeffe4d9bb"
+      "path": "raising_hell/graphics/mini_games/abduct/tank1.png",
+      "size": 3499,
+      "sha256": "dd2dc5aa0df240123c8c7f87c61c97ad64e04e293783728d6a313b3e6bcb974e"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/imp_left.png",
-      "size": 1969,
-      "sha256": "6b7ba94d088b3e3379d21680ec2e86a54ee96cd18958ba9bdfcc4e845e9e2533"
+      "path": "raising_hell/graphics/mini_games/abduct/tank2.png",
+      "size": 3675,
+      "sha256": "bc7a86196b7b765af935837a47114c75c430bed5b8940c7da8fc439ca0b954d2"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/imp_right.png",
-      "size": 1961,
-      "sha256": "0c4221f8100f89a77c99b564cadf85edb7c7dc56ab6064bc191a84ca2e386883"
+      "path": "raising_hell/graphics/mini_games/abduct/ufo1.png",
+      "size": 3097,
+      "sha256": "0324e8436b3d919936ca7ced83a1bc529ffbbed3307baa5e5f91ba43f7429e62"
     },
     {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/imp_up.png",
-      "size": 1775,
-      "sha256": "6a320fde6685f2ce0b36774e9c65dd0d33d576f815bffd6e79cac744a48719c3"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/intro_goal.png",
-      "size": 17435,
-      "sha256": "186721241d9b39e59b40bd5894c6bc0850c054f0371e83f57d16eee3e8061ada"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/stone_chunk.png",
-      "size": 2934,
-      "sha256": "e4e70849175dde843b3fd676590f75f171883d239419d64a87b70d0d437825a7"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/stone_chunk_sm.png",
-      "size": 1953,
-      "sha256": "dcc85ebcc2d6067464646b2bd2f33600435a39e5bb1417974be58d60db55c3d5"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/crossy/dev/stone_chunk_xs.png",
-      "size": 1245,
-      "sha256": "6e6d4181383cedaa5827e45913dca435ded21295b232ef6a5ebee3fb23ae0f1c"
+      "path": "raising_hell/graphics/mini_games/abduct/ufo2.png",
+      "size": 3108,
+      "sha256": "b2bb7f39f5e9eac974f8f8176db533203e4dc761400f717e2fdbeddbaccb06ed"
     },
     {
       "path": "raising_hell/graphics/mini_games/crossy/eld/crossy_eld_bg.png",
@@ -241,51 +561,6 @@
       "sha256": "f1eb416382cae9f081bd1077249d353b2a306e282645d491d0b6a6048594423b"
     },
     {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgl.png",
-      "size": 20746,
-      "sha256": "8a50dcea5df06bf021bbb4ce10a4c3a57067a00c2279bc6b373d445d6ce0d8f7"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/eld_fbrun_bgr.png",
-      "size": 20482,
-      "sha256": "026c8345cee1ba44e24f51478e9c209b4ddd34ab7549d216cfa195940ad698bc"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/mer_gore.png",
-      "size": 5277,
-      "sha256": "ffe529f047d374de6a0197737946ffd5b631ead377d81fa5892a1614a2c131a0"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/mertaunt1.png",
-      "size": 5425,
-      "sha256": "ad998aac1b1f3fe1731d234b4ba8567a2befdfcda1f2ffa4101b7ff8ae873400"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/mertaunt2.png",
-      "size": 5811,
-      "sha256": "4218450c4d3cdf603493284d1e385ed1a85257d439e3986432fab1f2a32c59fe"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/sub_sprite.png",
-      "size": 3496,
-      "sha256": "2fc1a9619a77ecef8f90faa8048a5fc82bed855eb60b64d4890efaee6128e317"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/trident1.png",
-      "size": 2275,
-      "sha256": "f33edaf4b30052a4471364bcd9d18ce5b250d4e84e3b2321722576c24a988e48"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/trident2.png",
-      "size": 2849,
-      "sha256": "3abd837548605c1da25464f6be62863c23973b982ffd4b0aa354526fe0ae1359"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/fbrun/eld/trident3.png",
-      "size": 3169,
-      "sha256": "5cfc6d34ec18658fb591e1e70fe392a1f901c61c329ddaa4b74fbcd04183ccfb"
-    },
-    {
       "path": "raising_hell/graphics/mini_games/flappy/dev/dev_flap_bg.jpg",
       "size": 7270,
       "sha256": "7989762b026f050e69c2d493eac1ce2d02c268f9238245bb1b52ecea538d95f5"
@@ -351,71 +626,6 @@
       "sha256": "f99e3a050ddce89c985839fa8fe61aad6c8a584087383e40547077ad62fc1afb"
     },
     {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/column_down.png",
-      "size": 7741,
-      "sha256": "db63322156ea96924da848a94c7206b6579d099fc230938ede80697bbc1ddbb0"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/column_up.png",
-      "size": 7650,
-      "sha256": "3f0aeaa295ccf0e3783f3a179e2abd6e98a25d27a11ba94eb5f8d25ba620bfda"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/eld_flap_bg.jpg",
-      "size": 8236,
-      "sha256": "63e8c9f2debad5899759d9892d3b6daf7552067d4a85c2ddf773903253fd9371"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse1.png",
-      "size": 8268,
-      "sha256": "12d981570d247b3d56492e4efeef649fc5985dee23164333237b1659c0ee2b41"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse2.png",
-      "size": 7652,
-      "sha256": "17128dab6fcb91c59ea18ac7bc1eca7567bb825013105f36ee04195ca2134aba"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse3.png",
-      "size": 5615,
-      "sha256": "da95a50d925c56e82c27cc34a55f1003012b4979d3f2e68c4f9758661e5ea8cf"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse4.png",
-      "size": 4964,
-      "sha256": "479ee3db1680e189207196f53986a216a12544489cb5a5cc7b6e06cf716e7988"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_curse5.png",
-      "size": 4725,
-      "sha256": "ab64fb56db1e9e3b065713034e6e2aee38721141330e146de4e0b5f0286920fe"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_taunt1.png",
-      "size": 7297,
-      "sha256": "39e5baa7e6cd82f28e5ce90ba2c7fdf3eac7e13b8dfb691ea8390b96e0b0aa76"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/mer_taunt2.png",
-      "size": 7174,
-      "sha256": "d61b7b8c86d0e33f51be4c68008792628fb9a5612e8d4100cce5358287aaa2a5"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/starfish1.png",
-      "size": 2365,
-      "sha256": "702bae3b0f7dc45ce15393f2f58f5f0d3c785ec4cbca2b0835db5340f9999732"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/starfish2.png",
-      "size": 2507,
-      "sha256": "e8f4279963dd498c995f573bedd79371e75beb9566c7b2a02f5e4ba83cc0b332"
-    },
-    {
-      "path": "raising_hell/graphics/mini_games/flappy/eld/starfish3.png",
-      "size": 2484,
-      "sha256": "2e8fd8e42eefe498c78139de9963ac3290c6073ce881f62caa5f4a0095b63cc7"
-    },
-    {
       "path": "raising_hell/graphics/mini_games/resrun/dev/branch_ground.png",
       "size": 17667,
       "sha256": "1816114e17bbef2154feeef637198bf7843dea8ee65ec61e34f11bbd075e0677"
@@ -476,69 +686,764 @@
       "sha256": "cf300f6e872d9112dfbcd1c3e90aeca52dda4275af954a05d7a52eddd9b04a9a"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/bat_fly1.png",
-      "size": 727,
-      "sha256": "a5742e0cc2c843458d1b07a5a5147bf9ebeb5344abcedc29bfd1108df7328117"
+      "path": "raising_hell/graphics/mini_games/signal/asteroid.png",
+      "size": 931,
+      "sha256": "22accdba649624b03b29727dc0abcf8c868318b68cc32f41a2304793a7deb249"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/bat_fly2.png",
-      "size": 1032,
-      "sha256": "da8a779d322266e656fa12293577397a8332a6cd23abcbbb2995751d0bbb112a"
+      "path": "raising_hell/graphics/mini_games/signal/ship.png",
+      "size": 1114,
+      "sha256": "336336653bd43ffe6fe7ef48cb81c4164fff40b5feaa46dba243528297b368de"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/cult_hand1.png",
-      "size": 3801,
-      "sha256": "f1fb89626a3e90e38bc2fcf79b6f8f87d12dd62c291d8581cc8e576e1dc22ea6"
+      "path": "raising_hell/graphics/mini_games/signal/signal.png",
+      "size": 663,
+      "sha256": "816f928ba5a78ecbab96dcb722ad6396dbe7f42ed6180be3e5ad3ffeb23d3dd9"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/cult_hand2.png",
-      "size": 4686,
-      "sha256": "08934508c230f8d2538db27fcb9f3e0e4fd9ba1f6b29b32824fe7c75a946e8e1"
+      "path": "raising_hell/graphics/mini_games/voidrite/rune1.png",
+      "size": 1902,
+      "sha256": "0c9e01d6521adde18d1b156fe7480190aaa5a668e02f379c57e504c97486a324"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/dock_ground.png",
-      "size": 15009,
-      "sha256": "6bd59baa18722d34d19cf8202e235ac410a2df1940982e13f62db39481b128a4"
+      "path": "raising_hell/graphics/mini_games/voidrite/rune2.png",
+      "size": 1937,
+      "sha256": "c996effcf04a11485ab011c65ed39660e0bd4947ebbeefbb336876112fd04abb"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/rat_ground.png",
-      "size": 1325,
-      "sha256": "d30ed09a2a00e8556e59084be2b7bd8ea42b1e16c79671c9ae8b8a14d08b0fdd"
+      "path": "raising_hell/graphics/mini_games/voidrite/rune3.png",
+      "size": 1915,
+      "sha256": "a64c87f12b272b17bf2731f7d2d60d82aa1f7a4655bc9116b8ee64a6a618cd44"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/spider_ground.png",
-      "size": 2360,
-      "sha256": "b6d5cf01ea47b9060ae71b5bdcca36d1f4f7f3cdb83054b8daa81c71189bed35"
+      "path": "raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot1.png",
+      "size": 9750,
+      "sha256": "b5abfccc1c93ee519feb26362d616bdd2040b1509c52b251418de58b6a1465ca"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_crouch.png",
-      "size": 3608,
-      "sha256": "85a238e8f09d503e01b26b5b0123955a2e029fd27b4ef777c0466313fe80c356"
+      "path": "raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot2.png",
+      "size": 10430,
+      "sha256": "447da1a5bd597427e1d1b9ef83b1d680a79506fb8b32711a3fe170b5a1841dc5"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_jump.png",
-      "size": 2553,
-      "sha256": "cb29bc4441bd781f920d0858dfe25bb333da9c112c569c7f7517f7e6d7bd0b74"
+      "path": "raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot3.png",
+      "size": 9408,
+      "sha256": "dbffac954cd1cf12e1705cc04c6ade1082840db4d0cd42d2810651afc852614e"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_run1.png",
-      "size": 4190,
-      "sha256": "31e8e2e1b4d747511a16f2a59b0bc99d90c71e0e34aecfa1d0b8b83a5801876d"
+      "path": "raising_hell/graphics/pet/anim/al/ad/agy/aln_ad_agy_shoot4.png",
+      "size": 9317,
+      "sha256": "4d3d2dd7aaa7fc188427a89a83198615e2ddf2bd6f463df587c9b8814beef52d"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_run2.png",
-      "size": 4505,
-      "sha256": "81a726f074aa7ae33f04c321cd3bb9fe16c5273dee24d7615e45123a98279c1e"
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_sigh1.png",
+      "size": 9720,
+      "sha256": "bbade47b9e28de32db34c26d69be9298432e68535f9aafcbf4356d50c45c8026"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_win1.png",
-      "size": 3247,
-      "sha256": "aa74305bd39ae6f0235b7cb8cd09b9afa079791f278454b3ed126b724bf78068"
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_sigh2.png",
+      "size": 9611,
+      "sha256": "200114564b442c3235f8fdbaa7ba577f3d79672429ede27e8a0543891e3c5328"
     },
     {
-      "path": "raising_hell/graphics/mini_games/resrun/eld/worm_win2.png",
-      "size": 3440,
-      "sha256": "6751fd560f0855fc158458236f3b3c036d704bca0bc18743f8329d49fda0f5d8"
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_sigh3.png",
+      "size": 9746,
+      "sha256": "c25bf09464d83b27cb0f8a7163c81efc72ea9d82de913ebe3fd959df6b615e35"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele1.png",
+      "size": 8552,
+      "sha256": "ccf75972d204abb20d8c669bf7812313aec37e7f983cc259570fcc69b9826bae"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele2.png",
+      "size": 8008,
+      "sha256": "abe34871d621f450779d9662afe0169376702a1a5fe529bcd0d66a197ae30756"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele3.png",
+      "size": 10320,
+      "sha256": "e5fffb35193be920773fa59e414372abff01a06592eb9b9bf5b77f9ecba12bb7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele4.png",
+      "size": 13206,
+      "sha256": "b17d74fa39a8f622af1554a5b48aae7357a48326e9e690edabe72c37be4252ac"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele5.png",
+      "size": 9184,
+      "sha256": "67f1fd90b5db23ce0b03a6f6ade6d85f10fad52797a167f8ea6be82e1932506e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele6.png",
+      "size": 6336,
+      "sha256": "2420ad4931ef3d91bfaf92a2964c62808845bc32447047cc6296c26bf45b4a21"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/brd/aln_ad_brd_tele7.png",
+      "size": 2544,
+      "sha256": "29bf511e0af746acfb93e6b7f3945635b924400ae455f64e29533745854a06db"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hgy/aln_ad_hgy_bend1.png",
+      "size": 8734,
+      "sha256": "c17692a960bcf25c02f340422d677360587ccb36e15743367aab8ad0d06b2bd3"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hgy/aln_ad_hgy_bend2.png",
+      "size": 8525,
+      "sha256": "2a2b4fa8415a7152a7a5e0112b09dcc80f413a5f77be78f81a7d83b41c118a51"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick1.png",
+      "size": 8553,
+      "sha256": "b7ef9afb0bf01114ca11af7984f32938acdafb8ba6ce762fe5facf9736738706"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick2.png",
+      "size": 8781,
+      "sha256": "6fa52d42e9ef61636a06b2346ecfb1f92f869d57c1447f550746c0f245611196"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_flick3.png",
+      "size": 9369,
+      "sha256": "684897fc9be0129fb65483ef0af2160774a19335eff0eb521b290fbb3d4ee595"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_stance1.png",
+      "size": 8980,
+      "sha256": "0889be3a7209cb12593557e1ef8f92def85e11033b277f1640e683a8a6a5aead"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_stance2.png",
+      "size": 8600,
+      "sha256": "b8e3560fa9ca1efda80f6c41a74d3026d34cb0a7420e15046204096f60ba9121"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/hpy/aln_ad_hpy_stance3.png",
+      "size": 8666,
+      "sha256": "38006c01723ddff53dcccab85b93330740d65b961c34d4970f8709d89bdfadc8"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/sck/aln_ad_sck_heave1.png",
+      "size": 7844,
+      "sha256": "8ec64f017022e1674b22f854a45cccf5cdfa9080c3c0c283c4f93be56e916b24"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/sck/aln_ad_sck_heave2.png",
+      "size": 8355,
+      "sha256": "eb77f637828fffb2114e8a227e72086638f22eee484b6a1f46837f7e40f36bef"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/sleep/al_ad_sleep_snore1.jpg",
+      "size": 13553,
+      "sha256": "c8b433887cd8364d9852ec763cd1ae5c6ac59c0acb3adb17a69ba2ec5772343a"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/sleep/al_ad_sleep_snore2.jpg",
+      "size": 13536,
+      "sha256": "b28d65c85bd8caa1cb59a2056c9389b5eb4ae15dacd76ecb5761aaf1cbdbac0c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/sleep/al_ad_sleep_snore3.jpg",
+      "size": 13613,
+      "sha256": "f46c5d82ec69655c5aca64af04628600c3152ac87bb4fef0548d44acbaa53d44"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/trd/aln_ad_trd_nod1.png",
+      "size": 8855,
+      "sha256": "9a4c4e1b78f1d2a242d8f22ffe6efd7f0044e4f20477f1a8f9c641a140a4756e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/trd/aln_ad_trd_nod2.png",
+      "size": 8406,
+      "sha256": "a8dc7a0c349c843d8d8959f54b3f18df57258e88d903f245b13322316d89a39c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/trd/aln_ad_trd_nod3.png",
+      "size": 8124,
+      "sha256": "59babcd3d09ccc1bb4c2a944dda46219a3d7e00352ccb707a69869362e3772e4"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walk1.png",
+      "size": 9665,
+      "sha256": "54485eaa7425a5fe58e2e533dabd3219fb3e738284831de7763de4e5ad9160de"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walk2.png",
+      "size": 8525,
+      "sha256": "1c9484675d2533e75d70817b3cb4115111f5bc72859c7eab25c7f680f366fda5"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walkleft1.png",
+      "size": 9627,
+      "sha256": "3d9fddd00cf4bf0075100a164ad815805791729abfb8047e4e059eb57be44074"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ad/wlk/al_ad_walkleft2.png",
+      "size": 8151,
+      "sha256": "0ed37273115ba1aec54c7a265897279b4e9ed45fd5824f214e675998842ac5e5"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce1.png",
+      "size": 10547,
+      "sha256": "11a4f9d2a1c1ec24e0a7806f4aa3c9b4b72afb21ba367bf118d62782d56ddb37"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce2.png",
+      "size": 10343,
+      "sha256": "19f1d6be32f1e8abaaed535e357b33c4bbf9e66448c0413dd6857b06da343d7b"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_pounce3.png",
+      "size": 10511,
+      "sha256": "4608a8e8908fd53301f23245015503f6eb79fbdff815a969df52fc8dc0de55c7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_stomp1.png",
+      "size": 9500,
+      "sha256": "c980c9080b376f082f8162fd69b76eaef6c08b33e8629a7484d8010b79be5370"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/agy/al_bb_agy_stomp2.png",
+      "size": 10653,
+      "sha256": "75dace8baa37b679bd3f25658a85f2a776d890ff11f818c77497dd62ec0f98a3"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink1.png",
+      "size": 9278,
+      "sha256": "04b3adf9097277ae6b32eab52747f0008c95cb4943a0a21cf4f9407071d574a3"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_blink2.png",
+      "size": 9084,
+      "sha256": "3477ece940060b48f22f0d93ac6d1ce2f0dc87a8d9c94f8f27840c0510b0204e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele1.png",
+      "size": 9660,
+      "sha256": "44224152e32da5eb2332578287562b9e2dc92e07214eb98d0ddd847a0e1b3b87"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele2.png",
+      "size": 10550,
+      "sha256": "b8192dcd891210f48d69fbc4135b05a2da4164dc721e39c616671ee9a51babdb"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele3.png",
+      "size": 10394,
+      "sha256": "53e302444623489cfb8b3c4287b8a8f804bb6488c02525c9f67e85ae3a0b3710"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele4.png",
+      "size": 10086,
+      "sha256": "3389fd4ddc7315f352cd84f3f48869d0b71334470a19af9f0b3f4d1db8b72d6f"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele5.png",
+      "size": 12886,
+      "sha256": "d027cbdff6804cd7ed9e77df7a2e89c49bbd7dbbc1c93b130a354380fa2eed2f"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele6.png",
+      "size": 7836,
+      "sha256": "9e8c0319daab96d3dd3362b079fb51ec847544cd3811fe7461d046ffc2aa455d"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/brd/al_bb_brd_tele7.png",
+      "size": 1700,
+      "sha256": "b1dbc58d289f898c30a358869119986e44840511614f9a133efde1662527114a"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hgy/al_bb_hgy_stand1.png",
+      "size": 9777,
+      "sha256": "4f91415b470616ff25d5046f9f85ec35680e7390568342c578f8786974681bd7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hgy/al_bb_hgy_stand2.png",
+      "size": 9681,
+      "sha256": "532d54c71f69abfb287aede8796378b1d58e7bd3a9c1a88e34f0309587488e63"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_gun1.png",
+      "size": 8409,
+      "sha256": "56f6e335639b9746b71eb297a97ae050d90796890913bddbbf6fdb75747b3087"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_gun2.png",
+      "size": 8205,
+      "sha256": "8d7f9af6e45edf63a2db3762ac3f5ae227fec9b02c17416df7421e4049848f45"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_left_gun1.png",
+      "size": 8264,
+      "sha256": "314296d8359120accdd0ad47011914f0e1fc282b38293013d9937e8ad8e74d60"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_left_gun2.png",
+      "size": 8061,
+      "sha256": "1f21e444a20f58b19594ae960ec37ff3919e3d5ec7ab014d13f63711f9cc6b11"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn1.png",
+      "size": 9775,
+      "sha256": "04e86be79e7eabaf0a267e20c8a578bb26d39f2ee6bd3e3f92baf92230ec79cd"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn2.png",
+      "size": 10002,
+      "sha256": "1bbf7f5e27a9242b4419cfd9815dc82c3cf35bae7fa9004f475e772dda48199e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn3.png",
+      "size": 9775,
+      "sha256": "04e86be79e7eabaf0a267e20c8a578bb26d39f2ee6bd3e3f92baf92230ec79cd"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/hpy/al_bb_hpy_turn4.png",
+      "size": 8594,
+      "sha256": "98d6d0dfa987ac41a873417ce23d7aad953337565f81c76d272eccc4ccc7c352"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_moan1.png",
+      "size": 9212,
+      "sha256": "a04d29608ec1b87b72c81cdb4a4dcf476bcb0839ca9192c07f7152ded72409e3"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_moan2.png",
+      "size": 9156,
+      "sha256": "fdba90980b44a2449670b5116fde334d7920a2aba8123306091434c3d8aa2a4a"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_sneeze1.png",
+      "size": 9719,
+      "sha256": "4a8c67383c5538ca3a82f389682bbe1485bb008dc1a466b270712d2eee300d37"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_sneeze2.png",
+      "size": 9621,
+      "sha256": "74c40f3688dd01ef1ee91b55dacf8f9290af08bc254dcb2e5d25dde056f9504c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sck/al_bb_sck_sneeze3.png",
+      "size": 9838,
+      "sha256": "a1a782ab5a9bb3a261d1db5b6b922d8fca7607da7c5107674dd2e00a3c1e63ae"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sleep/al_bb_sleep_snore1.jpg",
+      "size": 15757,
+      "sha256": "a2f2739ad24be8bc3b50c7751d189cff0cf7e81923e406f54a93a5dfacaa4f0e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sleep/al_bb_sleep_snore2.jpg",
+      "size": 15785,
+      "sha256": "393899cc7389dca64e25cccaf338d3a899716e5f73e8cd7a1097ec11d376f8c3"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sleep/al_bb_sleep_yawn1.jpg",
+      "size": 15739,
+      "sha256": "cc2fdb0ed63a29f3d9876f7e4c02fc2510b1ebb50172fa34e9be1606c3e5004b"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sleep/al_bb_sleep_yawn2.jpg",
+      "size": 15864,
+      "sha256": "dd059a71104c5f89eb9242db13ba8847c2a54f375e0d25096f8aa0dd628b40aa"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/sleep/al_bb_sleep_yawn3.jpg",
+      "size": 16048,
+      "sha256": "fa61d3f9b299c7e9638c2ddb927dcdafd9fcecde6904366f50d4c3f5317e1575"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay1.png",
+      "size": 13029,
+      "sha256": "2b7f89b70db78f0f0a826862f9a945b2cb25b8746e3721b3c1c7e762879f67eb"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay2.png",
+      "size": 12785,
+      "sha256": "3e52bda8364812276bc056e6b5391ed3bf56752f58c053b69b00b54aa500d2ee"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/trd/al_bb_trd_lay3.png",
+      "size": 12718,
+      "sha256": "7d1655ad95841ed259ede3c0b9a4198c11a2afb871c1c58b3ddf6e84b1586e90"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walk1.png",
+      "size": 8412,
+      "sha256": "ae5888d36df24aba3f932110d68d8e45c426ba9845b4360b8fabf8a06628e405"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walk2.png",
+      "size": 7950,
+      "sha256": "7a7f5afb039f29265c5adad4e0241a3966091b0a37d707380cecfcffaab48aeb"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walkleft1.png",
+      "size": 8196,
+      "sha256": "ad985f9ff0230051c33aa860be017efdce015763eb7ec6986c6d936ec15cebd5"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/bb/wlk/al_bb_walkleft2.png",
+      "size": 7861,
+      "sha256": "baf0a9badf503041e5ed6a14da9a927b7a5d654ad16d93a30d4e01b93caabaca"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/agy/al_ed_agy_shake1.png",
+      "size": 8827,
+      "sha256": "64177602b8a2153a1c9a7bc22d60c5b9de40b900abcf6a4a30fbb5b6926a5f79"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/agy/al_ed_agy_shake2.png",
+      "size": 9612,
+      "sha256": "8fef21eeeaf3cf3dbaba3119161c69fdfb2b51303dc16d16b68f524b883f12b8"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/agy/al_ed_agy_shake3.png",
+      "size": 9278,
+      "sha256": "3d47352ac6d4e9bae0d9c40926ac377673f70e44fe3d96ad9ff73e2003478512"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam1.png",
+      "size": 9026,
+      "sha256": "21d96c38d3405d45d381e5618a30db5d23cbc957d61b21c8050d4b717e41e3df"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam2.png",
+      "size": 9158,
+      "sha256": "147ac1628361c6482d65b24eead2116fee05480d031a65281f2c17e06f1b6673"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam3.png",
+      "size": 8531,
+      "sha256": "218d90a6f6eb8148b7421158f4689e4861186b440a34d69ef79f6601ad2d92b7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam4.png",
+      "size": 13438,
+      "sha256": "7cf633a7fc8486c809468a3e7f25a3bb1cca20d86b9105f672cf4a10dc868842"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam5.png",
+      "size": 13651,
+      "sha256": "b28c441e150ace1891bacbc71c7cf3728ba4ad9d6fa117b6739cd5745592f2fe"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam6.png",
+      "size": 11812,
+      "sha256": "26e53877b280031de4f62d527c5ad3332cf5918e561ca2c996a2c905c3b17c1e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam7.png",
+      "size": 9966,
+      "sha256": "fb1242e2394323d9e8c2d02ab11164f7fffab8bd72b6bb749fe24bfe694f001f"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_beam8.png",
+      "size": 9505,
+      "sha256": "c4bc7152054d4c4782a037f0b5dba656b27ab235219d7273c94c6b20481daca8"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_blink1.png",
+      "size": 9290,
+      "sha256": "dcc9367ae60227af66b5e4d898551e58d8210cb4d9cbfcd60e7b3ea21b19e7f3"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_blink2.png",
+      "size": 9021,
+      "sha256": "73458102658fdb69cb96f562f0b6a8771e4f519465117e1038d503053a688bc2"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_blink3.png",
+      "size": 9034,
+      "sha256": "f928b0d34c275f9375e0d568c9c1b3fa32a66bd69514d7960f83080b82cfee64"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/brd/al_ed_brd_blink4.png",
+      "size": 9036,
+      "sha256": "31af4e7387a985dbb42af59487e5ecdd498cdab9a40ff85519736e8fe52ffd44"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hgy/al_ed_hgy_bend1.png",
+      "size": 8124,
+      "sha256": "8e9e3f3b8222d24e6db528c8520ce28f4c2bdedef9f85f9db2d9e0fba3a6a3f2"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hgy/al_ed_hgy_bend2.png",
+      "size": 7820,
+      "sha256": "bd77202a6291f29d9e89c7c3504cb1953b32de5efc3acafb891b0ec339cafd16"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can1.png",
+      "size": 9736,
+      "sha256": "ef09ec250d487894fdfcdcc51158c52cbe157129cb8235ab167b18cc0e96db1c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_can2.png",
+      "size": 9550,
+      "sha256": "379986bab73e5c9dc0e3b7f9b14eb920d40b9001ddc39c76b97f560c946424bd"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft1.png",
+      "size": 9669,
+      "sha256": "23917608358b41721e696a1af24a3cb754785122cd14f5b6cd138759a8e15a48"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_canleft2.png",
+      "size": 9445,
+      "sha256": "4c81bacbd53749b0009653dea7fcf48e279ca9155fb28da5484a1309b55ebc87"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile1.png",
+      "size": 9458,
+      "sha256": "8419d56d0eebfddd8743277db7e4ade481d2c8a3f3bfdd5e4a556f38418aa7a4"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile2.png",
+      "size": 9406,
+      "sha256": "72d587c289156a30fb1f026cc8c35ce7e6b44551d36661accebc8bcca499b571"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/hpy/al_ed_hpy_smile3.png",
+      "size": 9380,
+      "sha256": "563dfce1601d86f7ceb94c03dd933cf6e9bb1215af71ea4e06e57d55e78f56b5"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/sck/al_ed_sck_lay1.png",
+      "size": 8490,
+      "sha256": "544ac34fb0be0252596ddb955a93010358be0af6aa6147accc2e9dae029c744d"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/sck/al_ed_sck_lay2.png",
+      "size": 6903,
+      "sha256": "c3d8fd8bd116ec02390d4a9b0696d04b4c0e9b9c49ece14f6d03125942ef97d6"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/sck/al_ed_sck_lay3.png",
+      "size": 9079,
+      "sha256": "94c7995bb5f649609fe36ff7226b7e38a17a510b73faccd961fb2295b34021bc"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore1.jpg",
+      "size": 13897,
+      "sha256": "57d43cafcecc4d8fb4445a7218308e3dc78e8cf5a8008340c39312195c5fb52d"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore2.jpg",
+      "size": 14015,
+      "sha256": "5b644f3dfc820280103f6c2581c2af30c84e782cfac937837f8f46a57bff9e3b"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/sleep/al_ed_sleep_snore3.jpg",
+      "size": 14108,
+      "sha256": "531dd7d44258d971fddbbfad417f71511ee96fc804e79e3ca93718db4880705a"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/trd/al_ed_trd_rock1.png",
+      "size": 12712,
+      "sha256": "e6e7759f1b846c98329a04ea3b08559f746d77f18dc5198317c7c71bb7a275a7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/trd/al_ed_trd_rock2.png",
+      "size": 12714,
+      "sha256": "1d77955cd43c251265a146a4ee3e0ecfe091cd4b31f57b8299b670728994f121"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/trd/al_ed_trd_rock3.png",
+      "size": 12560,
+      "sha256": "b9e445e547409058e4556c020d969b45f2314d7b2cc810ad1a9dee8b7db23825"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walk1.png",
+      "size": 9052,
+      "sha256": "496afed4f380af84ac9a52a1e9b3f6ae93dc307a1f7b63899dab97501e7acc2b"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walk2.png",
+      "size": 8525,
+      "sha256": "3575542ec7d7a83ea52396ea96018264039595b64b7c41582bdc6d22a6ea5dad"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walkleft1.png",
+      "size": 8979,
+      "sha256": "38600cc4960fe465e7c7fbbb721ee2ce9ad7597a8881a405bc5cfdff8e71b747"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/ed/wlk/al_ed_walkleft2.png",
+      "size": 8192,
+      "sha256": "c9229f5094ef105462b73a2baa86ad9410cfd4128c6de758b447ceb0e91f6cd1"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_jump1.png",
+      "size": 9851,
+      "sha256": "d93c91951c6c2696b3ce8ce98f10aa93ec1da292e971a6086d5cd5e1772e572f"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_jump2.png",
+      "size": 9764,
+      "sha256": "ba8fe320ff1bdd687614f2324f2b7ede16ae455edb1180cbe576b953ca9bb9a0"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber1.png",
+      "size": 9816,
+      "sha256": "27627252241a31a1997c5744789ad41ea7fc25df908d86e54f7220fad0a74546"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber2.png",
+      "size": 10029,
+      "sha256": "14438340d1683cd08f886465305e83c0d23224037739bf2c1d1ea43dad7e29eb"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber3.png",
+      "size": 10257,
+      "sha256": "80b744427d66c235d853a81cf71a24b0fa2ba8b5d193c35b3d77057cb91a9850"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/agy/al_tn_agy_saber4.png",
+      "size": 10633,
+      "sha256": "ae45aa90ee2592df42cdbd3c28342dc5303ced2835d10f1e667cec8e5b934473"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly1.png",
+      "size": 9719,
+      "sha256": "29002f18868320440bd92fb4c95a54a9d25776772678bf5add1613640f02d05b"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_fly2.png",
+      "size": 9102,
+      "sha256": "2d36670472c0b73c36cb70aaff2b5e7cd7a034e16ac1fee602acd85338e0f934"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_rcufo1.png",
+      "size": 1144,
+      "sha256": "140b43fa661a7bbfbeaf34551d6bab4b9390f663592813c38a3eb88ae2aea4da"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_rcufo2.png",
+      "size": 1142,
+      "sha256": "22eea5f45c0ae53068a0efddb06480502f6f6148b3f2bd2006e171608f40bb9a"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_stomp1.png",
+      "size": 8889,
+      "sha256": "f53600c7e1b78af581a3d3419450f1a264d09e581dba20419a87baaacdc6c280"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_stomp2.png",
+      "size": 8595,
+      "sha256": "9afb690414b5ca9edd08f328f127ee9db3a8aa291b51d99a6f076f7d6a851382"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/brd/al_tn_brd_stomp3.png",
+      "size": 8648,
+      "sha256": "5c196fc2a8497f2efb5cc6c0136eac96f7b6f1fc106c6ef250a984e1c1881db8"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hgy/al_tn_hgy_fork1.png",
+      "size": 10171,
+      "sha256": "494e068903af687d29efeb71d66e5143e15682f71ce225bca2f611fe3cc734cd"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hgy/al_tn_hgy_fork2.png",
+      "size": 10723,
+      "sha256": "b9be2e981f0a15ddc3ca3825b1d812628e0bd8e38c82d9d9bcb5b056a5c9aebd"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick1.png",
+      "size": 10227,
+      "sha256": "d13af71ba31c9b90d982e6a961cbfa690938a924fe3ed8521d99f9d9592179c0"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick2.png",
+      "size": 9925,
+      "sha256": "b0f7a34b6b0189a17259f0844a03bfdebc3868734378c3c41842f0913042c75c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick3.png",
+      "size": 9995,
+      "sha256": "e84d7bd6ccdb21e20a5035986c77e5eb9a7cf097317dd6ed3f9c76d69b727c65"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_flick4.png",
+      "size": 10227,
+      "sha256": "d13af71ba31c9b90d982e6a961cbfa690938a924fe3ed8521d99f9d9592179c0"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_sway1.png",
+      "size": 9246,
+      "sha256": "150bf1eb936bc9021d6e958ec7e9d801e508434f7dd57cceb91b8b01601fe3f6"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_sway2.png",
+      "size": 9660,
+      "sha256": "730cc59e53f2933b9f65565e5c0e8e7f98632dcb86127b3b9798e4d0f18dfc49"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/hpy/al_tn_hpy_sway3.png",
+      "size": 9629,
+      "sha256": "acd28453c278670b9114b7809104e661737d751df146f7f31eecf49ac3068901"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/sck/al_tn_sick1.png",
+      "size": 7316,
+      "sha256": "2ea6e7136819a4b1ae9afe4b88ba89d703ba68be40b7fccfdd4b82b95844a718"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/sck/al_tn_sick2.png",
+      "size": 7908,
+      "sha256": "0172bef43cdd6a62e20ea083bce8b6e8c71ffde50a43c26f866fe362f2056775"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/sck/al_tn_sick3.png",
+      "size": 7299,
+      "sha256": "4627b91629884cd340f130873c54e3f881c0206b56706c52d58ed57ca424c928"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/sleep/al_tn_sleep_snore1.jpg",
+      "size": 15709,
+      "sha256": "d042afd559cce75c7e299c9e81c64b1c833bfd12af1a53522fdc85ac62c2cae1"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/sleep/al_tn_sleep_snore2.jpg",
+      "size": 15652,
+      "sha256": "f470d79b54be5818323f712d5fdf3f802d1dfc3c5ad80728f5d95abf8014e91f"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore1.png",
+      "size": 10145,
+      "sha256": "af411c7f9d8e21da8b54e7a343e48d1f1cf6ca13d598386f1f5563f83b5d58df"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore2.png",
+      "size": 10222,
+      "sha256": "6b629b5b5fc791f976fbd29c989bdec1bd9b4fdf2334b1c0956ce04dfadb55ad"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/trd/al_tn_trd_snore3.png",
+      "size": 10275,
+      "sha256": "365aafbd026e80d96a3140a09cf5f2e77197bd79be45f8e29a4490b21594eb9e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walk1.png",
+      "size": 9223,
+      "sha256": "74618c9275a7d248c6a59244326fdfd840a51c5b8d6749a1ac5913fdaca44103"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walk2.png",
+      "size": 9502,
+      "sha256": "361572e8ab90d9ef48d0267bccc44f522a16508dfb0a58c5b2f7cba0f91ed663"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft1.png",
+      "size": 9095,
+      "sha256": "4902a6ae19c1c1990ee732d268afd400757c6f2731c859eb767d79e71fa3bdf8"
+    },
+    {
+      "path": "raising_hell/graphics/pet/anim/al/tn/wlk/al_tn_walkleft2.png",
+      "size": 9353,
+      "sha256": "06a41bbff1d2f3ed0a0c1fefe46584d30d9cfa71a4e5b936df04a7a05a671c0e"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/ad/agy/dev_ad_ang_kick1.png",
@@ -757,13 +1662,13 @@
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/hgy/dev_baby_hgy_rub1.png",
-      "size": 14200,
-      "sha256": "ec3310346355125f947be4655b5accc27d4d02441bb374bc8d451a0742ba19c2"
+      "size": 14854,
+      "sha256": "618e31e3dbe0cfd1af9d2ab3a1c3c2d077c8a6f6a61b91325196c0b7f6794fbb"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/hgy/dev_baby_hgy_rub2.png",
-      "size": 14134,
-      "sha256": "e355d7c08c1b79542d865fdc422e3d8189f5774368f5ead7c14190dcb1384c01"
+      "size": 14863,
+      "sha256": "d796c9cd20b87e8b2d3a426932ccabd7ed4d1643b5eba9dbe5fea8bd5bf411ec"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/hpy/dev_baby_hpy_ball1.png",
@@ -857,23 +1762,23 @@
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk1.png",
-      "size": 8122,
-      "sha256": "a266a424b7369d7d0f9bc1194136b3a92e767da997a486712bf839af76b14c26"
+      "size": 8395,
+      "sha256": "a61cfce0244c95de6722da861747230e437200df6b1855854e43de5b0ce327ee"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walk2.png",
-      "size": 8829,
-      "sha256": "877149e553b3ea2c47d90ee8024ac5b07b74068aafe4f74a6064a452368e813b"
+      "size": 9105,
+      "sha256": "c7e02b705ddeeef45fb408950be62c5cc0ea7e545c9e86710dbb439c67f92bc5"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft1.png",
-      "size": 8317,
-      "sha256": "d1c6da4cd6c24ce932536e9ec7d4682bb74a358d1b6ef6a3a13d3266ace3e90c"
+      "size": 8331,
+      "sha256": "f42fea48962c259fc25265762e19963bda3fa3451102b1ba373598995edec460"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/bb/wlk/dev_bb_walkleft2.png",
-      "size": 9153,
-      "sha256": "b8135131e5852b2d080b8f942d1b01590983b1a10c0750eec532840477069680"
+      "size": 9080,
+      "sha256": "81cd0f8e7e2931186673e1348c10c9adbb4d937b8289eb6eabdf4602370151f9"
     },
     {
       "path": "raising_hell/graphics/pet/anim/dev/ed/agy/dev_el_angry_fire1.png",
@@ -1801,6 +2706,126 @@
       "sha256": "0678282519a88a61a08075c761d2b697ef538ec0ddc443ad879e0ec10033cba9"
     },
     {
+      "path": "raising_hell/graphics/pet/bio/al/ad/al_ad_agy_bio.png",
+      "size": 10186,
+      "sha256": "e63e9cdf7aa10ed9701157c23b9f6636119491ba9ca732fcc868f5ea200f94c6"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ad/al_ad_brd_bio.png",
+      "size": 9176,
+      "sha256": "6264384b3343237e5ffef0b21e2873d1347060266b0f5c1a2595d37e3f1d2a8e"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ad/al_ad_hgy_bio.png",
+      "size": 9727,
+      "sha256": "96d172bb6935d71450b2b7f94fa304dfd98ab6385fbadafdaa0184e50538b21c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ad/al_ad_hpy_bio.png",
+      "size": 9383,
+      "sha256": "a43ecb80ffb7c63b14c391c7dc46562662d2867162505995ede18d8be2f955bf"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ad/al_ad_sck_bio.png",
+      "size": 9710,
+      "sha256": "ee4fe8af7da15e3f1d22910bb1474e8b9ad2f63100274741345092559f0bef30"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ad/al_ad_trd_bio.png",
+      "size": 10122,
+      "sha256": "6bec665b7fc1668c6a7f7144b5ce61e3692f623dbf0feb6a89511a97a52ee35c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/bb/al_bb_agy_bio.png",
+      "size": 9679,
+      "sha256": "d804530788c1f178e5bdc4b1dd4f1e6d31efbc179b738f73f0e79416e21b2632"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/bb/al_bb_brd_bio.png",
+      "size": 8702,
+      "sha256": "39c31fe47df51730a266df6dcb220ea3bb4a184275bca1d5b4c3f65986bbbbcf"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/bb/al_bb_hgy_bio.png",
+      "size": 9142,
+      "sha256": "e951a66ca662351923e3e40eaad43a3accf67a9eb46bcb7d197313eebb6c566d"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/bb/al_bb_hpy_bio.png",
+      "size": 8642,
+      "sha256": "0054fd34f389ad8e2cbe3387a0dea451a610db5719ead8a37c067a787e4730f7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/bb/al_bb_sck_bio.png",
+      "size": 8889,
+      "sha256": "7a33c6efaefd37d5d59d5795f0a764e91446535c4106b20ec3c7f86520d202eb"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/bb/al_bb_trd_bio.png",
+      "size": 9084,
+      "sha256": "4491ffd5d1ba4517fd0ccd5e3e9e63fe551cea2c082a57d9ee869d8643bf5488"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ed/al_ed_agy_bio.png",
+      "size": 10301,
+      "sha256": "8279ef4e2229e935e623fbcb2ab66ea82ddfcbf69b09a824f3b5ba1f5e089b1f"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ed/al_ed_brd_bio.png",
+      "size": 10744,
+      "sha256": "908a5e5c4c05f554e016e9d43b8153298ec3d9b1e6bc7622b4a51d35882275a9"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ed/al_ed_hgy_bio.png",
+      "size": 10272,
+      "sha256": "feac9fdafa3836300d165ea381ab9a73906d93d9d10ce7833e00a7d4e6227ceb"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ed/al_ed_hpy_bio.png",
+      "size": 10642,
+      "sha256": "1b9917e61f102ad676dd448bce1617f7e79093465dc92f3057c82fa546a99cd8"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ed/al_ed_sck_bio.png",
+      "size": 9911,
+      "sha256": "a5f02f9160b4fdd7ed82e6845b688e0c7e8cdd49b247c948eaff83be819c8ac4"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/ed/al_ed_trd_bio.png",
+      "size": 10850,
+      "sha256": "76b167d92dcf281bb3977deeebf91283bfc00757e686d698244722a42338bb79"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/tn/al_tn_agy_bio.png",
+      "size": 11496,
+      "sha256": "3409e5fac030494f5a826da11bd36970c47d649eeb641375e0ff46055970530d"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/tn/al_tn_brd_bio.png",
+      "size": 11054,
+      "sha256": "54cac3f1d560b14f784a02949331bf251b7f237f634b374aaa372ee5c74b228c"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/tn/al_tn_hgy_bio.png",
+      "size": 11287,
+      "sha256": "ecf01418380af3dcd5b2e569fe80d9a90073df617a1c74124038ddd9d5bf14af"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/tn/al_tn_hpy_bio.png",
+      "size": 10879,
+      "sha256": "4a1ab0212b69f159664af0c58c243c0495b0185aaeeda6be30d2de6393678021"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/tn/al_tn_sck_bio.png",
+      "size": 10626,
+      "sha256": "f0da017a789cb2ba0b7c427e1ad828479d1ffd1a5616a904672244d16f984ddc"
+    },
+    {
+      "path": "raising_hell/graphics/pet/bio/al/tn/al_tn_trd_bio.png",
+      "size": 10565,
+      "sha256": "8dbfd943d5b339e7185ce48c2311acc0624a97f14258c0795269e2b030ba0e21"
+    },
+    {
       "path": "raising_hell/graphics/pet/bio/dev/ad/dev_ad_agy_bio.png",
       "size": 6052,
       "sha256": "cf843853d69b682ff9dd148b1e1c29a667ff82cc1e389372edd1d1424db3e116"
@@ -2041,6 +3066,36 @@
       "sha256": "7972023fd120015bbd76b3a9bcedc718fd1676ec8825d62ee4ee4c4562bb5f58"
     },
     {
+      "path": "raising_hell/graphics/pet/egg/al_egg.png",
+      "size": 5761,
+      "sha256": "e2d9bb570c72ac3416e46bc415afd07a383dd47552e749d990acb13577571ed7"
+    },
+    {
+      "path": "raising_hell/graphics/pet/egg/al_egg_cracked.png",
+      "size": 22078,
+      "sha256": "c53d6da22b83bf836ca934b87af83ea9195f5a68c5dc7496bba21a5e8a52c551"
+    },
+    {
+      "path": "raising_hell/graphics/pet/egg/anim/al/al_crack1.png",
+      "size": 7423,
+      "sha256": "3dc2826cc823ca79acc43c5f22df9d5ec5e2509ec3e66c44516a2ac41d280ca2"
+    },
+    {
+      "path": "raising_hell/graphics/pet/egg/anim/al/al_crack2.png",
+      "size": 7568,
+      "sha256": "e70bf877d72f8c2228e896fa8b28b4e9875404f92b68c6b1cd0c442c9e96fcd0"
+    },
+    {
+      "path": "raising_hell/graphics/pet/egg/anim/al/al_crack3.png",
+      "size": 7423,
+      "sha256": "0288cc6a3824495be086d31cb1b8f526c7d9af5d2132963e5a61a52880931cf0"
+    },
+    {
+      "path": "raising_hell/graphics/pet/egg/anim/al/al_crack4.png",
+      "size": 7585,
+      "sha256": "0ca573ec5dde65d7e42ea86edc3aee86dcad4d1461812a361d2babe5cfb814cb"
+    },
+    {
       "path": "raising_hell/graphics/pet/egg/anim/dev/devil_crack1.png",
       "size": 7589,
       "sha256": "2af200e7e245c94e34e59301c0d8b46a1e35813ff47996b28f57befba3ebe962"
@@ -2116,11 +3171,6 @@
       "sha256": "a64a65a54da79b590f1704d5e5eee9dce30dfb4c62e3f471aa798cc8533b0933"
     },
     {
-      "path": "raising_hell/graphics/ui/icons/inf_coin.png",
-      "size": 1186,
-      "sha256": "1434c69ea68a0c9a2ac644104daaa7a719b5dc5c10fbaa7ab89717e00e59bf11"
-    },
-    {
       "path": "raising_hell/graphics/ui/icons/inf_icon.png",
       "size": 430,
       "sha256": "30103a392ac4a62d035685a9e4d13f6d8f3ba6ff34402ff353e19120f466a727"
@@ -2134,6 +3184,51 @@
       "path": "raising_hell/graphics/ui/icons/life_icon.png",
       "size": 1032,
       "sha256": "62ca49f119725f061c40f938e31965a5272b6674c54fcc92da5d7b306beff03a"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_baby.png",
+      "size": 8122,
+      "sha256": "5b06abc8a3671ac5142a3913ec25cfe574c58e4b56082f21d20d60ec2d40e8f7"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_bait.png",
+      "size": 9908,
+      "sha256": "300e26a02f69364e97bd6943a62956b3a428b09224e00fcf9edb3de49320bbed"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_evo.png",
+      "size": 6359,
+      "sha256": "03e204216c42dbea4b5895b63c13cbc2450d9202b8fa9ab286d32ace47a01d1a"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_food.png",
+      "size": 6743,
+      "sha256": "f19711416224efc17c14f983ac4341cf9a7acc7e2362ef06400ecfa0641bb4cf"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_health.png",
+      "size": 8106,
+      "sha256": "46aeeda5fd035d82aa2600110e3d96d2b6e9b7beac4c2c88cecb9b2ac5c6e6c3"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_mood.png",
+      "size": 9342,
+      "sha256": "7ab46aab3111fad28733717ee211972aef48b110e74a3f4f440c95cc89eb6f9f"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/al/al_rest.png",
+      "size": 7563,
+      "sha256": "30f5cf4ffc0cffa6d10849f664da23220e29058b0f6b1fa1b5272effa923809d"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/dev/dev_baby.png",
+      "size": 7520,
+      "sha256": "41aeed1b1704450f395c4d97b0e01d05d33d2e1b282620718bb4f3fd352b6079"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/dev/dev_bait.png",
+      "size": 8289,
+      "sha256": "450d0eddb7c039684c838c8262fcb7e1ee5f6c3ee1298bb4e4dfeb9dfbcdb48c"
     },
     {
       "path": "raising_hell/graphics/ui/shop_items/dev/dev_evo.png",
@@ -2161,6 +3256,16 @@
       "sha256": "48d77b80343af8a678384b1f31b7cfd3ba2dc5be38506bcafdb643d91f0bf032"
     },
     {
+      "path": "raising_hell/graphics/ui/shop_items/eld/eld_baby.png",
+      "size": 5126,
+      "sha256": "0bd49a6a8ded97821b0d79d841a7f91540a73b954d7e934aeb5cbbe6b76687f2"
+    },
+    {
+      "path": "raising_hell/graphics/ui/shop_items/eld/eld_bait.png",
+      "size": 6720,
+      "sha256": "4bf4ed7bc33dac0624155157ad3a9415b2c043396c66f5f863317234ee8c732a"
+    },
+    {
       "path": "raising_hell/graphics/ui/shop_items/eld/eld_evo.png",
       "size": 6101,
       "sha256": "f7d6984f079eab2ccfd88d6e0fdadff3d40013f77d3c9dc09eb85c154f6f81e5"
@@ -2184,6 +3289,36 @@
       "path": "raising_hell/graphics/ui/shop_items/eld/eld_rest.png",
       "size": 7053,
       "sha256": "9eee43a1e2335617698c02bdfe96024daa243fb59be035c88bcee932f7c15739"
+    },
+    {
+      "path": "raising_hell/graphics/ui/thought_bubbles/thought_burger1.png",
+      "size": 5219,
+      "sha256": "3ba142da68ee8f5f3f45dea6817afcb4f57e1f61a1af3db54a66ebff088d6bd6"
+    },
+    {
+      "path": "raising_hell/graphics/ui/thought_bubbles/thought_burger2.png",
+      "size": 5229,
+      "sha256": "a6d04b710444eb1285d4bca1098c24863c914a0d40b3a711442de1fb2a6dda06"
+    },
+    {
+      "path": "raising_hell/graphics/ui/thought_bubbles/thought_health1.png",
+      "size": 4662,
+      "sha256": "041bb0e69f28bbeef6b54a59bb87ced66878ca5cf780f849bd23537adaf591ba"
+    },
+    {
+      "path": "raising_hell/graphics/ui/thought_bubbles/thought_health2.png",
+      "size": 4719,
+      "sha256": "23e9dd03722c86e450f63d080ae8213b6acf010ac8c3e0b5d6084e030ef05200"
+    },
+    {
+      "path": "raising_hell/graphics/ui/thought_bubbles/thought_rest1.png",
+      "size": 4977,
+      "sha256": "ec0446355bd38c4df654e77c463fe588a3adfbe4f5b9ad7f116d3dd57cf20f67"
+    },
+    {
+      "path": "raising_hell/graphics/ui/thought_bubbles/thought_rest2.png",
+      "size": 4997,
+      "sha256": "4d5a9b3f7dade55e246902581207d8f97337a6c6bed0a8c440f4083d2b49f08a"
     }
   ]
 }
