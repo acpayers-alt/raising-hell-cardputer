@@ -42,6 +42,10 @@ struct ItemDeltas
   int xp;
 };
 
+static constexpr int kSoulFoodHungerGain = 35;
+static constexpr int kSoulFoodHappinessGain = 10;
+static constexpr int kSoulFoodEnergyGain = 10;
+
 ItemDeltas inventoryPreviewDeltas(ItemType type);
 
 // ------------------------------------

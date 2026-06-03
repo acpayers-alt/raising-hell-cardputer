@@ -4,6 +4,7 @@
 #include "feed.h"
 #include "feed_menu_state.h"
 #include "input.h"
+#include "inventory.h"
 #include "pet.h"
 #include "sound.h"
 #include "ui_actions.h"
@@ -16,9 +17,7 @@ void feedPet(int mode)
   // Safety clamp
   mode = (mode <= 0) ? 0 : 1;
 
-  // Your UI uses 20 hunger per soul food in graphics.cpp for "needed" calc.
-  const int kHungerGain = 20;
-
+  const int kHungerGain = kSoulFoodHungerGain;
   if (mode == 0)
   {
     // Just a Snack

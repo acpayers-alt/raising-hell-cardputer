@@ -2,10 +2,10 @@
 
 #define RH_VERSION_MAJOR 3
 #define RH_VERSION_MINOR 0
-#define RH_VERSION_PATCH 0
+#define RH_VERSION_PATCH 1
 
 #define RH_VERSION_LABEL "alien"
-#define RH_VERSION_STRING "3.0.0-alien"
+#define RH_VERSION_STRING "3.0.1-alien"
 
 #ifndef PUBLIC_BUILD
 #define PUBLIC_BUILD 0

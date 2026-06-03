@@ -4,6 +4,7 @@
 
 #include "app_state.h"
 #include "graphics.h" // ui_showMessage
+#include "inventory.h"
 #include "pet.h"
 #include "save_manager.h"
 #include "ui_menu_state.h" // feedMenuIndex
@@ -15,9 +16,9 @@ bool consumeOneSoulFood()
   if (!g_app.inventory.hasItem(ITEM_SOUL_FOOD))
     return false;
 
-  pet.hunger = constrain(pet.hunger + 20, 0, 100);
-  pet.happiness = constrain(pet.happiness + 10, 0, 100);
-  pet.energy = constrain(pet.energy + 10, 0, 100);
+  pet.hunger = constrain(pet.hunger + kSoulFoodHungerGain, 0, 100);
+  pet.happiness = constrain(pet.happiness + kSoulFoodHappinessGain, 0, 100);
+  pet.energy = constrain(pet.energy + kSoulFoodEnergyGain, 0, 100);
 
   g_app.inventory.removeItem(ITEM_SOUL_FOOD, 1);
 
