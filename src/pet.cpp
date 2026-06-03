@@ -98,10 +98,10 @@ Pet::Pet()
 // ------------------------------------------------------------
 // Thresholds (0..100). Tweak freely.
 // Match STAT tab thresholds so animations/bio/status are consistent.
-static constexpr int MOOD_SICK_HEALTH_MAX = 60; // <60 = Sick (STAT tab uses 60)
-static constexpr int MOOD_TIRED_ENERGY_MAX = 30;
-static constexpr int MOOD_HUNGRY_HUNGER_MAX = 30;
-static constexpr int MOOD_MAD_HAPPY_MAX = 30;
+static constexpr int MOOD_SICK_HEALTH_MAX = 60; // <=60 = Sick
+static constexpr int MOOD_TIRED_ENERGY_MAX = 10;
+static constexpr int MOOD_HUNGRY_HUNGER_MAX = 10;
+static constexpr int MOOD_MAD_HAPPY_MAX = 10;
 
 // If not sick/tired/hungry/angry:
 static constexpr int MOOD_BORED_HAPPY_MAX = 59; // <60 = Bored
